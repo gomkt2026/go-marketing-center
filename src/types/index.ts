@@ -1,0 +1,339 @@
+// 對應 db/schema.sql 的 TypeScript 型別定義(V1 前端骨架用,未來直接替換為 API 回傳型別)
+
+export type UserRole = 'super_admin' | 'brand_manager' | 'brand_editor' | 'viewer';
+
+export interface User {
+  id: string;
+  displayName: string;
+  email: string;
+  role: UserRole;
+  avatarUrl?: string;
+}
+
+export type BrandVersionStatus = 'draft' | 'published' | 'archived';
+
+export interface Brand {
+  id: string;
+  slug: string;
+  name: string;
+  tagline: string;
+  primaryColor: string;
+  logoInitial: string;
+  currentVersionId: string;
+}
+
+export interface BrandVersion {
+  id: string;
+  brandId: string;
+  versionNumber: number;
+  status: BrandVersionStatus;
+  summaryOfChanges: string;
+  confidenceScore: number;
+  publishedBy?: string;
+  publishedAt?: string;
+}
+
+export type VerificationStatus = 'verified' | 'claimed' | 'pending';
+export type BrandRuleType = 'can_claim' | 'cannot_claim' | 'marketing_rule' | 'negative_rule';
+
+export interface BrandRule {
+  id: string;
+  brandId: string;
+  ruleType: BrandRuleType;
+  statement: string;
+  conditionNote?: string;
+  verification: VerificationStatus;
+  validUntil?: string;
+}
+
+export interface BrandAudience {
+  id: string;
+  brandId: string;
+  name: string;
+  painPoints: string[];
+  appealAngle: string;
+}
+
+export interface BrandPersona {
+  id: string;
+  brandId: string;
+  code: string;
+  name: string;
+  ageRange?: string;
+  profile?: string;
+  painPoints: string[];
+  appealAngle: string;
+}
+
+export type PublishingPlatform =
+  | 'instagram' | 'facebook' | 'threads' | 'line_oa'
+  | 'tiktok' | 'youtube' | 'linkedin' | 'x' | 'edm';
+
+export interface BrandChannel {
+  id: string;
+  brandId: string;
+  platform: PublishingPlatform;
+  toneOfVoice: string;
+  lengthGuideline: string;
+  formatGuideline: string;
+  hashtagCountMin: number;
+  hashtagCountMax: number;
+}
+
+export interface BrandKeyword {
+  id: string;
+  brandId: string;
+  category: 'hashtag' | 'cta' | 'key_message';
+  value: string;
+}
+
+export interface BrandVisual {
+  id: string;
+  brandId: string;
+  label: string;
+  value: string;
+  category: 'color' | 'layout' | 'typography';
+}
+
+export interface BrandHistory {
+  id: string;
+  brandId: string;
+  happenedOn: string;
+  title: string;
+  description: string;
+}
+
+export interface BrandExample {
+  id: string;
+  brandId: string;
+  category: 'content_pillar' | 'storytelling' | 'hot_topic_bank' | 'competitor';
+  title: string;
+  body: string;
+  weightPercent?: number;
+}
+
+export interface BrandDocument {
+  id: string;
+  brandId: string;
+  sourceType: string;
+  title: string;
+  fileUrl: string;
+}
+
+export type MarketSignalType =
+  | 'news' | 'policy' | 'current_event' | 'trending_topic'
+  | 'industry_trend' | 'social_content' | 'evergreen';
+export type MarketSignalStatus = 'new' | 'discussed' | 'used' | 'dismissed';
+
+export interface MarketSignal {
+  id: string;
+  brandId: string;
+  signalType: MarketSignalType;
+  title: string;
+  summary: string;
+  relevanceScore: number;
+  status: MarketSignalStatus;
+  discoveredByAgentId: string;
+  discoveredAt: string;
+}
+
+export type AgentRoleCode =
+  | 'brand_ai' | 'market_analyst' | 'content_strategist'
+  | 'risk_advisor' | 'devils_advocate' | 'moderator';
+
+export interface AIAgent {
+  id: string;
+  brandId: string | null;
+  roleCode: AgentRoleCode;
+  displayName: string;
+  avatarColor: string;
+}
+
+export interface Collaboration {
+  id: string;
+  title: string;
+  description: string;
+  status: 'active' | 'closed';
+  brandIds: string[];
+}
+
+export interface CollaborationBrief {
+  id: string;
+  collaborationId: string;
+  title: string;
+  contentMarkdown: string;
+  versionNumber: number;
+}
+
+export type MeetingStatus = 'scheduled' | 'in_progress' | 'concluded' | 'archived';
+
+export interface Meeting {
+  id: string;
+  brandId?: string;
+  collaborationId?: string;
+  title: string;
+  topic: string;
+  status: MeetingStatus;
+  participantAgentIds: string[];
+  participantUserIds: string[];
+  createdAt: string;
+}
+
+export interface MeetingMessage {
+  id: string;
+  meetingId: string;
+  senderType: 'user' | 'ai_agent';
+  senderAgentId?: string;
+  senderUserId?: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface MeetingSummary {
+  meetingId: string;
+  summaryMarkdown: string;
+  generatedByAgentId: string;
+}
+
+export type ProposalStatus = 'pending_decision' | 'approved' | 'rejected' | 'needs_revision' | 'withdrawn';
+
+export interface ProposalOption {
+  id: string;
+  proposalId: string;
+  label: string;
+  description: string;
+  pros: string[];
+  cons: string[];
+  riskLevel: 'low' | 'medium' | 'high';
+  estimatedCost?: number;
+  brandFitScore: number;
+  estimatedImpact: Record<string, string>;
+}
+
+export interface Proposal {
+  id: string;
+  brandId?: string;
+  collaborationId?: string;
+  meetingId?: string;
+  title: string;
+  status: ProposalStatus;
+  proposedByAgentId: string;
+  createdAt: string;
+  options: ProposalOption[];
+}
+
+export type DecisionAction = 'approve' | 'modify_approve' | 'reject' | 'return_for_discussion' | 'defer';
+
+export interface Decision {
+  id: string;
+  proposalId: string;
+  chosenOptionId?: string;
+  action: DecisionAction;
+  decidedBy: string;
+  note: string;
+  decidedAt: string;
+}
+
+export type CampaignStatus = 'planning' | 'active' | 'paused' | 'completed' | 'cancelled';
+
+export interface Campaign {
+  id: string;
+  primaryBrandId: string;
+  brandIds: string[];
+  collaborationId?: string;
+  decisionId?: string;
+  title: string;
+  objective?: string;
+  status: CampaignStatus;
+  startDate: string;
+  endDate: string;
+}
+
+export type ContentType = 'article' | 'image' | 'video_prompt' | 'video_script' | 'edm' | 'live_stream_plan';
+export type ContentStatus =
+  | 'draft' | 'pending_review' | 'approved' | 'needs_revision'
+  | 'rejected' | 'scheduled' | 'published' | 'archived';
+
+export interface ContentVersion {
+  id: string;
+  contentId: string;
+  versionNumber: number;
+  body: string;
+  hashtags: string[];
+  cta: string;
+  createdAt: string;
+}
+
+export interface ContentReviewAction {
+  id: string;
+  contentId: string;
+  contentVersionId: string;
+  reviewerId: string;
+  action: 'approve' | 'modify' | 'return' | 'regenerate' | 'postpone' | 'reject';
+  comment: string;
+  reviewedAt: string;
+}
+
+export interface Content {
+  id: string;
+  campaignId: string;
+  brandId: string;
+  brandVersionId: string;
+  contentType: ContentType;
+  targetPlatform: PublishingPlatform;
+  title: string;
+  status: ContentStatus;
+  generatedByAgentId: string;
+  versions: ContentVersion[];
+  reviews: ContentReviewAction[];
+}
+
+export type PublishingJobStatus = 'queued' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
+
+export interface PublishingJob {
+  id: string;
+  contentId: string;
+  contentVersionId: string;
+  platform: PublishingPlatform;
+  status: PublishingJobStatus;
+  scheduledAt?: string;
+  publishedAt?: string;
+  publishedBy?: string;
+}
+
+export interface PerformanceReport {
+  id: string;
+  publishingJobId: string;
+  impressions: number;
+  clicks: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  engagementRate: number;
+  capturedAt: string;
+}
+
+export type LearningRecordType = 'content_performance' | 'cta_effectiveness' | 'audience_engagement' | 'channel_insight' | 'other';
+
+export interface LearningRecord {
+  id: string;
+  brandId: string;
+  recordType: LearningRecordType;
+  insight: string;
+  relatedContentId?: string;
+  generatedByAgentId: string;
+  createdAt: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  brandId?: string;
+  collaborationId?: string;
+  actorType: 'user' | 'ai_agent';
+  actorUserId?: string;
+  actorAgentId?: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  createdAt: string;
+}

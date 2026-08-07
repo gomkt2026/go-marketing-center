@@ -1,0 +1,287 @@
+import { useMemo, useState, type ReactNode, type CSSProperties } from 'react';
+import { useParams, Navigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Card } from '@/components/ui/Card';
+import { Badge, type BadgeTone } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Tabs } from '@/components/ui/Tabs';
+import {
+  brandBySlug, versionByBrand, brandRules, brandAudiences, brandPersonas,
+  brandChannels, brandVisuals, brandKeywords, brandExamples, brandDocuments,
+} from '@/mocks';
+import type { BrandRule, VerificationStatus } from '@/types';
+
+const TABS = [
+  { id: 'core', label: '品牌核心' },
+  { id: 'audience', label: '受眾' },
+  { id: 'channel', label: '平台調性' },
+  { id: 'rules', label: '規則邊界' },
+  { id: 'visual', label: '視覺' },
+  { id: 'library', label: '素材庫' },
+  { id: 'raw', label: '原始檢視' },
+];
+
+const verificationTone: Record<VerificationStatus, BadgeTone> = {
+  verified: 'primary', claimed: 'accent', pending: 'default',
+};
+const verificationLabel: Record<VerificationStatus, string> = {
+  verified: '✅ 已驗證', claimed: '⚠️ 行銷宣稱', pending: '待驗證',
+};
+const ruleTypeLabel: Record<string, { label: string; tone: BadgeTone }> = {
+  can_claim: { label: '可宣稱', tone: 'primary' },
+  cannot_claim: { label: '不可宣稱', tone: 'danger' },
+  marketing_rule: { label: '行銷規則', tone: 'secondary' },
+  negative_rule: { label: '負面表列', tone: 'danger' },
+};
+
+export function BrandIntelligence() {
+  const { brand: slug } = useParams();
+  const brand = slug ? brandBySlug(slug) : undefined;
+  const [tab, setTab] = useState('core');
+  const [rules, setRules] = useState<BrandRule[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  useMemo(() => {
+    if (brand) setRules(brandRules.filter((r) => r.brandId === brand.id));
+  }, [brand?.id]);
+
+  if (!brand) return <Navigate to="/" replace />;
+  const version = versionByBrand(brand.id);
+  const audiences = brandAudiences.filter((a) => a.brandId === brand.id);
+  const personas = brandPersonas.filter((p) => p.brandId === brand.id);
+  const channels = brandChannels.filter((c) => c.brandId === brand.id);
+  const visuals = brandVisuals.filter((v) => v.brandId === brand.id);
+  const keywords = brandKeywords.filter((k) => k.brandId === brand.id);
+  const documents = brandDocuments.filter((d) => d.brandId === brand.id);
+  const pillars = brandExamples.filter((e) => e.brandId === brand.id && e.category === 'content_pillar');
+  const hotTopics = brandExamples.filter((e) => e.brandId === brand.id && e.category === 'hot_topic_bank');
+
+  function archiveRule(id: string) {
+    setRules((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title={`${brand.name} 品牌智慧`}
+        subtitle="結構化知識條目為唯一事實來源;Markdown 僅為發布時自動編譯的唯讀成品"
+        actions={
+          <>
+            <Badge tone="primary">版本 v{version?.versionNumber} 已發布</Badge>
+            <Button variant="ghost">歷史版本</Button>
+            <Button variant="secondary">建立草稿並編輯</Button>
+          </>
+        }
+      />
+
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '4px 16px 0' }}>
+          <Tabs tabs={TABS} active={tab} onChange={setTab} />
+        </div>
+        <div style={{ padding: 20 }}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+            >
+              {tab === 'core' && (
+                <div style={{ display: 'grid', gap: 14 }}>
+                  <Field label="一句話定位">{brand.tagline}</Field>
+                  <Field label="內容支柱(Content Pillars)">
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {pillars.map((p) => (
+                        <div key={p.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+                          <Badge tone="secondary">{p.weightPercent}%</Badge>
+                          <div>
+                            <strong style={{ fontSize: 13 }}>{p.title}</strong>
+                            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{p.body}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Field>
+                  {hotTopics.length > 0 && (
+                    <Field label="熱點主題庫">
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {hotTopics.map((h) => (
+                          <div key={h.id}>
+                            <strong style={{ fontSize: 13 }}>{h.title}</strong>
+                            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{h.body}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </Field>
+                  )}
+                  <Field label="關鍵訊息 / Hashtag / CTA">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {keywords.map((k) => (
+                        <Badge key={k.id} tone={k.category === 'hashtag' ? 'primary' : k.category === 'cta' ? 'accent' : 'default'}>
+                          {k.value}
+                        </Badge>
+                      ))}
+                    </div>
+                  </Field>
+                </div>
+              )}
+
+              {tab === 'audience' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                  {audiences.map((a) => (
+                    <div key={a.id} style={cardBoxStyle}>
+                      <strong style={{ fontSize: 14 }}>{a.name}</strong>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0' }}>痛點:{a.painPoints.join('、')}</div>
+                      <div style={{ fontSize: 12 }}>訴求角度:{a.appealAngle}</div>
+                    </div>
+                  ))}
+                  {personas.map((p) => (
+                    <div key={p.id} style={cardBoxStyle}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <Badge tone="secondary">{p.code}</Badge>
+                        <strong style={{ fontSize: 14 }}>{p.name}</strong>
+                      </div>
+                      {p.ageRange && <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 6 }}>年齡層:{p.ageRange}</div>}
+                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0' }}>痛點:{p.painPoints.join('、')}</div>
+                      <div style={{ fontSize: 12 }}>訴求角度:{p.appealAngle}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {tab === 'channel' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                  {channels.map((c) => (
+                    <div key={c.id} style={cardBoxStyle}>
+                      <Badge tone="primary">{c.platform}</Badge>
+                      <div style={{ fontSize: 12, margin: '8px 0 4px' }}><strong>語氣:</strong>{c.toneOfVoice}</div>
+                      <div style={{ fontSize: 12, marginBottom: 4 }}><strong>字數:</strong>{c.lengthGuideline}</div>
+                      <div style={{ fontSize: 12, marginBottom: 4 }}><strong>格式:</strong>{c.formatGuideline}</div>
+                      <div style={{ fontSize: 12 }}><strong>Hashtag 數量:</strong>{c.hashtagCountMin}–{c.hashtagCountMax}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {tab === 'rules' && (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {rules.map((r) => {
+                    const meta = ruleTypeLabel[r.ruleType];
+                    const isEditing = editingId === r.id;
+                    return (
+                      <motion.div key={r.id} layout style={cardBoxStyle}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                              <Badge tone={meta.tone}>{meta.label}</Badge>
+                              <Badge tone={verificationTone[r.verification]}>{verificationLabel[r.verification]}</Badge>
+                              {r.validUntil && <Badge tone="accent">失效日:{new Date(r.validUntil).toLocaleDateString('zh-TW')}</Badge>}
+                            </div>
+                            {isEditing ? (
+                              <textarea
+                                defaultValue={r.statement}
+                                style={{ width: '100%', minHeight: 60, borderRadius: 8, border: '1px solid var(--color-border)', padding: 8, fontSize: 13, fontFamily: 'inherit' }}
+                              />
+                            ) : (
+                              <div style={{ fontSize: 14 }}>{r.statement}</div>
+                            )}
+                            {r.conditionNote && <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>條件:{r.conditionNote}</div>}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <Button variant="ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setEditingId(isEditing ? null : r.id)}>
+                              {isEditing ? '完成' : '編輯'}
+                            </Button>
+                            <Button variant="danger" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => archiveRule(r.id)}>封存</Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                  <Button variant="secondary" style={{ justifySelf: 'start' }} onClick={() => {
+                    const newRule: BrandRule = {
+                      id: `rule-new-${Date.now()}`, brandId: brand.id, ruleType: 'marketing_rule',
+                      statement: '新規則(點擊編輯以填寫內容)', verification: 'pending',
+                    };
+                    setRules((prev) => [...prev, newRule]);
+                  }}
+                  >
+                    + 新增規則
+                  </Button>
+                </div>
+              )}
+
+              {tab === 'visual' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                  {visuals.map((v) => (
+                    <div key={v.id} style={cardBoxStyle}>
+                      {v.category === 'color' && (
+                        <div style={{ width: '100%', height: 40, borderRadius: 8, background: v.value, marginBottom: 8, border: '1px solid var(--color-border)' }} />
+                      )}
+                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{v.label}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{v.value}</div>
+                    </div>
+                  ))}
+                  {visuals.length === 0 && <p>尚無視覺規範資料</p>}
+                </div>
+              )}
+
+              {tab === 'library' && (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {documents.map((d) => (
+                    <div key={d.id} style={{ ...cardBoxStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{d.title}</div>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{d.fileUrl}</div>
+                      </div>
+                      <Badge tone="secondary">{d.sourceType}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {tab === 'raw' && (
+                <pre
+                  style={{
+                    background: 'var(--color-bg-soft)', borderRadius: 10, padding: 16, fontSize: 12.5,
+                    lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--color-text)', maxHeight: 480, overflowY: 'auto',
+                  }}
+                >
+{`# ${brand.name} 品牌知識庫(Brand Knowledge Base)
+
+> 版本: v${version?.versionNumber} | 狀態: published
+> 發布時間: ${version?.publishedAt ? new Date(version.publishedAt).toLocaleString('zh-TW') : '-'}
+> 本檔案由系統自動編譯,不可手動修改。如需修改請至上方分頁編輯結構化條目。
+
+## 1. 品牌總覽
+一句話定位: ${brand.tagline}
+
+## 3. 目標受眾
+${audiences.map((a) => `- ${a.name}:${a.appealAngle}`).join('\n')}
+
+## 7. 品牌規則
+${rules.map((r) => `- [${ruleTypeLabel[r.ruleType].label}] ${r.statement}`).join('\n')}
+`}
+                </pre>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
+      <div style={{ fontSize: 14 }}>{children}</div>
+    </div>
+  );
+}
+
+const cardBoxStyle: CSSProperties = {
+  border: '1px solid var(--color-border)', borderRadius: 10, padding: 14, background: 'var(--color-bg)',
+};

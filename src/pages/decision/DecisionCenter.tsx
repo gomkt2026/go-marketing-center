@@ -4,7 +4,10 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { proposals as initialProposals, brandById, collaborations, decisions, currentUser } from '@/mocks';
+import { useAuth } from '@/context/AuthContext';
+import { useBrand } from '@/context/BrandContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { Proposal, ProposalStatus } from '@/types';
 
 const statusTone: Record<ProposalStatus, BadgeTone> = {
@@ -17,24 +20,40 @@ const riskTone: Record<string, BadgeTone> = { low: 'primary', medium: 'accent', 
 const riskLabel: Record<string, string> = { low: '低', medium: '中', high: '高' };
 
 export function DecisionCenter() {
-  const [items, setItems] = useState<Proposal[]>(initialProposals);
+  const { user } = useAuth();
+  const { brandById } = useBrand();
+  const { data, loading, error, reload } = useAsyncData(() => api.proposals(), []);
+  const collaborationsQuery = useAsyncData(() => api.collaborations(), []);
   const [flash, setFlash] = useState<{ id: string; kind: 'approve' | 'reject' } | null>(null);
 
-  function act(proposalId: string, kind: 'approve' | 'reject' | 'return') {
+  if (loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+
+  const items = data.proposals;
+  const decisions = data.decisions;
+  const collaborations = collaborationsQuery.data?.collaborations ?? [];
+
+  async function act(proposalId: string, kind: 'approve' | 'reject' | 'return') {
     setFlash({ id: proposalId, kind: kind === 'reject' ? 'reject' : 'approve' });
-    setTimeout(() => {
-      setItems((prev) => prev.map((p) => {
-        if (p.id !== proposalId) return p;
-        if (kind === 'approve') return { ...p, status: 'approved' };
-        if (kind === 'reject') return { ...p, status: 'rejected' };
-        return { ...p, status: 'needs_revision' };
-      }));
-      setFlash(null);
-    }, 350);
+    try {
+      await api.decideProposal(proposalId, {
+        action: kind === 'return' ? 'return' : kind,
+        note: kind === 'approve' ? '管理者批准' : kind === 'reject' ? '管理者否決' : '退回討論',
+      });
+      await reload();
+    } finally {
+      setTimeout(() => setFlash(null), 350);
+    }
   }
 
   const pending = items.filter((p) => p.status === 'pending_decision');
   const resolved = items.filter((p) => p.status !== 'pending_decision');
+
+  function scopeLabel(p: Proposal): string {
+    if (p.brandId) return brandById(p.brandId)?.name ?? '';
+    if (p.collaborationId) return collaborations.find((c) => c.id === p.collaborationId)?.title ?? '合作案';
+    return '';
+  }
 
   return (
     <div>
@@ -69,14 +88,14 @@ export function DecisionCenter() {
           </div>
         </>
       )}
+
+      {user && (
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 20 }}>
+          目前操作身分:{user.displayName}({user.role}) · 所有決策將記錄於 activity_logs
+        </p>
+      )}
     </div>
   );
-}
-
-function scopeLabel(p: Proposal): string {
-  if (p.brandId) return brandById(p.brandId)?.name ?? '';
-  if (p.collaborationId) return collaborations.find((c) => c.id === p.collaborationId)?.title ?? '合作案';
-  return '';
 }
 
 function ProposalCard({
@@ -108,11 +127,6 @@ function ProposalCard({
                 <Badge tone={riskTone[opt.riskLevel]}>風險:{riskLabel[opt.riskLevel]}</Badge>
                 <Badge tone="secondary">符合度 {opt.brandFitScore}%</Badge>
               </div>
-              {Object.keys(opt.estimatedImpact).length > 0 && (
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
-                  預估成效:{Object.entries(opt.estimatedImpact).map(([k, v]) => `${k} ${v}`).join('・')}
-                </div>
-              )}
             </motion.div>
           ))}
         </div>
@@ -133,13 +147,9 @@ function ProposalCard({
 
         {proposal.status === 'pending_decision' && !flash && (
           <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
-            <Button variant="primary" onClick={() => onAct(proposal.id, 'approve')}>✓ 批准方案 A</Button>
-            <Button variant="ghost">✎ 修改後批准</Button>
-            <Button variant="secondary" onClick={() => onAct(proposal.id, 'return')}>↩ 退回討論</Button>
-            <Button variant="danger" onClick={() => onAct(proposal.id, 'reject')}>✗ 否決</Button>
-            <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--color-text-muted)', alignSelf: 'center' }}>
-              僅 {currentUser.displayName} 等管理者可操作
-            </div>
+            <Button variant="primary" onClick={() => void onAct(proposal.id, 'approve')}>✓ 批准方案 A</Button>
+            <Button variant="secondary" onClick={() => void onAct(proposal.id, 'return')}>↩ 退回討論</Button>
+            <Button variant="danger" onClick={() => void onAct(proposal.id, 'reject')}>✗ 否決</Button>
           </div>
         )}
       </Card>

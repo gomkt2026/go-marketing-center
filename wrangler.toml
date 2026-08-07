@@ -1,0 +1,7 @@
+name = "go-marketing-center"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
+
+[vars]
+# 本機開發預設;正式環境請在 Cloudflare Pages 後台設定
+ADMIN_USERNAME = "Admin"

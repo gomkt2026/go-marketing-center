@@ -2,47 +2,51 @@ import { useParams, Link, Navigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import {
-  brandBySlug, versionByBrand, campaignsByBrand, contentsByBrand,
-  learningByBrand, signalsByBrand, brandHistories,
-} from '@/mocks';
+import { useBrand } from '@/context/BrandContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 
 export function BrandWorkspace() {
   const { brand: slug } = useParams();
+  const { brandBySlug } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
-  if (!brand) return <Navigate to="/" replace />;
 
-  const version = versionByBrand(brand.id);
-  const campaigns = campaignsByBrand(brand.id);
-  const brandContents = contentsByBrand(brand.id);
-  const learning = learningByBrand(brand.id);
-  const signals = signalsByBrand(brand.id);
-  const histories = brandHistories.filter((h) => h.brandId === brand.id);
+  const brandQuery = useAsyncData(() => slug ? api.brand(slug) : Promise.reject(new Error('no slug')), [slug]);
+  const workspaceQuery = useAsyncData(() => slug ? api.brandWorkspace(slug) : Promise.reject(new Error('no slug')), [slug]);
+
+  if (!brand) return <Navigate to="/" replace />;
+  if (brandQuery.loading || workspaceQuery.loading) return <LoadingState />;
+  if (brandQuery.error || workspaceQuery.error || !workspaceQuery.data) {
+    return <ErrorState message={brandQuery.error ?? workspaceQuery.error ?? '載入失敗'} onRetry={() => { brandQuery.reload(); workspaceQuery.reload(); }} />;
+  }
+
+  const version = brandQuery.data?.version;
+  const { stats, histories } = workspaceQuery.data;
 
   return (
     <div>
       <PageHeader
         title={`${brand.name} 品牌工作區`}
         subtitle={brand.tagline}
-        actions={<Badge tone="primary">v{version?.versionNumber} 已發布</Badge>}
+        actions={<Badge tone="primary">v{version?.versionNumber ?? '-'} 已發布</Badge>}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
         <Card delay={0}>
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>進行中活動</div>
-          <div style={{ fontSize: 24, fontWeight: 800 }}>{campaigns.filter((c) => c.status === 'active').length}</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{stats.activeCampaigns}</div>
         </Card>
         <Card delay={0.03}>
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>待審閱內容</div>
-          <div style={{ fontSize: 24, fontWeight: 800 }}>{brandContents.filter((c) => c.status === 'pending_review').length}</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{stats.pendingContents}</div>
         </Card>
         <Card delay={0.06}>
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>市場情報</div>
-          <div style={{ fontSize: 24, fontWeight: 800 }}>{signals.length}</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{stats.marketSignals}</div>
         </Card>
         <Card delay={0.09}>
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>學習觀察</div>
-          <div style={{ fontSize: 24, fontWeight: 800 }}>{learning.length}</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{stats.learningRecords}</div>
         </Card>
       </div>
 

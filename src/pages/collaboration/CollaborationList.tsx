@@ -1,12 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { collaborations, collaborationBriefs, brandById, proposals } from '@/mocks';
+import { useBrand } from '@/context/BrandContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 
 export function CollaborationList() {
-  const [expanded, setExpanded] = useState<string | null>(collaborations[0]?.id ?? null);
+  const { brandById } = useBrand();
+  const { data, loading, error, reload } = useAsyncData(() => api.collaborations(), []);
+  const proposalsQuery = useAsyncData(() => api.proposals(), []);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    const list = data?.collaborations;
+    if (list?.length && expanded === null) {
+      setExpanded(list[0].id);
+    }
+  }, [data?.collaborations, expanded]);
+
+  if (loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+
+  const collaborations = data.collaborations;
+  const proposals = proposalsQuery.data?.proposals ?? [];
 
   return (
     <div>
@@ -18,7 +36,7 @@ export function CollaborationList() {
 
       <div style={{ display: 'grid', gap: 16 }}>
         {collaborations.map((c) => {
-          const brief = collaborationBriefs.find((b) => b.collaborationId === c.id);
+          const brief = c.latestBrief;
           const relatedProposals = proposals.filter((p) => p.collaborationId === c.id);
           const isOpen = expanded === c.id;
           return (

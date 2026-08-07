@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -6,7 +6,9 @@ import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Tabs } from '@/components/ui/Tabs';
-import { brandBySlug, contentsByBrand, latestVersion } from '@/mocks';
+import { useBrand } from '@/context/BrandContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { Content, ContentStatus } from '@/types';
 
 const statusTone: Record<ContentStatus, BadgeTone> = {
@@ -25,35 +27,53 @@ const QUEUE_TABS = [
   { id: 'rejected', label: '已退回' },
 ];
 
+function latestVersion(content: Content) {
+  return content.versions[content.versions.length - 1];
+}
+
 export function ContentCenter() {
   const { brand: slug } = useParams();
+  const { brandBySlug } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
   const [tab, setTab] = useState('pending_review');
   const [items, setItems] = useState<Content[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  useMemo(() => {
-    if (brand) {
-      const list = contentsByBrand(brand.id);
-      setItems(list);
-      setSelectedId(list.find((c) => c.status === 'pending_review')?.id ?? list[0]?.id ?? null);
+  const { data, loading, error, reload } = useAsyncData(
+    () => slug ? api.contents(slug) : Promise.reject(new Error('no slug')),
+    [slug],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (data?.contents) {
+      if (!cancelled) {
+        setItems(data.contents);
+        setSelectedId((prev) => {
+          if (prev && data.contents.some((c) => c.id === prev)) return prev;
+          return data.contents.find((c) => c.status === 'pending_review')?.id ?? data.contents[0]?.id ?? null;
+        });
+      }
     }
-  }, [brand?.id]);
+    return () => { cancelled = true; };
+  }, [data?.contents]);
 
   if (!brand) return <Navigate to="/" replace />;
+  if (loading) return <LoadingState />;
+  if (error) return <ErrorState message={error} onRetry={reload} />;
 
   const filtered = items.filter((c) => c.status === tab || (tab === 'approved' && c.status === 'published'));
   const selected = items.find((c) => c.id === selectedId) ?? filtered[0];
 
-  function review(action: 'approve' | 'modify' | 'return' | 'regenerate' | 'postpone' | 'reject') {
+  async function review(action: 'approve' | 'modify' | 'return' | 'regenerate' | 'postpone' | 'reject') {
     if (!selected) return;
-    const nextStatus: ContentStatus = action === 'approve' ? 'approved'
-      : action === 'reject' ? 'rejected'
-      : action === 'modify' || action === 'regenerate' ? 'needs_revision'
-      : 'draft';
-    setItems((prev) => prev.map((c) => (c.id === selected.id ? { ...c, status: nextStatus } : c)));
-    const remaining = filtered.filter((c) => c.id !== selected.id);
-    setSelectedId(remaining[0]?.id ?? null);
+    const version = latestVersion(selected);
+    await api.reviewContent(selected.id, {
+      action,
+      contentVersionId: version?.id,
+      comment: action === 'approve' ? '核准發布' : '',
+    });
+    reload();
   }
 
   return (
@@ -63,7 +83,7 @@ export function ContentCenter() {
       <Card style={{ padding: 0, marginBottom: 16 }}>
         <div style={{ padding: '4px 16px 0' }}>
           <Tabs
-            tabs={QUEUE_TABS.map((t) => ({ ...t, label: `${t.label} ${items.filter((c) => c.status === t.id).length}` }))}
+            tabs={QUEUE_TABS.map((t) => ({ ...t, label: `${t.label} ${items.filter((c) => c.status === t.id || (t.id === 'approved' && c.status === 'published')).length}` }))}
             active={tab}
             onChange={(id) => { setTab(id); setSelectedId(items.find((c) => c.status === id)?.id ?? null); }}
           />
@@ -82,14 +102,16 @@ export function ContentCenter() {
               }}
             >
               <div style={{ fontSize: 13, fontWeight: 600 }}>{c.title}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>{c.targetPlatform} · v{latestVersion(c).versionNumber}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                {c.targetPlatform} · v{latestVersion(c)?.versionNumber ?? '-'}
+              </div>
             </button>
           ))}
           {filtered.length === 0 && <p style={{ fontSize: 13 }}>此分類目前沒有內容</p>}
         </div>
 
         <AnimatePresence mode="wait">
-          {selected ? (
+          {selected && latestVersion(selected) ? (
             <motion.div
               key={selected.id}
               initial={{ opacity: 0, x: 30 }}
@@ -119,10 +141,6 @@ export function ContentCenter() {
                   <div style={{ fontSize: 12, color: 'var(--color-secondary)', marginTop: 10, fontWeight: 700 }}>{latestVersion(selected).cta}</div>
                 </div>
 
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14 }}>
-                  版本:第 {latestVersion(selected).versionNumber} 版 · 品牌版本 {selected.brandVersionId} · 規則檢查:✅ 通過事實邊界
-                </div>
-
                 {selected.reviews.length > 0 && (
                   <div style={{ marginBottom: 14, borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
                     <strong style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>審閱紀錄</strong>
@@ -133,12 +151,12 @@ export function ContentCenter() {
                 )}
 
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
-                  <Button variant="primary" onClick={() => review('approve')}>✓ 批准</Button>
-                  <Button variant="ghost" onClick={() => review('modify')}>✎ 修改</Button>
-                  <Button variant="secondary" onClick={() => review('return')}>↩ 退回</Button>
-                  <Button variant="secondary" onClick={() => review('regenerate')}>🔄 重新生成</Button>
-                  <Button variant="ghost" onClick={() => review('postpone')}>⏰ 延期</Button>
-                  <Button variant="danger" onClick={() => review('reject')}>✗ 否決</Button>
+                  <Button variant="primary" onClick={() => void review('approve')}>✓ 批准</Button>
+                  <Button variant="ghost" onClick={() => void review('modify')}>✎ 修改</Button>
+                  <Button variant="secondary" onClick={() => void review('return')}>↩ 退回</Button>
+                  <Button variant="secondary" onClick={() => void review('regenerate')}>🔄 重新生成</Button>
+                  <Button variant="ghost" onClick={() => void review('postpone')}>⏰ 延期</Button>
+                  <Button variant="danger" onClick={() => void review('reject')}>✗ 否決</Button>
                 </div>
               </Card>
             </motion.div>

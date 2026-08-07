@@ -3,7 +3,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { meetings, brandById, collaborations } from '@/mocks';
+import { useBrand } from '@/context/BrandContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { MeetingStatus } from '@/types';
 import { MeetingDetail } from './MeetingDetail';
 
@@ -16,6 +18,14 @@ const statusLabel: Record<MeetingStatus, string> = {
 
 export function MeetingList() {
   const { meetingId } = useParams();
+  const { brandById } = useBrand();
+  const { data, loading, error, reload } = useAsyncData(() => api.meetings(), []);
+  const collabQuery = useAsyncData(() => api.collaborations(), []);
+
+  if (loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+
+  const collaborations = collabQuery.data?.collaborations ?? [];
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20, alignItems: 'start' }}>
@@ -23,7 +33,7 @@ export function MeetingList() {
         <PageHeader title="AI 會議室" />
         <Button variant="primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}>+ 建立會議</Button>
         <div style={{ display: 'grid', gap: 10 }}>
-          {meetings.map((m) => {
+          {data.meetings.map((m) => {
             const scope = m.brandId ? brandById(m.brandId)?.name : collaborations.find((c) => c.id === m.collaborationId)?.title;
             const active = meetingId === m.id;
             return (

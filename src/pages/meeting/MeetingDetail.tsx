@@ -5,19 +5,31 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
-import {
-  meetings, messagesByMeeting, agentById, roleLabels, meetingSummaries, userName,
-  proposals,
-} from '@/mocks';
+import { useMeta } from '@/context/MetaContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
+import { ROLE_LABELS } from '@/lib/constants';
 
 export function MeetingDetail({ meetingId }: { meetingId: string }) {
-  const meeting = meetings.find((m) => m.id === meetingId);
+  const { agentById, userName } = useMeta();
   const [note, setNote] = useState('');
-  if (!meeting) return null;
+  const { data, loading, error, reload } = useAsyncData(() => api.meeting(meetingId), [meetingId]);
+  const proposalsQuery = useAsyncData(() => api.proposals(), []);
 
-  const messages = messagesByMeeting(meetingId);
-  const summary = meetingSummaries.find((s) => s.meetingId === meetingId);
-  const relatedProposal = proposals.find((p) => p.meetingId === meetingId);
+  if (loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+
+  const meeting = data.meeting;
+  const messages = data.messages;
+  const summary = data.summary;
+  const relatedProposal = proposalsQuery.data?.proposals.find((p) => p.meetingId === meetingId);
+
+  async function sendMessage() {
+    if (!note.trim()) return;
+    await api.postMeetingMessage(meetingId, note.trim());
+    setNote('');
+    reload();
+  }
 
   return (
     <div>
@@ -39,7 +51,7 @@ export function MeetingDetail({ meetingId }: { meetingId: string }) {
               <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-bg-soft)', borderRadius: 999, padding: '4px 10px 4px 4px' }}>
                 <Avatar label={agent.displayName} color={agent.avatarColor} size={22} />
                 <span style={{ fontSize: 12, fontWeight: 600 }}>{agent.displayName}</span>
-                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{roleLabels[agent.roleCode]}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{ROLE_LABELS[agent.roleCode]}</span>
               </div>
             );
           })}
@@ -70,7 +82,7 @@ export function MeetingDetail({ meetingId }: { meetingId: string }) {
                 <div style={{ maxWidth: '75%' }}>
                   <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 3, textAlign: isUser ? 'right' : 'left' }}>
                     {agent ? agent.displayName : userName(msg.senderUserId)}
-                    {agent && <span style={{ marginLeft: 6 }}>· {roleLabels[agent.roleCode]}</span>}
+                    {agent && <span style={{ marginLeft: 6 }}>· {ROLE_LABELS[agent.roleCode]}</span>}
                   </div>
                   <div
                     style={{
@@ -89,10 +101,11 @@ export function MeetingDetail({ meetingId }: { meetingId: string }) {
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="管理者插話…(V1 示意,尚未串接發送)"
+            placeholder="管理者插話…"
             style={{ flex: 1, border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}
+            onKeyDown={(e) => { if (e.key === 'Enter') void sendMessage(); }}
           />
-          <Button variant="secondary">送出</Button>
+          <Button variant="secondary" onClick={() => void sendMessage()}>送出</Button>
         </div>
       </Card>
 

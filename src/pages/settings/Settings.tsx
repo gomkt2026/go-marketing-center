@@ -4,7 +4,9 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { Tabs } from '@/components/ui/Tabs';
-import { aiAgents, roleLabels, brandById, users } from '@/mocks';
+import { useBrand } from '@/context/BrandContext';
+import { useMeta } from '@/context/MetaContext';
+import { ROLE_LABELS } from '@/lib/constants';
 
 const TABS = [
   { id: 'agents', label: 'AI Agents' },
@@ -25,6 +27,8 @@ const permissionMatrix: { action: string; ai: boolean; editor: boolean; manager:
 
 export function Settings() {
   const [tab, setTab] = useState('agents');
+  const { brandById } = useBrand();
+  const { agents, users } = useMeta();
 
   return (
     <div>
@@ -37,14 +41,14 @@ export function Settings() {
 
       {tab === 'agents' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-          {aiAgents.map((a) => {
+          {agents.map((a) => {
             const brand = a.brandId ? brandById(a.brandId) : undefined;
             return (
               <Card key={a.id} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 <Avatar label={a.displayName} color={a.avatarColor} size={40} />
                 <div style={{ flex: 1 }}>
                   <strong style={{ fontSize: 14 }}>{a.displayName}</strong>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{roleLabels[a.roleCode]}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{ROLE_LABELS[a.roleCode]}</div>
                 </div>
                 <Badge tone={brand ? 'secondary' : 'default'}>{brand ? brand.name : '跨品牌通用'}</Badge>
               </Card>

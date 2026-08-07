@@ -2,7 +2,10 @@ import { useParams, Navigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { brandBySlug, learningByBrand, contents, agentById } from '@/mocks';
+import { useBrand } from '@/context/BrandContext';
+import { useMeta } from '@/context/MetaContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 
 const typeLabel: Record<string, string> = {
   content_performance: '內容成效', cta_effectiveness: 'CTA 成效',
@@ -11,9 +14,20 @@ const typeLabel: Record<string, string> = {
 
 export function Learning() {
   const { brand: slug } = useParams();
+  const { brandBySlug } = useBrand();
+  const { agentById } = useMeta();
   const brand = slug ? brandBySlug(slug) : undefined;
+  const contentsQuery = useAsyncData(() => slug ? api.contents(slug) : Promise.reject(new Error('no slug')), [slug]);
+  const { data, loading, error, reload } = useAsyncData(
+    () => slug ? api.learning(slug) : Promise.reject(new Error('no slug')),
+    [slug],
+  );
+
   if (!brand) return <Navigate to="/" replace />;
-  const records = learningByBrand(brand.id);
+  if (loading || contentsQuery.loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+
+  const contents = contentsQuery.data?.contents ?? [];
 
   return (
     <div>
@@ -30,7 +44,7 @@ export function Learning() {
       </Card>
 
       <div style={{ display: 'grid', gap: 12 }}>
-        {records.map((r) => {
+        {data.records.map((r) => {
           const content = contents.find((c) => c.id === r.relatedContentId);
           const agent = agentById(r.generatedByAgentId);
           return (
@@ -38,14 +52,16 @@ export function Learning() {
               <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                 <Badge tone="secondary">{typeLabel[r.recordType]}</Badge>
               </div>
-              <p style={{ fontSize: 14, color: 'var(--color-text)' }}>{r.insight}</p>
+              <p style={{ fontSize: 14 }}>{r.insight}</p>
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
-                由 {agent?.displayName} 產出{content && ` · 依據內容:${content.title}`}
+                {agent?.displayName && `由 ${agent.displayName} 分析`}
+                {content && ` · 關聯內容:${content.title}`}
+                {' · '}{new Date(r.createdAt).toLocaleDateString('zh-TW')}
               </div>
             </Card>
           );
         })}
-        {records.length === 0 && <Card><p>尚無學習觀察紀錄</p></Card>}
+        {data.records.length === 0 && <Card><p>尚無學習紀錄</p></Card>}
       </div>
     </div>
   );

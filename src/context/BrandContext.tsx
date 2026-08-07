@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import { brands, brandBySlug } from '@/mocks';
+import { createContext, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
+import { api } from '@/lib/api';
 import type { Brand } from '@/types';
 
 interface BrandContextValue {
@@ -7,22 +7,40 @@ interface BrandContextValue {
   isAllBrands: boolean;
   setBrandBySlug: (slug: string | null) => void;
   brands: Brand[];
+  brandsLoading: boolean;
+  brandBySlug: (slug: string) => Brand | undefined;
+  brandById: (id: string) => Brand | undefined;
 }
 
 const BrandContext = createContext<BrandContextValue | undefined>(undefined);
 
 export function BrandProvider({ children }: { children: ReactNode }) {
   const [slug, setSlug] = useState<string | null>('homigo');
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+
+  useEffect(() => {
+    setBrandsLoading(true);
+    api.brands()
+      .then(({ brands: list }) => setBrands(list))
+      .catch(() => setBrands([]))
+      .finally(() => setBrandsLoading(false));
+  }, []);
 
   const value = useMemo<BrandContextValue>(() => {
-    const currentBrand = slug ? brandBySlug(slug) ?? null : null;
+    const brandBySlugFn = (s: string) => brands.find((b) => b.slug === s);
+    const brandByIdFn = (id: string) => brands.find((b) => b.id === id);
+    const currentBrand = slug ? brandBySlugFn(slug) ?? null : null;
     return {
       currentBrand,
       isAllBrands: slug === null,
       setBrandBySlug: setSlug,
       brands,
+      brandsLoading,
+      brandBySlug: brandBySlugFn,
+      brandById: brandByIdFn,
     };
-  }, [slug]);
+  }, [slug, brands, brandsLoading]);
 
   return <BrandContext.Provider value={value}>{children}</BrandContext.Provider>;
 }

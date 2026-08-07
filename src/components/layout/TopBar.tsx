@@ -1,8 +1,11 @@
 import { BrandSwitcher } from './BrandSwitcher';
-import { currentUser } from '@/mocks';
+import { useAuth } from '@/context/AuthContext';
 import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
 
 export function TopBar() {
+  const { user, logout } = useAuth();
+
   return (
     <header
       style={{
@@ -22,10 +25,20 @@ export function TopBar() {
         >
           🔔
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Avatar label={currentUser.displayName} color="var(--color-secondary)" size={32} />
-          <div style={{ fontSize: 13, fontWeight: 600 }}>{currentUser.displayName}</div>
-        </div>
+        {user && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Avatar label={user.displayName} color="var(--color-secondary)" size={32} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{user.displayName}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>上帝視角 · {user.role}</div>
+              </div>
+            </div>
+            <Button variant="ghost" onClick={() => void logout()} style={{ fontSize: 12, padding: '6px 10px' }}>
+              登出
+            </Button>
+          </div>
+        )}
       </div>
     </header>
   );

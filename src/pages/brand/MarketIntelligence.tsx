@@ -2,7 +2,10 @@ import { useParams, Navigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
-import { brandBySlug, signalsByBrand } from '@/mocks';
+import { Button } from '@/components/ui/Button';
+import { useBrand } from '@/context/BrandContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { MarketSignalStatus, MarketSignalType } from '@/types';
 
 const typeLabel: Record<MarketSignalType, string> = {
@@ -18,9 +21,23 @@ const statusLabel: Record<MarketSignalStatus, string> = {
 
 export function MarketIntelligence() {
   const { brand: slug } = useParams();
+  const { brandBySlug } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
+  const { data, loading, error, reload } = useAsyncData(
+    () => slug ? api.marketSignals(slug) : Promise.reject(new Error('no slug')),
+    [slug],
+  );
+
   if (!brand) return <Navigate to="/" replace />;
-  const signals = signalsByBrand(brand.id);
+  if (loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+
+  const signals = data.signals;
+
+  async function updateStatus(id: string, status: MarketSignalStatus) {
+    await api.updateMarketSignal(id, status);
+    reload();
+  }
 
   return (
     <div>
@@ -37,7 +54,7 @@ export function MarketIntelligence() {
                 <Badge tone={statusTone[s.status]}>{statusLabel[s.status]}</Badge>
               </div>
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                相關性 {(s.relevanceScore * 100).toFixed(0)}%
+                相關性 {(Number(s.relevanceScore) * 100).toFixed(0)}%
               </div>
             </div>
             <strong style={{ fontSize: 15 }}>{s.title}</strong>
@@ -45,6 +62,12 @@ export function MarketIntelligence() {
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
               由 Market Analyst 發現・{new Date(s.discoveredAt).toLocaleString('zh-TW')}
             </div>
+            {s.status === 'new' && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <Button variant="secondary" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => void updateStatus(s.id, 'discussed')}>標記討論中</Button>
+                <Button variant="ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => void updateStatus(s.id, 'dismissed')}>忽略</Button>
+              </div>
+            )}
           </Card>
         ))}
         {signals.length === 0 && (

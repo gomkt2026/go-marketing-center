@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode, type CSSProperties } from 'react';
+import { useEffect, useState, type ReactNode, type CSSProperties } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -6,11 +6,13 @@ import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Tabs } from '@/components/ui/Tabs';
-import {
-  brandBySlug, versionByBrand, brandRules, brandAudiences, brandPersonas,
-  brandChannels, brandVisuals, brandKeywords, brandExamples, brandDocuments,
-} from '@/mocks';
-import type { BrandRule, VerificationStatus } from '@/types';
+import { useBrand } from '@/context/BrandContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
+import type {
+  BrandRule, BrandAudience, BrandPersona, BrandChannel, BrandVisual,
+  BrandKeyword, BrandExample, BrandDocument, BrandVersion, VerificationStatus,
+} from '@/types';
 
 const TABS = [
   { id: 'core', label: '品牌核心' },
@@ -37,28 +39,57 @@ const ruleTypeLabel: Record<string, { label: string; tone: BadgeTone }> = {
 
 export function BrandIntelligence() {
   const { brand: slug } = useParams();
+  const { brandBySlug } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
   const [tab, setTab] = useState('core');
   const [rules, setRules] = useState<BrandRule[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  useMemo(() => {
-    if (brand) setRules(brandRules.filter((r) => r.brandId === brand.id));
-  }, [brand?.id]);
+  const brandQuery = useAsyncData(
+    () => slug ? api.brand(slug) : Promise.reject(new Error('no slug')),
+    [slug],
+  );
+  const intelQuery = useAsyncData(
+    () => slug ? api.brandIntelligence(slug) : Promise.reject(new Error('no slug')),
+    [slug],
+  );
+
+  useEffect(() => {
+    if (intelQuery.data?.rules) setRules(intelQuery.data.rules);
+  }, [intelQuery.data?.rules]);
 
   if (!brand) return <Navigate to="/" replace />;
-  const version = versionByBrand(brand.id);
-  const audiences = brandAudiences.filter((a) => a.brandId === brand.id);
-  const personas = brandPersonas.filter((p) => p.brandId === brand.id);
-  const channels = brandChannels.filter((c) => c.brandId === brand.id);
-  const visuals = brandVisuals.filter((v) => v.brandId === brand.id);
-  const keywords = brandKeywords.filter((k) => k.brandId === brand.id);
-  const documents = brandDocuments.filter((d) => d.brandId === brand.id);
-  const pillars = brandExamples.filter((e) => e.brandId === brand.id && e.category === 'content_pillar');
-  const hotTopics = brandExamples.filter((e) => e.brandId === brand.id && e.category === 'hot_topic_bank');
+  if (brandQuery.loading || intelQuery.loading) return <LoadingState />;
+  if (brandQuery.error || intelQuery.error) {
+    return <ErrorState message={brandQuery.error ?? intelQuery.error ?? '載入失敗'} onRetry={() => { brandQuery.reload(); intelQuery.reload(); }} />;
+  }
 
-  function archiveRule(id: string) {
+  const version = brandQuery.data?.version as BrandVersion | null | undefined;
+  const intel = intelQuery.data!;
+  const audiences = intel.audiences as BrandAudience[];
+  const personas = intel.personas as BrandPersona[];
+  const channels = intel.channels as BrandChannel[];
+  const visuals = intel.visuals as BrandVisual[];
+  const keywords = intel.keywords as BrandKeyword[];
+  const documents = intel.documents as BrandDocument[];
+  const pillars = (intel.examples as BrandExample[]).filter((e) => e.category === 'content_pillar');
+  const hotTopics = (intel.examples as BrandExample[]).filter((e) => e.category === 'hot_topic_bank');
+
+  async function archiveRule(id: string) {
+    await api.deleteBrandRule(id);
     setRules((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  async function addRule() {
+    if (!brand) return;
+    const { rule } = await api.createBrandRule({
+      brandId: brand.id,
+      ruleType: 'marketing_rule',
+      statement: '新規則(點擊編輯以填寫內容)',
+      verification: 'pending',
+    });
+    setRules((prev) => [...prev, rule]);
+    setEditingId(rule.id);
   }
 
   return (
@@ -68,7 +99,7 @@ export function BrandIntelligence() {
         subtitle="結構化知識條目為唯一事實來源;Markdown 僅為發布時自動編譯的唯讀成品"
         actions={
           <>
-            <Badge tone="primary">版本 v{version?.versionNumber} 已發布</Badge>
+            <Badge tone="primary">版本 v{version?.versionNumber ?? '-'} 已發布</Badge>
             <Button variant="ghost">歷史版本</Button>
             <Button variant="secondary">建立草稿並編輯</Button>
           </>
@@ -193,20 +224,13 @@ export function BrandIntelligence() {
                             <Button variant="ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setEditingId(isEditing ? null : r.id)}>
                               {isEditing ? '完成' : '編輯'}
                             </Button>
-                            <Button variant="danger" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => archiveRule(r.id)}>封存</Button>
+                            <Button variant="danger" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => void archiveRule(r.id)}>封存</Button>
                           </div>
                         </div>
                       </motion.div>
                     );
                   })}
-                  <Button variant="secondary" style={{ justifySelf: 'start' }} onClick={() => {
-                    const newRule: BrandRule = {
-                      id: `rule-new-${Date.now()}`, brandId: brand.id, ruleType: 'marketing_rule',
-                      statement: '新規則(點擊編輯以填寫內容)', verification: 'pending',
-                    };
-                    setRules((prev) => [...prev, newRule]);
-                  }}
-                  >
+                  <Button variant="secondary" style={{ justifySelf: 'start' }} onClick={() => void addRule()}>
                     + 新增規則
                   </Button>
                 </div>
@@ -250,7 +274,7 @@ export function BrandIntelligence() {
                 >
 {`# ${brand.name} 品牌知識庫(Brand Knowledge Base)
 
-> 版本: v${version?.versionNumber} | 狀態: published
+> 版本: v${version?.versionNumber ?? '-'} | 狀態: published
 > 發布時間: ${version?.publishedAt ? new Date(version.publishedAt).toLocaleString('zh-TW') : '-'}
 > 本檔案由系統自動編譯,不可手動修改。如需修改請至上方分頁編輯結構化條目。
 

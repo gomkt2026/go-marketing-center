@@ -1,15 +1,33 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import {
-  sortedActivity, actionLabels, brands, brandById, agentById, userName, collaborations,
-} from '@/mocks';
+import { useBrand } from '@/context/BrandContext';
+import { useMeta } from '@/context/MetaContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 
 export function Timeline() {
   const [filterBrand, setFilterBrand] = useState<string>('all');
-  const events = sortedActivity().filter((a) => filterBrand === 'all' || a.brandId === filterBrand);
+  const { brands, brandById } = useBrand();
+  const { agentById, userName, actionLabels, setActionLabels } = useMeta();
+  const { data, loading, error, reload } = useAsyncData(
+    () => api.activity(filterBrand === 'all' ? undefined : filterBrand),
+    [filterBrand],
+  );
+  const collabQuery = useAsyncData(() => api.collaborations(), []);
+
+  useEffect(() => {
+    if (data?.actionLabels) setActionLabels(data.actionLabels);
+  }, [data?.actionLabels, setActionLabels]);
+
+  if (loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+
+  const events = data.activity;
+  const labels = { ...data.actionLabels, ...actionLabels };
+  const collaborations = collabQuery.data?.collaborations ?? [];
 
   return (
     <div>
@@ -49,7 +67,7 @@ export function Timeline() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13.5 }}>
                     <span>{e.actorType === 'ai_agent' ? '🤖' : '👤'}</span>{' '}
-                    <strong>{actor}</strong> {actionLabels[e.action] ?? e.action}
+                    <strong>{actor}</strong> {labels[e.action] ?? e.action}
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                     {brand && <Badge tone="secondary">{brand.name}</Badge>}

@@ -18,3 +18,5 @@ Thumbs.db
 dist/
 .output/
 .wrangler/
+.dev.vars
+

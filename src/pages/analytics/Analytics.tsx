@@ -2,32 +2,24 @@ import { useParams, Navigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
-import { brandBySlug, contentsByBrand, jobByContent, performanceByJob } from '@/mocks';
+import { useBrand } from '@/context/BrandContext';
+import { api } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 
 export function Analytics() {
   const { brand: slug } = useParams();
+  const { brandBySlug } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
-  if (!brand) return <Navigate to="/" replace />;
-
-  const contents = contentsByBrand(brand.id);
-  const reports = contents
-    .map((c) => {
-      const job = jobByContent(c.id);
-      const perf = job ? performanceByJob(job.id) : undefined;
-      return perf ? { content: c, perf } : null;
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null);
-
-  const totals = reports.reduce(
-    (acc, r) => ({
-      impressions: acc.impressions + r.perf.impressions,
-      clicks: acc.clicks + r.perf.clicks,
-      comments: acc.comments + r.perf.comments,
-      shares: acc.shares + r.perf.shares,
-      saves: acc.saves + r.perf.saves,
-    }),
-    { impressions: 0, clicks: 0, comments: 0, shares: 0, saves: 0 },
+  const { data, loading, error, reload } = useAsyncData(
+    () => slug ? api.analytics(slug) : Promise.reject(new Error('no slug')),
+    [slug],
   );
+
+  if (!brand) return <Navigate to="/" replace />;
+  if (loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+
+  const { reports, totals } = data;
 
   return (
     <div>
@@ -46,11 +38,13 @@ export function Analytics() {
           <Card key={perf.id}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
               <strong style={{ fontSize: 14 }}>{content.title}</strong>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary-dark)' }}>互動率 {(perf.engagementRate * 100).toFixed(2)}%</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary-dark)' }}>
+                互動率 {(Number(perf.engagementRate) * 100).toFixed(2)}%
+              </span>
             </div>
             <div style={{ display: 'flex', gap: 20, fontSize: 12, color: 'var(--color-text-muted)' }}>
-              <span>曝光 {perf.impressions.toLocaleString()}</span>
-              <span>點擊 {perf.clicks.toLocaleString()}</span>
+              <span>曝光 {Number(perf.impressions).toLocaleString()}</span>
+              <span>點擊 {Number(perf.clicks).toLocaleString()}</span>
               <span>留言 {perf.comments}</span>
               <span>分享 {perf.shares}</span>
               <span>收藏 {perf.saves}</span>

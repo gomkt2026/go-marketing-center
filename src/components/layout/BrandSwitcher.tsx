@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBrand } from '@/context/BrandContext';
-import { versionByBrand } from '@/mocks';
+import { api } from '@/lib/api';
+import { useAsyncData } from '@/hooks/useAsyncData';
 
 const BRAND_SCOPED_PREFIXES = ['workspace', 'intelligence', 'market', 'campaigns', 'contents', 'publishing', 'analytics', 'learning'];
 
@@ -21,7 +22,11 @@ export function BrandSwitcher() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  const version = currentBrand ? versionByBrand(currentBrand.id) : undefined;
+  const versionQuery = useAsyncData(
+    () => currentBrand ? api.brand(currentBrand.slug).then((r) => r.version) : Promise.resolve(null),
+    [currentBrand?.slug],
+  );
+  const version = versionQuery.data;
 
   function handleSelect(slug: string | null) {
     setBrandBySlug(slug);

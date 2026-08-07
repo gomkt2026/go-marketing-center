@@ -1,0 +1,20 @@
+# 環境變數（含資料庫連線字串，不可上傳）
+.env
+.env.local
+.env.*.local
+
+# 依賴
+node_modules/
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# 建置輸出
+dist/
+.output/
+.wrangler/

@@ -20,6 +20,7 @@ const TYPE_TICK_MS = 45;
 const EMOTION_EMOJI: Record<string, string> = {
   happy: '😄', excited: '🤩', annoyed: '😒', angry: '😤',
   worried: '😟', laughing: '🤣', proud: '😎', neutral: '💬',
+  sad: '😢', confident: '💪', determined: '✊', surprised: '😲', moved: '🥹',
 };
 
 const FALLBACK_AVATAR: Record<string, string> = {
@@ -278,28 +279,32 @@ export function LiveMeetingRoom({ meeting, initialMessages, onReload }: {
               return (
                 <motion.div
                   key={a.id}
-                  animate={isSpeaking ? { y: [0, -10, 0] } : { y: 0 }}
+                  animate={isSpeaking ? { y: [0, -12, 0] } : { y: 0 }}
                   transition={isSpeaking ? { repeat: Infinity, duration: 0.7 } : {}}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                    opacity: !running || isSpeaking || currentIsUser ? 1 : 0.55,
-                    filter: isSpeaking ? 'none' : running ? 'saturate(0.8)' : 'none',
-                    transition: 'opacity 0.3s',
+                    opacity: !running || isSpeaking || currentIsUser ? 1 : 0.4,
+                    filter: isSpeaking ? 'none' : running ? 'saturate(0.6) brightness(0.85)' : 'none',
+                    transition: 'opacity 0.3s, filter 0.3s',
                   }}
                 >
                   <div style={{ position: 'relative' }}>
                     {p.avatarUrl ? (
                       <img src={p.avatarUrl} alt={p.nickname} style={{
-                        width: isSpeaking ? 96 : 80, height: isSpeaking ? 96 : 80,
+                        width: isSpeaking ? 132 : 72, height: isSpeaking ? 132 : 72,
                         borderRadius: '50%', objectFit: 'cover',
-                        border: isSpeaking ? '3px solid #FFD86B' : '3px solid rgba(255,255,255,0.85)',
-                        boxShadow: '0 4px 14px rgba(0,0,0,0.35)', transition: 'width 0.25s, height 0.25s, border 0.25s',
+                        border: isSpeaking ? '4px solid #FFD86B' : '3px solid rgba(255,255,255,0.85)',
+                        boxShadow: isSpeaking ? '0 0 24px rgba(255,216,107,0.75), 0 6px 18px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.35)',
+                        transition: 'width 0.25s, height 0.25s, border 0.25s, box-shadow 0.25s',
                       }} />
                     ) : (
                       <div style={{
-                        width: isSpeaking ? 96 : 80, height: isSpeaking ? 96 : 80, borderRadius: '50%',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38,
-                        background: 'rgba(255,255,255,0.9)', border: isSpeaking ? '3px solid #FFD86B' : '3px solid rgba(255,255,255,0.85)',
+                        width: isSpeaking ? 132 : 72, height: isSpeaking ? 132 : 72, borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isSpeaking ? 56 : 34,
+                        background: 'rgba(255,255,255,0.9)',
+                        border: isSpeaking ? '4px solid #FFD86B' : '3px solid rgba(255,255,255,0.85)',
+                        boxShadow: isSpeaking ? '0 0 24px rgba(255,216,107,0.75)' : 'none',
+                        transition: 'width 0.25s, height 0.25s, border 0.25s, box-shadow 0.25s',
                       }}>
                         {FALLBACK_AVATAR[p.characterTitle ?? ''] ?? '🙂'}
                       </div>
@@ -315,10 +320,12 @@ export function LiveMeetingRoom({ meeting, initialMessages, onReload }: {
                     )}
                   </div>
                   <span style={{
-                    fontSize: 12.5, fontWeight: 700, color: '#fff', background: 'rgba(0,0,0,0.55)',
-                    padding: '2px 10px', borderRadius: 999,
+                    fontSize: isSpeaking ? 14 : 12.5, fontWeight: 700,
+                    color: isSpeaking ? '#3a2d00' : '#fff',
+                    background: isSpeaking ? '#FFD86B' : 'rgba(0,0,0,0.55)',
+                    padding: '2px 10px', borderRadius: 999, transition: 'all 0.25s',
                   }}>
-                    {p.nickname ?? a.displayName}
+                    {isSpeaking ? '🗣 ' : ''}{p.nickname ?? a.displayName}
                   </span>
                 </motion.div>
               );

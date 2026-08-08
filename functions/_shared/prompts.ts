@@ -175,7 +175,7 @@ export function buildPostUserPrompt(params: {
     params.extraInstruction ?? '',
     '',
     '回傳 JSON 物件,格式:',
-    '{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話", "imagePrompt": "若為 instagram 必填:給圖片生成模型的英文描述,風格有趣吸睛,不含文字"}',
+    '{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話", "imagePrompt": "若為 instagram 必填:給圖片生成模型的英文描述。畫面要以「人」為主角(有表情、有動作、有生活感的真實場景,例如師傅擦汗大笑、店員幫客人摺衣服),溫暖手繪插畫或自然攝影感,避免冷冰冰的物件圖或科技感構圖,不含文字"}',
   ].filter(Boolean).join('\n');
 }
 

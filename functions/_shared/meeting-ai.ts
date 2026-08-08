@@ -73,8 +73,12 @@ function agentSystemPrompt(agent: MeetingAgent, meetingTitle: string, meetingTop
     '',
     '發言規則:',
     liveMode
-      ? '- 像在群聊直播裡講話:一次 50-100 字,口語、快節奏、有情緒(可以吐槽、虧對方、據理力爭),但最終都是為自己品牌著想'
+      ? '- 像在群聊直播裡講話:一次 50-100 字,口語、快節奏、有情緒(可以吐槽、虧對方、據理力爭,也可以難過、感動、突然很有信心),但最終都是為自己品牌著想'
       : '- 用台灣職場口語,像真人在會議裡講話,不要客套開場白',
+    liveMode
+      ? '- 講話要像「真人」:常用台灣人的發語詞和口頭語(欸、蛤?、哇賽、老實說、講真的、啊不然、對啦、唉唷、嗯…、就是說),' +
+        '偶爾句子講一半停頓(用「…」),會直接叫對方的名字回應(「小咪妳這樣講喔…」),不要每句都文法完整'
+      : '',
     liveMode
       ? '- 要推進討論:回應上一位講的話,然後丟出自己的具體主張(發文主題、切角、時段、平台形式)'
       : '- 一次發言 150 字以內,只講一兩個重點,要有具體主張(可以直接提議發文規則、時段、形式)',
@@ -143,7 +147,10 @@ export async function runAgentRound(
 // 直播模式:單次生成「下一位」小編的發言(含情緒標記)
 // ============================================================================
 
-export const MEETING_EMOTIONS = ['neutral', 'happy', 'excited', 'annoyed', 'angry', 'worried', 'laughing', 'proud'] as const;
+export const MEETING_EMOTIONS = [
+  'neutral', 'happy', 'excited', 'annoyed', 'angry', 'worried', 'laughing', 'proud',
+  'sad', 'confident', 'determined', 'surprised', 'moved',
+] as const;
 export type MeetingEmotion = typeof MEETING_EMOTIONS[number];
 
 export interface AdvanceResult {
@@ -187,7 +194,7 @@ async function buildMeetingMemory(env: Env, meetingId: string, brandId: string |
   return parts.join('\n\n');
 }
 
-/** 直播會議:讓下一位小編發言一則(輪替+偶爾插隊,回應前文與使用者插話) */
+/** 直播會議:讓下一位小編發言一則(加權隨機挑人、可搶話,回應前文與使用者插話) */
 export async function advanceMeetingOnce(env: Env, meetingId: string): Promise<AdvanceResult | null> {
   const sql = getSql(env);
   const meetingRows = await sql`SELECT title, topic, status FROM meetings WHERE id = ${meetingId}::uuid LIMIT 1`;
@@ -210,17 +217,29 @@ export async function advanceMeetingOnce(env: Env, meetingId: string): Promise<A
   `;
   const recent = (msgRows as { sender_type: string; sender_agent_id: string | null; content: string; agent_name: string | null; agent_nickname: string | null; user_name: string | null }[]).reverse();
 
+  // 發言者不照順序:加權隨機挑人(同一人不連續講兩次)
+  //   - 上一則對話點到名字的人,很可能跳出來回應(權重 x3)
+  //   - 衝動型小編(canInterrupt)本來就比較搶話(權重 x1.5)
   const lastAgentMsg = [...recent].reverse().find((m) => m.sender_type === 'ai_agent' && m.sender_agent_id);
-  const lastIdx = lastAgentMsg ? agents.findIndex((a) => a.id === lastAgentMsg.sender_agent_id) : -1;
-  let speaker = agents[(lastIdx + 1) % agents.length];
-
-  // 插隊:有 canInterrupt 特質的小編(阿豪)有 25% 機率打斷,搶走這一輪發言
-  let interrupted = false;
-  const interrupter = agents.find((a) => a.persona.canInterrupt && a.id !== speaker.id && a.id !== lastAgentMsg?.sender_agent_id);
-  if (interrupter && recent.length > 0 && Math.random() < 0.25) {
-    speaker = interrupter;
-    interrupted = true;
+  const lastMsg = recent[recent.length - 1];
+  const candidates = agents.filter((a) => a.id !== lastAgentMsg?.sender_agent_id || agents.length === 1);
+  const weighted = candidates.map((a) => {
+    let w = 1;
+    const nickname = a.persona.nickname ?? a.displayName;
+    if (lastMsg?.content.includes(nickname)) w *= 3;
+    if (a.persona.canInterrupt) w *= 1.5;
+    return { agent: a, w };
+  });
+  const totalW = weighted.reduce((s, x) => s + x.w, 0);
+  let roll = Math.random() * totalW;
+  let speaker = weighted[0].agent;
+  for (const x of weighted) {
+    roll -= x.w;
+    if (roll <= 0) { speaker = x.agent; break; }
   }
+
+  // 搶話:衝動型小編 30%、其他人 10% 機率會用打斷的口氣搶著講
+  const interrupted = recent.length > 0 && Math.random() < (speaker.persona.canInterrupt ? 0.3 : 0.1);
 
   const transcript = recent
     .map((m) => `${m.agent_nickname ?? m.agent_name ?? m.user_name ?? '管理者'}:${m.content}`)
@@ -242,7 +261,7 @@ export async function advanceMeetingOnce(env: Env, meetingId: string): Promise<A
           `目前會議對話:\n${transcript || '(會議剛開始,還沒有人講話,由你開場,直接切入主題)'}`,
           '',
           interrupted
-            ? '你聽到一半忍不住了,直接打斷上一位的話搶著發言(開頭就要有打斷的感覺,例如「等等等等,哩等一下!」),然後講你的主張。回傳 JSON:'
+            ? '你聽到一半忍不住了,直接打斷上一位的話搶著發言(開頭就要有打斷的感覺,用符合你個性的方式,例如「等等等等!」「欸不是啊…」「蛤?等一下啦」),然後講你的主張。回傳 JSON:'
             : '輪到你發言了。回傳 JSON:',
           `{"message":"你要講的話(50-100字,不要加名字前綴)","emotion":"${MEETING_EMOTIONS.join('|')} 中選一個最符合這則發言的情緒"}`,
         ].join('\n'),

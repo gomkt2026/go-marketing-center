@@ -152,6 +152,27 @@ export interface AIAgent {
   avatarColor: string;
 }
 
+/** 品牌小編人設(存於 ai_agents.persona JSONB) */
+export interface AgentPersona {
+  nickname?: string;
+  characterTitle?: string;
+  avatarUrl?: string | null;
+  temperament?: string;
+  catchphrase?: string;
+  focus?: string;
+}
+
+/** /api/agents 回傳的 Agent(含人設與品牌) */
+export interface AgentWithPersona {
+  id: string;
+  displayName: string;
+  roleCode: AgentRoleCode;
+  brandId: string | null;
+  brandSlug: string | null;
+  brandName: string | null;
+  persona: AgentPersona;
+}
+
 export interface Collaboration {
   id: string;
   title: string;
@@ -177,6 +198,8 @@ export interface Meeting {
   title: string;
   topic: string;
   status: MeetingStatus;
+  mode?: 'standard' | 'live_editors';
+  metadata?: { postPlan?: MeetingPostPlanItem[]; planExecuted?: boolean } & Record<string, unknown>;
   participantAgentIds: string[];
   participantUserIds: string[];
   createdAt: string;
@@ -189,7 +212,16 @@ export interface MeetingMessage {
   senderAgentId?: string;
   senderUserId?: string;
   content: string;
+  metadata?: { emotion?: string } & Record<string, unknown>;
   createdAt: string;
+}
+
+/** 會議結論的發文計畫項目 */
+export interface MeetingPostPlanItem {
+  brandSlug: string;
+  platform: 'facebook' | 'instagram' | 'threads';
+  topic: string;
+  angle: string;
 }
 
 export interface MeetingSummary {
@@ -314,12 +346,24 @@ export interface SocialAccount {
   externalId?: string | null;
   status: SocialAccountStatus;
   notes?: string | null;
+  autoPublish?: boolean;
   connectedAt?: string | null;
   hasToken?: boolean;
   tokenMasked?: string | null;
 }
 
 export type PublishingJobStatus = 'queued' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
+
+/** 發布管理頁:各平台待發布佇列項目 */
+export interface PublishingQueueItem {
+  id: string;
+  title: string;
+  status: ContentStatus;
+  targetPlatform: PublishingPlatform;
+  predictedEngagementScore?: number | null;
+  genSource?: string | null;
+  createdAt: string;
+}
 
 export interface PublishingJob {
   id: string;
@@ -330,6 +374,7 @@ export interface PublishingJob {
   scheduledAt?: string;
   publishedAt?: string;
   publishedBy?: string;
+  externalPostId?: string | null;
 }
 
 export interface PerformanceReport {

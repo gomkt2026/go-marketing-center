@@ -25,8 +25,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     action: 'meeting.concluded',
     entityType: 'meeting',
     entityId: meetingId,
-    afterState: { suggestedRules: conclusion.suggestedRules.length },
+    afterState: { suggestedRules: conclusion.suggestedRules.length, postPlan: conclusion.postPlan.length },
   });
 
-  return json({ summary: conclusion.summaryMarkdown, suggestedRules: conclusion.suggestedRules });
+  return json({ summary: conclusion.summaryMarkdown, suggestedRules: conclusion.suggestedRules, postPlan: conclusion.postPlan });
 };

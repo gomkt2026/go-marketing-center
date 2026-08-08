@@ -40,11 +40,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   let ok = false;
   let detail = '';
+  let fetchedId: string | null = null;
   try {
     const res = await fetch(testUrl);
     const data = await res.json().catch(() => ({})) as Record<string, unknown>;
     if (res.ok) {
       ok = true;
+      fetchedId = typeof data.id === 'string' ? data.id : null;
       detail = `連線成功:${JSON.stringify({ id: data.id, name: data.name ?? data.username })}`;
     } else {
       const err = (data as { error?: { message?: string } }).error;
@@ -57,7 +59,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const newStatus = ok ? 'connected' : 'error';
   await sql`
     UPDATE brand_social_accounts
-    SET status = ${newStatus}, connected_at = ${ok ? new Date().toISOString() : null}, notes = ${detail}
+    SET status = ${newStatus}, connected_at = ${ok ? new Date().toISOString() : null}, notes = ${detail},
+        external_id = COALESCE(external_id, ${fetchedId})
     WHERE id = ${account.id}::uuid
   `;
 

@@ -3,6 +3,15 @@ import { getSql } from './db';
 import { chatComplete, chatCompleteJson } from './openai';
 import { getBrandVoice, ANTI_AI_RULES } from './prompts';
 
+export interface AgentPersona {
+  nickname?: string;
+  characterTitle?: string;
+  avatarUrl?: string | null;
+  temperament?: string;
+  catchphrase?: string;
+  focus?: string;
+}
+
 export interface MeetingAgent {
   id: string;
   displayName: string;
@@ -10,6 +19,7 @@ export interface MeetingAgent {
   brandId: string | null;
   brandSlug: string | null;
   brandName: string | null;
+  persona: AgentPersona;
 }
 
 const ROLE_PERSONA: Record<string, string> = {
@@ -24,7 +34,7 @@ const ROLE_PERSONA: Record<string, string> = {
 export async function getMeetingAgents(env: Env, meetingId: string): Promise<MeetingAgent[]> {
   const sql = getSql(env);
   const rows = await sql`
-    SELECT a.id, a.display_name, a.brand_id, r.code AS role_code, b.slug AS brand_slug, b.name AS brand_name
+    SELECT a.id, a.display_name, a.brand_id, a.persona, r.code AS role_code, b.slug AS brand_slug, b.name AS brand_name
     FROM meeting_participants mp
     JOIN ai_agents a ON a.id = mp.agent_id
     JOIN agent_roles r ON r.id = a.role_id
@@ -39,24 +49,35 @@ export async function getMeetingAgents(env: Env, meetingId: string): Promise<Mee
     brandId: (r.brand_id as string | null),
     brandSlug: (r.brand_slug as string | null),
     brandName: (r.brand_name as string | null),
+    persona: ((r.persona ?? {}) as AgentPersona),
   }));
 }
 
-function agentSystemPrompt(agent: MeetingAgent, meetingTitle: string, meetingTopic: string | null): string {
+function agentSystemPrompt(agent: MeetingAgent, meetingTitle: string, meetingTopic: string | null, liveMode = false): string {
   const rolePersona = ROLE_PERSONA[agent.roleCode] ?? ROLE_PERSONA.brand_ai;
   const voice = agent.brandSlug ? getBrandVoice(agent.brandSlug) : null;
+  const p = agent.persona;
+  const displayName = p.nickname ?? agent.displayName;
   return [
-    `你是「${agent.displayName}」,正在參加內部行銷會議「${meetingTitle}」。`,
+    `你是「${displayName}」${p.characterTitle ? `(${p.characterTitle})` : ''},正在參加${liveMode ? '一場三品牌小編的直播式快閃會議' : `內部行銷會議`}「${meetingTitle}」。`,
     meetingTopic ? `會議主題:${meetingTopic}` : '',
     rolePersona,
     agent.brandName ? `你代表品牌:${agent.brandName}。` : '',
+    p.temperament ? `你的性格:${p.temperament}` : '',
+    p.catchphrase ? `你的口頭禪是「${p.catchphrase}」(偶爾自然地用,不要每句都講)。` : '',
+    p.focus ? `你在意的立場:${p.focus}` : '',
     voice ? voice.frontlinePersona : '',
     voice?.dailyConcerns ? `你的行業日常話題:${voice.dailyConcerns}` : '',
     '',
     '發言規則:',
-    '- 用台灣職場口語,像真人在會議裡講話,不要客套開場白',
-    '- 一次發言 150 字以內,只講一兩個重點,要有具體主張(可以直接提議發文規則、時段、形式)',
+    liveMode
+      ? '- 像在群聊直播裡講話:一次 50-100 字,口語、快節奏、有情緒(可以吐槽、虧對方、據理力爭),但最終都是為自己品牌著想'
+      : '- 用台灣職場口語,像真人在會議裡講話,不要客套開場白',
+    liveMode
+      ? '- 要推進討論:回應上一位講的話,然後丟出自己的具體主張(發文主題、切角、時段、平台形式)'
+      : '- 一次發言 150 字以內,只講一兩個重點,要有具體主張(可以直接提議發文規則、時段、形式)',
     '- 可以回應、質疑其他人的發言;意見相同就補充新角度,不要重複',
+    liveMode ? '- 若管理者(使用者)有插話,優先回應他的意見' : '',
     ANTI_AI_RULES,
   ].filter(Boolean).join('\n');
 }
@@ -116,6 +137,83 @@ export async function runAgentRound(
   return insertedIds;
 }
 
+// ============================================================================
+// 直播模式:單次生成「下一位」小編的發言(含情緒標記)
+// ============================================================================
+
+export const MEETING_EMOTIONS = ['neutral', 'happy', 'excited', 'annoyed', 'angry', 'worried', 'laughing', 'proud'] as const;
+export type MeetingEmotion = typeof MEETING_EMOTIONS[number];
+
+export interface AdvanceResult {
+  messageId: string;
+  content: string;
+  emotion: MeetingEmotion;
+  agent: MeetingAgent;
+}
+
+/** 直播會議:讓下一位小編發言一則(輪替,回應前文與使用者插話) */
+export async function advanceMeetingOnce(env: Env, meetingId: string): Promise<AdvanceResult | null> {
+  const sql = getSql(env);
+  const meetingRows = await sql`SELECT title, topic, status FROM meetings WHERE id = ${meetingId}::uuid LIMIT 1`;
+  if (!meetingRows.length) return null;
+  const meeting = meetingRows[0] as { title: string; topic: string | null; status: string };
+  if (meeting.status === 'concluded' || meeting.status === 'archived') return null;
+
+  const agents = await getMeetingAgents(env, meetingId);
+  if (!agents.length) return null;
+
+  // 最近對話 + 找出上一位發言的 Agent 以決定下一位(輪替)
+  const msgRows = await sql`
+    SELECT mm.sender_type, mm.sender_agent_id, mm.content, a.display_name AS agent_name,
+           a.persona->>'nickname' AS agent_nickname, u.display_name AS user_name
+    FROM meeting_messages mm
+    LEFT JOIN ai_agents a ON a.id = mm.sender_agent_id
+    LEFT JOIN users u ON u.id = mm.sender_user_id
+    WHERE mm.meeting_id = ${meetingId}::uuid
+    ORDER BY mm.created_at DESC LIMIT 30
+  `;
+  const recent = (msgRows as { sender_type: string; sender_agent_id: string | null; content: string; agent_name: string | null; agent_nickname: string | null; user_name: string | null }[]).reverse();
+
+  const lastAgentMsg = [...recent].reverse().find((m) => m.sender_type === 'ai_agent' && m.sender_agent_id);
+  const lastIdx = lastAgentMsg ? agents.findIndex((a) => a.id === lastAgentMsg.sender_agent_id) : -1;
+  const speaker = agents[(lastIdx + 1) % agents.length];
+
+  const transcript = recent
+    .map((m) => `${m.agent_nickname ?? m.agent_name ?? m.user_name ?? '管理者'}:${m.content}`)
+    .join('\n');
+
+  const reply = await chatCompleteJson<{ message: string; emotion: string }>(env, {
+    temperature: 0.95,
+    maxTokens: 300,
+    messages: [
+      { role: 'system', content: agentSystemPrompt(speaker, meeting.title, meeting.topic, true) },
+      {
+        role: 'user',
+        content: [
+          `目前會議對話:\n${transcript || '(會議剛開始,還沒有人講話,由你開場,直接切入主題)'}`,
+          '',
+          '輪到你發言了。回傳 JSON:',
+          `{"message":"你要講的話(50-100字,不要加名字前綴)","emotion":"${MEETING_EMOTIONS.join('|')} 中選一個最符合這則發言的情緒"}`,
+        ].join('\n'),
+      },
+    ],
+  });
+
+  const emotion = (MEETING_EMOTIONS as readonly string[]).includes(reply.emotion) ? reply.emotion as MeetingEmotion : 'neutral';
+  const inserted = await sql`
+    INSERT INTO meeting_messages (meeting_id, sender_type, sender_agent_id, content, metadata)
+    VALUES (${meetingId}::uuid, 'ai_agent', ${speaker.id}::uuid, ${reply.message.trim()}, ${JSON.stringify({ emotion })})
+    RETURNING id
+  `;
+
+  return {
+    messageId: (inserted[0] as { id: string }).id,
+    content: reply.message.trim(),
+    emotion,
+    agent: speaker,
+  };
+}
+
 export interface SuggestedRule {
   brandSlug: string;
   ruleType: 'marketing_rule' | 'can_claim' | 'cannot_claim' | 'negative_rule';
@@ -123,9 +221,17 @@ export interface SuggestedRule {
   conditionNote?: string;
 }
 
+export interface PostPlanItem {
+  brandSlug: string;
+  platform: 'facebook' | 'instagram' | 'threads';
+  topic: string;
+  angle: string;
+}
+
 export interface MeetingConclusion {
   summaryMarkdown: string;
   suggestedRules: SuggestedRule[];
+  postPlan: PostPlanItem[];
 }
 
 /** 總結會議並提出可採納的發文規則 */
@@ -163,18 +269,29 @@ export async function concludeMeeting(env: Env, meetingId: string): Promise<Meet
           transcript,
           '',
           `可用品牌 slug:${brandList}`,
-          '請整理:1) Markdown 會議摘要(共識、分歧、待辦) 2) 各品牌可直接採納的發文規則(具體可執行,例如發文時段、平台形式、禁忌)。',
-          '回傳 JSON:{"summaryMarkdown":"...","suggestedRules":[{"brandSlug":"homigo","ruleType":"marketing_rule","statement":"規則內容","conditionNote":"適用條件(可省略)"}]}',
+          '請整理:',
+          '1) Markdown 會議摘要(共識、分歧、待辦)',
+          '2) 各品牌可直接採納的發文規則(具體可執行,例如發文時段、平台形式、禁忌)',
+          '3) 發文計畫 postPlan:根據討論結論,列出接下來要生成的貼文(哪個品牌、哪個平台、什麼主題、什麼切角);只列討論中真正有共識的項目,最多 6 項',
+          '回傳 JSON:{"summaryMarkdown":"...","suggestedRules":[{"brandSlug":"homigo","ruleType":"marketing_rule","statement":"規則內容","conditionNote":"適用條件(可省略)"}],"postPlan":[{"brandSlug":"taskgo","platform":"facebook|instagram|threads","topic":"貼文主題","angle":"切入角度一句話"}]}',
         ].join('\n'),
       },
     ],
   });
 
+  const postPlan = (conclusion.postPlan ?? []).slice(0, 6);
+
   await sql`
     INSERT INTO meeting_summaries (meeting_id, summary_markdown)
     VALUES (${meetingId}::uuid, ${conclusion.summaryMarkdown})
   `;
-  await sql`UPDATE meetings SET status = 'concluded', updated_at = now() WHERE id = ${meetingId}::uuid`;
+  // postPlan 存入 meetings.metadata,供 execute-plan 端點讀取
+  await sql`
+    UPDATE meetings
+    SET status = 'concluded', updated_at = now(),
+        metadata = metadata || ${JSON.stringify({ postPlan, planExecuted: false })}::jsonb
+    WHERE id = ${meetingId}::uuid
+  `;
 
-  return conclusion;
+  return { ...conclusion, postPlan };
 }

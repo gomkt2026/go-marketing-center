@@ -79,7 +79,10 @@ export const api = {
     }),
 
   publishing: (slug: string) =>
-    request<{ jobs: (import('@/types').PublishingJob & { contentTitle?: string })[] }>(`/api/brands/${slug}/publishing`),
+    request<{
+      jobs: (import('@/types').PublishingJob & { contentTitle?: string; targetPlatform?: string })[];
+      queue: import('@/types').PublishingQueueItem[];
+    }>(`/api/brands/${slug}/publishing`),
 
   analytics: (slug: string) =>
     request<{
@@ -125,7 +128,7 @@ export const api = {
       body: JSON.stringify({ content }),
     }),
 
-  createMeeting: (body: { title: string; topic?: string; brandSlug?: string; crossBrand?: boolean; kickoff?: boolean }) =>
+  createMeeting: (body: { title: string; topic?: string; brandSlug?: string; crossBrand?: boolean; kickoff?: boolean; mode?: 'standard' | 'live_editors' }) =>
     request<{ meeting: import('@/types').Meeting; aiError?: string | null }>('/api/meetings', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -135,7 +138,34 @@ export const api = {
     request<{
       summary: string;
       suggestedRules: { brandSlug: string; ruleType: string; statement: string; conditionNote?: string }[];
+      postPlan: import('@/types').MeetingPostPlanItem[];
     }>(`/api/meetings/${id}/conclude`, { method: 'POST' }),
+
+  advanceMeeting: (id: string) =>
+    request<{
+      message: import('@/types').MeetingMessage | null;
+      agent: { id: string; displayName: string; nickname?: string; avatarUrl?: string | null } | null;
+      done?: boolean;
+    }>(`/api/meetings/${id}/advance`, { method: 'POST' }),
+
+  executeMeetingPlan: (id: string) =>
+    request<{
+      created: { brandSlug: string; platform: string; contentId: string; title: string }[];
+      failures: { brandSlug: string; platform: string; error: string }[];
+    }>(`/api/meetings/${id}/execute-plan`, { method: 'POST' }),
+
+  agents: () => request<{ agents: import('@/types').AgentWithPersona[] }>('/api/agents'),
+
+  updateAgentPersona: (id: string, body: {
+    nickname?: string; characterTitle?: string; temperament?: string; catchphrase?: string; focus?: string;
+  }) =>
+    request<{ agent: { id: string; displayName: string; persona: import('@/types').AgentPersona } }>(`/api/agents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  generateAgentAvatar: (id: string) =>
+    request<{ avatarUrl: string }>(`/api/agents/${id}/avatar`, { method: 'POST' }),
 
   collaborations: () =>
     request<{ collaborations: (import('@/types').Collaboration & { latestBrief?: import('@/types').CollaborationBrief | null })[] }>('/api/collaborations'),
@@ -175,7 +205,7 @@ export const api = {
 
   saveSocialAccount: (slug: string, body: {
     platform: string; accountName?: string; externalId?: string;
-    accessToken?: string; clearToken?: boolean; notes?: string;
+    accessToken?: string; clearToken?: boolean; notes?: string; autoPublish?: boolean;
   }) =>
     request<{ account: import('@/types').SocialAccount }>(`/api/brands/${slug}/social-accounts`, {
       method: 'PUT',

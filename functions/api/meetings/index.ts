@@ -43,8 +43,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     brandSlug?: string;
     crossBrand?: boolean;
     kickoff?: boolean;
+    mode?: 'standard' | 'live_editors';
   };
   if (!body.title?.trim()) return error('title is required', 400);
+  const mode = body.mode === 'live_editors' ? 'live_editors' : 'standard';
 
   const sql = getSql(context.env);
   const brandRows = await sql`SELECT id, slug FROM brands WHERE is_active = true ORDER BY name`;
@@ -56,8 +58,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!hostBrand) return error('找不到品牌', 404);
 
   const meetingRows = await sql`
-    INSERT INTO meetings (brand_id, title, topic, status, initiated_by_type, initiated_by_user_id)
-    VALUES (${hostBrand.id}::uuid, ${body.title.trim()}, ${body.topic ?? null}, 'in_progress', 'user', ${auth.id}::uuid)
+    INSERT INTO meetings (brand_id, title, topic, status, initiated_by_type, initiated_by_user_id, mode)
+    VALUES (${hostBrand.id}::uuid, ${body.title.trim()}, ${body.topic ?? null}, 'in_progress', 'user', ${auth.id}::uuid, ${mode})
     RETURNING *
   `;
   const meetingId = (meetingRows[0] as { id: string }).id;
@@ -68,7 +70,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     VALUES (${meetingId}::uuid, 'user', ${auth.id}::uuid)
   `;
 
-  const agentRows = body.crossBrand
+  // live_editors 模式:只邀三位品牌小編(brand_ai),不含分析師等其他角色
+  const agentRows = mode === 'live_editors'
+    ? await sql`
+        SELECT a.id FROM ai_agents a
+        JOIN agent_roles r ON r.id = a.role_id
+        WHERE a.is_active = true AND a.brand_id IS NOT NULL AND r.code = 'brand_ai'
+      `
+    : body.crossBrand
     ? await sql`
         SELECT a.id FROM ai_agents a
         JOIN agent_roles r ON r.id = a.role_id
@@ -98,9 +107,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     afterState: { title: body.title, crossBrand: !!body.crossBrand },
   });
 
-  // kickoff:讓每個 Agent 先各自表態一輪
+  // kickoff:讓每個 Agent 先各自表態一輪(live 模式不 kickoff,由前端 advance 逐則生成)
   let aiError: string | null = null;
-  if (body.kickoff !== false && context.env.OPENAI_API_KEY) {
+  if (mode !== 'live_editors' && body.kickoff !== false && context.env.OPENAI_API_KEY) {
     try {
       const { runAgentRound } = await import('../../_shared/meeting-ai');
       await runAgentRound(context.env, meetingId);

@@ -52,8 +52,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!body.content?.trim()) return error('content is required', 400);
 
   const sql = getSql(context.env);
-  const meetingRows = await sql`SELECT brand_id FROM meetings WHERE id = ${meetingId}::uuid LIMIT 1`;
+  const meetingRows = await sql`SELECT brand_id, mode FROM meetings WHERE id = ${meetingId}::uuid LIMIT 1`;
   if (!meetingRows.length) return error('Meeting not found', 404);
+  const meetingMode = (meetingRows[0] as { mode?: string }).mode ?? 'standard';
 
   const inserted = await sql`
     INSERT INTO meeting_messages (meeting_id, sender_type, sender_user_id, content)
@@ -71,9 +72,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   });
 
   // 管理者發言後,讓與會的 AI Agent 依序回覆一輪
+  // live_editors 模式不在這裡回覆:插話會被下一次 advance 的小編看到並回應
   let aiReplies = 0;
   let aiError: string | null = null;
-  if (context.env.OPENAI_API_KEY) {
+  if (meetingMode !== 'live_editors' && context.env.OPENAI_API_KEY) {
     try {
       const { runAgentRound } = await import('../../_shared/meeting-ai');
       const ids = await runAgentRound(context.env, meetingId);

@@ -75,7 +75,12 @@ export async function generatePlatformPost(
   return { post, prediction, imageUrl, imageError };
 }
 
-/** 將生成結果寫入 contents / content_versions / content_assets,回傳 contentId */
+export interface SavedContent {
+  contentId: string;
+  versionId: string;
+}
+
+/** 將生成結果寫入 contents / content_versions / content_assets */
 export async function saveGeneratedContent(
   env: Env,
   params: {
@@ -86,9 +91,9 @@ export async function saveGeneratedContent(
     campaignId?: string | null;
     generatedByAgentId?: string | null;
     promptMeta?: Record<string, unknown>;
-    status?: 'draft' | 'pending_review';
+    status?: 'draft' | 'pending_review' | 'published';
   },
-): Promise<string> {
+): Promise<SavedContent> {
   const sql = getSql(env);
   const { result, platform, brandCtx } = params;
 
@@ -126,7 +131,7 @@ export async function saveGeneratedContent(
     `;
   }
 
-  return contentId;
+  return { contentId, versionId };
 }
 
 /** 找出品牌的 brand_ai Agent(生成內容的掛名者) */

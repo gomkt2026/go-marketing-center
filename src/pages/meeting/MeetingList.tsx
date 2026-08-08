@@ -48,6 +48,28 @@ export function MeetingList() {
     }
   }
 
+  // 小編快閃會議:三位品牌小編 5 分鐘直播式討論
+  async function createLiveMeeting() {
+    if (creating) return;
+    const topic = window.prompt('這場快閃會議要聊什麼?(例如:下週三品牌的發文主題)');
+    if (!topic?.trim()) return;
+    setCreating(true);
+    try {
+      const now = new Date();
+      const res = await api.createMeeting({
+        title: `小編快閃會議 ${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+        topic: topic.trim(),
+        mode: 'live_editors',
+      });
+      await reload();
+      navigate(`/meetings/${res.meeting.id}`);
+    } catch (e) {
+      window.alert(`建立會議失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
+    } finally {
+      setCreating(false);
+    }
+  }
+
   if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
 
@@ -61,8 +83,11 @@ export function MeetingList() {
     <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20, alignItems: 'start' }}>
       <div>
         <PageHeader title="AI 會議室" />
-        <Button variant="primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }} disabled={creating} onClick={() => void createMeeting()}>
-          {creating ? '⏳ 建立中(AI 開場發言)...' : '+ 建立會議'}
+        <Button variant="primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }} disabled={creating} onClick={() => void createLiveMeeting()}>
+          {creating ? '⏳ 建立中...' : '⚡ 小編快閃會議(5 分鐘直播)'}
+        </Button>
+        <Button variant="secondary" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }} disabled={creating} onClick={() => void createMeeting()}>
+          + 建立一般會議
         </Button>
         <div style={{ display: 'grid', gap: 10 }}>
           {meetings.map((m) => {

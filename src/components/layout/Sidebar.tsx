@@ -26,6 +26,7 @@ const groups: MenuGroup[] = [
     title: '協作決策',
     items: [
       { label: 'AI 會議室', path: '/meetings' },
+      { label: '小編人設', path: '/personas' },
       { label: '決策中心', path: '/decisions' },
       { label: '品牌合作', path: '/collaborations' },
     ],

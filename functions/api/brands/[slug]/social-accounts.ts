@@ -61,6 +61,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     accessToken?: string;   // 提供則覆寫;undefined 表示不變
     clearToken?: boolean;   // true 則清除 token
     notes?: string;
+    autoPublish?: boolean;  // 排程生成後直接發布(目前支援 threads)
   };
   if (!body.platform || !SUPPORTED.includes(body.platform)) {
     return error(`platform 必須為 ${SUPPORTED.join(' / ')}`, 400);
@@ -83,17 +84,19 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
 
   // 有 token 即進入手動發布模式(connected 需通過連線測試)
   const status = tokenEnc ? 'manual' : (body.accountName?.trim() ? 'manual' : 'disconnected');
+  const autoPublish = (body.autoPublish ?? (existing.length ? (existing[0] as { auto_publish: boolean }).auto_publish : false)) && !!tokenEnc;
 
   const rows = await sql`
-    INSERT INTO brand_social_accounts (brand_id, platform, account_name, external_id, access_token_enc, status, notes, connected_at)
+    INSERT INTO brand_social_accounts (brand_id, platform, account_name, external_id, access_token_enc, status, notes, auto_publish, connected_at)
     VALUES (${brand.id}::uuid, ${body.platform}, ${body.accountName ?? null}, ${body.externalId ?? null},
-            ${tokenEnc}, ${status}, ${body.notes ?? null}, ${tokenEnc ? new Date().toISOString() : null})
+            ${tokenEnc}, ${status}, ${body.notes ?? null}, ${autoPublish}, ${tokenEnc ? new Date().toISOString() : null})
     ON CONFLICT (brand_id, platform) DO UPDATE SET
       account_name = EXCLUDED.account_name,
       external_id = EXCLUDED.external_id,
       access_token_enc = EXCLUDED.access_token_enc,
       status = EXCLUDED.status,
       notes = EXCLUDED.notes,
+      auto_publish = EXCLUDED.auto_publish,
       connected_at = EXCLUDED.connected_at
     RETURNING *
   `;

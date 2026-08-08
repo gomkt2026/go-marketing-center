@@ -4,6 +4,7 @@ import { getSql } from '../../../functions/_shared/db';
 import { chatCompleteJson } from '../../../functions/_shared/openai';
 import { buildBrandContext, getBrandVoice } from '../../../functions/_shared/prompts';
 import { generatePlatformPost, saveGeneratedContent, findBrandAgent } from '../../../functions/_shared/generate';
+import { getThreadsAccount, publishThreadsPost } from '../../../functions/_shared/threads';
 import { logActivity } from '../../../functions/_shared/activity';
 import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from './sources';
 
@@ -177,7 +178,7 @@ async function generateSignalDrafts(env: Env): Promise<void> {
         topic: signal.title,
         topicSummary: signal.summary ?? undefined,
       });
-      const contentId = await saveGeneratedContent(env, {
+      const { contentId } = await saveGeneratedContent(env, {
         brandCtx, platform, result,
         sourceMarketSignalId: signal.id,
         generatedByAgentId: agentId,
@@ -200,24 +201,34 @@ async function generateSignalDrafts(env: Env): Promise<void> {
 }
 
 // ============================================================================
-// 主流程 2:每小時 Threads 趨勢貼文草稿(累積聲量素材,人工審核後發布)
+// 主流程 2:Threads 每 30 分鐘熱門議題貼文
+//   - 每 tick 只處理最久沒發 Threads 的 2 個品牌(控制子請求數)
+//   - 品牌已連 Threads API 且開啟自動發布 → 直接發布;否則存草稿
 // ============================================================================
-async function generateThreadsDrafts(env: Env): Promise<void> {
+const THREADS_DAILY_CAP = 30; // 每品牌每日 Threads 貼文上限
+const THREADS_BRANDS_PER_TICK = 2;
+
+async function threadsRound(env: Env): Promise<void> {
   const sql = getSql(env);
   const trends = await fetchGoogleTrendsTW(8);
   if (!trends.length) return;
 
-  const brands = await sql`SELECT id, slug, name FROM brands WHERE is_active = true`;
-  for (const brand of brands as { id: string; slug: string; name: string }[]) {
-    try {
-      // 避免草稿爆量:該品牌今日 Threads 草稿超過 12 篇就跳過
-      const countRows = await sql`
-        SELECT count(*)::int AS n FROM contents
-        WHERE brand_id = ${brand.id}::uuid AND target_platform = 'threads'
-          AND status = 'draft' AND created_at > now() - interval '24 hours'
-      `;
-      if (((countRows[0] as { n: number }).n) >= 12) continue;
+  // 取最久沒產出 Threads 內容的品牌優先
+  const brands = await sql`
+    SELECT b.id, b.slug, b.name,
+           (SELECT max(c.created_at) FROM contents c
+            WHERE c.brand_id = b.id AND c.target_platform = 'threads') AS last_at,
+           (SELECT count(*)::int FROM contents c
+            WHERE c.brand_id = b.id AND c.target_platform = 'threads'
+              AND c.created_at > now() - interval '24 hours') AS today_count
+    FROM brands b WHERE b.is_active = true
+    ORDER BY last_at ASC NULLS FIRST
+    LIMIT ${THREADS_BRANDS_PER_TICK}
+  `;
 
+  for (const brand of brands as { id: string; slug: string; name: string; today_count: number }[]) {
+    if (brand.today_count >= THREADS_DAILY_CAP) continue;
+    try {
       const brandCtx = await buildBrandContext(env, brand.id);
       const agentId = await findBrandAgent(env, brand.id);
       const trendList = trends.map((t) => t.title).join('、');
@@ -228,16 +239,36 @@ async function generateThreadsDrafts(env: Env): Promise<void> {
         topic: `台灣現在的熱門話題:${trendList}`,
         extraInstruction:
           '從上面的熱門話題挑「一個」最能跟品牌日常自然掛勾的,寫一則 Threads 跟風文。' +
-          '如果全部都掛不上,就寫一則品牌日常observation廢文(第一線工作看到的趣事)。不要硬蹭。',
+          '如果全部都掛不上,就寫一則品牌日常 observation 文(第一線工作看到的趣事)。不要硬蹭。',
       });
-      const contentId = await saveGeneratedContent(env, {
+
+      const account = await getThreadsAccount(env, brand.id);
+      const willAutoPublish = !!account?.autoPublish;
+
+      const { contentId, versionId } = await saveGeneratedContent(env, {
         brandCtx,
         platform: 'threads',
         result,
         generatedByAgentId: agentId,
         status: 'draft',
-        promptMeta: { source: 'threads_hourly', trends: trends.map((t) => t.title) },
+        promptMeta: { source: 'threads_30min', trends: trends.map((t) => t.title) },
       });
+
+      if (willAutoPublish && account) {
+        try {
+          const published = await publishThreadsPost(account, { text: result.post.body });
+          await sql`
+            INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, published_at, external_post_id)
+            VALUES (${contentId}::uuid, ${versionId}::uuid, 'threads', 'published', now(),
+                    ${published.permalink ?? published.postId})
+          `;
+          await sql`UPDATE contents SET status = 'published', updated_at = now() WHERE id = ${contentId}::uuid`;
+          console.log(`[threads] ${brand.slug} 已自動發布:${published.permalink ?? published.postId}`);
+        } catch (pubErr) {
+          console.error(`[threads] ${brand.slug} 自動發布失敗,保留草稿`, pubErr);
+        }
+      }
+
       await logActivity(env, {
         brandId: brand.id,
         actorType: 'ai_agent',
@@ -245,12 +276,127 @@ async function generateThreadsDrafts(env: Env): Promise<void> {
         action: 'content.generated',
         entityType: 'content',
         entityId: contentId,
-        afterState: { platform: 'threads', auto: true, hourly: true },
+        afterState: { platform: 'threads', auto: true, autoPublished: willAutoPublish },
       });
     } catch (e) {
-      console.error(`[threads] 品牌 ${brand.slug} 草稿生成失敗`, e);
+      console.error(`[threads] 品牌 ${brand.slug} 生成失敗`, e);
     }
   }
+}
+
+// ============================================================================
+// 主流程 2b:FB/IG 每日主題圖文(每天每品牌 1-2 主題)
+//   台灣早上 07:00-09:59 的 */30 tick 觸發;每 tick 只處理一個品牌一個主題
+// ============================================================================
+const DAILY_THEME_TARGET = 2;
+
+/** 回傳 true 表示這個 tick 已經做了主題生成(呼叫端應跳過 Threads 輪) */
+async function generateDailyTheme(env: Env): Promise<boolean> {
+  const sql = getSql(env);
+  // 台灣今天已生成的主題數(以 daily_theme 內容的 themeKey 去重)
+  const brands = await sql`
+    SELECT b.id, b.slug, b.name,
+           (SELECT count(DISTINCT c.generation_prompt_meta->>'themeKey')::int FROM contents c
+            WHERE c.brand_id = b.id
+              AND c.generation_prompt_meta->>'source' = 'daily_theme'
+              AND c.created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours') AS theme_count
+    FROM brands b WHERE b.is_active = true
+    ORDER BY theme_count ASC
+    LIMIT 1
+  `;
+  if (!brands.length) return false;
+  const brand = brands[0] as { id: string; slug: string; name: string; theme_count: number };
+  if (brand.theme_count >= DAILY_THEME_TARGET) return false;
+
+  try {
+    // 近 48 小時高分情報 + 今日已用主題(避免重複)
+    const [signalRows, usedThemeRows] = await Promise.all([
+      sql`
+        SELECT title, summary, relevance_score FROM market_signals
+        WHERE brand_id = ${brand.id}::uuid AND discovered_at > now() - interval '48 hours'
+        ORDER BY relevance_score DESC LIMIT 6
+      `,
+      sql`
+        SELECT DISTINCT generation_prompt_meta->>'theme' AS theme FROM contents
+        WHERE brand_id = ${brand.id}::uuid
+          AND generation_prompt_meta->>'source' = 'daily_theme'
+          AND created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours'
+      `,
+    ]);
+
+    const voice = getBrandVoice(brand.slug);
+    const signalText = (signalRows as { title: string; summary: string | null }[])
+      .map((s, i) => `${i + 1}. ${s.title}${s.summary ? ` — ${s.summary}` : ''}`)
+      .join('\n');
+    const usedThemes = (usedThemeRows as { theme: string | null }[]).map((r) => r.theme).filter(Boolean);
+
+    const theme = await chatCompleteJson<{ theme: string; angle: string; summary: string }>(env, {
+      temperature: 0.6,
+      messages: [
+        { role: 'system', content: `你是品牌「${brand.name}」的內容企劃。${voice.frontlinePersona}` },
+        {
+          role: 'user',
+          content: [
+            '請從以下近期情報歸納出「一個」今天最值得做 FB+IG 圖文的主題。',
+            signalText || '(目前沒有新情報,請從行業日常議題自選一個)',
+            usedThemes.length ? `今天已做過的主題(不要重複):${usedThemes.join('、')}` : '',
+            `這個行業的日常話題:${voice.dailyConcerns}`,
+            '',
+            '回傳 JSON:{"theme":"主題標題","angle":"切入角度一句話","summary":"主題背景說明(100字內)"}',
+          ].filter(Boolean).join('\n'),
+        },
+      ],
+    });
+
+    const themeKey = `${new Date().toISOString().slice(0, 10)}-${brand.slug}-${brand.theme_count + 1}`;
+    const brandCtx = await buildBrandContext(env, brand.id);
+    const agentId = await findBrandAgent(env, brand.id);
+
+    for (const platform of ['facebook', 'instagram'] as const) {
+      try {
+        const result = await generatePlatformPost(env, {
+          brandCtx, platform,
+          topic: theme.theme,
+          topicSummary: theme.summary,
+          extraInstruction: `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。`,
+        });
+        const { contentId } = await saveGeneratedContent(env, {
+          brandCtx, platform, result,
+          generatedByAgentId: agentId,
+          status: 'pending_review',
+          promptMeta: { source: 'daily_theme', theme: theme.theme, themeKey },
+        });
+        await logActivity(env, {
+          brandId: brand.id,
+          actorType: 'ai_agent',
+          actorAgentId: agentId,
+          action: 'content.generated',
+          entityType: 'content',
+          entityId: contentId,
+          afterState: { platform, auto: true, dailyTheme: theme.theme },
+        });
+      } catch (e) {
+        console.error(`[themes] ${brand.slug}/${platform} 主題貼文生成失敗`, e);
+      }
+    }
+    console.log(`[themes] ${brand.slug} 今日主題 #${brand.theme_count + 1}:${theme.theme}`);
+    return true;
+  } catch (e) {
+    console.error(`[themes] 品牌 ${brand.slug} 主題生成失敗`, e);
+    return false;
+  }
+}
+
+// ============================================================================
+// */30 統一調度:台灣早上時窗優先補每日主題,其餘時間跑 Threads 輪
+// ============================================================================
+async function halfHourlyDispatch(env: Env): Promise<void> {
+  const twHour = (new Date().getUTCHours() + 8) % 24;
+  if (twHour >= 7 && twHour < 10) {
+    const didTheme = await generateDailyTheme(env);
+    if (didTheme) return; // 主題生成已耗掉大量子請求,這個 tick 不再跑 Threads
+  }
+  await threadsRound(env);
 }
 
 // ============================================================================
@@ -282,8 +428,8 @@ export default {
       case '45 * * * *':
         ctx.waitUntil(generateSignalDrafts(env));
         break;
-      case '5 * * * *':
-        ctx.waitUntil(generateThreadsDrafts(env));
+      case '*/30 * * * *':
+        ctx.waitUntil(halfHourlyDispatch(env));
         break;
       case '30 18 * * *':
         ctx.waitUntil(cleanupOldMedia(env));
@@ -293,7 +439,7 @@ export default {
     }
   },
 
-  // 手動觸發除錯用:GET /?task=collect|drafts|threads|cleanup(需帶 secret)
+  // 手動觸發除錯用:GET /?task=collect|drafts|threads|themes|cleanup(需帶 secret)
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const task = url.searchParams.get('task');
@@ -303,9 +449,10 @@ export default {
     }
     if (task === 'collect') await collectSignals(env);
     else if (task === 'drafts') await generateSignalDrafts(env);
-    else if (task === 'threads') await generateThreadsDrafts(env);
+    else if (task === 'threads') await threadsRound(env);
+    else if (task === 'themes') await generateDailyTheme(env);
     else if (task === 'cleanup') await cleanupOldMedia(env);
-    else return new Response('task 必須為 collect / drafts / threads / cleanup', { status: 400 });
+    else return new Response('task 必須為 collect / drafts / threads / themes / cleanup', { status: 400 });
     return new Response(JSON.stringify({ ok: true, task }), { headers: { 'Content-Type': 'application/json' } });
   },
 };

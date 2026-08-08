@@ -66,4 +66,6 @@ export const ACTION_LABELS: Record<string, string> = {
   'meeting.created': '建立會議',
   'meeting.concluded': '產生會議結論',
   'brand_rule.adopted': '採納會議結論為品牌規則',
+  'agent.persona_updated': '更新小編人設',
+  'meeting.plan_executed': '執行會議發文計畫',
 };

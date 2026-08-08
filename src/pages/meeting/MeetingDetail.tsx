@@ -10,6 +10,7 @@ import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import { ROLE_LABELS } from '@/lib/constants';
+import { LiveMeetingRoom } from './LiveMeetingRoom';
 
 interface SuggestedRule {
   brandSlug: string;
@@ -32,6 +33,11 @@ export function MeetingDetail({ meetingId }: { meetingId: string }) {
 
   if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+
+  // 小編快閃會議走直播式介面
+  if (data.meeting.mode === 'live_editors') {
+    return <LiveMeetingRoom key={meetingId} meeting={data.meeting} initialMessages={data.messages} onReload={reload} />;
+  }
 
   const meeting = data.meeting;
   const messages = data.messages;

@@ -45,7 +45,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         topicSummary: signal.summary ?? undefined,
         extraInstruction: body.instruction,
       });
-      const contentId = await saveGeneratedContent(context.env, {
+      const { contentId } = await saveGeneratedContent(context.env, {
         brandCtx,
         platform,
         result,

@@ -26,6 +26,7 @@ interface FormState {
   accountName: string;
   externalId: string;
   accessToken: string;
+  autoPublish: boolean;
 }
 
 export function SocialAccounts() {
@@ -33,7 +34,7 @@ export function SocialAccounts() {
   const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>({ accountName: '', externalId: '', accessToken: '' });
+  const [form, setForm] = useState<FormState>({ accountName: '', externalId: '', accessToken: '', autoPublish: false });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -54,6 +55,7 @@ export function SocialAccounts() {
       accountName: acc?.accountName ?? '',
       externalId: acc?.externalId ?? '',
       accessToken: '',
+      autoPublish: acc?.autoPublish ?? false,
     });
     setEditing(platform);
     setMessage(null);
@@ -69,6 +71,7 @@ export function SocialAccounts() {
         accountName: form.accountName || undefined,
         externalId: form.externalId || undefined,
         accessToken: form.accessToken || undefined,
+        autoPublish: form.autoPublish,
       });
       setEditing(null);
       setMessage('已儲存設定');
@@ -132,6 +135,7 @@ export function SocialAccounts() {
                       {acc.accountName && <div>帳號名稱:{acc.accountName}</div>}
                       {acc.externalId && <div>平台 ID:{acc.externalId}</div>}
                       {acc.hasToken && <div>Token:{acc.tokenMasked}</div>}
+                      {acc.autoPublish && <div>🚀 排程自動發布:已開啟</div>}
                       {acc.notes && <div style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>{acc.notes}</div>}
                     </div>
                   )}
@@ -175,6 +179,16 @@ export function SocialAccounts() {
                       placeholder="貼上 token 後會加密儲存"
                     />
                   </label>
+                  {p.id === 'threads' && (
+                    <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={form.autoPublish}
+                        onChange={(e) => setForm((f) => ({ ...f, autoPublish: e.target.checked }))}
+                      />
+                      排程自動發布(每 30 分鐘的 Threads 熱門議題貼文直接發布,不經人工審核;需已填入有效 token)
+                    </label>
+                  )}
                   <div style={{ display: 'flex', gap: 8 }}>
                     <Button variant="primary" disabled={busy} onClick={() => void save(p.id)}>{busy ? '儲存中...' : '儲存'}</Button>
                     <Button variant="ghost" onClick={() => setEditing(null)}>取消</Button>

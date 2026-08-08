@@ -22,7 +22,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         senderType: 'ai_agent',
         senderAgentId: result.agent.id,
         content: result.content,
-        metadata: { emotion: result.emotion },
+        metadata: { emotion: result.emotion, interrupted: result.interrupted },
         createdAt: new Date().toISOString(),
       },
       agent: {

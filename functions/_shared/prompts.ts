@@ -90,12 +90,13 @@ export interface BrandContext {
 
 export async function buildBrandContext(env: Env, brandId: string): Promise<BrandContext> {
   const sql = getSql(env);
-  const [brandRows, personaRows, ruleRows, channelRows, keywordRows] = await Promise.all([
+  const [brandRows, personaRows, ruleRows, channelRows, keywordRows, learningRows] = await Promise.all([
     sql`SELECT id, slug, name, tagline FROM brands WHERE id = ${brandId}::uuid LIMIT 1`,
     sql`SELECT name, age_range, profile, pain_points, appeal_angle FROM brand_personas WHERE brand_id = ${brandId}::uuid ORDER BY sort_order LIMIT 6`,
     sql`SELECT rule_type, statement, condition_note FROM brand_rules WHERE brand_id = ${brandId}::uuid ORDER BY sort_order LIMIT 30`,
     sql`SELECT platform, tone_of_voice, length_guideline, format_guideline, hashtag_count_min, hashtag_count_max FROM brand_channels WHERE brand_id = ${brandId}::uuid`,
     sql`SELECT category, value FROM brand_keywords WHERE brand_id = ${brandId}::uuid LIMIT 40`,
+    sql`SELECT insight FROM learning_records WHERE brand_id = ${brandId}::uuid ORDER BY created_at DESC LIMIT 8`,
   ]);
   if (!brandRows.length) throw new Error('Brand not found');
 
@@ -118,6 +119,10 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     .map((k) => `${k.category}:${k.value}`)
     .join('、');
 
+  const learnings = (learningRows as { insight: string }[])
+    .map((l) => `- ${l.insight}`)
+    .join('\n');
+
   const systemPrompt = [
     `品牌:${brand.name}${brand.tagline ? `(${brand.tagline})` : ''}`,
     '',
@@ -128,6 +133,7 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     rules ? `品牌規則(必須遵守,cannot_claim 與 negative_rule 絕對禁止觸犯):\n${rules}` : '',
     channels ? `各平台既有調性設定:\n${channels}` : '',
     keywords ? `品牌關鍵字/CTA 庫(自然使用,不要硬塞):${keywords}` : '',
+    learnings ? `過往經營累積的品牌心得(寫文時參考這些洞察):\n${learnings}` : '',
     '',
     ANTI_AI_RULES,
   ].filter(Boolean).join('\n');

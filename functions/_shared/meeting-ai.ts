@@ -10,6 +10,8 @@ export interface AgentPersona {
   temperament?: string;
   catchphrase?: string;
   focus?: string;
+  /** 有此特質的小編在直播中偶爾會插隊打斷別人(例如阿豪) */
+  canInterrupt?: boolean;
 }
 
 export interface MeetingAgent {
@@ -148,10 +150,44 @@ export interface AdvanceResult {
   messageId: string;
   content: string;
   emotion: MeetingEmotion;
+  interrupted: boolean;
   agent: MeetingAgent;
 }
 
-/** 直播會議:讓下一位小編發言一則(輪替,回應前文與使用者插話) */
+/** 過往會議記憶:近期結論摘要 + 該品牌的學習洞察,讓小編延續共識、越聊越懂品牌 */
+async function buildMeetingMemory(env: Env, meetingId: string, brandId: string | null): Promise<string> {
+  const sql = getSql(env);
+  const [summaryRows, learningRows] = await Promise.all([
+    sql`
+      SELECT m.title, ms.summary_markdown
+      FROM meeting_summaries ms
+      JOIN meetings m ON m.id = ms.meeting_id
+      WHERE ms.meeting_id != ${meetingId}::uuid
+      ORDER BY ms.created_at DESC LIMIT 3
+    `,
+    brandId ? sql`
+      SELECT insight FROM learning_records
+      WHERE brand_id = ${brandId}::uuid
+      ORDER BY created_at DESC LIMIT 6
+    ` : Promise.resolve([]),
+  ]);
+
+  const parts: string[] = [];
+  const summaries = summaryRows as { title: string; summary_markdown: string }[];
+  if (summaries.length) {
+    parts.push(
+      '你們過去開會討論過的結論(記得延續共識,不要重複討論已定案的事;若這次的討論跟過去結論衝突,可以指出來):\n' +
+      summaries.map((s) => `【${s.title}】${s.summary_markdown.slice(0, 300)}`).join('\n'),
+    );
+  }
+  const learnings = learningRows as { insight: string }[];
+  if (learnings.length) {
+    parts.push('你從過去經營中累積的品牌心得:\n' + learnings.map((l) => `- ${l.insight}`).join('\n'));
+  }
+  return parts.join('\n\n');
+}
+
+/** 直播會議:讓下一位小編發言一則(輪替+偶爾插隊,回應前文與使用者插話) */
 export async function advanceMeetingOnce(env: Env, meetingId: string): Promise<AdvanceResult | null> {
   const sql = getSql(env);
   const meetingRows = await sql`SELECT title, topic, status FROM meetings WHERE id = ${meetingId}::uuid LIMIT 1`;
@@ -176,23 +212,38 @@ export async function advanceMeetingOnce(env: Env, meetingId: string): Promise<A
 
   const lastAgentMsg = [...recent].reverse().find((m) => m.sender_type === 'ai_agent' && m.sender_agent_id);
   const lastIdx = lastAgentMsg ? agents.findIndex((a) => a.id === lastAgentMsg.sender_agent_id) : -1;
-  const speaker = agents[(lastIdx + 1) % agents.length];
+  let speaker = agents[(lastIdx + 1) % agents.length];
+
+  // 插隊:有 canInterrupt 特質的小編(阿豪)有 25% 機率打斷,搶走這一輪發言
+  let interrupted = false;
+  const interrupter = agents.find((a) => a.persona.canInterrupt && a.id !== speaker.id && a.id !== lastAgentMsg?.sender_agent_id);
+  if (interrupter && recent.length > 0 && Math.random() < 0.25) {
+    speaker = interrupter;
+    interrupted = true;
+  }
 
   const transcript = recent
     .map((m) => `${m.agent_nickname ?? m.agent_name ?? m.user_name ?? '管理者'}:${m.content}`)
     .join('\n');
 
+  const memory = await buildMeetingMemory(env, meetingId, speaker.brandId);
+
   const reply = await chatCompleteJson<{ message: string; emotion: string }>(env, {
     temperature: 0.95,
     maxTokens: 300,
     messages: [
-      { role: 'system', content: agentSystemPrompt(speaker, meeting.title, meeting.topic, true) },
+      {
+        role: 'system',
+        content: [agentSystemPrompt(speaker, meeting.title, meeting.topic, true), memory].filter(Boolean).join('\n\n'),
+      },
       {
         role: 'user',
         content: [
           `目前會議對話:\n${transcript || '(會議剛開始,還沒有人講話,由你開場,直接切入主題)'}`,
           '',
-          '輪到你發言了。回傳 JSON:',
+          interrupted
+            ? '你聽到一半忍不住了,直接打斷上一位的話搶著發言(開頭就要有打斷的感覺,例如「等等等等,哩等一下!」),然後講你的主張。回傳 JSON:'
+            : '輪到你發言了。回傳 JSON:',
           `{"message":"你要講的話(50-100字,不要加名字前綴)","emotion":"${MEETING_EMOTIONS.join('|')} 中選一個最符合這則發言的情緒"}`,
         ].join('\n'),
       },
@@ -202,7 +253,7 @@ export async function advanceMeetingOnce(env: Env, meetingId: string): Promise<A
   const emotion = (MEETING_EMOTIONS as readonly string[]).includes(reply.emotion) ? reply.emotion as MeetingEmotion : 'neutral';
   const inserted = await sql`
     INSERT INTO meeting_messages (meeting_id, sender_type, sender_agent_id, content, metadata)
-    VALUES (${meetingId}::uuid, 'ai_agent', ${speaker.id}::uuid, ${reply.message.trim()}, ${JSON.stringify({ emotion })})
+    VALUES (${meetingId}::uuid, 'ai_agent', ${speaker.id}::uuid, ${reply.message.trim()}, ${JSON.stringify({ emotion, interrupted })})
     RETURNING id
   `;
 
@@ -210,6 +261,7 @@ export async function advanceMeetingOnce(env: Env, meetingId: string): Promise<A
     messageId: (inserted[0] as { id: string }).id,
     content: reply.message.trim(),
     emotion,
+    interrupted,
     agent: speaker,
   };
 }
@@ -228,10 +280,16 @@ export interface PostPlanItem {
   angle: string;
 }
 
+export interface BrandLearning {
+  brandSlug: string;
+  insight: string;
+}
+
 export interface MeetingConclusion {
   summaryMarkdown: string;
   suggestedRules: SuggestedRule[];
   postPlan: PostPlanItem[];
+  learnings: BrandLearning[];
 }
 
 /** 總結會議並提出可採納的發文規則 */
@@ -254,7 +312,7 @@ export async function concludeMeeting(env: Env, meetingId: string): Promise<Meet
     .join('\n');
   if (!transcript) return null;
 
-  const brandRows = await sql`SELECT slug, name FROM brands WHERE is_active = true`;
+  const brandRows = await sql`SELECT id, slug, name FROM brands WHERE is_active = true`;
   const brandList = (brandRows as { slug: string; name: string }[]).map((b) => `${b.slug}(${b.name})`).join('、');
 
   const conclusion = await chatCompleteJson<MeetingConclusion>(env, {
@@ -273,7 +331,8 @@ export async function concludeMeeting(env: Env, meetingId: string): Promise<Meet
           '1) Markdown 會議摘要(共識、分歧、待辦)',
           '2) 各品牌可直接採納的發文規則(具體可執行,例如發文時段、平台形式、禁忌)',
           '3) 發文計畫 postPlan:根據討論結論,列出接下來要生成的貼文(哪個品牌、哪個平台、什麼主題、什麼切角);只列討論中真正有共識的項目,最多 4 項。每一項的 platform 只能填「一個」平台;若同主題要發多平台,就拆成多項。',
-          '回傳 JSON:{"summaryMarkdown":"...","suggestedRules":[{"brandSlug":"homigo","ruleType":"marketing_rule","statement":"規則內容","conditionNote":"適用條件(可省略)"}],"postPlan":[{"brandSlug":"taskgo","platform":"facebook 或 instagram 或 threads 擇一","topic":"貼文主題","angle":"切入角度一句話"}]}',
+          '4) 品牌學習 learnings:從這次討論中,每個有參與的品牌學到什麼(對品牌價值、受眾、內容方向的洞察),一品牌最多 2 條,要具體、日後可直接引用。',
+          '回傳 JSON:{"summaryMarkdown":"...","suggestedRules":[{"brandSlug":"homigo","ruleType":"marketing_rule","statement":"規則內容","conditionNote":"適用條件(可省略)"}],"postPlan":[{"brandSlug":"taskgo","platform":"facebook 或 instagram 或 threads 擇一","topic":"貼文主題","angle":"切入角度一句話"}],"learnings":[{"brandSlug":"washgo","insight":"洞察內容"}]}',
         ].join('\n'),
       },
     ],
@@ -304,5 +363,22 @@ export async function concludeMeeting(env: Env, meetingId: string): Promise<Meet
     WHERE id = ${meetingId}::uuid
   `;
 
-  return { ...conclusion, postPlan };
+  // 品牌學習寫入 learning_records:小編未來的會議與貼文生成都會引用這些洞察,越聊越懂品牌
+  const learnings = (conclusion.learnings ?? []).slice(0, 6);
+  const brandIdBySlug = new Map((brandRows as { id: string; slug: string }[]).map((b) => [b.slug, b.id]));
+  for (const l of learnings) {
+    const brandId = brandIdBySlug.get(l.brandSlug);
+    if (!brandId || !l.insight?.trim()) continue;
+    try {
+      await sql`
+        INSERT INTO learning_records (brand_id, record_type, insight, supporting_data)
+        VALUES (${brandId}::uuid, 'other', ${l.insight.trim()},
+                ${JSON.stringify({ source: 'meeting', meetingId, meetingTitle: meeting.title })})
+      `;
+    } catch (e) {
+      console.error('[meeting-ai] 寫入品牌學習失敗', e);
+    }
+  }
+
+  return { ...conclusion, postPlan, learnings };
 }

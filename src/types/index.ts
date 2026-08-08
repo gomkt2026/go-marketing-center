@@ -212,7 +212,7 @@ export interface MeetingMessage {
   senderAgentId?: string;
   senderUserId?: string;
   content: string;
-  metadata?: { emotion?: string } & Record<string, unknown>;
+  metadata?: { emotion?: string; interrupted?: boolean } & Record<string, unknown>;
   createdAt: string;
 }
 

@@ -139,6 +139,7 @@ export const api = {
       summary: string;
       suggestedRules: { brandSlug: string; ruleType: string; statement: string; conditionNote?: string }[];
       postPlan: import('@/types').MeetingPostPlanItem[];
+      learnings: { brandSlug: string; insight: string }[];
     }>(`/api/meetings/${id}/conclude`, { method: 'POST' }),
 
   advanceMeeting: (id: string) =>

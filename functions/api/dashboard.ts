@@ -27,15 +27,17 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     `,
   ]);
 
-  const activeByBrand = Object.fromEntries(
-    (campaignStats as { brand_id: string; active_count: number }[]).map((r) => [r.brand_id, r.active_count]),
-  );
-  const pendingByBrand = Object.fromEntries(
-    (pendingContents as { brand_id: string }[]).reduce<Record<string, number>>((acc, r) => {
-      acc[r.brand_id] = (acc[r.brand_id] ?? 0) + 1;
+  const activeByBrand = (campaignStats as { brand_id: string; active_count: number }[]).reduce<Record<string, number>>(
+    (acc, r) => {
+      acc[r.brand_id] = r.active_count;
       return acc;
-    }, {}),
+    },
+    {},
   );
+  const pendingByBrand = (pendingContents as { brand_id: string }[]).reduce<Record<string, number>>((acc, r) => {
+    acc[r.brand_id] = (acc[r.brand_id] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return json({
     brands,

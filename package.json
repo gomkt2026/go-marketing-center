@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "pages:dev": "wrangler pages dev dist --port 8788",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name=go-marketing-center --branch=main"
+    "deploy": "npm run build && wrangler pages deploy dist --project-name=go-marketing-center --branch=Ben"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -30,10 +30,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const brandCtx = await buildBrandContext(context.env, signal.brand_id);
   const agentId = await findBrandAgent(context.env, signal.brand_id);
 
+  // 三平台並行生成,並用 waitUntil 保護:即使使用者中途離開頁面(連線中斷),
+  // 生成工作仍會在背景完成寫入資料庫,稍後可在內容中心看到
+  const work = (async () => {
   const created: { contentId: string; platform: SocialPlatform; score: number; imageUrl: string | null; imageError: string | null }[] = [];
   const failures: { platform: SocialPlatform; error: string }[] = [];
 
-  // 三平台並行生成:串行約 60 秒以上,使用者容易在等待中離開頁面導致請求被中止
   const results = await Promise.all(platforms.map(async (platform) => {
     try {
       const result = await generatePlatformPost(context.env, {
@@ -75,6 +77,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (created.length) {
     await sql`UPDATE market_signals SET status = 'used' WHERE id = ${signalId}::uuid AND status IN ('new', 'discussed')`;
   }
+  return { created, failures };
+  })();
+
+  context.waitUntil(work.then(() => undefined, () => undefined));
+  const { created, failures } = await work;
+
   if (!created.length) {
     return error(`全部平台生成失敗:${failures.map((f) => `${f.platform}: ${f.error}`).join(';')}`, 502);
   }

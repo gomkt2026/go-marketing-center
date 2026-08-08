@@ -74,6 +74,8 @@ export async function generateImage(
       model: env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1',
       prompt: params.prompt,
       size: params.size ?? '1024x1024',
+      // medium 品質社群貼圖已足夠,生成時間比預設(auto=high)快一倍以上
+      quality: 'medium',
       n: 1,
     }),
   });

@@ -6,8 +6,6 @@ pages_build_output_dir = "dist"
 # 本機開發請在 .env 設定,正式環境請用 `wrangler pages secret put`
 
 # AI 生成圖片存放的 R2 bucket
-# TODO: 帳號在 Cloudflare Dashboard 啟用 R2 後,取消下面註解並執行:
-#   wrangler r2 bucket create go-marketing-media && npm run deploy
-# [[r2_buckets]]
-# binding = "MEDIA"
-# bucket_name = "go-marketing-media"
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "go-marketing-media"

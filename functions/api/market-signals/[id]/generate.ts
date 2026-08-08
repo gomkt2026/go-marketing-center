@@ -33,7 +33,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const created: { contentId: string; platform: SocialPlatform; score: number; imageUrl: string | null; imageError: string | null }[] = [];
   const failures: { platform: SocialPlatform; error: string }[] = [];
 
-  for (const platform of platforms) {
+  // 三平台並行生成:串行約 60 秒以上,使用者容易在等待中離開頁面導致請求被中止
+  const results = await Promise.all(platforms.map(async (platform) => {
     try {
       const result = await generatePlatformPost(context.env, {
         brandCtx,
@@ -50,8 +51,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         generatedByAgentId: agentId,
         promptMeta: { source: 'market_signal', signalId, instruction: body.instruction ?? null },
       });
-      created.push({ contentId, platform, score: result.prediction.score, imageUrl: result.imageUrl, imageError: result.imageError });
-
       await logActivity(context.env, {
         brandId: signal.brand_id,
         actorType: agentId ? 'ai_agent' : 'user',
@@ -62,9 +61,15 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         entityId: contentId,
         afterState: { platform, fromSignal: signalId },
       });
+      return { ok: true as const, item: { contentId, platform, score: result.prediction.score, imageUrl: result.imageUrl, imageError: result.imageError } };
     } catch (e) {
-      failures.push({ platform, error: e instanceof Error ? e.message : '生成失敗' });
+      return { ok: false as const, platform, error: e instanceof Error ? e.message : '生成失敗' };
     }
+  }));
+
+  for (const r of results) {
+    if (r.ok) created.push(r.item);
+    else failures.push({ platform: r.platform, error: r.error });
   }
 
   if (created.length) {

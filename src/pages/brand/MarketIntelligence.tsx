@@ -45,7 +45,7 @@ export function MarketIntelligence() {
 
   async function generatePosts(signalId: string) {
     setGeneratingId(signalId);
-    setGenMessage(null);
+    setGenMessage('⏳ AI 正在為 FB / IG / Threads 並行生成貼文與配圖(約 30 秒),請留在此頁等待完成…');
     try {
       const res = await api.generateFromSignal(signalId);
       const okCount = res.created.length;
@@ -106,7 +106,7 @@ export function MarketIntelligence() {
                   disabled={generatingId !== null}
                   onClick={() => void generatePosts(s.id)}
                 >
-                  {generatingId === s.id ? '⏳ AI 生成中(約 1 分鐘)...' : '✨ 生成三平台貼文'}
+                  {generatingId === s.id ? '⏳ AI 生成中(約 30 秒)...' : '✨ 生成三平台貼文'}
                 </Button>
                 {s.status === 'new' && (
                   <>

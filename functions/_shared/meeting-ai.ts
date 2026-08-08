@@ -272,14 +272,25 @@ export async function concludeMeeting(env: Env, meetingId: string): Promise<Meet
           '請整理:',
           '1) Markdown 會議摘要(共識、分歧、待辦)',
           '2) 各品牌可直接採納的發文規則(具體可執行,例如發文時段、平台形式、禁忌)',
-          '3) 發文計畫 postPlan:根據討論結論,列出接下來要生成的貼文(哪個品牌、哪個平台、什麼主題、什麼切角);只列討論中真正有共識的項目,最多 6 項',
-          '回傳 JSON:{"summaryMarkdown":"...","suggestedRules":[{"brandSlug":"homigo","ruleType":"marketing_rule","statement":"規則內容","conditionNote":"適用條件(可省略)"}],"postPlan":[{"brandSlug":"taskgo","platform":"facebook|instagram|threads","topic":"貼文主題","angle":"切入角度一句話"}]}',
+          '3) 發文計畫 postPlan:根據討論結論,列出接下來要生成的貼文(哪個品牌、哪個平台、什麼主題、什麼切角);只列討論中真正有共識的項目,最多 4 項。每一項的 platform 只能填「一個」平台;若同主題要發多平台,就拆成多項。',
+          '回傳 JSON:{"summaryMarkdown":"...","suggestedRules":[{"brandSlug":"homigo","ruleType":"marketing_rule","statement":"規則內容","conditionNote":"適用條件(可省略)"}],"postPlan":[{"brandSlug":"taskgo","platform":"facebook 或 instagram 或 threads 擇一","topic":"貼文主題","angle":"切入角度一句話"}]}',
         ].join('\n'),
       },
     ],
   });
 
-  const postPlan = (conclusion.postPlan ?? []).slice(0, 6);
+  // 容錯:AI 偶爾會把 platform 寫成 "facebook|instagram" 複合值,拆成多項
+  const VALID_PLATFORMS = ['facebook', 'instagram', 'threads'] as const;
+  const postPlan: PostPlanItem[] = [];
+  for (const item of conclusion.postPlan ?? []) {
+    const platforms = String(item.platform).split(/[|、,/\s]+/)
+      .filter((p): p is PostPlanItem['platform'] => (VALID_PLATFORMS as readonly string[]).includes(p));
+    for (const platform of platforms) {
+      // 上限 4 項:控制 execute-plan 單次請求的生成量(Workers 子請求上限)
+      if (postPlan.length >= 4) break;
+      postPlan.push({ ...item, platform });
+    }
+  }
 
   await sql`
     INSERT INTO meeting_summaries (meeting_id, summary_markdown)

@@ -19,7 +19,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!meetingRows.length) return error('會議不存在', 404);
   const meeting = meetingRows[0] as { id: string; title: string; brand_id: string | null; metadata: Record<string, unknown> };
 
-  const plan = ((meeting.metadata?.postPlan ?? []) as PostPlanItem[]).slice(0, 6);
+  const plan = ((meeting.metadata?.postPlan ?? []) as PostPlanItem[]).slice(0, 4);
   if (!plan.length) return error('這場會議沒有發文計畫,請先產生會議結論', 400);
   if (meeting.metadata?.planExecuted) return error('發文計畫已執行過', 400);
 

@@ -161,4 +161,121 @@ export const api = {
 
   deleteBrandRule: (id: string) =>
     request<{ ok: boolean }>(`/api/brand-rules/${id}`, { method: 'DELETE' }),
+
+  // -- 活動報名與報到(管理端,需登入) --------------------------------------
+  events: (slug: string) =>
+    request<{ events: import('@/types').EventRecord[] }>(`/api/brands/${slug}/events`),
+
+  createEvent: (slug: string, body: {
+    title: string; description?: string; location?: string; eventDate?: string;
+    price?: number; priceLabel?: string; lineAddFriendUrl?: string;
+  }) =>
+    request<{ event: import('@/types').EventRecord }>(`/api/brands/${slug}/events`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  eventDetail: (id: string) =>
+    request<{
+      event: import('@/types').EventRecord;
+      sessions: import('@/types').EventSession[];
+      referrers: import('@/types').EventReferrer[];
+    }>(`/api/events/${id}`),
+
+  updateEvent: (id: string, body: Partial<{
+    title: string; description: string; location: string; eventDate: string;
+    status: import('@/types').EventStatus; formFields: import('@/types').EventFormField[];
+    price: number; priceLabel: string; lineAddFriendUrl: string;
+    sessions: { id?: string; label: string; startsAt?: string; capacity?: number | null; sortOrder?: number }[];
+  }>) =>
+    request<{ event: import('@/types').EventRecord }>(`/api/events/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  eventReferrers: (eventId: string) =>
+    request<{ referrers: import('@/types').EventReferrer[] }>(`/api/events/${eventId}/referrers`),
+
+  createEventReferrer: (eventId: string, body: {
+    name: string; commissionType: import('@/types').EventReferrerCommissionType; commissionValue: number;
+  }) =>
+    request<{ referrer: import('@/types').EventReferrer }>(`/api/events/${eventId}/referrers`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateEventReferrer: (eventId: string, referrerId: string, body: Partial<{
+    name: string; commissionType: import('@/types').EventReferrerCommissionType;
+    commissionValue: number; isActive: boolean;
+  }>) =>
+    request<{ referrer: import('@/types').EventReferrer }>(`/api/events/${eventId}/referrers/${referrerId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteEventReferrer: (eventId: string, referrerId: string) =>
+    request<{ ok: boolean }>(`/api/events/${eventId}/referrers/${referrerId}`, { method: 'DELETE' }),
+
+  eventRegistrations: (eventId: string, search?: string) =>
+    request<{ registrations: import('@/types').EventRegistration[] }>(
+      `/api/events/${eventId}/registrations${search ? `?search=${encodeURIComponent(search)}` : ''}`,
+    ),
+
+  checkinRegistration: (eventId: string, registrationId: string, action: 'check_in' | 'undo') =>
+    request<{ registration: import('@/types').EventRegistration }>(
+      `/api/events/${eventId}/registrations/${registrationId}/checkin`,
+      { method: 'POST', body: JSON.stringify({ action }) },
+    ),
+
+  eventStats: (eventId: string) =>
+    request<import('@/types').EventStats>(`/api/events/${eventId}/stats`),
+
+  eventExportUrl: (eventId: string) => `/api/events/${eventId}/export`,
+};
+
+// -- 活動報名(公開端,無需登入) ----------------------------------------------
+export const publicApi = {
+  event: (slug: string) =>
+    request<{
+      event: Pick<import('@/types').EventRecord, 'id' | 'slug' | 'title' | 'description' | 'location' | 'eventDate' | 'status' | 'formFields' | 'priceLabel' | 'lineAddFriendUrl'>;
+      sessions: import('@/types').EventSession[];
+      referrers: import('@/types').EventReferrer[];
+    }>(`/api/public/events/${slug}`),
+
+  register: (slug: string, body: {
+    name: string; phone: string; email?: string; lineId?: string;
+    sessionId?: string; referrerId?: string; referrerName?: string;
+    customAnswers?: Record<string, unknown>;
+  }) =>
+    request<{ registration: import('@/types').EventRegistration }>(`/api/public/events/${slug}/register`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  lookupByPhone: (slug: string, phone: string) =>
+    request<{ registrations: import('@/types').EventRegistration[] }>(`/api/public/events/${slug}/lookup`, {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    }),
+
+  ticket: (qrToken: string) =>
+    request<{ ticket: import('@/types').EventRegistration & {
+      eventSlug: string; eventTitle: string; eventLocation?: string; eventDate?: string;
+      lineAddFriendUrl?: string; sessionLabel?: string;
+    } }>(`/api/public/tickets/${qrToken}`),
+};
+
+// -- 工作人員報到(無需登入,以 staffToken 授權) --------------------------------
+export const checkinApi = {
+  verify: (staffToken: string) =>
+    request<{ eventId: string; eventSlug: string; title: string; location?: string; eventDate?: string; status: string }>(
+      '/api/checkin/verify',
+      { method: 'POST', body: JSON.stringify({ staffToken }) },
+    ),
+
+  scan: (staffToken: string, qrToken: string) =>
+    request<{ ok: boolean; alreadyCheckedIn: boolean; registration: import('@/types').EventRegistration }>(
+      '/api/checkin/scan',
+      { method: 'POST', body: JSON.stringify({ staffToken, qrToken }) },
+    ),
 };

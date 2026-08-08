@@ -54,4 +54,12 @@ export const ACTION_LABELS: Record<string, string> = {
   'brand_rule.deleted': '刪除品牌規則',
   'meeting.message.created': '新增會議訊息',
   'campaign.created': '建立行銷活動',
+  'event.created': '建立活動',
+  'event.updated': '更新活動設定',
+  'event.registration.created': '活動報名',
+  'event.checked_in': '活動報到',
+  'event.checkin_undo': '取消報到',
+  'event.referrer.created': '新增推薦人',
+  'event.referrer.updated': '更新推薦人',
+  'event.referrer.deleted': '刪除推薦人',
 };

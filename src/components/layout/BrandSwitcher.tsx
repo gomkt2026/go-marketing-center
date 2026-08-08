@@ -5,7 +5,7 @@ import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData } from '@/hooks/useAsyncData';
 
-const BRAND_SCOPED_PREFIXES = ['workspace', 'intelligence', 'market', 'campaigns', 'contents', 'publishing', 'analytics', 'learning'];
+const BRAND_SCOPED_PREFIXES = ['workspace', 'intelligence', 'market', 'campaigns', 'events', 'contents', 'publishing', 'analytics', 'learning'];
 
 export function BrandSwitcher() {
   const { currentBrand, brands, setBrandBySlug, isAllBrands } = useBrand();

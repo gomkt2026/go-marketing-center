@@ -325,6 +325,104 @@ export interface LearningRecord {
   createdAt: string;
 }
 
+// ============================================================================
+// Events(活動報名與報到)
+// ============================================================================
+
+export type EventStatus = 'draft' | 'open' | 'closed' | 'completed';
+export type EventRegistrationStatus = 'registered' | 'cancelled';
+export type EventReferrerCommissionType = 'percentage' | 'fixed';
+export type EventFormFieldType = 'text' | 'number' | 'select' | 'textarea';
+
+export interface EventFormField {
+  key: string;
+  label: string;
+  type: EventFormFieldType;
+  required?: boolean;
+  options?: string[];
+}
+
+export interface EventRecord {
+  id: string;
+  brandId: string;
+  campaignId?: string | null;
+  slug: string;
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  eventDate?: string | null;
+  status: EventStatus;
+  staffToken: string;
+  formFields: EventFormField[];
+  price?: number | null;
+  priceLabel?: string | null;
+  lineAddFriendUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  registrationCount?: number;
+  checkedInCount?: number;
+}
+
+export interface EventSession {
+  id: string;
+  eventId: string;
+  label: string;
+  startsAt?: string | null;
+  capacity?: number | null;
+  sortOrder: number;
+  registeredCount?: number;
+  remaining?: number | null;
+}
+
+export interface EventReferrer {
+  id: string;
+  eventId: string;
+  name: string;
+  commissionType: EventReferrerCommissionType;
+  commissionValue: number;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  sessionId?: string | null;
+  sessionLabel?: string | null;
+  name: string;
+  phone: string;
+  email?: string | null;
+  lineId?: string | null;
+  referrerId?: string | null;
+  referrerName?: string | null;
+  referrerDisplayName?: string | null;
+  customAnswers: Record<string, unknown>;
+  qrToken: string;
+  status: EventRegistrationStatus;
+  source: 'web' | 'manual';
+  checkedInAt?: string | null;
+  createdAt: string;
+}
+
+export interface EventReferrerStat {
+  referrerId: string | null;
+  name: string;
+  commissionType: EventReferrerCommissionType | null;
+  commissionValue: number | null;
+  isActive: boolean | null;
+  registrationCount: number;
+  checkedInCount: number;
+  commissionAmount: number | null;
+}
+
+export interface EventStats {
+  totalRegistrations: number;
+  totalCheckedIn: number;
+  checkInRate: number;
+  sessions: { id: string; label: string; registeredCount: number; checkedInCount: number }[];
+  referrers: EventReferrerStat[];
+}
+
 export interface ActivityLog {
   id: string;
   brandId?: string;

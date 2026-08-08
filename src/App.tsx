@@ -20,6 +20,12 @@ import { Analytics } from '@/pages/analytics/Analytics';
 import { Learning } from '@/pages/learning/Learning';
 import { Timeline } from '@/pages/timeline/Timeline';
 import { Settings } from '@/pages/settings/Settings';
+import { EventList } from '@/pages/event/EventList';
+import { EventDetail } from '@/pages/event/EventDetail';
+import { EventRegister } from '@/pages/public/EventRegister';
+import { EventTicket } from '@/pages/public/EventTicket';
+import { CheckinEntry } from '@/pages/public/CheckinEntry';
+import { CheckinScan } from '@/pages/public/CheckinScan';
 
 export default function App() {
   return (
@@ -27,6 +33,13 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+
+          {/* 公開活動報名/報到頁面(無需登入) */}
+          <Route path="/e/:slug" element={<EventRegister />} />
+          <Route path="/e/:slug/ticket" element={<EventTicket />} />
+          <Route path="/checkin" element={<CheckinEntry />} />
+          <Route path="/checkin/:eventId" element={<CheckinScan />} />
+
           <Route
             path="/*"
             element={
@@ -44,6 +57,8 @@ export default function App() {
                         <Route path="/:brand/intelligence" element={<BrandIntelligence />} />
                         <Route path="/:brand/market" element={<MarketIntelligence />} />
                         <Route path="/:brand/campaigns" element={<Campaigns />} />
+                        <Route path="/:brand/events" element={<EventList />} />
+                        <Route path="/:brand/events/:id" element={<EventDetail />} />
                         <Route path="/:brand/contents" element={<ContentCenter />} />
                         <Route path="/:brand/publishing" element={<Publishing />} />
                         <Route path="/:brand/analytics" element={<Analytics />} />

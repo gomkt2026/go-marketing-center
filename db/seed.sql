@@ -15,6 +15,7 @@ BEGIN;
 TRUNCATE TABLE
   activity_logs, learning_records, performance_reports, publishing_logs,
   publishing_jobs, content_reviews, content_assets, content_versions, contents,
+  event_registrations, event_referrers, event_sessions, events,
   campaign_brands, campaigns, decisions, proposal_options, proposals,
   meeting_summaries, meeting_messages, meeting_participants, meetings,
   collaboration_briefs, collaboration_brands, collaborations,
@@ -105,6 +106,15 @@ DECLARE
   p_collab_1     UUID := gen_random_uuid();
   po_collab_a UUID := gen_random_uuid();
   d_collab_1     UUID := gen_random_uuid();
+
+  -- 活動報名與報到:Washgo × 洗楽 小小洗衣師職人體驗營
+  ev_senraku     UUID := gen_random_uuid();
+  sess_am        UUID := gen_random_uuid();
+  sess_pm        UUID := gen_random_uuid();
+  ref_senraku    UUID := gen_random_uuid();
+  ref_partner    UUID := gen_random_uuid();
+  reg_demo_1     UUID := gen_random_uuid();
+  reg_demo_2     UUID := gen_random_uuid();
 
 BEGIN
 
@@ -436,6 +446,52 @@ BEGIN
 
   INSERT INTO content_versions (id, content_id, version_number, body, hashtags, cta, generated_by_agent_id, created_at) VALUES
     (cv_washgo_1_1, ct_washgo_1, 1, '換季收納前,先讓外套洗好曬乾再收起來。到府收送+專業洗護,明年拿出來不再有霉味。', '["#Washgo","#衣物送洗","#換季"]', '加入 @washgo 領取 100 GoCoin', a_content, now() - interval '1 days');
+
+  -- ==========================================================================
+  -- 活動報名與報到示範:Washgo × 合作廠商「洗楽」小小洗衣師職人體驗營
+  -- ==========================================================================
+  INSERT INTO events (
+    id, brand_id, slug, title, description, location, event_date, status,
+    staff_token, form_fields, price, price_label, line_add_friend_url, created_by
+  ) VALUES (
+    ev_senraku, b_washgo, 'senraku-little-laundry-master',
+    '洗楽 小小洗衣師職人體驗營',
+    '認識洗劑、衣物分類、晾衣體驗、摺衣闖關,寓教於樂的親子洗衣職人體驗。每組限一位大人＋一位小朋友。',
+    '洗楽 SENRAKU 門市',
+    (now() + interval '7 days' + interval '10 hours'),
+    'open',
+    encode(gen_random_bytes(24), 'hex'),
+    '[
+      {"key":"childName","label":"小朋友姓名","type":"text","required":true},
+      {"key":"childAge","label":"小朋友年齡","type":"number","required":true}
+    ]'::jsonb,
+    499,
+    'NT$499(原價 699)',
+    'https://line.me/R/ti/p/@washgo',
+    u_washgo_mgr
+  );
+
+  INSERT INTO event_sessions (id, event_id, label, starts_at, capacity, sort_order) VALUES
+    (sess_am, ev_senraku, '上午場 10:00', (now() + interval '7 days' + interval '10 hours'), 8, 1),
+    (sess_pm, ev_senraku, '下午場 15:00', (now() + interval '7 days' + interval '15 hours'), 8, 2);
+
+  INSERT INTO event_referrers (id, event_id, name, commission_type, commission_value, sort_order) VALUES
+    (ref_senraku, ev_senraku, '洗楽門市自然到店', 'percentage', 10, 1),
+    (ref_partner, ev_senraku, 'Washgo 官方 LINE 導流', 'fixed', 50, 2);
+
+  INSERT INTO event_registrations (
+    id, event_id, session_id, name, phone, email, line_id,
+    referrer_id, custom_answers, qr_token, status, source, checked_in_at
+  ) VALUES
+    (reg_demo_1, ev_senraku, sess_am, '陳媽媽', '0912345678', 'chenmom@example.com', 'chenmom_line',
+      ref_senraku, '{"childName":"陳小寶","childAge":"6"}'::jsonb,
+      encode(gen_random_bytes(24), 'hex'), 'registered', 'web', now() - interval '1 hours'),
+    (reg_demo_2, ev_senraku, sess_pm, '林爸爸', '0922334455', NULL, NULL,
+      ref_partner, '{"childName":"林小晴","childAge":"5"}'::jsonb,
+      encode(gen_random_bytes(24), 'hex'), 'registered', 'web', NULL);
+
+  INSERT INTO activity_logs (brand_id, actor_type, actor_user_id, action, entity_type, entity_id, after_state, created_at) VALUES
+    (b_washgo, 'user', u_washgo_mgr, 'event.created', 'event', ev_senraku, '{"title":"洗楽 小小洗衣師職人體驗營"}', now() - interval '2 days');
 
   -- ==========================================================================
   -- Collaboration 的提案(修繕串接週年回顧)

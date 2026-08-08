@@ -20,6 +20,7 @@
 │            │                                                  │
 │ 內容營運     │                                                  │
 │ 行銷活動     │                                                  │
+│ 活動報名     │                                                  │
 │ 內容中心     │                                                  │
 │ 發布管理     │                                                  │
 │            │                                                  │
@@ -37,7 +38,7 @@
 - 頂部列全域品牌切換器：Homigo / TaskGo / Washgo / 全部品牌 / ＋新增品牌
 - 切換後停留原頁、資料 context 換為該品牌，URL 帶品牌 slug：`/homigo/contents` ↔ `/taskgo/contents`
 - 頁面分兩類：
-  - **品牌範圍頁**（必須先選定品牌）：品牌智慧、市場情報、行銷活動、內容中心、發布管理、成效分析、持續學習
+  - **品牌範圍頁**（必須先選定品牌）：品牌智慧、市場情報、行銷活動、活動報名、內容中心、發布管理、成效分析、持續學習
   - **跨品牌全域頁**（可看全部或篩選）：總覽 Dashboard、決策中心、AI 會議室、品牌合作、時間軸
 - 切換時頂部列顯示品牌識別色 + Logo，防止跨品牌誤操作
 - 切換器只列出使用者有權限的品牌（對應 `brand_members`）
@@ -59,6 +60,7 @@
 
 內容營運
 ├─ 行銷活動 Campaigns
+├─ 活動報名 Events(報名/報到/推薦人拆帳,詳見 10-events.md)
 ├─ 內容中心 Content(含 Final Review)
 └─ 發布管理 Publishing
 
@@ -86,6 +88,12 @@
 | `/collaborations` | 品牌合作列表 | 全域 |
 | `/collaborations/:id` | 合作工作區 | — |
 | `/:brand/campaigns` | 行銷活動 | 品牌 |
+| `/:brand/events` | 活動報名列表 | 品牌 |
+| `/:brand/events/:id` | 活動詳情(場次/表單/推薦人/名單/統計) | 品牌 |
+| `/e/:slug` | 公開報名頁(無需登入) | 公開 |
+| `/e/:slug/ticket` | QR 票券頁 / 手機查票(無需登入) | 公開 |
+| `/checkin` | 報到授權碼輸入頁(無需登入) | 公開 |
+| `/checkin/:eventId` | 工作人員掃碼報到頁(staff token 授權) | 公開 |
 | `/:brand/contents` | 內容中心 + Final Review | 品牌 |
 | `/:brand/publishing` | 發布管理 | 品牌 |
 | `/:brand/analytics` | 成效分析 | 品牌 |

@@ -635,6 +635,92 @@ CREATE TABLE content_reviews (
 CREATE INDEX idx_content_reviews_content ON content_reviews(content_id);
 
 -- ============================================================================
+-- Events(實體活動報名與報到;與 campaigns 行銷檔期不同語意,可選掛勾)
+-- ============================================================================
+
+CREATE TYPE event_status AS ENUM ('draft', 'open', 'closed', 'completed');
+CREATE TYPE event_registration_status AS ENUM ('registered', 'cancelled');
+CREATE TYPE event_registration_source AS ENUM ('web', 'manual');
+CREATE TYPE event_referrer_commission_type AS ENUM ('percentage', 'fixed');
+
+CREATE TABLE events (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id            UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  campaign_id         UUID REFERENCES campaigns(id) ON DELETE SET NULL,
+  slug                CITEXT NOT NULL UNIQUE,
+  title               TEXT NOT NULL,
+  description         TEXT,
+  location            TEXT,
+  event_date          TIMESTAMPTZ,
+  status              event_status NOT NULL DEFAULT 'draft',
+  staff_token         VARCHAR(64) NOT NULL,
+  form_fields         JSONB NOT NULL DEFAULT '[]',   -- [{key,label,type,required,options?}]
+  price               NUMERIC(10,2),                 -- 拆帳計算用單價
+  price_label         TEXT,                          -- 顯示用文案,如 "NT$499(原價699)"
+  line_add_friend_url TEXT,
+  created_by          UUID REFERENCES users(id),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_events_brand ON events(brand_id, status);
+CREATE UNIQUE INDEX idx_events_staff_token ON events(staff_token);
+CREATE TRIGGER trg_events_updated_at BEFORE UPDATE ON events
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- 場次(上午/下午,可設名額上限)
+CREATE TABLE event_sessions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id    UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  label       TEXT NOT NULL,
+  starts_at   TIMESTAMPTZ,
+  capacity    INTEGER,                                -- NULL = 不限
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_event_sessions_event ON event_sessions(event_id);
+
+-- 推薦人名單(每活動自訂,含拆帳規則)
+CREATE TABLE event_referrers (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id          UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  name              TEXT NOT NULL,
+  commission_type   event_referrer_commission_type NOT NULL DEFAULT 'percentage',
+  commission_value  NUMERIC(10,2) NOT NULL DEFAULT 0,  -- percentage: 0-100; fixed: 每人金額
+  is_active         BOOLEAN NOT NULL DEFAULT true,
+  sort_order        INTEGER NOT NULL DEFAULT 0,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_event_referrers_event ON event_referrers(event_id);
+CREATE TRIGGER trg_event_referrers_updated_at BEFORE UPDATE ON event_referrers
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- 報名 / 票券 / 報到狀態三合一(對齊 ENG 專案設計,不另建 tickets/check_ins 表)
+CREATE TABLE event_registrations (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id        UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  session_id      UUID REFERENCES event_sessions(id) ON DELETE SET NULL,
+  name            TEXT NOT NULL,
+  phone           TEXT NOT NULL,
+  email           TEXT,
+  line_id         TEXT,
+  referrer_id     UUID REFERENCES event_referrers(id) ON DELETE SET NULL,
+  referrer_name   TEXT,                                 -- 名單外自行填寫
+  custom_answers  JSONB NOT NULL DEFAULT '{}',
+  qr_token        VARCHAR(64) NOT NULL UNIQUE,
+  status          event_registration_status NOT NULL DEFAULT 'registered',
+  source          event_registration_source NOT NULL DEFAULT 'web',
+  checked_in_at   TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_event_registrations_event_phone ON event_registrations(event_id, phone);
+CREATE INDEX idx_event_registrations_qr ON event_registrations(qr_token);
+CREATE INDEX idx_event_registrations_referrer ON event_registrations(referrer_id);
+CREATE TRIGGER trg_event_registrations_updated_at BEFORE UPDATE ON event_registrations
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================================
 -- Publishing(發布)
 -- ============================================================================
 

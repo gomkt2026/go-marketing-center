@@ -34,6 +34,7 @@ const groups: MenuGroup[] = [
     title: '內容營運',
     items: [
       { label: '行銷活動', path: '/campaigns', brandScoped: true },
+      { label: '活動報名', path: '/events', brandScoped: true },
       { label: '內容中心', path: '/contents', brandScoped: true },
       { label: '發布管理', path: '/publishing', brandScoped: true },
     ],

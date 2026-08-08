@@ -1,0 +1,63 @@
+name: Deploy
+
+on:
+  push:
+    branches: [Ben, main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: 4a06488424bef2c5d7b313ba21b3530f
+
+jobs:
+  deploy-pages:
+    name: 部署主站 (Cloudflare Pages)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 安裝依賴
+        run: npm ci
+
+      - name: 建置(含型別檢查)
+        run: npm run build
+
+      - name: 部署到 Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=go-marketing-center --branch=Ben --commit-dirty=true
+
+  deploy-scheduler:
+    name: 部署排程 Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 安裝依賴
+        run: npm ci
+
+      - name: 型別檢查
+        run: npx tsc --noEmit -p workers/scheduler/tsconfig.json
+
+      - name: 部署 Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/scheduler
+          command: deploy

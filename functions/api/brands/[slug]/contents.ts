@@ -15,13 +15,24 @@ async function loadContentsForBrand(env: Env, brandId: string) {
   const result = [];
   for (const c of contents) {
     const contentId = c.id as string;
-    const [versions, reviews] = await Promise.all([
+    const [versions, reviews, assets] = await Promise.all([
       sql`SELECT * FROM content_versions WHERE content_id = ${contentId}::uuid ORDER BY version_number`,
       sql`SELECT * FROM content_reviews WHERE content_id = ${contentId}::uuid ORDER BY reviewed_at`,
+      sql`
+        SELECT a.* FROM content_assets a
+        JOIN content_versions v ON v.id = a.content_version_id
+        WHERE v.content_id = ${contentId}::uuid
+        ORDER BY a.created_at
+      `,
     ]);
+    const assetList = rowsToCamel(assets as Record<string, unknown>[]);
+    const versionList = rowsToCamel(versions as Record<string, unknown>[]).map((v) => ({
+      ...v,
+      assets: assetList.filter((a) => a.contentVersionId === v.id),
+    }));
     result.push({
       ...c,
-      versions: rowsToCamel(versions as Record<string, unknown>[]),
+      versions: versionList,
       reviews: rowsToCamel(reviews as Record<string, unknown>[]),
     });
   }

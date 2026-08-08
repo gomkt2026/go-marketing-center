@@ -1,0 +1,143 @@
+import type { Env } from './env';
+import { getSql } from './db';
+import { chatCompleteJson, generateImage } from './openai';
+import {
+  buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt,
+  type BrandContext, type GeneratedPost, type EngagementPrediction,
+} from './prompts';
+import { buildMediaKey, putMedia } from './media';
+
+export type SocialPlatform = 'facebook' | 'instagram' | 'threads';
+
+export const SUPPORTED_PLATFORMS: SocialPlatform[] = ['facebook', 'instagram', 'threads'];
+
+export interface GenerationResult {
+  post: GeneratedPost;
+  prediction: EngagementPrediction;
+  imageUrl: string | null;
+  imageError: string | null;
+}
+
+/** 生成單一平台貼文 + 互動潛力評估 + IG 圖片 */
+export async function generatePlatformPost(
+  env: Env,
+  params: {
+    brandCtx: BrandContext;
+    platform: SocialPlatform;
+    topic: string;
+    topicSummary?: string;
+    extraInstruction?: string;
+  },
+): Promise<GenerationResult> {
+  const { brandCtx, platform } = params;
+
+  let post = await chatCompleteJson<GeneratedPost>(env, {
+    messages: [
+      { role: 'system', content: brandCtx.systemPrompt },
+      { role: 'user', content: buildPostUserPrompt({ platform, topic: params.topic, topicSummary: params.topicSummary, extraInstruction: params.extraInstruction }) },
+    ],
+  });
+
+  // FB 硬限制 1000 字:超過就要求縮短一次
+  if (platform === 'facebook' && post.body.length > 1000) {
+    post = await chatCompleteJson<GeneratedPost>(env, {
+      messages: [
+        { role: 'system', content: brandCtx.systemPrompt },
+        { role: 'user', content: buildPostUserPrompt({ platform, topic: params.topic, topicSummary: params.topicSummary, extraInstruction: params.extraInstruction }) },
+        { role: 'assistant', content: JSON.stringify(post) },
+        { role: 'user', content: `這篇 ${post.body.length} 字,超過 1000 字上限。請保留故事核心,縮短到 1000 字以內,回傳同格式 JSON。` },
+      ],
+      temperature: 0.5,
+    });
+  }
+
+  const prediction = await chatCompleteJson<EngagementPrediction>(env, {
+    messages: [
+      { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
+      { role: 'user', content: buildEngagementEvalPrompt({ platform, body: post.body }) },
+    ],
+    temperature: 0.3,
+  });
+
+  // IG 貼文生成配圖;失敗不阻擋文案產出
+  let imageUrl: string | null = null;
+  let imageError: string | null = null;
+  if (platform === 'instagram' && post.imagePrompt) {
+    try {
+      const bytes = await generateImage(env, { prompt: post.imagePrompt, size: '1024x1024' });
+      const key = buildMediaKey(brandCtx.slug);
+      imageUrl = await putMedia(env, key, bytes);
+    } catch (e) {
+      imageError = e instanceof Error ? e.message : '圖片生成失敗';
+    }
+  }
+
+  return { post, prediction, imageUrl, imageError };
+}
+
+/** 將生成結果寫入 contents / content_versions / content_assets,回傳 contentId */
+export async function saveGeneratedContent(
+  env: Env,
+  params: {
+    brandCtx: BrandContext;
+    platform: SocialPlatform;
+    result: GenerationResult;
+    sourceMarketSignalId?: string | null;
+    campaignId?: string | null;
+    generatedByAgentId?: string | null;
+    promptMeta?: Record<string, unknown>;
+    status?: 'draft' | 'pending_review';
+  },
+): Promise<string> {
+  const sql = getSql(env);
+  const { result, platform, brandCtx } = params;
+
+  const contentType = platform === 'instagram' ? 'image' : 'article';
+  const contentRows = await sql`
+    INSERT INTO contents (
+      campaign_id, brand_id, content_type, target_platform, title, status,
+      generated_by_agent_id, predicted_engagement_score, engagement_analysis,
+      generation_prompt_meta, source_market_signal_id
+    ) VALUES (
+      ${params.campaignId ?? null}, ${brandCtx.brandId}::uuid, ${contentType}, ${platform},
+      ${result.post.title}, ${params.status ?? 'pending_review'},
+      ${params.generatedByAgentId ?? null},
+      ${Math.max(0, Math.min(100, result.prediction.score))},
+      ${result.prediction.analysis + (result.prediction.suggestions.length ? `\n改進建議:\n- ${result.prediction.suggestions.join('\n- ')}` : '')},
+      ${JSON.stringify(params.promptMeta ?? {})},
+      ${params.sourceMarketSignalId ?? null}
+    ) RETURNING id
+  `;
+  const contentId = (contentRows[0] as { id: string }).id;
+
+  const versionRows = await sql`
+    INSERT INTO content_versions (content_id, version_number, body, hashtags, cta, generated_by_agent_id)
+    VALUES (${contentId}::uuid, 1, ${result.post.body}, ${JSON.stringify(result.post.hashtags ?? [])},
+            ${result.post.cta ?? ''}, ${params.generatedByAgentId ?? null})
+    RETURNING id
+  `;
+  const versionId = (versionRows[0] as { id: string }).id;
+
+  if (result.imageUrl) {
+    await sql`
+      INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
+      VALUES (${versionId}::uuid, 'image', ${result.imageUrl},
+              ${JSON.stringify({ imagePrompt: result.post.imagePrompt ?? '', generated: true })})
+    `;
+  }
+
+  return contentId;
+}
+
+/** 找出品牌的 brand_ai Agent(生成內容的掛名者) */
+export async function findBrandAgent(env: Env, brandId: string): Promise<string | null> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT a.id FROM ai_agents a
+    JOIN agent_roles r ON r.id = a.role_id
+    WHERE a.brand_id = ${brandId}::uuid AND a.is_active = true
+    ORDER BY (r.code = 'brand_ai') DESC
+    LIMIT 1
+  `;
+  return rows.length ? (rows[0] as { id: string }).id : null;
+}

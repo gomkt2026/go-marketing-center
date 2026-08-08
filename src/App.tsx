@@ -20,6 +20,7 @@ import { Analytics } from '@/pages/analytics/Analytics';
 import { Learning } from '@/pages/learning/Learning';
 import { Timeline } from '@/pages/timeline/Timeline';
 import { Settings } from '@/pages/settings/Settings';
+import { SocialAccounts } from '@/pages/settings/SocialAccounts';
 import { EventList } from '@/pages/event/EventList';
 import { EventDetail } from '@/pages/event/EventDetail';
 import { EventRegister } from '@/pages/public/EventRegister';
@@ -61,6 +62,7 @@ export default function App() {
                         <Route path="/:brand/events/:id" element={<EventDetail />} />
                         <Route path="/:brand/contents" element={<ContentCenter />} />
                         <Route path="/:brand/publishing" element={<Publishing />} />
+                        <Route path="/:brand/social" element={<SocialAccounts />} />
                         <Route path="/:brand/analytics" element={<Analytics />} />
                         <Route path="/:brand/learning" element={<Learning />} />
 

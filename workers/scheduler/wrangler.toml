@@ -1,0 +1,18 @@
+# 排程 Worker:市場情報自動蒐集 + Threads 趨勢草稿 + 媒體清理
+# 部署:cd workers/scheduler && wrangler deploy
+# secrets:wrangler secret put DATABASE_URL / OPENAI_API_KEY
+name = "go-marketing-scheduler"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+[triggers]
+# 每 3 小時第 15 分:蒐集熱門議題 → AI 篩選寫入 market_signals
+# 每小時第 45 分:為一則高分情報生成三平台草稿(拆開避免超過子請求上限)
+# 每小時第 5 分:每品牌生成一則 Threads 趨勢貼文草稿
+# 每天 18:30 UTC(台灣 02:30):清理超過 31 天的 R2 生成圖片
+crons = ["15 */3 * * *", "45 * * * *", "5 * * * *", "30 18 * * *"]
+
+# TODO: 帳號啟用 R2 並建立 bucket 後取消註解重新部署
+# [[r2_buckets]]
+# binding = "MEDIA"
+# bucket_name = "go-marketing-media"

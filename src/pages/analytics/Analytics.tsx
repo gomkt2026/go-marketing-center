@@ -8,14 +8,14 @@ import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 
 export function Analytics() {
   const { brand: slug } = useParams();
-  const { brandBySlug } = useBrand();
+  const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
   const { data, loading, error, reload } = useAsyncData(
     () => slug ? api.analytics(slug) : Promise.reject(new Error('no slug')),
     [slug],
   );
 
-  if (!brand) return <Navigate to="/" replace />;
+  if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
 

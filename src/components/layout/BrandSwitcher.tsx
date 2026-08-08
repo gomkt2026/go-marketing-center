@@ -5,7 +5,7 @@ import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData } from '@/hooks/useAsyncData';
 
-const BRAND_SCOPED_PREFIXES = ['workspace', 'intelligence', 'market', 'campaigns', 'events', 'contents', 'publishing', 'analytics', 'learning'];
+const BRAND_SCOPED_PREFIXES = ['workspace', 'intelligence', 'market', 'campaigns', 'events', 'contents', 'publishing', 'social', 'analytics', 'learning'];
 
 export function BrandSwitcher() {
   const { currentBrand, brands, setBrandBySlug, isAllBrands } = useBrand();
@@ -31,13 +31,17 @@ export function BrandSwitcher() {
   function handleSelect(slug: string | null) {
     setBrandBySlug(slug);
     setOpen(false);
+    const parts = location.pathname.split('/').filter(Boolean);
+    const rest = parts.length > 1 ? parts.slice(1).join('/') : '';
+    const isScoped = rest && BRAND_SCOPED_PREFIXES.includes(rest.split('/')[0]);
     if (slug) {
-      const parts = location.pathname.split('/').filter(Boolean);
-      const rest = parts.length > 1 ? parts.slice(1).join('/') : '';
-      const isScoped = rest && BRAND_SCOPED_PREFIXES.includes(rest.split('/')[0]);
       if (isScoped) {
-        navigate(`/${slug}/${rest}`);
+        // 品牌 scoped 頁面:切到同頁的新品牌路徑(去掉詳情 id,只保留第一層)
+        navigate(`/${slug}/${rest.split('/')[0]}`);
       }
+    } else if (isScoped) {
+      // 切到「全部品牌」時,品牌 scoped 頁面無對應檢視,導回總覽
+      navigate('/');
     }
   }
 

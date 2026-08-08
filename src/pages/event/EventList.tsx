@@ -18,7 +18,7 @@ const statusLabel: Record<EventStatus, string> = {
 
 export function EventList() {
   const { brand: slug } = useParams();
-  const { brandBySlug } = useBrand();
+  const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
   const navigate = useNavigate();
   const { data, loading, error, reload } = useAsyncData(
@@ -27,7 +27,7 @@ export function EventList() {
   );
   const [creating, setCreating] = useState(false);
 
-  if (!brand) return <Navigate to="/" replace />;
+  if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
 

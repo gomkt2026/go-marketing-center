@@ -1,4 +1,5 @@
-import { Link, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -18,22 +19,53 @@ const statusLabel: Record<MeetingStatus, string> = {
 
 export function MeetingList() {
   const { meetingId } = useParams();
-  const { brandById } = useBrand();
+  const { brandById, currentBrand } = useBrand();
+  const navigate = useNavigate();
+  const [creating, setCreating] = useState(false);
   const { data, loading, error, reload } = useAsyncData(() => api.meetings(), []);
   const collabQuery = useAsyncData(() => api.collaborations(), []);
+
+  async function createMeeting() {
+    if (creating) return;
+    const title = window.prompt('會議標題?(例如:本週發文規則討論)');
+    if (!title?.trim()) return;
+    const topic = window.prompt('會議主題/背景?(選填)') ?? undefined;
+    const crossBrand = window.confirm('要邀請三個品牌的 AI 代理人一起討論嗎?\n(確定=三品牌跨會議;取消=只邀請目前品牌的 Agent)');
+    setCreating(true);
+    try {
+      const res = await api.createMeeting({
+        title: title.trim(),
+        topic: topic?.trim() || undefined,
+        brandSlug: crossBrand ? undefined : currentBrand?.slug,
+        crossBrand,
+      });
+      await reload();
+      navigate(`/meetings/${res.meeting.id}`);
+    } catch (e) {
+      window.alert(`建立會議失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
+    } finally {
+      setCreating(false);
+    }
+  }
 
   if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
 
   const collaborations = collabQuery.data?.collaborations ?? [];
+  // 跟隨上方品牌切換:單一品牌時只顯示該品牌會議與跨品牌合作會議
+  const meetings = currentBrand
+    ? data.meetings.filter((m) => m.brandId === currentBrand.id || !m.brandId)
+    : data.meetings;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20, alignItems: 'start' }}>
       <div>
         <PageHeader title="AI 會議室" />
-        <Button variant="primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}>+ 建立會議</Button>
+        <Button variant="primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }} disabled={creating} onClick={() => void createMeeting()}>
+          {creating ? '⏳ 建立中(AI 開場發言)...' : '+ 建立會議'}
+        </Button>
         <div style={{ display: 'grid', gap: 10 }}>
-          {data.meetings.map((m) => {
+          {meetings.map((m) => {
             const scope = m.brandId ? brandById(m.brandId)?.name : collaborations.find((c) => c.id === m.collaborationId)?.title;
             const active = meetingId === m.id;
             return (

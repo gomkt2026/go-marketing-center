@@ -6,13 +6,27 @@ import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { useMeta } from '@/context/MetaContext';
+import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import { ROLE_LABELS } from '@/lib/constants';
 
+interface SuggestedRule {
+  brandSlug: string;
+  ruleType: string;
+  statement: string;
+  conditionNote?: string;
+}
+
 export function MeetingDetail({ meetingId }: { meetingId: string }) {
   const { agentById, userName } = useMeta();
+  const { brands } = useBrand();
   const [note, setNote] = useState('');
+  const [sending, setSending] = useState(false);
+  const [concluding, setConcluding] = useState(false);
+  const [suggestedRules, setSuggestedRules] = useState<SuggestedRule[]>([]);
+  const [adoptedIdx, setAdoptedIdx] = useState<Set<number>>(new Set());
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
   const { data, loading, error, reload } = useAsyncData(() => api.meeting(meetingId), [meetingId]);
   const proposalsQuery = useAsyncData(() => api.proposals(), []);
 
@@ -25,10 +39,52 @@ export function MeetingDetail({ meetingId }: { meetingId: string }) {
   const relatedProposal = proposalsQuery.data?.proposals.find((p) => p.meetingId === meetingId);
 
   async function sendMessage() {
-    if (!note.trim()) return;
-    await api.postMeetingMessage(meetingId, note.trim());
-    setNote('');
-    reload();
+    if (!note.trim() || sending) return;
+    setSending(true);
+    setActionMsg(null);
+    try {
+      const res = await api.postMeetingMessage(meetingId, note.trim());
+      setNote('');
+      if (res.aiError) setActionMsg(`AI 回覆失敗:${res.aiError}`);
+      reload();
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function conclude() {
+    if (concluding) return;
+    setConcluding(true);
+    setActionMsg(null);
+    try {
+      const res = await api.concludeMeeting(meetingId);
+      setSuggestedRules(res.suggestedRules);
+      setAdoptedIdx(new Set());
+      reload();
+    } catch (e) {
+      setActionMsg(`產生結論失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
+    } finally {
+      setConcluding(false);
+    }
+  }
+
+  async function adoptRule(rule: SuggestedRule, idx: number) {
+    const brand = brands.find((b) => b.slug === rule.brandSlug);
+    if (!brand) {
+      setActionMsg(`找不到品牌 ${rule.brandSlug}`);
+      return;
+    }
+    try {
+      await api.createBrandRule({
+        brandId: brand.id,
+        ruleType: rule.ruleType,
+        statement: rule.statement,
+        conditionNote: rule.conditionNote,
+      });
+      setAdoptedIdx((prev) => new Set(prev).add(idx));
+    } catch (e) {
+      setActionMsg(`採納失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
+    }
   }
 
   return (
@@ -97,6 +153,12 @@ export function MeetingDetail({ meetingId }: { meetingId: string }) {
             );
           })}
         </div>
+        {sending && (
+          <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 10 }}>⏳ AI 代理人正在回覆討論中,可能需要 30 秒左右...</p>
+        )}
+        {actionMsg && (
+          <p style={{ fontSize: 12.5, color: '#B85454', marginTop: 10 }}>{actionMsg}</p>
+        )}
         <div style={{ display: 'flex', gap: 8, marginTop: 14, borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
           <input
             value={note}
@@ -105,9 +167,46 @@ export function MeetingDetail({ meetingId }: { meetingId: string }) {
             style={{ flex: 1, border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}
             onKeyDown={(e) => { if (e.key === 'Enter') void sendMessage(); }}
           />
-          <Button variant="secondary" onClick={() => void sendMessage()}>送出</Button>
+          <Button variant="secondary" disabled={sending} onClick={() => void sendMessage()}>{sending ? '回覆中...' : '送出'}</Button>
+          {meeting.status !== 'concluded' && (
+            <Button variant="primary" disabled={concluding} onClick={() => void conclude()}>
+              {concluding ? '整理中...' : '🧾 產生結論'}
+            </Button>
+          )}
         </div>
       </Card>
+
+      {suggestedRules.length > 0 && (
+        <Card style={{ marginBottom: 14 }}>
+          <strong style={{ display: 'block', marginBottom: 10 }}>會議建議的發文規則(點採納即寫入品牌智慧)</strong>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {suggestedRules.map((r, idx) => {
+              const brand = brands.find((b) => b.slug === r.brandSlug);
+              const adopted = adoptedIdx.has(idx);
+              return (
+                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, border: '1px solid var(--color-border)', borderRadius: 10, padding: 12 }}>
+                  <div>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                      <Badge tone="secondary">{brand?.name ?? r.brandSlug}</Badge>
+                      <Badge tone="default">{r.ruleType}</Badge>
+                    </div>
+                    <div style={{ fontSize: 13.5 }}>{r.statement}</div>
+                    {r.conditionNote && <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>條件:{r.conditionNote}</div>}
+                  </div>
+                  <Button
+                    variant={adopted ? 'ghost' : 'primary'}
+                    disabled={adopted}
+                    style={{ flexShrink: 0, fontSize: 12, padding: '5px 12px' }}
+                    onClick={() => void adoptRule(r, idx)}
+                  >
+                    {adopted ? '✓ 已採納' : '採納'}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {summary && (
         <Card style={{ marginBottom: 14 }}>

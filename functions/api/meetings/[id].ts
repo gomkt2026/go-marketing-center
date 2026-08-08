@@ -70,5 +70,18 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     entityId: (inserted[0] as { id: string }).id,
   });
 
-  return json({ message: rowToCamel(inserted[0] as Record<string, unknown>) }, 201);
+  // 管理者發言後,讓與會的 AI Agent 依序回覆一輪
+  let aiReplies = 0;
+  let aiError: string | null = null;
+  if (context.env.OPENAI_API_KEY) {
+    try {
+      const { runAgentRound } = await import('../../_shared/meeting-ai');
+      const ids = await runAgentRound(context.env, meetingId);
+      aiReplies = ids.length;
+    } catch (e) {
+      aiError = e instanceof Error ? e.message : 'AI 回覆失敗';
+    }
+  }
+
+  return json({ message: rowToCamel(inserted[0] as Record<string, unknown>), aiReplies, aiError }, 201);
 };

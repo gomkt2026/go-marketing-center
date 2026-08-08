@@ -9,9 +9,15 @@ import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 
 export function Timeline() {
-  const [filterBrand, setFilterBrand] = useState<string>('all');
-  const { brands, brandById } = useBrand();
+  const { brands, brandById, currentBrand } = useBrand();
+  // 預設跟隨上方品牌切換,使用者仍可用下方 chips 手動改變篩選
+  const [filterBrand, setFilterBrand] = useState<string>(currentBrand?.id ?? 'all');
   const { agentById, userName, actionLabels, setActionLabels } = useMeta();
+
+  useEffect(() => {
+    setFilterBrand(currentBrand?.id ?? 'all');
+  }, [currentBrand?.id]);
+
   const { data, loading, error, reload } = useAsyncData(
     () => api.activity(filterBrand === 'all' ? undefined : filterBrand),
     [filterBrand],

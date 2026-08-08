@@ -39,7 +39,7 @@ const ruleTypeLabel: Record<string, { label: string; tone: BadgeTone }> = {
 
 export function BrandIntelligence() {
   const { brand: slug } = useParams();
-  const { brandBySlug } = useBrand();
+  const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
   const [tab, setTab] = useState('core');
   const [rules, setRules] = useState<BrandRule[]>([]);
@@ -58,7 +58,7 @@ export function BrandIntelligence() {
     if (intelQuery.data?.rules) setRules(intelQuery.data.rules);
   }, [intelQuery.data?.rules]);
 
-  if (!brand) return <Navigate to="/" replace />;
+  if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (brandQuery.loading || intelQuery.loading) return <LoadingState />;
   if (brandQuery.error || intelQuery.error) {
     return <ErrorState message={brandQuery.error ?? intelQuery.error ?? '載入失敗'} onRetry={() => { brandQuery.reload(); intelQuery.reload(); }} />;

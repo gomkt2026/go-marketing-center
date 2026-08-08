@@ -8,13 +8,13 @@ import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 
 export function BrandWorkspace() {
   const { brand: slug } = useParams();
-  const { brandBySlug } = useBrand();
+  const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
 
   const brandQuery = useAsyncData(() => slug ? api.brand(slug) : Promise.reject(new Error('no slug')), [slug]);
   const workspaceQuery = useAsyncData(() => slug ? api.brandWorkspace(slug) : Promise.reject(new Error('no slug')), [slug]);
 
-  if (!brand) return <Navigate to="/" replace />;
+  if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (brandQuery.loading || workspaceQuery.loading) return <LoadingState />;
   if (brandQuery.error || workspaceQuery.error || !workspaceQuery.data) {
     return <ErrorState message={brandQuery.error ?? workspaceQuery.error ?? '載入失敗'} onRetry={() => { brandQuery.reload(); workspaceQuery.reload(); }} />;

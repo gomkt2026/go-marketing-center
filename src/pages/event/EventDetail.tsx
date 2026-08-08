@@ -35,7 +35,7 @@ function toDatetimeLocal(iso?: string | null): string {
 
 export function EventDetail() {
   const { brand: slug, id } = useParams();
-  const { brandBySlug } = useBrand();
+  const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
   const [tab, setTab] = useState('settings');
 
@@ -43,7 +43,7 @@ export function EventDetail() {
   const registrationsQuery = useAsyncData(() => (id ? api.eventRegistrations(id) : Promise.reject(new Error('no id'))), [id]);
   const statsQuery = useAsyncData(() => (id ? api.eventStats(id) : Promise.reject(new Error('no id'))), [id]);
 
-  if (!brand || !id) return <Navigate to="/" replace />;
+  if (!brand || !id) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (detailQuery.loading) return <LoadingState />;
   if (detailQuery.error || !detailQuery.data) {
     return <ErrorState message={detailQuery.error ?? '載入失敗'} onRetry={detailQuery.reload} />;

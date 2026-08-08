@@ -62,4 +62,8 @@ export const ACTION_LABELS: Record<string, string> = {
   'event.referrer.created': '新增推薦人',
   'event.referrer.updated': '更新推薦人',
   'event.referrer.deleted': '刪除推薦人',
+  'social_account.updated': '更新社群帳號設定',
+  'meeting.created': '建立會議',
+  'meeting.concluded': '產生會議結論',
+  'brand_rule.adopted': '採納會議結論為品牌規則',
 };

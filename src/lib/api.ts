@@ -120,10 +120,22 @@ export const api = {
     }>(`/api/meetings/${id}`),
 
   postMeetingMessage: (id: string, content: string) =>
-    request<{ message: import('@/types').MeetingMessage }>(`/api/meetings/${id}`, {
+    request<{ message: import('@/types').MeetingMessage; aiReplies?: number; aiError?: string | null }>(`/api/meetings/${id}`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),
+
+  createMeeting: (body: { title: string; topic?: string; brandSlug?: string; crossBrand?: boolean; kickoff?: boolean }) =>
+    request<{ meeting: import('@/types').Meeting; aiError?: string | null }>('/api/meetings', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  concludeMeeting: (id: string) =>
+    request<{
+      summary: string;
+      suggestedRules: { brandSlug: string; ruleType: string; statement: string; conditionNote?: string }[];
+    }>(`/api/meetings/${id}/conclude`, { method: 'POST' }),
 
   collaborations: () =>
     request<{ collaborations: (import('@/types').Collaboration & { latestBrief?: import('@/types').CollaborationBrief | null })[] }>('/api/collaborations'),
@@ -139,6 +151,47 @@ export const api = {
     request<{ signal: import('@/types').MarketSignal }>(`/api/market-signals/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    }),
+
+  // -- AI 內容生成 ----------------------------------------------------------
+  generateFromSignal: (signalId: string, body?: { platforms?: string[]; instruction?: string }) =>
+    request<{
+      created: { contentId: string; platform: string; score: number; imageUrl: string | null; imageError: string | null }[];
+      failures: { platform: string; error: string }[];
+    }>(`/api/market-signals/${signalId}/generate`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
+
+  regenerateContent: (contentId: string, body?: { instruction?: string }) =>
+    request<{ ok: boolean; versionNumber: number; predictedEngagementScore: number; imageUrl: string | null; imageError: string | null }>(
+      `/api/contents/${contentId}/regenerate`,
+      { method: 'POST', body: JSON.stringify(body ?? {}) },
+    ),
+
+  // -- 社群帳號串接 ----------------------------------------------------------
+  socialAccounts: (slug: string) =>
+    request<{ accounts: import('@/types').SocialAccount[] }>(`/api/brands/${slug}/social-accounts`),
+
+  saveSocialAccount: (slug: string, body: {
+    platform: string; accountName?: string; externalId?: string;
+    accessToken?: string; clearToken?: boolean; notes?: string;
+  }) =>
+    request<{ account: import('@/types').SocialAccount }>(`/api/brands/${slug}/social-accounts`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  testSocialAccount: (slug: string, platform: string) =>
+    request<{ ok: boolean; status: string; detail: string }>(`/api/brands/${slug}/social-accounts/test`, {
+      method: 'POST',
+      body: JSON.stringify({ platform }),
+    }),
+
+  manualPublishContent: (contentId: string, body?: { externalPostUrl?: string }) =>
+    request<{ ok: boolean; jobId: string }>(`/api/contents/${contentId}/manual-publish`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
     }),
 
   createBrandRule: (body: {

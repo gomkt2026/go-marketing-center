@@ -14,7 +14,7 @@ const typeLabel: Record<string, string> = {
 
 export function Learning() {
   const { brand: slug } = useParams();
-  const { brandBySlug } = useBrand();
+  const { brandBySlug, brandsLoading } = useBrand();
   const { agentById } = useMeta();
   const brand = slug ? brandBySlug(slug) : undefined;
   const contentsQuery = useAsyncData(() => slug ? api.contents(slug) : Promise.reject(new Error('no slug')), [slug]);
@@ -23,7 +23,7 @@ export function Learning() {
     [slug],
   );
 
-  if (!brand) return <Navigate to="/" replace />;
+  if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (loading || contentsQuery.loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
 

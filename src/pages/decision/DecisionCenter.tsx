@@ -21,7 +21,7 @@ const riskLabel: Record<string, string> = { low: '低', medium: '中', high: '�
 
 export function DecisionCenter() {
   const { user } = useAuth();
-  const { brandById } = useBrand();
+  const { brandById, currentBrand } = useBrand();
   const { data, loading, error, reload } = useAsyncData(() => api.proposals(), []);
   const collaborationsQuery = useAsyncData(() => api.collaborations(), []);
   const [flash, setFlash] = useState<{ id: string; kind: 'approve' | 'reject' } | null>(null);
@@ -29,7 +29,10 @@ export function DecisionCenter() {
   if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
 
-  const items = data.proposals;
+  // 跟隨上方品牌切換:單一品牌時只顯示該品牌與跨品牌合作的提案
+  const items = currentBrand
+    ? data.proposals.filter((p) => p.brandId === currentBrand.id || !p.brandId)
+    : data.proposals;
   const decisions = data.decisions;
   const collaborations = collaborationsQuery.data?.collaborations ?? [];
 

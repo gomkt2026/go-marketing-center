@@ -37,6 +37,7 @@ const groups: MenuGroup[] = [
       { label: '活動報名', path: '/events', brandScoped: true },
       { label: '內容中心', path: '/contents', brandScoped: true },
       { label: '發布管理', path: '/publishing', brandScoped: true },
+      { label: '社群帳號', path: '/social', brandScoped: true },
     ],
   },
   {
@@ -54,7 +55,9 @@ const groups: MenuGroup[] = [
 ];
 
 export function Sidebar() {
-  const { currentBrand } = useBrand();
+  const { currentBrand, brands } = useBrand();
+  // 「全部品牌」模式下,品牌 scoped 連結退回第一個品牌,避免產生無效路徑
+  const scopedBrand = currentBrand ?? brands[0];
 
   return (
     <aside
@@ -99,7 +102,7 @@ export function Sidebar() {
               </div>
             )}
             {group.items.map((item) => {
-              const to = item.brandScoped && currentBrand ? `/${currentBrand.slug}${item.path}` : item.path;
+              const to = item.brandScoped && scopedBrand ? `/${scopedBrand.slug}${item.path}` : item.path;
               return (
                 <NavLink
                   key={item.path}

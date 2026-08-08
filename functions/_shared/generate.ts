@@ -18,7 +18,7 @@ export interface GenerationResult {
   imageError: string | null;
 }
 
-/** 生成單一平台貼文 + 互動潛力評估 + IG 圖片 */
+/** 生成單一平台貼文 + 互動潛力評估 + FB/IG 配圖 */
 export async function generatePlatformPost(
   env: Env,
   params: {
@@ -59,12 +59,17 @@ export async function generatePlatformPost(
     temperature: 0.3,
   });
 
-  // IG 貼文生成配圖;失敗不阻擋文案產出
+  // FB / IG 貼文生成配圖;失敗不阻擋文案產出
+  // FB 走寫實攝影(橫式 1536x1024,貼近動態牆比例);IG 維持方形
   let imageUrl: string | null = null;
   let imageError: string | null = null;
-  if (platform === 'instagram' && post.imagePrompt) {
+  if ((platform === 'facebook' || platform === 'instagram') && post.imagePrompt) {
     try {
-      const bytes = await generateImage(env, { prompt: post.imagePrompt, size: '1024x1024' });
+      const isFb = platform === 'facebook';
+      const prompt = isFb
+        ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, real everyday people in Taiwan, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable, no text, no watermark.`
+        : post.imagePrompt;
+      const bytes = await generateImage(env, { prompt, size: isFb ? '1536x1024' : '1024x1024' });
       const key = buildMediaKey(brandCtx.slug);
       imageUrl = await putMedia(env, key, bytes);
     } catch (e) {

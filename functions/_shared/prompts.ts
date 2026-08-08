@@ -159,6 +159,18 @@ export interface EngagementPrediction {
   suggestions: string[]; // 改進建議
 }
 
+/** 各平台配圖描述的要求:FB 走寫實攝影、IG 走溫暖插畫/自然攝影,Threads 純文字不出圖 */
+const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = {
+  facebook:
+    '"imagePrompt": "必填:給圖片生成模型的英文描述,走「寫實攝影」風格。' +
+    '像紀實攝影師捕捉到的真實瞬間:以真實的人為主角、台灣日常生活場景、自然光、真實的表情與動作' +
+    '(例如師傅在工地喝水擦汗、房東房客在門口聊天、客人抱著剛洗好還溫熱的衣服微笑),' +
+    '要溫暖、貼近人心、有故事感,photorealistic 質感,避免棚拍廣告感、塑膠感與科技感構圖,不含文字"',
+  instagram:
+    '"imagePrompt": "必填:給圖片生成模型的英文描述。畫面要以「人」為主角(有表情、有動作、有生活感的真實場景,例如師傅擦汗大笑、店員幫客人摺衣服),溫暖手繪插畫或自然攝影感,避免冷冰冰的物件圖或科技感構圖,不含文字"',
+  threads: '',
+};
+
 export function buildPostUserPrompt(params: {
   platform: 'facebook' | 'instagram' | 'threads';
   topic: string;
@@ -166,6 +178,7 @@ export function buildPostUserPrompt(params: {
   extraInstruction?: string;
 }): string {
   const guideline = PLATFORM_GUIDELINES[params.platform];
+  const imageSpec = IMAGE_PROMPT_SPEC[params.platform];
   return [
     `請針對以下主題,為 ${params.platform} 平台寫一篇貼文。`,
     `主題:${params.topic}`,
@@ -175,7 +188,7 @@ export function buildPostUserPrompt(params: {
     params.extraInstruction ?? '',
     '',
     '回傳 JSON 物件,格式:',
-    '{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話", "imagePrompt": "若為 instagram 必填:給圖片生成模型的英文描述。畫面要以「人」為主角(有表情、有動作、有生活感的真實場景,例如師傅擦汗大笑、店員幫客人摺衣服),溫暖手繪插畫或自然攝影感,避免冷冰冰的物件圖或科技感構圖,不含文字"}',
+    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${imageSpec ? `, ${imageSpec}` : ''}}`,
   ].filter(Boolean).join('\n');
 }
 

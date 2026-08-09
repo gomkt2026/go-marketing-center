@@ -13,6 +13,8 @@ export interface Env {
   OPENAI_IMAGE_MODEL?: string;
   /** 選填:社群 token 加密金鑰,未設定則以 SESSION_SECRET 衍生 */
   TOKEN_ENCRYPTION_KEY?: string;
+  /** 選填:Throk Threads 數據 API 金鑰(sk-throk-...),用於抓熱門貼文做模仿學習 */
+  THROK_API_KEY?: string;
   /** R2 bucket:AI 生成圖片等媒體檔案 */
   MEDIA?: R2Bucket;
 }

@@ -32,7 +32,25 @@ export interface GenerationResult {
   imageError: string | null;
 }
 
-/** 生成單一平台貼文 + 互動潛力評估 + FB/IG 配圖 */
+/** Threads 配圖每品牌每日上限(控制成本;以台灣時區的一天計) */
+const THREADS_IMAGE_DAILY_CAP = 4;
+
+async function threadsImageCountToday(env: Env, brandId: string): Promise<number> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT count(*)::int AS n
+    FROM content_assets ca
+    JOIN content_versions cv ON cv.id = ca.content_version_id
+    JOIN contents c ON c.id = cv.content_id
+    WHERE c.brand_id = ${brandId}::uuid
+      AND c.target_platform = 'threads'
+      AND ca.asset_type = 'image'
+      AND ca.created_at >= date_trunc('day', now() + interval '8 hours') - interval '8 hours'
+  `;
+  return rows.length ? (rows[0] as { n: number }).n : 0;
+}
+
+/** 生成單一平台貼文 + 互動潛力評估 + 配圖(FB/IG 必配;Threads 由 AI 判斷且受每日上限) */
 export async function generatePlatformPost(
   env: Env,
   params: {
@@ -81,19 +99,34 @@ export async function generatePlatformPost(
     temperature: 0.3,
   });
 
-  // FB / IG 貼文生成配圖;失敗不阻擋文案產出
+  // FB / IG 貼文生成配圖;Threads 由 AI 判斷選填 imagePrompt 才產圖(每品牌每日上限控成本)
   // FB 走寫實攝影(橫式 1536x1024);IG 方形;Homigo IG 走 4:5 直式設計圖(防呆規範)
+  // imageRendering = 'illustration' 的品牌(如 Washgo)全部走插畫風,不套 photorealistic
   // 品牌 logo 已上傳 R2(brand-assets/{slug}/logo.png)時,改走 edits 端點把「真 logo」原樣合成進圖
   let imageUrl: string | null = null;
   let imageError: string | null = null;
-  if ((platform === 'facebook' || platform === 'instagram') && post.imagePrompt) {
+  let wantsImage = !!post.imagePrompt;
+  if (wantsImage && platform === 'threads') {
+    try {
+      const used = await threadsImageCountToday(env, brandCtx.brandId);
+      if (used >= THREADS_IMAGE_DAILY_CAP) {
+        wantsImage = false;
+        console.log(`[generate] ${brandCtx.slug} Threads 今日配圖已達上限 ${THREADS_IMAGE_DAILY_CAP},改純文字`);
+      }
+    } catch {
+      wantsImage = false; // 計數失敗就保守不產圖
+    }
+  }
+  if (wantsImage && post.imagePrompt) {
     try {
       const isFb = platform === 'facebook';
       const isHomigoIg = platform === 'instagram' && brandCtx.slug === 'homigo';
       const logo = await getBrandLogo(env, brandCtx.slug);
       // 台灣人臉孔身形與在地場景;FB 加寫實攝影質感;品牌可自帶紀實風格方向(如老屋紀實)
       const twPeople = 'any people shown are Taiwanese with East Asian facial features and natural everyday body types, authentic Taiwan daily-life setting';
-      const brandStyle = getBrandVoice(brandCtx.slug).imageStyle;
+      const voice = getBrandVoice(brandCtx.slug);
+      const brandStyle = voice.imageStyle;
+      const isIllustration = voice.imageRendering === 'illustration';
       const logoRule = logo
         ? '\nThe provided reference image is the official brand logo. Composite this exact logo as a small, clean, unobtrusive watermark (bottom corner). Do NOT redraw, distort, recolor or resize it disproportionately; keep it away from the edges.'
         : '';
@@ -101,9 +134,11 @@ export async function generatePlatformPost(
         ? `${post.imagePrompt}\n\n${HOMIGO_IG_IMAGE_STYLE}\n${logo
             ? '【品牌標】參考圖就是官方 Homigo logo:原樣放在畫面左下角或 footer,不可變形、不可重畫、不可過大、不可貼底。'
             : HOMIGO_TEXT_MARK_RULE}`
-        : isFb
-          ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text.${logoRule || ' No watermark.'}`
-          : `${post.imagePrompt}. Warm and relatable, ${twPeople}.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text.${logoRule || ' No watermark.'}`;
+        : isIllustration
+          ? `${post.imagePrompt}. ${brandStyle ?? 'Warm hand-drawn illustration style.'} Any people shown are Taiwanese, authentic Taiwan daily-life setting. No text.${logoRule || ' No watermark.'}`
+          : isFb
+            ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text.${logoRule || ' No watermark.'}`
+            : `${post.imagePrompt}. Warm and relatable, ${twPeople}.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text.${logoRule || ' No watermark.'}`;
       const size = isHomigoIg ? '1024x1536' as const : isFb ? '1536x1024' as const : '1024x1024' as const;
       // Homigo 設計圖要在圖上渲染繁中文字,用 high 品質防錯字
       const quality = isHomigoIg ? 'high' as const : 'medium' as const;

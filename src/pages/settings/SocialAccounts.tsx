@@ -194,7 +194,7 @@ export function SocialAccounts() {
                           checked={form.autoPublish}
                           onChange={(e) => setForm((f) => ({ ...f, autoPublish: e.target.checked }))}
                         />
-                        排程自動發布(每 30 分鐘的 Threads 熱門議題貼文直接發布,不經人工審核;需已填入有效 token)
+                        排程自動發布(約每 2 小時一篇 Threads 熱門議題貼文直接發布,凌晨 2-6 點停發,不經人工審核;需已填入有效 token)
                       </label>
                       <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                         <input

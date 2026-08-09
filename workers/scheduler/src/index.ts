@@ -202,14 +202,14 @@ async function generateSignalDrafts(env: Env): Promise<void> {
 }
 
 // ============================================================================
-// 主流程 2:Threads 熱門議題貼文(每品牌每小時一篇)
-//   - 每 tick 處理最久沒發的 2 個品牌;同品牌 55 分鐘內不重發 → 每小時恰一篇
+// 主流程 2:Threads 熱門議題貼文(每品牌每 2 小時一篇;凌晨 2-6 點停發)
+//   - 每 tick 處理最久沒發的 2 個品牌;同品牌 115 分鐘內不重發 → 約每 2 小時一篇
 //   - 熱門議題來源:Google Trends TW + 近期自抓的社群情報(PTT/Dcard)
 //   - 品牌已連 Threads API 且開啟自動發布 → 直接發布;否則存草稿
 // ============================================================================
-const THREADS_DAILY_CAP = 24; // 每品牌每日上限(每小時一篇)
+const THREADS_DAILY_CAP = 10; // 每品牌每日上限(每 2 小時一篇、扣掉凌晨停發時段)
 const THREADS_BRANDS_PER_TICK = 2;
-const THREADS_MIN_INTERVAL_MS = 55 * 60 * 1000; // 每品牌至少間隔 55 分鐘
+const THREADS_MIN_INTERVAL_MS = 115 * 60 * 1000; // 每品牌至少間隔 115 分鐘 → 每 2 小時一篇
 
 async function threadsRound(env: Env): Promise<void> {
   const sql = getSql(env);
@@ -274,7 +274,7 @@ async function threadsRound(env: Env): Promise<void> {
 
       if (willAutoPublish && account) {
         try {
-          const published = await publishThreadsPost(account, { text: result.post.body });
+          const published = await publishThreadsPost(account, { text: result.post.body, imageUrl: result.imageUrl });
           await sql`
             INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, published_at, external_post_id)
             VALUES (${contentId}::uuid, ${versionId}::uuid, 'threads', 'published', now(),
@@ -631,6 +631,7 @@ async function generateDailyTheme(env: Env, targetCount: number = DAILY_THEME_TA
 
 // ============================================================================
 // */30 統一調度:
+//   - 台灣 02:00-05:59 → 深夜靜默,不發文也不回覆
 //   - 台灣 08:00-09:59 → 補每品牌「當日第 1 篇」FB/IG 主題圖文(早上 8 點檔)
 //   - 台灣 20:00-21:59 → 補每品牌「當日第 2 篇」FB/IG 主題圖文(晚上 8 點檔)
 //   - 整點 tick 跑 Threads 發文輪;半點 tick 跑 Threads 熱門貼文回覆輪
@@ -638,6 +639,10 @@ async function generateDailyTheme(env: Env, targetCount: number = DAILY_THEME_TA
 // ============================================================================
 async function halfHourlyDispatch(env: Env): Promise<void> {
   const twHour = (new Date().getUTCHours() + 8) % 24;
+  if (twHour >= 2 && twHour < 6) {
+    console.log('[dispatch] 台灣凌晨 2-6 點靜默時段,跳過 Threads 發文與回覆');
+    return;
+  }
   if (twHour >= 8 && twHour < 10) {
     const didTheme = await generateDailyTheme(env, 1);
     if (didTheme) return; // 主題生成已耗掉大量子請求,這個 tick 不再跑 Threads

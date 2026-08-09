@@ -14,6 +14,8 @@ export interface BrandVoice {
   contentCraft?: string;
   /** 配圖風格方向(附加到圖片生成 prompt) */
   imageStyle?: string;
+  /** 圖片呈現方式:photo 走寫實攝影(預設);illustration 走插畫風(不套 photorealistic) */
+  imageRendering?: 'photo' | 'illustration';
 }
 
 const BRAND_VOICES: Record<string, BrandVoice> = {
@@ -62,6 +64,12 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '棉被外套換季沒地方收;櫃檯最常被問「這個洗得掉嗎」「多久好」。' +
       '你講話親切、像鄰居阿姨/年輕店員,愛分享洗衣小知識與客人趣事。',
     dailyConcerns: '換季送洗、汙漬急救、名牌衣物保養、羽絨被清洗、梅雨天曬不乾、洗衣標籤看不懂',
+    imageStyle:
+      'Studio Ghibli-inspired hand-drawn animation style: soft watercolor textures, warm pastel palette, gentle golden lighting; ' +
+      'a cozy whimsical Taiwanese self-service laundry scene with an adorable tech twist — round friendly washing machines with cute glowing faces, ' +
+      'a small helper robot folding fluffy towels, floating soap bubbles catching the light, steam swirls, plants by the window; ' +
+      'heartwarming, wholesome, storybook-like anime film quality that makes people smile and want to like the post.',
+    imageRendering: 'illustration',
   },
 };
 
@@ -221,7 +229,7 @@ export const HOMIGO_IG_IMAGE_STYLE = [
 export const HOMIGO_TEXT_MARK_RULE =
   '【品牌標】畫面左下角或 footer 放小小的深藍色「Homigo」文字標,乾淨、不可過大、不可貼底。';
 
-/** 各平台配圖描述的要求:FB 走寫實攝影、IG 走溫暖插畫/自然攝影,Threads 純文字不出圖 */
+/** 各平台配圖描述的要求:FB 走寫實攝影、IG 走溫暖插畫/自然攝影,Threads 預設純文字、AI 判斷有圖更好才選填 */
 const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = {
   facebook:
     '"imagePrompt": "必填:給圖片生成模型的英文描述,走「寫實紀實攝影」風格。' +
@@ -232,7 +240,10 @@ const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = 
     '要溫暖、貼近人心、有故事感,photorealistic 質感,避免棚拍廣告感、塑膠感與科技感構圖,不含文字"',
   instagram:
     '"imagePrompt": "必填:給圖片生成模型的英文描述。畫面要以「台灣人」為主角(東亞臉孔、自然的身形與台灣日常穿著,有表情、有動作、有生活感的真實場景,例如師傅擦汗大笑、店員幫客人摺衣服),場景要有台灣感(騎樓、巷口、公寓、夜市…),溫暖手繪插畫或自然攝影感,避免冷冰冰的物件圖或科技感構圖,不含文字"',
-  threads: '',
+  threads:
+    '"imagePrompt": "選填,預設【不要】提供這個欄位(Threads 以純文字為主,大多數貼文不需要圖)。' +
+    '只有當你判斷「這篇配一張圖會明顯更吸睛、更容易被按讚轉發」(例如畫面感很強的場景、視覺哏)才提供:' +
+    '給圖片生成模型的英文描述,描繪一個溫暖可愛、有台灣生活感的場景,不含文字"',
 };
 
 export function buildPostUserPrompt(params: {

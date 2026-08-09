@@ -178,6 +178,15 @@ export const api = {
 
   meta: () => request<{ users: User[]; agents: AIAgent[] }>('/api/meta'),
 
+  trending: () =>
+    request<{
+      trends: { title: string; url: string | null; snippet: string | null }[];
+      news: import('@/types').TrendingItem[];
+      community: import('@/types').TrendingItem[];
+      keywords: { text: string; weight: number }[];
+      generatedAt: string;
+    }>('/api/trending'),
+
   updateMarketSignal: (id: string, status: string) =>
     request<{ signal: import('@/types').MarketSignal }>(`/api/market-signals/${id}`, {
       method: 'PATCH',

@@ -20,6 +20,7 @@ const groups: MenuGroup[] = [
       { label: '品牌工作區', path: '/workspace', brandScoped: true },
       { label: '品牌智慧', path: '/intelligence', brandScoped: true },
       { label: '市場情報', path: '/market', brandScoped: true },
+      { label: '即時熱門', path: '/trending' },
     ],
   },
   {

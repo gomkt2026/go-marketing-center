@@ -5,9 +5,8 @@ import { chatCompleteJson } from '../../../functions/_shared/openai';
 import { buildBrandContext, getBrandVoice } from '../../../functions/_shared/prompts';
 import { generatePlatformPost, saveGeneratedContent, findBrandAgent } from '../../../functions/_shared/generate';
 import { getThreadsAccount, publishThreadsPost } from '../../../functions/_shared/threads';
-import { getThreadsHotPosts, buildHotPostReference } from '../../../functions/_shared/throk';
 import { logActivity } from '../../../functions/_shared/activity';
-import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from './sources';
+import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from '../../../functions/_shared/sources';
 
 // 每品牌的議題來源設定;filterKeywords 用於從一般新聞中挑出行業相關文章
 const BRAND_SOURCES: Record<string, { newsQuery: string; filterKeywords: string[]; pttBoard?: string; dcardForum?: string }> = {
@@ -204,7 +203,7 @@ async function generateSignalDrafts(env: Env): Promise<void> {
 // ============================================================================
 // 主流程 2:Threads 熱門議題貼文(每品牌每小時一篇)
 //   - 每 tick 處理最久沒發的 2 個品牌;同品牌 55 分鐘內不重發 → 每小時恰一篇
-//   - 有 THROK_API_KEY 時附上台灣區爆紅貼文做模仿學習
+//   - 熱門議題來源:Google Trends TW + 近期自抓的社群情報(PTT/Dcard)
 //   - 品牌已連 Threads API 且開啟自動發布 → 直接發布;否則存草稿
 // ============================================================================
 const THREADS_DAILY_CAP = 24; // 每品牌每日上限(每小時一篇)
@@ -213,8 +212,8 @@ const THREADS_MIN_INTERVAL_MS = 55 * 60 * 1000; // 每品牌至少間隔 55 分�
 
 async function threadsRound(env: Env): Promise<void> {
   const sql = getSql(env);
-  const [trends, hotPosts] = await Promise.all([fetchGoogleTrendsTW(8), getThreadsHotPosts(env)]);
-  if (!trends.length && !hotPosts.length) return;
+  const trends = await fetchGoogleTrendsTW(8);
+  if (!trends.length) return;
 
   // 取最久沒產出 Threads 內容的品牌優先
   const brands = await sql`
@@ -229,8 +228,6 @@ async function threadsRound(env: Env): Promise<void> {
     LIMIT ${THREADS_BRANDS_PER_TICK}
   `;
 
-  const hotReference = buildHotPostReference(hotPosts);
-
   for (const brand of brands as { id: string; slug: string; name: string; last_at: string | null; today_count: number }[]) {
     if (brand.today_count >= THREADS_DAILY_CAP) continue;
     if (brand.last_at && Date.now() - new Date(brand.last_at).getTime() < THREADS_MIN_INTERVAL_MS) continue;
@@ -239,14 +236,26 @@ async function threadsRound(env: Env): Promise<void> {
       const agentId = await findBrandAgent(env, brand.id);
       const trendList = trends.map((t) => t.title).join('、');
 
+      // 品牌近期自抓的社群情報(PTT/Dcard 熱門討論)當作社群風向參考
+      const socialRows = await sql`
+        SELECT title FROM market_signals
+        WHERE brand_id = ${brand.id}::uuid
+          AND source_platform IN ('ptt', 'dcard')
+          AND discovered_at > now() - interval '48 hours'
+        ORDER BY relevance_score DESC LIMIT 5
+      `;
+      const socialTopics = (socialRows as { title: string }[]).map((r) => r.title);
+
       const result = await generatePlatformPost(env, {
         brandCtx,
         platform: 'threads',
-        topic: `台灣現在的熱門話題:${trendList || '(見下方爆紅貼文)'}`,
+        topic: `台灣現在的熱門話題:${trendList}`,
         extraInstruction: [
           '從上面的熱門話題挑「一個」最能跟品牌日常自然掛勾的,寫一則 Threads 跟風文。' +
           '如果全部都掛不上,就寫一則品牌日常 observation 文(第一線工作看到的趣事)。不要硬蹭。',
-          hotReference,
+          socialTopics.length
+            ? `目前社群(PTT/Dcard)正在討論的行業話題,也可以從這裡取材:\n${socialTopics.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
+            : '',
         ].filter(Boolean).join('\n\n'),
       });
 
@@ -259,7 +268,7 @@ async function threadsRound(env: Env): Promise<void> {
         result,
         generatedByAgentId: agentId,
         status: 'draft',
-        promptMeta: { source: 'threads_hourly', trends: trends.map((t) => t.title), hotPostsUsed: hotPosts.length > 0 },
+        promptMeta: { source: 'threads_hourly', trends: trends.map((t) => t.title), socialTopics },
       });
 
       if (willAutoPublish && account) {
@@ -456,7 +465,7 @@ export default {
     }
   },
 
-  // 手動觸發除錯用:GET /?task=collect|drafts|threads|themes|throk|cleanup(需帶 secret)
+  // 手動觸發除錯用:GET /?task=collect|drafts|threads|themes|cleanup(需帶 secret)
   // themes 可帶 &target=1|2 指定要補到當日第幾篇
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -469,14 +478,8 @@ export default {
     else if (task === 'drafts') await generateSignalDrafts(env);
     else if (task === 'threads') await threadsRound(env);
     else if (task === 'themes') await generateDailyTheme(env, Number(url.searchParams.get('target') ?? DAILY_THEME_TARGET));
-    else if (task === 'throk') {
-      const posts = await getThreadsHotPosts(env);
-      return new Response(JSON.stringify({ ok: true, configured: !!env.THROK_API_KEY, count: posts.length, sample: posts.slice(0, 3) }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
     else if (task === 'cleanup') await cleanupOldMedia(env);
-    else return new Response('task 必須為 collect / drafts / threads / themes / throk / cleanup', { status: 400 });
+    else return new Response('task 必須為 collect / drafts / threads / themes / cleanup', { status: 400 });
     return new Response(JSON.stringify({ ok: true, task }), { headers: { 'Content-Type': 'application/json' } });
   },
 };

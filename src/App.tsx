@@ -10,6 +10,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { BrandWorkspace } from '@/pages/brand/BrandWorkspace';
 import { BrandIntelligence } from '@/pages/brand/BrandIntelligence';
 import { MarketIntelligence } from '@/pages/brand/MarketIntelligence';
+import { Trending } from '@/pages/trending/Trending';
 import { MeetingList } from '@/pages/meeting/MeetingList';
 import { DecisionCenter } from '@/pages/decision/DecisionCenter';
 import { CollaborationList } from '@/pages/collaboration/CollaborationList';
@@ -54,6 +55,7 @@ export default function App() {
                       </Routes>
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
+                        <Route path="/trending" element={<Trending />} />
 
                         <Route path="/:brand/workspace" element={<BrandWorkspace />} />
                         <Route path="/:brand/intelligence" element={<BrandIntelligence />} />

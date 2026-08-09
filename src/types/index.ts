@@ -140,6 +140,19 @@ export interface MarketSignal {
   discoveredAt: string;
 }
 
+/** 即時熱門看板的項目(來自精選情報或即時抓取) */
+export interface TrendingItem {
+  title: string;
+  url: string | null;
+  source: string;
+  summary: string | null;
+  brandSlug: string | null;
+  brandName: string | null;
+  relevance: number | null;
+  signalId: string | null;
+  discoveredAt: string | null;
+}
+
 export type AgentRoleCode =
   | 'brand_ai' | 'market_analyst' | 'content_strategist'
   | 'risk_advisor' | 'devils_advocate' | 'moderator';

@@ -15,6 +15,8 @@ export interface Env {
   TOKEN_ENCRYPTION_KEY?: string;
   /** R2 bucket:AI 生成圖片等媒體檔案 */
   MEDIA?: R2Bucket;
+  /** 選填:站台公開網址(組媒體絕對 URL 給 Meta API 抓圖用),預設 Pages 網域 */
+  PUBLIC_BASE_URL?: string;
 }
 
 export function getSessionSecret(env: Env): string {

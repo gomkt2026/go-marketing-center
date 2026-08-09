@@ -186,6 +186,16 @@ export function SocialAccounts() {
                       placeholder="貼上 token 後會加密儲存"
                     />
                   </label>
+                  {(p.id === 'facebook' || p.id === 'instagram') && (
+                    <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={form.autoPublish}
+                        onChange={(e) => setForm((f) => ({ ...f, autoPublish: e.target.checked }))}
+                      />
+                      排程自動發布(每日早晚主題圖文生成後直接透過 API 發布,不經人工審核;需已填入平台 ID 與有效 token{p.id === 'instagram' ? ';IG 必須有配圖,無圖時會留待人工審核' : ''})
+                    </label>
+                  )}
                   {p.id === 'threads' && (
                     <>
                       <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>

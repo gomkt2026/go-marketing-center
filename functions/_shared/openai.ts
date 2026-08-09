@@ -85,7 +85,7 @@ async function parseImageResponse(res: Response): Promise<Uint8Array> {
   throw new OpenAIError(502, 'OpenAI 未回傳圖片資料');
 }
 
-/** 產生圖片,回傳 PNG bytes */
+/** 產生圖片,回傳 JPEG bytes */
 export async function generateImage(
   env: Env,
   params: { prompt: string; size?: ImageSize; quality?: ImageQuality },
@@ -100,6 +100,8 @@ export async function generateImage(
       size: params.size ?? '1024x1024',
       // 預設 medium(快);要在圖上渲染中文字的設計圖用 high,避免錯字
       quality: params.quality ?? 'medium',
+      // IG Graph API 的 image_url 只接受 JPEG,統一輸出 JPEG(檔案也較小)
+      output_format: 'jpeg',
       n: 1,
     }),
   });
@@ -120,6 +122,7 @@ export async function generateImageWithReference(
   form.append('prompt', params.prompt);
   form.append('size', params.size ?? '1024x1024');
   form.append('quality', params.quality ?? 'medium');
+  form.append('output_format', 'jpeg');
   form.append('input_fidelity', 'high');
   form.append('image[]', new Blob([params.reference as unknown as ArrayBuffer], { type: 'image/png' }), 'logo.png');
   const res = await fetch(`${OPENAI_BASE}/images/edits`, {

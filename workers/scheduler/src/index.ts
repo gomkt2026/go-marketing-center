@@ -5,6 +5,8 @@ import { chatCompleteJson } from '../../../functions/_shared/openai';
 import { buildBrandContext, getBrandVoice, ANTI_AI_RULES } from '../../../functions/_shared/prompts';
 import { generatePlatformPost, saveGeneratedContent, findBrandAgent } from '../../../functions/_shared/generate';
 import { getThreadsAccount, publishThreadsPost, searchThreadsPosts, type ThreadsSearchPost } from '../../../functions/_shared/threads';
+import { getMetaAccount, publishFacebookPost, publishInstagramPost, composePostMessage } from '../../../functions/_shared/meta';
+import { toPublicMediaUrl } from '../../../functions/_shared/media';
 import { publishReplyTarget, replyTextIssue } from '../../../functions/_shared/threads-replies';
 import { logActivity } from '../../../functions/_shared/activity';
 import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from '../../../functions/_shared/sources';
@@ -274,7 +276,7 @@ async function threadsRound(env: Env): Promise<void> {
 
       if (willAutoPublish && account) {
         try {
-          const published = await publishThreadsPost(account, { text: result.post.body, imageUrl: result.imageUrl });
+          const published = await publishThreadsPost(account, { text: result.post.body, imageUrl: toPublicMediaUrl(env, result.imageUrl) });
           await sql`
             INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, published_at, external_post_id)
             VALUES (${contentId}::uuid, ${versionId}::uuid, 'threads', 'published', now(),
@@ -602,12 +604,39 @@ async function generateDailyTheme(env: Env, targetCount: number = DAILY_THEME_TA
           topicSummary: theme.summary,
           extraInstruction: `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。`,
         });
-        const { contentId } = await saveGeneratedContent(env, {
+
+        // 帳號開啟排程自動發布 → 生成後直接透過 Graph API 發布;否則存待審核
+        const account = await getMetaAccount(env, brand.id, platform);
+        const publicImage = toPublicMediaUrl(env, result.imageUrl);
+        const willAutoPublish = !!account?.autoPublish && (platform !== 'instagram' || !!publicImage);
+
+        const { contentId, versionId } = await saveGeneratedContent(env, {
           brandCtx, platform, result,
           generatedByAgentId: agentId,
           status: 'pending_review',
           promptMeta: { source: 'daily_theme', theme: theme.theme, themeKey },
         });
+
+        let autoPublished = false;
+        if (willAutoPublish && account) {
+          try {
+            const message = composePostMessage(result.post.body, result.post.hashtags);
+            const published = platform === 'facebook'
+              ? await publishFacebookPost(account, { message, imageUrl: publicImage })
+              : await publishInstagramPost(account, { caption: message, imageUrl: publicImage! });
+            await sql`
+              INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, published_at, external_post_id)
+              VALUES (${contentId}::uuid, ${versionId}::uuid, ${platform}, 'published', now(),
+                      ${published.permalink ?? published.postId})
+            `;
+            await sql`UPDATE contents SET status = 'published', updated_at = now() WHERE id = ${contentId}::uuid`;
+            autoPublished = true;
+            console.log(`[themes] ${brand.slug}/${platform} 已自動發布:${published.permalink ?? published.postId}`);
+          } catch (pubErr) {
+            console.error(`[themes] ${brand.slug}/${platform} 自動發布失敗,保留待審核`, pubErr);
+          }
+        }
+
         await logActivity(env, {
           brandId: brand.id,
           actorType: 'ai_agent',
@@ -615,7 +644,7 @@ async function generateDailyTheme(env: Env, targetCount: number = DAILY_THEME_TA
           action: 'content.generated',
           entityType: 'content',
           entityId: contentId,
-          afterState: { platform, auto: true, dailyTheme: theme.theme },
+          afterState: { platform, auto: true, dailyTheme: theme.theme, autoPublished },
         });
       } catch (e) {
         console.error(`[themes] ${brand.slug}/${platform} 主題貼文生成失敗`, e);

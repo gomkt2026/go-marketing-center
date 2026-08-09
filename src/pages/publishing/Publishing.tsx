@@ -53,8 +53,8 @@ const genSourceLabel: Record<string, string> = {
 };
 
 const PLATFORM_COLUMNS: { id: 'facebook' | 'instagram' | 'threads'; label: string; note: string }[] = [
-  { id: 'facebook', label: 'Facebook', note: '每日 1-2 主題故事文,人工審核後發布' },
-  { id: 'instagram', label: 'Instagram', note: '與 FB 共用每日主題,搭配 AI 生成配圖' },
+  { id: 'facebook', label: 'Facebook', note: '每日 1-2 主題故事文;連接 API 後可自動發布或批准後一鍵發布' },
+  { id: 'instagram', label: 'Instagram', note: '與 FB 共用每日主題,搭配 AI 生成配圖;連接 API 後可自動發布' },
   { id: 'threads', label: 'Threads', note: '約每 2 小時一篇熱門議題貼文(凌晨 2-6 點停發);連接 API 後可自動發布' },
 ];
 

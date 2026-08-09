@@ -145,8 +145,8 @@ export async function generatePlatformPost(
       const bytes = logo
         ? await generateImageWithReference(env, { prompt, reference: logo, size, quality })
         : await generateImage(env, { prompt, size, quality });
-      const key = buildMediaKey(brandCtx.slug);
-      imageUrl = await putMedia(env, key, bytes);
+      const key = buildMediaKey(brandCtx.slug, 'jpg');
+      imageUrl = await putMedia(env, key, bytes, 'image/jpeg');
     } catch (e) {
       imageError = e instanceof Error ? e.message : '圖片生成失敗';
     }

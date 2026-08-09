@@ -61,7 +61,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     accessToken?: string;   // 提供則覆寫;undefined 表示不變
     clearToken?: boolean;   // true 則清除 token
     notes?: string;
-    autoPublish?: boolean;  // 排程生成後直接發布(目前支援 threads)
+    autoPublish?: boolean;  // 排程生成後直接發布(threads / facebook / instagram)
     autoReply?: boolean;    // 自動回覆熱門貼文(threads)
     replyDailyCap?: number; // 每日回覆上限
   };

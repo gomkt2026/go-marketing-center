@@ -17,3 +17,16 @@ export async function putMedia(env: Env, key: string, bytes: Uint8Array, content
   await env.MEDIA.put(key, bytes as unknown as ArrayBuffer, { httpMetadata: { contentType } });
   return `/api/media/${key}`;
 }
+
+const DEFAULT_PUBLIC_BASE = 'https://go-marketing-center.pages.dev';
+
+/**
+ * 把站內相對媒體路徑(/api/media/...)轉成公開絕對 URL。
+ * Meta / Threads 的 image_url 參數是由對方伺服器抓圖,必須是公開絕對網址。
+ */
+export function toPublicMediaUrl(env: Env, url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = (env.PUBLIC_BASE_URL ?? DEFAULT_PUBLIC_BASE).replace(/\/$/, '');
+  return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+}

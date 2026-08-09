@@ -41,6 +41,10 @@ const platformTone: Record<string, BadgeTone> = {
 const platformLabel: Record<string, string> = {
   facebook: 'FB', instagram: 'IG', threads: 'Threads',
 };
+const API_PUBLISH_PLATFORMS = ['threads', 'facebook', 'instagram'];
+const apiPublishLabel: Record<string, string> = {
+  facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads',
+};
 
 function latestVersion(content: Content) {
   return content.versions[content.versions.length - 1];
@@ -123,9 +127,10 @@ export function ContentCenter() {
     if (!selected || apiPublishing) return;
     setApiPublishing(true);
     setPublishMessage(null);
+    const label = apiPublishLabel[selected.targetPlatform ?? ''] ?? selected.targetPlatform;
     try {
       const res = await api.apiPublishContent(selected.id);
-      setPublishMessage(res.permalink ? `已發布到 Threads:${res.permalink}` : '已發布到 Threads');
+      setPublishMessage(res.permalink ? `已發布到 ${label}:${res.permalink}` : `已發布到 ${label}`);
       reload();
     } catch (e) {
       setPublishMessage(`發布失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
@@ -275,14 +280,14 @@ export function ContentCenter() {
                   <div style={{ marginBottom: 14, borderRadius: 12, background: 'var(--color-primary-soft)', padding: 14 }}>
                     <strong style={{ fontSize: 13 }}>發布</strong>
                     <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '4px 0 10px' }}>
-                      {selected.targetPlatform === 'threads'
-                        ? '已連接 Threads API 的品牌可一鍵發布;或複製文案手動貼文後標記已發布'
+                      {API_PUBLISH_PLATFORMS.includes(selected.targetPlatform ?? '')
+                        ? `已連接 ${apiPublishLabel[selected.targetPlatform ?? '']} API 的品牌可一鍵發布;或複製文案手動貼文後標記已發布${selected.targetPlatform === 'instagram' ? '(IG API 發布必須有配圖)' : ''}`
                         : `複製文案與下載配圖後貼到 ${selected.targetPlatform},再回來標記已發布`}
                     </p>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {selected.targetPlatform === 'threads' && selected.status === 'approved' && (
+                      {API_PUBLISH_PLATFORMS.includes(selected.targetPlatform ?? '') && selected.status === 'approved' && (
                         <Button variant="primary" style={{ fontSize: 12, padding: '5px 12px' }} disabled={apiPublishing} onClick={() => void apiPublish()}>
-                          {apiPublishing ? '⏳ 發布中...' : '🚀 發布到 Threads'}
+                          {apiPublishing ? '⏳ 發布中...' : `🚀 發布到 ${apiPublishLabel[selected.targetPlatform ?? '']}`}
                         </Button>
                       )}
                       <Button variant="secondary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => void copyBody()}>📋 複製文案</Button>
@@ -293,7 +298,7 @@ export function ContentCenter() {
                       ))}
                       {selected.status === 'approved' && (
                         <Button
-                          variant={selected.targetPlatform === 'threads' ? 'ghost' : 'primary'}
+                          variant={API_PUBLISH_PLATFORMS.includes(selected.targetPlatform ?? '') ? 'ghost' : 'primary'}
                           style={{ fontSize: 12, padding: '5px 12px' }}
                           onClick={() => void markPublished()}
                         >

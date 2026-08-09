@@ -3,11 +3,15 @@ import type { Env } from '../../../_shared/env';
 import { requireAuth } from '../../../_shared/auth';
 import { getSql } from '../../../_shared/db';
 import { getThreadsAccount, publishThreadsPost } from '../../../_shared/threads';
+import { getMetaAccount, publishFacebookPost, publishInstagramPost, composePostMessage } from '../../../_shared/meta';
+import { toPublicMediaUrl } from '../../../_shared/media';
 import { logActivity } from '../../../_shared/activity';
 import { json, error } from '../../../_shared/response';
 
-// 已批准的內容透過官方 API 直接發布(目前支援 threads)
-// 流程:批准 → 點「發布到 Threads」→ 呼叫 Threads API → 寫入發布紀錄
+const PLATFORM_LABELS: Record<string, string> = { threads: 'Threads', facebook: 'Facebook', instagram: 'Instagram' };
+
+// 已批准的內容透過官方 API 直接發布(支援 Threads / FB 粉專 / IG 商業帳號)
+// 流程:批准 → 點「API 發布」→ 呼叫對應平台 API → 寫入發布紀錄
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
@@ -19,41 +23,56 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!contentRows.length) return error('找不到內容', 404);
   const content = contentRows[0] as { brand_id: string; target_platform: string | null; status: string; title: string };
 
-  if (content.target_platform !== 'threads') {
-    return error('目前僅支援 Threads 透過 API 發布,FB / IG 請使用手動發布流程', 400);
+  const platform = content.target_platform;
+  if (platform !== 'threads' && platform !== 'facebook' && platform !== 'instagram') {
+    return error('此內容的目標平台不支援 API 發布', 400);
   }
   if (!['approved', 'scheduled'].includes(content.status)) {
     return error('內容需先批准才能發布', 400);
   }
 
   const versionRows = await sql`
-    SELECT id, body FROM content_versions
+    SELECT id, body, hashtags FROM content_versions
     WHERE content_id = ${contentId}::uuid ORDER BY version_number DESC LIMIT 1
   `;
   if (!versionRows.length) return error('內容沒有版本', 400);
-  const version = versionRows[0] as { id: string; body: string };
+  const version = versionRows[0] as { id: string; body: string; hashtags: string[] | null };
 
-  const account = await getThreadsAccount(context.env, content.brand_id);
-  if (!account) return error('品牌尚未連接 Threads 帳號(社群帳號頁需填入有效 token)', 400);
-
-  // 最新版本若有配圖則一併帶上(Threads 支援單張圖片)
+  // 最新版本若有配圖則一併帶上(轉成公開絕對網址,Meta 伺服器才抓得到)
   const assetRows = await sql`
     SELECT file_url FROM content_assets
     WHERE content_version_id = ${version.id}::uuid AND asset_type = 'image'
     LIMIT 1
   `;
-  const imageUrl = assetRows.length ? (assetRows[0] as { file_url: string }).file_url : null;
+  const imageUrl = toPublicMediaUrl(
+    context.env,
+    assetRows.length ? (assetRows[0] as { file_url: string }).file_url : null,
+  );
 
   let published: { postId: string; permalink: string | null };
   try {
-    published = await publishThreadsPost(account, { text: version.body, imageUrl });
+    if (platform === 'threads') {
+      const account = await getThreadsAccount(context.env, content.brand_id);
+      if (!account) return error('品牌尚未連接 Threads 帳號(社群帳號頁需填入有效 token)', 400);
+      published = await publishThreadsPost(account, { text: version.body, imageUrl });
+    } else {
+      const account = await getMetaAccount(context.env, content.brand_id, platform);
+      if (!account) return error(`品牌尚未連接 ${PLATFORM_LABELS[platform]} 帳號(社群帳號頁需填入平台 ID 與有效 token)`, 400);
+      const message = composePostMessage(version.body, version.hashtags);
+      if (platform === 'instagram') {
+        if (!imageUrl) return error('IG API 發布必須有配圖,此內容沒有圖片', 400);
+        published = await publishInstagramPost(account, { caption: message, imageUrl });
+      } else {
+        published = await publishFacebookPost(account, { message, imageUrl });
+      }
+    }
   } catch (e) {
-    return error(e instanceof Error ? e.message : 'Threads 發布失敗', 502);
+    return error(e instanceof Error ? e.message : `${PLATFORM_LABELS[platform]} 發布失敗`, 502);
   }
 
   const jobRows = await sql`
     INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, published_at, published_by, external_post_id)
-    VALUES (${contentId}::uuid, ${version.id}::uuid, 'threads', 'published',
+    VALUES (${contentId}::uuid, ${version.id}::uuid, ${platform}, 'published',
             now(), ${auth.id}::uuid, ${published.permalink ?? published.postId})
     RETURNING id
   `;
@@ -72,8 +91,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     action: 'publishing.published',
     entityType: 'publishing_job',
     entityId: jobId,
-    afterState: { viaApi: true, platform: 'threads', permalink: published.permalink },
+    afterState: { viaApi: true, platform, permalink: published.permalink },
   });
 
-  return json({ ok: true, jobId, permalink: published.permalink, postId: published.postId }, 201);
+  return json({ ok: true, jobId, platform, permalink: published.permalink, postId: published.postId }, 201);
 };

@@ -35,19 +35,21 @@ const STOPWORDS = new Set([
 ]);
 
 /**
- * 輕量中文關鍵詞抽取:對標題做 2-6 字 n-gram 詞頻統計。
- * 去雜訊規則:某個詞若是「頻率不低於它的更長詞」的一部分,表示它從未獨立出現過
- * (只是滑動視窗切出的碎片,如「颱風白海」之於「颱風白海豚」),直接丟棄,只留最長的完整詞。
+ * 輕量中文關鍵詞抽取:對標題做 2-8 字 n-gram 詞頻統計。
+ * 去雜訊規則:
+ * 1. 某個詞若是「頻率不低於它的更長詞」的一部分,表示它從未獨立出現過
+ *    (只是滑動視窗切出的碎片,如「颱風白海」之於「颱風白海豚」),丟棄,只留最長的完整詞。
+ * 2. 輸出前剔除含停用詞的片語(如「颱風白海豚影響」含「影響」),留下乾淨的關鍵詞。
  */
 function extractKeywords(titles: string[], limit = 40): KeywordItem[] {
   const freq = new Map<string, number>();
   for (const title of titles) {
     const seen = new Set<string>(); // 同一標題內同詞只計一次
     for (const run of title.match(/[\u4e00-\u9fff]{2,}/g) ?? []) {
-      for (let n = 2; n <= 6; n++) {
+      for (let n = 2; n <= 8; n++) {
         for (let i = 0; i + n <= run.length; i++) {
           const gram = run.slice(i, i + n);
-          if (STOPWORDS.has(gram) || seen.has(gram)) continue;
+          if (seen.has(gram)) continue;
           seen.add(gram);
           freq.set(gram, (freq.get(gram) ?? 0) + 1);
         }
@@ -59,7 +61,12 @@ function extractKeywords(titles: string[], limit = 40): KeywordItem[] {
   }
 
   const candidates = [...freq.entries()].filter(([, count]) => count >= 2);
+  const containsStopword = (text: string) => {
+    for (const sw of STOPWORDS) if (text.includes(sw)) return true;
+    return false;
+  };
   const kept = candidates.filter(([text, weight]) =>
+    !containsStopword(text) &&
     !candidates.some(([other, otherWeight]) =>
       other.length > text.length && otherWeight >= weight && other.includes(text)));
 

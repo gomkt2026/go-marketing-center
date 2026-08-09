@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { Meeting, MeetingMessage, AgentWithPersona, MeetingPostPlanItem } from '@/types';
 
-const MEETING_SECONDS = 5 * 60;
+const MEETING_SECONDS = 3 * 60;
 /** 兩則發言之間的間隔(毫秒),加上生成時間約 12-18 秒一則 */
 const GAP_MS_MIN = 7000;
 const GAP_MS_MAX = 12000;
@@ -251,7 +251,7 @@ export function LiveMeetingRoom({ meeting, initialMessages, onReload }: {
               ⏱ {mm}:{ss}
             </span>
             {!isConcluded && !running && (
-              <Button variant="primary" onClick={start}>▶ 開始 5 分鐘小編會議</Button>
+              <Button variant="primary" onClick={start}>▶ 開始 3 分鐘小編會議</Button>
             )}
             {!isConcluded && messages.length > 0 && (
               <Button variant="secondary" disabled={concluding} onClick={() => void conclude()}>
@@ -363,7 +363,7 @@ export function LiveMeetingRoom({ meeting, initialMessages, onReload }: {
             </>
           ) : (
             <p style={{ color: 'rgba(243,239,228,0.65)', fontSize: 14, lineHeight: 1.8, margin: 0, paddingTop: 14, textAlign: 'center' }}>
-              {isConcluded ? '會議已結束。' : '按「▶ 開始 5 分鐘小編會議」,三位小編就會在這裡開聊;你隨時可以插話。'}
+              {isConcluded ? '會議已結束。' : '按「▶ 開始 3 分鐘小編會議」,三位小編就會在這裡開聊;你隨時可以插話。'}
             </p>
           )}
           {typing && (

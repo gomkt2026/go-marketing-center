@@ -48,7 +48,7 @@ export function MeetingList() {
     }
   }
 
-  // 小編快閃會議:三位品牌小編 5 分鐘直播式討論
+  // 小編快閃會議:三位品牌小編 3 分鐘直播式討論
   async function createLiveMeeting() {
     if (creating) return;
     const topic = window.prompt('這場快閃會議要聊什麼?(例如:下週三品牌的發文主題)');
@@ -84,7 +84,7 @@ export function MeetingList() {
       <div>
         <PageHeader title="AI 會議室" />
         <Button variant="primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }} disabled={creating} onClick={() => void createLiveMeeting()}>
-          {creating ? '⏳ 建立中...' : '⚡ 小編快閃會議(5 分鐘直播)'}
+          {creating ? '⏳ 建立中...' : '⚡ 小編快閃會議(3 分鐘直播)'}
         </Button>
         <Button variant="secondary" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }} disabled={creating} onClick={() => void createMeeting()}>
           + 建立一般會議

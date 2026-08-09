@@ -3,6 +3,7 @@ import { getSql } from './db';
 import { chatCompleteJson, generateImage } from './openai';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
+  HOMIGO_IG_IMAGE_STYLE,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
 } from './prompts';
 import { buildMediaKey, putMedia } from './media';
@@ -31,10 +32,14 @@ export async function generatePlatformPost(
 ): Promise<GenerationResult> {
   const { brandCtx, platform } = params;
 
+  const userPrompt = buildPostUserPrompt({
+    platform, topic: params.topic, topicSummary: params.topicSummary,
+    extraInstruction: params.extraInstruction, brandSlug: brandCtx.slug,
+  });
   let post = await chatCompleteJson<GeneratedPost>(env, {
     messages: [
       { role: 'system', content: brandCtx.systemPrompt },
-      { role: 'user', content: buildPostUserPrompt({ platform, topic: params.topic, topicSummary: params.topicSummary, extraInstruction: params.extraInstruction }) },
+      { role: 'user', content: userPrompt },
     ],
   });
 
@@ -43,7 +48,7 @@ export async function generatePlatformPost(
     post = await chatCompleteJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: brandCtx.systemPrompt },
-        { role: 'user', content: buildPostUserPrompt({ platform, topic: params.topic, topicSummary: params.topicSummary, extraInstruction: params.extraInstruction }) },
+        { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
         { role: 'user', content: `這篇 ${post.body.length} 字,超過 1000 字上限。請保留故事核心,縮短到 1000 字以內,回傳同格式 JSON。` },
       ],
@@ -60,19 +65,24 @@ export async function generatePlatformPost(
   });
 
   // FB / IG 貼文生成配圖;失敗不阻擋文案產出
-  // FB 走寫實攝影(橫式 1536x1024,貼近動態牆比例);IG 維持方形
+  // FB 走寫實攝影(橫式 1536x1024);IG 方形;Homigo IG 走 4:5 直式設計圖(防呆規範)
   let imageUrl: string | null = null;
   let imageError: string | null = null;
   if ((platform === 'facebook' || platform === 'instagram') && post.imagePrompt) {
     try {
       const isFb = platform === 'facebook';
+      const isHomigoIg = platform === 'instagram' && brandCtx.slug === 'homigo';
       // 台灣人臉孔身形與在地場景;FB 加寫實攝影質感;品牌可自帶紀實風格方向(如老屋紀實)
       const twPeople = 'any people shown are Taiwanese with East Asian facial features and natural everyday body types, authentic Taiwan daily-life setting';
       const brandStyle = getBrandVoice(brandCtx.slug).imageStyle;
-      const prompt = isFb
-        ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text, no watermark.`
-        : `${post.imagePrompt}. Warm and relatable, ${twPeople}.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text, no watermark.`;
-      const bytes = await generateImage(env, { prompt, size: isFb ? '1536x1024' : '1024x1024' });
+      const prompt = isHomigoIg
+        ? `${post.imagePrompt}\n\n${HOMIGO_IG_IMAGE_STYLE}`
+        : isFb
+          ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text, no watermark.`
+          : `${post.imagePrompt}. Warm and relatable, ${twPeople}.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text, no watermark.`;
+      const size = isHomigoIg ? '1024x1536' as const : isFb ? '1536x1024' as const : '1024x1024' as const;
+      // Homigo 設計圖要在圖上渲染繁中文字,用 high 品質防錯字
+      const bytes = await generateImage(env, { prompt, size, quality: isHomigoIg ? 'high' : 'medium' });
       const key = buildMediaKey(brandCtx.slug);
       imageUrl = await putMedia(env, key, bytes);
     } catch (e) {

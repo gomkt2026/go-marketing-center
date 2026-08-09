@@ -21,7 +21,9 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
     frontlinePersona:
       '你是做包租代管十年的第一線人員,每天面對房東與房客。寫文時你會輪流換位思考:' +
       '房東擔心租金收不到、房子被弄壞、報稅麻煩;房客在意押金拿不拿得回來、修繕沒人理、租約陷阱。' +
-      '你講話像在 LINE 群組裡回覆客戶,務實、有溫度、偶爾吐槽行業亂象。',
+      '你講話像在 LINE 群組裡回覆客戶,務實、有溫度、偶爾吐槽行業亂象。' +
+      '品牌定位:Homigo 不是收租工具,而是在整理「租屋關係、租屋紀錄、租屋信任、租屋流程」;' +
+      '品牌核心句:「把原本散落的事情,重新整理回同一個地方。」寫文時的立場永遠是先同理租屋的混亂,再談整理。',
     dailyConcerns: '租屋補助、租金行情、惡房東/惡房客糾紛、修繕責任、租約公證、包租代管節稅、社宅政策',
     contentCraft:
       '寫深度文時遵守這個範式(高互動房產帳號的寫法):' +
@@ -190,6 +192,30 @@ export interface EngagementPrediction {
   suggestions: string[]; // 改進建議
 }
 
+// ============================================================================
+// Homigo IG/Threads 專用:4:5 直式「社群設計圖」規範(痛點主標 → 情境 → 解法)
+// ============================================================================
+
+/** 指示文案 AI 為 Homigo IG 圖撰寫設計描述(不是純照片描述) */
+export const HOMIGO_IG_IMAGE_PROMPT_SPEC =
+  '"imagePrompt": "必填:這張圖是 Homigo 的 4:5 直式「社群設計圖」(不是純照片)。請用繁體中文描述三個元素:' +
+  '1) 主標文字:從貼文提煉一句 4-10 字、有情緒、會直接印在圖上的痛點短句(例如「講不清楚」「根本管不動」「房子越多,越焦慮」「大家都在自保」);' +
+  '2) 情境畫面:台灣年輕房東或房客的真實疲憊場景(LINE 訊息爆炸、合約找不到、報修沒人理、電費算不清),自然表情、不要商業假笑;' +
+  '3) Homigo 解法元素:一個簡潔白底的手機畫面(合約管理/繳租紀錄/報修紀錄/電表管理擇一),低調出現在畫面下方"';
+
+/** Homigo IG 圖片生成的固定設計規格(直接附加在圖片 prompt 後) */
+export const HOMIGO_IG_IMAGE_STYLE = [
+  '【設計規格】4:5 直式社群貼文設計圖。米白背景(#F5F1EA)大面積留白;深藍(#0B2D5C)為主要資訊色;黃色(#F7B500)只做重點強調,禁止過度花俏。',
+  '上下留白至少 120px、左右至少 80px,文字不可貼邊,畫面不可過滿,留白感要足夠。',
+  '【閱讀順序】第一眼:大而粗、有情緒的繁體中文主標(痛點,可局部用黃色強調);第二眼:有共鳴的情境;第三眼才看到 Homigo 解法。先讓人感受到問題,不要一開始就像廣告、像在賣工具。',
+  '【人物】東亞臉孔的台灣年輕人,自然表情、不要過度微笑、不要商業假笑,情緒偏真實與疲憊(房東焦慮、房客無奈)。不浮誇、不搞笑,讓人有共鳴。',
+  '【手機UI】簡潔、白底、深藍 icon、黃色重點;像真的有人會用的租屋工具,不要金融 APP 的科技感,不要過度複雜的 UI、假 icon、無意義按鈕、奇怪數字。',
+  '【文字防呆】圖上所有文字必須是「正確的繁體中文」:禁止簡體字、禁止錯字、禁止英文亂碼、禁止模糊文字。文字量要少,只留主標與必要的 UI 標籤。',
+  '【整體感覺】像新創品牌做的內容視覺,有觀點、有情緒、有生活感;不要像電商廣告、保險 DM、傳統房仲海報、不要過度商業化。',
+  '【品牌標】畫面左下角或 footer 放小小的深藍色「Homigo」文字標,乾淨、不可過大、不可貼底。',
+  '目標:讓人看到的反應是「這真的就是我遇到的問題」,而不是「又一個廣告」。',
+].join('\n');
+
 /** 各平台配圖描述的要求:FB 走寫實攝影、IG 走溫暖插畫/自然攝影,Threads 純文字不出圖 */
 const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = {
   facebook:
@@ -209,9 +235,12 @@ export function buildPostUserPrompt(params: {
   topic: string;
   topicSummary?: string;
   extraInstruction?: string;
+  brandSlug?: string;
 }): string {
   const guideline = PLATFORM_GUIDELINES[params.platform];
-  const imageSpec = IMAGE_PROMPT_SPEC[params.platform];
+  const imageSpec = params.brandSlug === 'homigo' && params.platform === 'instagram'
+    ? HOMIGO_IG_IMAGE_PROMPT_SPEC
+    : IMAGE_PROMPT_SPEC[params.platform];
   return [
     `請針對以下主題,為 ${params.platform} 平台寫一篇貼文。`,
     `主題:${params.topic}`,

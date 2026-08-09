@@ -64,7 +64,7 @@ export async function chatCompleteJson<T>(
 /** 產生圖片,回傳 PNG bytes */
 export async function generateImage(
   env: Env,
-  params: { prompt: string; size?: '1024x1024' | '1024x1536' | '1536x1024' },
+  params: { prompt: string; size?: '1024x1024' | '1024x1536' | '1536x1024'; quality?: 'medium' | 'high' },
 ): Promise<Uint8Array> {
   const apiKey = requireApiKey(env);
   const res = await fetch(`${OPENAI_BASE}/images/generations`, {
@@ -74,8 +74,8 @@ export async function generateImage(
       model: env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1',
       prompt: params.prompt,
       size: params.size ?? '1024x1024',
-      // medium 品質社群貼圖已足夠,生成時間比預設(auto=high)快一倍以上
-      quality: 'medium',
+      // 預設 medium(快);要在圖上渲染中文字的設計圖用 high,避免錯字
+      quality: params.quality ?? 'medium',
       n: 1,
     }),
   });

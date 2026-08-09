@@ -7,6 +7,7 @@ import {
   type BrandContext, type GeneratedPost, type EngagementPrediction,
 } from './prompts';
 import { buildMediaKey, putMedia } from './media';
+import { normalizeMultilineText } from './text';
 
 export type SocialPlatform = 'facebook' | 'instagram' | 'threads';
 
@@ -55,6 +56,9 @@ export async function generatePlatformPost(
     ],
   });
 
+  // 修正模型偶發輸出的字面 \n(否則會原樣出現在貼文上)
+  post.body = normalizeMultilineText(post.body);
+
   // FB 硬限制 1000 字:超過就要求縮短一次
   if (platform === 'facebook' && post.body.length > 1000) {
     post = await chatCompleteJson<GeneratedPost>(env, {
@@ -66,6 +70,7 @@ export async function generatePlatformPost(
       ],
       temperature: 0.5,
     });
+    post.body = normalizeMultilineText(post.body);
   }
 
   const prediction = await chatCompleteJson<EngagementPrediction>(env, {

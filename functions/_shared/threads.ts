@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { decryptToken } from './crypto';
+import { normalizeMultilineText } from './text';
 
 // ============================================================================
 // Threads Graph API 發布封裝
@@ -139,7 +140,7 @@ export async function replyToThreadsPost(
   const containerParams = new URLSearchParams({
     access_token: account.accessToken,
     media_type: 'TEXT',
-    text: params.text.slice(0, 500),
+    text: normalizeMultilineText(params.text).slice(0, 500),
     reply_to_id: params.replyToId,
   });
   const createRes = await fetch(`${THREADS_API}/${account.threadsUserId}/threads`, {
@@ -181,10 +182,10 @@ export async function publishThreadsPost(
   account: ThreadsAccount,
   params: { text: string; imageUrl?: string | null },
 ): Promise<ThreadsPublishResult> {
-  // 1. 建立 media container
+  // 1. 建立 media container(發布前把字面 \n 修成真換行,保險舊資料)
   const containerParams = new URLSearchParams({
     access_token: account.accessToken,
-    text: params.text.slice(0, 500), // Threads 上限 500 字
+    text: normalizeMultilineText(params.text).slice(0, 500), // Threads 上限 500 字
   });
   if (params.imageUrl) {
     containerParams.set('media_type', 'IMAGE');

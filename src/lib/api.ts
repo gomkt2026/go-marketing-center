@@ -250,6 +250,12 @@ export const api = {
       body: JSON.stringify(body ?? {}),
     }),
 
+  apiPublishContent: (contentId: string) =>
+    request<{ ok: boolean; jobId: string; permalink: string | null; postId: string }>(
+      `/api/contents/${contentId}/api-publish`,
+      { method: 'POST' },
+    ),
+
   createBrandRule: (body: {
     brandId: string;
     ruleType: string;

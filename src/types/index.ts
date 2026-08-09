@@ -19,6 +19,7 @@ export interface Brand {
   tagline: string;
   primaryColor: string;
   logoInitial: string;
+  logoUrl: string | null;
   currentVersionId: string;
 }
 

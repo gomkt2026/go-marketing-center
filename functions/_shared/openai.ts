@@ -61,24 +61,10 @@ export async function chatCompleteJson<T>(
   }
 }
 
-/** 產生圖片,回傳 PNG bytes */
-export async function generateImage(
-  env: Env,
-  params: { prompt: string; size?: '1024x1024' | '1024x1536' | '1536x1024'; quality?: 'medium' | 'high' },
-): Promise<Uint8Array> {
-  const apiKey = requireApiKey(env);
-  const res = await fetch(`${OPENAI_BASE}/images/generations`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1',
-      prompt: params.prompt,
-      size: params.size ?? '1024x1024',
-      // 預設 medium(快);要在圖上渲染中文字的設計圖用 high,避免錯字
-      quality: params.quality ?? 'medium',
-      n: 1,
-    }),
-  });
+type ImageSize = '1024x1024' | '1024x1536' | '1536x1024';
+type ImageQuality = 'medium' | 'high';
+
+async function parseImageResponse(res: Response): Promise<Uint8Array> {
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new OpenAIError(res.status, `OpenAI image 失敗 (${res.status}): ${text.slice(0, 300)}`);
@@ -97,4 +83,49 @@ export async function generateImage(
     return new Uint8Array(await imgRes.arrayBuffer());
   }
   throw new OpenAIError(502, 'OpenAI 未回傳圖片資料');
+}
+
+/** 產生圖片,回傳 PNG bytes */
+export async function generateImage(
+  env: Env,
+  params: { prompt: string; size?: ImageSize; quality?: ImageQuality },
+): Promise<Uint8Array> {
+  const apiKey = requireApiKey(env);
+  const res = await fetch(`${OPENAI_BASE}/images/generations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1',
+      prompt: params.prompt,
+      size: params.size ?? '1024x1024',
+      // 預設 medium(快);要在圖上渲染中文字的設計圖用 high,避免錯字
+      quality: params.quality ?? 'medium',
+      n: 1,
+    }),
+  });
+  return parseImageResponse(res);
+}
+
+/**
+ * 帶參考圖產生圖片(images/edits 端點)。
+ * 用途:把品牌 logo 原樣合成進生成圖(input_fidelity=high 保持 logo 不被重畫走樣)。
+ */
+export async function generateImageWithReference(
+  env: Env,
+  params: { prompt: string; reference: Uint8Array; size?: ImageSize; quality?: ImageQuality },
+): Promise<Uint8Array> {
+  const apiKey = requireApiKey(env);
+  const form = new FormData();
+  form.append('model', env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1');
+  form.append('prompt', params.prompt);
+  form.append('size', params.size ?? '1024x1024');
+  form.append('quality', params.quality ?? 'medium');
+  form.append('input_fidelity', 'high');
+  form.append('image[]', new Blob([params.reference as unknown as ArrayBuffer], { type: 'image/png' }), 'logo.png');
+  const res = await fetch(`${OPENAI_BASE}/images/edits`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  return parseImageResponse(res);
 }

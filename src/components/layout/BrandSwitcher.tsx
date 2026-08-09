@@ -7,6 +7,30 @@ import { useAsyncData } from '@/hooks/useAsyncData';
 
 const BRAND_SCOPED_PREFIXES = ['workspace', 'intelligence', 'market', 'campaigns', 'events', 'contents', 'publishing', 'social', 'analytics', 'learning'];
 
+/** 品牌小圖標:有官方 logo 用 logo(白底 contain),沒有就退回色塊字首 */
+function BrandMark({ brand, size }: { brand: { primaryColor: string; logoInitial: string; logoUrl?: string | null; name: string }; size: number }) {
+  if (brand.logoUrl) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: size * 0.27, background: '#fff',
+        border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+      }}
+      >
+        <img src={brand.logoUrl} alt={brand.name} style={{ maxWidth: '86%', maxHeight: '86%', objectFit: 'contain' }} />
+      </div>
+    );
+  }
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size * 0.27, background: brand.primaryColor,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: size * 0.5,
+    }}
+    >
+      {brand.logoInitial}
+    </div>
+  );
+}
+
 export function BrandSwitcher() {
   const { currentBrand, brands, setBrandBySlug, isAllBrands } = useBrand();
   const [open, setOpen] = useState(false);
@@ -57,13 +81,7 @@ export function BrandSwitcher() {
       >
         {currentBrand ? (
           <>
-            <div style={{
-              width: 26, height: 26, borderRadius: 7, background: currentBrand.primaryColor,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 13,
-            }}
-            >
-              {currentBrand.logoInitial}
-            </div>
+            <BrandMark brand={currentBrand} size={26} />
             <div style={{ textAlign: 'left' }}>
               <div style={{ fontSize: 13, fontWeight: 700 }}>{currentBrand.name}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
@@ -101,13 +119,7 @@ export function BrandSwitcher() {
                   cursor: 'pointer', textAlign: 'left',
                 }}
               >
-                <div style={{
-                  width: 22, height: 22, borderRadius: 6, background: b.primaryColor,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 11,
-                }}
-                >
-                  {b.logoInitial}
-                </div>
+                <BrandMark brand={b} size={22} />
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{b.name}</div>
               </button>
             ))}

@@ -1,9 +1,9 @@
 import type { Env } from './env';
 import { getSql } from './db';
-import { chatCompleteJson, generateImage } from './openai';
+import { chatCompleteJson, generateImage, generateImageWithReference } from './openai';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
-  HOMIGO_IG_IMAGE_STYLE,
+  HOMIGO_IG_IMAGE_STYLE, HOMIGO_TEXT_MARK_RULE,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
 } from './prompts';
 import { buildMediaKey, putMedia } from './media';
@@ -11,6 +11,18 @@ import { buildMediaKey, putMedia } from './media';
 export type SocialPlatform = 'facebook' | 'instagram' | 'threads';
 
 export const SUPPORTED_PLATFORMS: SocialPlatform[] = ['facebook', 'instagram', 'threads'];
+
+/** 讀取品牌官方 logo(R2 brand-assets/{slug}/logo.png);沒有就回 null */
+async function getBrandLogo(env: Env, brandSlug: string): Promise<Uint8Array | null> {
+  if (!env.MEDIA) return null;
+  try {
+    const obj = await env.MEDIA.get(`brand-assets/${brandSlug}/logo.png`);
+    if (!obj) return null;
+    return new Uint8Array(await obj.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
 
 export interface GenerationResult {
   post: GeneratedPost;
@@ -66,23 +78,33 @@ export async function generatePlatformPost(
 
   // FB / IG 貼文生成配圖;失敗不阻擋文案產出
   // FB 走寫實攝影(橫式 1536x1024);IG 方形;Homigo IG 走 4:5 直式設計圖(防呆規範)
+  // 品牌 logo 已上傳 R2(brand-assets/{slug}/logo.png)時,改走 edits 端點把「真 logo」原樣合成進圖
   let imageUrl: string | null = null;
   let imageError: string | null = null;
   if ((platform === 'facebook' || platform === 'instagram') && post.imagePrompt) {
     try {
       const isFb = platform === 'facebook';
       const isHomigoIg = platform === 'instagram' && brandCtx.slug === 'homigo';
+      const logo = await getBrandLogo(env, brandCtx.slug);
       // 台灣人臉孔身形與在地場景;FB 加寫實攝影質感;品牌可自帶紀實風格方向(如老屋紀實)
       const twPeople = 'any people shown are Taiwanese with East Asian facial features and natural everyday body types, authentic Taiwan daily-life setting';
       const brandStyle = getBrandVoice(brandCtx.slug).imageStyle;
+      const logoRule = logo
+        ? '\nThe provided reference image is the official brand logo. Composite this exact logo as a small, clean, unobtrusive watermark (bottom corner). Do NOT redraw, distort, recolor or resize it disproportionately; keep it away from the edges.'
+        : '';
       const prompt = isHomigoIg
-        ? `${post.imagePrompt}\n\n${HOMIGO_IG_IMAGE_STYLE}`
+        ? `${post.imagePrompt}\n\n${HOMIGO_IG_IMAGE_STYLE}\n${logo
+            ? '【品牌標】參考圖就是官方 Homigo logo:原樣放在畫面左下角或 footer,不可變形、不可重畫、不可過大、不可貼底。'
+            : HOMIGO_TEXT_MARK_RULE}`
         : isFb
-          ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text, no watermark.`
-          : `${post.imagePrompt}. Warm and relatable, ${twPeople}.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text, no watermark.`;
+          ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text.${logoRule || ' No watermark.'}`
+          : `${post.imagePrompt}. Warm and relatable, ${twPeople}.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text.${logoRule || ' No watermark.'}`;
       const size = isHomigoIg ? '1024x1536' as const : isFb ? '1536x1024' as const : '1024x1024' as const;
       // Homigo 設計圖要在圖上渲染繁中文字,用 high 品質防錯字
-      const bytes = await generateImage(env, { prompt, size, quality: isHomigoIg ? 'high' : 'medium' });
+      const quality = isHomigoIg ? 'high' as const : 'medium' as const;
+      const bytes = logo
+        ? await generateImageWithReference(env, { prompt, reference: logo, size, quality })
+        : await generateImage(env, { prompt, size, quality });
       const key = buildMediaKey(brandCtx.slug);
       imageUrl = await putMedia(env, key, bytes);
     } catch (e) {

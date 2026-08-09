@@ -7,17 +7,17 @@ export const brands: Brand[] = [
   {
     id: 'b-homigo', slug: 'homigo', name: 'Homigo',
     tagline: '不是管理房子,而是讓房子自己運作。',
-    primaryColor: '#A7C18D', logoInitial: 'H', currentVersionId: 'v-homigo-1',
+    primaryColor: '#A7C18D', logoInitial: 'H', logoUrl: null, currentVersionId: 'v-homigo-1',
   },
   {
     id: 'b-taskgo', slug: 'taskgo', name: 'TaskGo',
     tagline: '讓工程專案管理更簡單、更智能',
-    primaryColor: '#ED9121', logoInitial: 'T', currentVersionId: 'v-taskgo-1',
+    primaryColor: '#ED9121', logoInitial: 'T', logoUrl: null, currentVersionId: 'v-taskgo-1',
   },
   {
     id: 'b-washgo', slug: 'washgo', name: 'Washgo',
     tagline: '衣物送洗,交給 Washgo',
-    primaryColor: '#A87C64', logoInitial: 'W', currentVersionId: 'v-washgo-1',
+    primaryColor: '#A87C64', logoInitial: 'W', logoUrl: null, currentVersionId: 'v-washgo-1',
   },
 ];
 

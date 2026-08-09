@@ -31,18 +31,20 @@ const STOPWORDS = new Set([
   '如果', '因為', '所以', '已經', '沒有', '不是', '就是', '真的', '知道', '現在', '今天', '昨天', '明天', '最近', '目前',
   '新聞', '影片', '直播', '快訊', '獨家', '報導', '記者', '網友', '民眾', '台灣', '全台', '國際', '中心', '綜合',
   '以及', '為何', '曝光', '揭密', '驚呆', '崩潰', '有片', '圖多', '請益', '請問', '心得', '分享', '討論', '問題',
+  '影響', '持續', '宣布', '表示', '指出', '可能', '最新', '進行', '相關', '注意', '小心', '一次', '這些', '那些',
 ]);
 
 /**
- * 輕量中文關鍵詞抽取:對標題做 2-4 字 n-gram 詞頻統計,
- * 偏好較長的高頻詞(避免「租屋補助」被拆成「租屋」+「補助」重複計入)
+ * 輕量中文關鍵詞抽取:對標題做 2-6 字 n-gram 詞頻統計。
+ * 去雜訊規則:某個詞若是「頻率不低於它的更長詞」的一部分,表示它從未獨立出現過
+ * (只是滑動視窗切出的碎片,如「颱風白海」之於「颱風白海豚」),直接丟棄,只留最長的完整詞。
  */
 function extractKeywords(titles: string[], limit = 40): KeywordItem[] {
   const freq = new Map<string, number>();
   for (const title of titles) {
     const seen = new Set<string>(); // 同一標題內同詞只計一次
     for (const run of title.match(/[\u4e00-\u9fff]{2,}/g) ?? []) {
-      for (let n = 2; n <= 4; n++) {
+      for (let n = 2; n <= 6; n++) {
         for (let i = 0; i + n <= run.length; i++) {
           const gram = run.slice(i, i + n);
           if (STOPWORDS.has(gram) || seen.has(gram)) continue;
@@ -56,22 +58,15 @@ function extractKeywords(titles: string[], limit = 40): KeywordItem[] {
     }
   }
 
-  // 只留出現 2 次以上的詞,長詞優先;去掉「是更長高頻詞的一部分」的子詞
-  const candidates = [...freq.entries()]
-    .filter(([, count]) => count >= 2)
-    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length);
+  const candidates = [...freq.entries()].filter(([, count]) => count >= 2);
+  const kept = candidates.filter(([text, weight]) =>
+    !candidates.some(([other, otherWeight]) =>
+      other.length > text.length && otherWeight >= weight && other.includes(text)));
 
-  const picked: KeywordItem[] = [];
-  for (const [text, weight] of candidates) {
-    if (picked.length >= limit) break;
-    const isSubword = picked.some((p) => p.text.includes(text) && p.weight >= weight);
-    if (isSubword) continue;
-    // 反向:若已選了子詞而新詞是更長且同頻的父詞,移除子詞
-    const childIdx = picked.findIndex((p) => text.includes(p.text) && p.weight <= weight);
-    if (childIdx >= 0) picked.splice(childIdx, 1);
-    picked.push({ text, weight });
-  }
-  return picked.sort((a, b) => b.weight - a.weight);
+  return kept
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .slice(0, limit)
+    .map(([text, weight]) => ({ text, weight }));
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {

@@ -209,7 +209,7 @@ async function generateSignalDrafts(env: Env): Promise<void> {
 //   - 熱門議題來源:Google Trends TW + 近期自抓的社群情報(PTT/Dcard)
 //   - 品牌已連 Threads API 且開啟自動發布 → 直接發布;否則存草稿
 // ============================================================================
-const THREADS_DAILY_CAP = 10; // 每品牌每日上限(每 2 小時一篇、扣掉凌晨停發時段)
+const THREADS_DAILY_CAP = 10; // 每品牌每日上限(每 2 小時一篇、扣掉凌晨停發時段;以台灣時區的當天計,午夜歸零)
 const THREADS_BRANDS_PER_TICK = 2;
 const THREADS_MIN_INTERVAL_MS = 115 * 60 * 1000; // 每品牌至少間隔 115 分鐘 → 每 2 小時一篇
 
@@ -225,7 +225,7 @@ async function threadsRound(env: Env): Promise<void> {
             WHERE c.brand_id = b.id AND c.target_platform = 'threads') AS last_at,
            (SELECT count(*)::int FROM contents c
             WHERE c.brand_id = b.id AND c.target_platform = 'threads'
-              AND c.created_at > now() - interval '24 hours') AS today_count
+              AND c.created_at >= date_trunc('day', now() + interval '8 hours') - interval '8 hours') AS today_count
     FROM brands b WHERE b.is_active = true
     ORDER BY last_at ASC NULLS FIRST
     LIMIT ${THREADS_BRANDS_PER_TICK}

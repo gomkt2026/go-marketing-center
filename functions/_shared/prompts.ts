@@ -10,6 +10,10 @@ export interface BrandVoice {
   frontlinePersona: string;
   /** 該行業關心的日常議題 */
   dailyConcerns: string;
+  /** 深度文寫作範式(參考高互動同業帳號的寫法) */
+  contentCraft?: string;
+  /** 配圖風格方向(附加到圖片生成 prompt) */
+  imageStyle?: string;
 }
 
 const BRAND_VOICES: Record<string, BrandVoice> = {
@@ -19,6 +23,17 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '房東擔心租金收不到、房子被弄壞、報稅麻煩;房客在意押金拿不拿得回來、修繕沒人理、租約陷阱。' +
       '你講話像在 LINE 群組裡回覆客戶,務實、有溫度、偶爾吐槽行業亂象。',
     dailyConcerns: '租屋補助、租金行情、惡房東/惡房客糾紛、修繕責任、租約公證、包租代管節稅、社宅政策',
+    contentCraft:
+      '寫深度文時遵守這個範式(高互動房產帳號的寫法):' +
+      '1. 開頭用一個數字或反直覺句當鉤子,例如「90%的房東,都低估了老屋出租前要花的錢」,禁止暖場鋪陳。' +
+      '2. 引用真實對話開場也很有力:房東在電話裡說的一句話、房客看房時問的一個問題,用引號原汁原味放出來。' +
+      '3. 內文用具體數字拆解給讀者看:租金、報酬率、修繕費、屋齡,算給他看;點破「看不見的成本」(管線、防水、壁癌、稅)比看得見的裝潢更吃錢。' +
+      '4. 一到兩句就換段,大量留白,手機閱讀的節奏;可用重複句式營造節奏感。' +
+      '5. 結尾收在一句沉澱的行業洞察(例如「租得快的房子,都是在還沒刊登前就決定的」),不要收在促銷。',
+    imageStyle:
+      'Documentary photography of Taiwanese apartments and old-house living: street arcades, terrazzo stairwells, ' +
+      'wooden window frames with soft daylight, rooftop water towers against the city skyline; ' +
+      'muted nostalgic film tones, quiet dignified composition. The building or space itself can be the subject; people are optional.',
   },
   taskgo: {
     frontlinePersona:
@@ -26,6 +41,18 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '請不到人;師傅在意薪水日結、工地安全、被業主嫌東嫌西。' +
       '你講話直接、江湖味、帶點工地幽默,句子短,不文謅謅。',
     dailyConcerns: '裝修行情、料價漲跌、缺工、工安、業主溝通、驗收糾紛、老屋翻新、廚衛改造',
+    contentCraft:
+      '寫深度文時遵守這個範式(高互動裝修帳號的寫法):' +
+      '1. 標題可用專欄式:「工班管理學|一組不好的工班,真的可以毀掉一整個案子」「老屋預算學|是不是少一個 0?」。' +
+      '2. 開頭用反直覺句、真實數字、或直接引用一段真實對話(屋主的徵求文、業主在 LINE 說的話)當鉤子,禁止暖場。' +
+      '3. 內文用具體數字拆解:坪數、預算、單價、工期,算給讀者看哪裡不合理(例如 69 坪預算 80 萬=一坪 1.16 萬,連基礎工程都不夠)。' +
+      '4. 講「工程鏈」的因果,讓外行人看懂內行邏輯:拆除沒處理好→水電只能遷就→泥作想辦法補→門窗木作櫥櫃全部跟著收;前面犯的錯,都是後面的人在付代價。' +
+      '5. 一到兩句就換段,大量留白;可用重複句式(「他會知道…他會知道…」)營造節奏。' +
+      '6. 結尾收在一句行業洞察(例如「最敢答應你的人,往往最危險」),不要收在促銷。',
+    imageStyle:
+      'Documentary photography of Taiwanese old houses and renovation sites: weathered facades with exposed red brick, ' +
+      'peeling plaster walls, terrazzo floors, iron window grilles, tiled roofs, craftsmen at work on site; ' +
+      'muted nostalgic tones, quiet dignified composition like an architectural portrait. The building itself can be the subject; people are optional.',
   },
   washgo: {
     frontlinePersona:
@@ -49,8 +76,9 @@ export function getBrandVoice(slug: string): BrandVoice {
 
 export const PLATFORM_GUIDELINES: Record<string, string> = {
   facebook:
-    'Facebook 貼文:當作寫一個真實故事,有場景、有人物、有轉折,引起共鳴。' +
+    'Facebook 貼文:當作寫一個真實故事或一篇有深度的行業觀察,有場景、有轉折,引起共鳴。' +
     '嚴格限制 1000 字以內。開頭第一句要讓人想往下讀,結尾自然帶出品牌,不要硬置入。' +
+    '排版節奏:一到兩句就換行成段,段落之間留白,像在手機上讀一篇好讀的長文;不要擠成大塊文字。' +
     'Hashtag 最多 3 個放文末。',
   instagram:
     'Instagram 貼文:有趣、視覺先行,文案是圖片的延伸。結合近期時事哏,前 125 字要抓住重點(之後會被折疊)。' +
@@ -130,6 +158,7 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     '',
     voice.frontlinePersona,
     voice.dailyConcerns ? `這個行業每天在聊的話題:${voice.dailyConcerns}` : '',
+    voice.contentCraft ?? '',
     '',
     personas ? `目標受眾:\n${personas}` : '',
     rules ? `品牌規則(必須遵守,cannot_claim 與 negative_rule 絕對禁止觸犯):\n${rules}` : '',
@@ -164,10 +193,11 @@ export interface EngagementPrediction {
 /** 各平台配圖描述的要求:FB 走寫實攝影、IG 走溫暖插畫/自然攝影,Threads 純文字不出圖 */
 const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = {
   facebook:
-    '"imagePrompt": "必填:給圖片生成模型的英文描述,走「寫實攝影」風格。' +
-    '像紀實攝影師捕捉到的真實瞬間:以真實的「台灣人」為主角(東亞臉孔、台灣人自然的身形與日常穿著,不要歐美模特兒長相)、' +
-    '台灣在地場景(騎樓、公寓、工地、巷口、洗衣店…)、自然光、真實的表情與動作' +
-    '(例如師傅在工地喝水擦汗、房東房客在門口聊天、客人抱著剛洗好還溫熱的衣服微笑),' +
+    '"imagePrompt": "必填:給圖片生成模型的英文描述,走「寫實紀實攝影」風格。' +
+    '主角可以是「人」也可以是「空間/建築本身」:' +
+    '拍人時要是真實的台灣人(東亞臉孔、自然身形與日常穿著,不要歐美模特兒長相),有真實的表情與動作;' +
+    '拍空間時讓老屋的質感說話(斑駁外牆、紅磚、磨石子地板、鐵窗花、樓梯間的光影),像建築紀實攝影。' +
+    '場景要在台灣(騎樓、公寓、工地、巷口、洗衣店…)、自然光,' +
     '要溫暖、貼近人心、有故事感,photorealistic 質感,避免棚拍廣告感、塑膠感與科技感構圖,不含文字"',
   instagram:
     '"imagePrompt": "必填:給圖片生成模型的英文描述。畫面要以「台灣人」為主角(東亞臉孔、自然的身形與台灣日常穿著,有表情、有動作、有生活感的真實場景,例如師傅擦汗大笑、店員幫客人摺衣服),場景要有台灣感(騎樓、巷口、公寓、夜市…),溫暖手繪插畫或自然攝影感,避免冷冰冰的物件圖或科技感構圖,不含文字"',

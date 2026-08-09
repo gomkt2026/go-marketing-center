@@ -2,7 +2,7 @@ import type { Env } from './env';
 import { getSql } from './db';
 import { chatCompleteJson, generateImage } from './openai';
 import {
-  buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt,
+  buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
 } from './prompts';
 import { buildMediaKey, putMedia } from './media';
@@ -66,11 +66,12 @@ export async function generatePlatformPost(
   if ((platform === 'facebook' || platform === 'instagram') && post.imagePrompt) {
     try {
       const isFb = platform === 'facebook';
-      // 兩平台都強制台灣人臉孔身形與在地場景,FB 另加寫實攝影質感
-      const twPeople = 'Taiwanese people with East Asian facial features and natural everyday body types, authentic Taiwan daily-life setting (street arcade, apartment, local shop)';
+      // 台灣人臉孔身形與在地場景;FB 加寫實攝影質感;品牌可自帶紀實風格方向(如老屋紀實)
+      const twPeople = 'any people shown are Taiwanese with East Asian facial features and natural everyday body types, authentic Taiwan daily-life setting';
+      const brandStyle = getBrandVoice(brandCtx.slug).imageStyle;
       const prompt = isFb
-        ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable, no text, no watermark.`
-        : `${post.imagePrompt}. Characters are ${twPeople}, warm and relatable, no text, no watermark.`;
+        ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text, no watermark.`
+        : `${post.imagePrompt}. Warm and relatable, ${twPeople}.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text, no watermark.`;
       const bytes = await generateImage(env, { prompt, size: isFb ? '1536x1024' : '1024x1024' });
       const key = buildMediaKey(brandCtx.slug);
       imageUrl = await putMedia(env, key, bytes);

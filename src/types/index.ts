@@ -361,9 +361,34 @@ export interface SocialAccount {
   status: SocialAccountStatus;
   notes?: string | null;
   autoPublish?: boolean;
+  autoReply?: boolean;
+  replyDailyCap?: number;
   connectedAt?: string | null;
   hasToken?: boolean;
   tokenMasked?: string | null;
+}
+
+export type ThreadsReplyStatus = 'pending' | 'approved' | 'replied' | 'skipped' | 'failed';
+
+/** Threads 熱門貼文回覆佇列項目 */
+export interface ThreadsReplyTarget {
+  id: string;
+  brandId: string;
+  targetPostId: string;
+  targetPermalink?: string | null;
+  targetUsername?: string | null;
+  targetText?: string | null;
+  targetTimestamp?: string | null;
+  sourceKeyword: string;
+  relevanceScore?: number | null;
+  relevanceReason?: string | null;
+  replyText?: string | null;
+  status: ThreadsReplyStatus;
+  replyPostId?: string | null;
+  replyPermalink?: string | null;
+  repliedAt?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
 }
 
 export type PublishingJobStatus = 'queued' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
@@ -377,6 +402,9 @@ export interface PublishingQueueItem {
   predictedEngagementScore?: number | null;
   genSource?: string | null;
   createdAt: string;
+  body?: string | null;
+  hashtags?: string[] | null;
+  imageUrl?: string | null;
 }
 
 export interface PublishingJob {

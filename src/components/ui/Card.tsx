@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import type { ReactNode, CSSProperties } from 'react';
+import type { ReactNode, CSSProperties, MouseEventHandler } from 'react';
 
 interface CardProps {
   children: ReactNode;
@@ -7,9 +7,10 @@ interface CardProps {
   className?: string;
   hoverable?: boolean;
   delay?: number;
+  onClick?: MouseEventHandler<HTMLDivElement>;
 }
 
-export function Card({ children, style, className, hoverable, delay = 0 }: CardProps) {
+export function Card({ children, style, className, hoverable, delay = 0, onClick }: CardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -17,6 +18,7 @@ export function Card({ children, style, className, hoverable, delay = 0 }: CardP
       transition={{ duration: 0.25, delay, ease: 'easeOut' }}
       whileHover={hoverable ? { y: -2, boxShadow: 'var(--shadow-card-hover)' } : undefined}
       className={className}
+      onClick={onClick}
       style={{
         background: 'var(--color-bg)',
         border: '1px solid var(--color-border)',

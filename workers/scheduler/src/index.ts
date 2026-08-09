@@ -2,9 +2,10 @@ import type { ScheduledController, ExecutionContext } from '@cloudflare/workers-
 import type { Env } from '../../../functions/_shared/env';
 import { getSql } from '../../../functions/_shared/db';
 import { chatCompleteJson } from '../../../functions/_shared/openai';
-import { buildBrandContext, getBrandVoice } from '../../../functions/_shared/prompts';
+import { buildBrandContext, getBrandVoice, ANTI_AI_RULES } from '../../../functions/_shared/prompts';
 import { generatePlatformPost, saveGeneratedContent, findBrandAgent } from '../../../functions/_shared/generate';
-import { getThreadsAccount, publishThreadsPost } from '../../../functions/_shared/threads';
+import { getThreadsAccount, publishThreadsPost, searchThreadsPosts, type ThreadsSearchPost } from '../../../functions/_shared/threads';
+import { publishReplyTarget, replyTextIssue } from '../../../functions/_shared/threads-replies';
 import { logActivity } from '../../../functions/_shared/activity';
 import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from '../../../functions/_shared/sources';
 
@@ -302,6 +303,227 @@ async function threadsRound(env: Env): Promise<void> {
 }
 
 // ============================================================================
+// 主流程 2c:Threads 熱門貼文自動回覆(互動引流)
+//   - 每小時輪一個品牌(掛在 :30 的 tick,與發文輪錯開)
+//   - Keyword Search(TOP)搜行業關鍵字 → AI 挑最多 2 則寫真人語氣回覆
+//   - auto_reply 開啟 → 每輪自動發布 1 則;否則存 pending 待前台審核
+//   - 防封號:每日上限、發布失敗即暫停當日、去重、同作者 7 天冷卻、禁連結促銷
+// ============================================================================
+const REPLY_RELEVANCE_MIN = 0.7;
+const REPLY_KEYWORDS_PER_ROUND = 2;    // 每輪最多 2 次 keyword search(保守用搜尋額度)
+const REPLY_CANDIDATES_FOR_AI = 6;     // 交給 AI 評估的候選貼文數
+const REPLY_MAX_QUEUED_PER_ROUND = 2;  // 每輪最多入庫的回覆數
+const REPLY_PENDING_QUEUE_LIMIT = 10;  // 待審佇列滿了就先不生成
+const REPLY_MIN_INTERVAL_MS = 20 * 60 * 1000;
+const REPLY_MAX_POST_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 不回覆超過 7 天的舊貼文
+
+interface ReplySelection {
+  index: number;
+  relevance: number;
+  reason: string;
+  reply: string;
+}
+
+async function threadsReplyRound(env: Env): Promise<void> {
+  const sql = getSql(env);
+  // 最久沒處理的品牌優先;沒接 Threads 的品牌直接跳過,每輪只處理一個品牌
+  const brands = await sql`
+    SELECT b.id, b.slug, b.name,
+           (SELECT max(t.created_at) FROM threads_reply_targets t WHERE t.brand_id = b.id) AS last_at
+    FROM brands b WHERE b.is_active = true
+    ORDER BY last_at ASC NULLS FIRST
+  `;
+
+  for (const brand of brands as { id: string; slug: string; name: string; last_at: string | null }[]) {
+    const account = await getThreadsAccount(env, brand.id);
+    if (!account) continue;
+
+    try {
+      // 當日狀態:回覆數 / 最近失敗 / 待審佇列
+      const stateRows = await sql`
+        SELECT
+          count(*) FILTER (WHERE status = 'replied' AND replied_at > now() - interval '24 hours')::int AS replied_24h,
+          max(replied_at) FILTER (WHERE status = 'replied') AS last_replied_at,
+          count(*) FILTER (WHERE status = 'failed' AND updated_at > now() - interval '12 hours')::int AS failed_recent,
+          count(*) FILTER (WHERE status = 'pending')::int AS pending_count
+        FROM threads_reply_targets WHERE brand_id = ${brand.id}::uuid
+      `;
+      const state = stateRows[0] as { replied_24h: number; last_replied_at: string | null; failed_recent: number; pending_count: number };
+      if (state.failed_recent > 0) {
+        console.log(`[replies] ${brand.slug} 近 12 小時有發布失敗,本輪暫停`);
+        return;
+      }
+      const capReached = state.replied_24h >= account.replyDailyCap;
+      const queueFull = state.pending_count >= REPLY_PENDING_QUEUE_LIMIT;
+      if (capReached && (account.autoReply || queueFull)) {
+        console.log(`[replies] ${brand.slug} 已達每日上限 ${account.replyDailyCap},本輪跳過`);
+        return;
+      }
+
+      // 關鍵字:行業關鍵字為主,有跟行業重疊的 Google Trends 熱詞優先
+      const config = BRAND_SOURCES[brand.slug] ?? { newsQuery: brand.name, filterKeywords: [brand.name] };
+      const baseKeywords = config.filterKeywords.length ? config.filterKeywords : [brand.name];
+      let trendKeywords: string[] = [];
+      try {
+        const trends = await fetchGoogleTrendsTW(10);
+        trendKeywords = trends
+          .map((t) => t.title)
+          .filter((title) => baseKeywords.some((k) => title.includes(k)));
+      } catch { /* trends 抓不到不影響 */ }
+      const shuffled = [...baseKeywords].sort(() => Math.random() - 0.5);
+      const keywords = [...new Set([...trendKeywords, ...shuffled])].slice(0, REPLY_KEYWORDS_PER_ROUND);
+
+      // 搜尋公開貼文(TOP 熱門排序)
+      let found: ThreadsSearchPost[] = [];
+      for (const kw of keywords) {
+        try {
+          const posts = await searchThreadsPosts(account, kw, 25);
+          found.push(...posts.map((p) => ({ ...p, sourceKeyword: kw }) as ThreadsSearchPost & { sourceKeyword: string }));
+        } catch (e) {
+          console.error(`[replies] ${brand.slug} 搜尋「${kw}」失敗`, e);
+        }
+      }
+      if (!found.length) {
+        console.log(`[replies] ${brand.slug} 沒有搜尋結果(檢查 token 是否有 threads_keyword_search 權限)`);
+        return;
+      }
+
+      // 過濾:去掉回覆/自家貼文/太舊/太短,並比對已處理過的貼文與 7 天內回覆過的作者
+      const ownUsername = (account.username ?? '').toLowerCase();
+      const postIds = found.map((p) => p.id);
+      const [seenRows, authorRows] = await Promise.all([
+        sql`SELECT target_post_id FROM threads_reply_targets WHERE brand_id = ${brand.id}::uuid AND target_post_id = ANY(${postIds})`,
+        sql`
+          SELECT DISTINCT lower(target_username) AS username FROM threads_reply_targets
+          WHERE brand_id = ${brand.id}::uuid AND target_username IS NOT NULL
+            AND status IN ('replied', 'pending', 'approved')
+            AND created_at > now() - interval '7 days'
+        `,
+      ]);
+      const seenIds = new Set((seenRows as { target_post_id: string }[]).map((r) => r.target_post_id));
+      const cooledAuthors = new Set((authorRows as { username: string }[]).map((r) => r.username));
+      const uniq = new Set<string>();
+      const candidates = (found as (ThreadsSearchPost & { sourceKeyword: string })[])
+        .filter((p) => {
+          if (uniq.has(p.id)) return false;
+          uniq.add(p.id);
+          if (seenIds.has(p.id)) return false;
+          if (p.isReply || !p.text || p.text.trim().length < 20) return false;
+          if (p.username && p.username.toLowerCase() === ownUsername) return false;
+          if (p.username && cooledAuthors.has(p.username.toLowerCase())) return false;
+          if (p.timestamp && Date.now() - new Date(p.timestamp).getTime() > REPLY_MAX_POST_AGE_MS) return false;
+          return true;
+        })
+        // 有人回過的貼文(hasReplies)當熱度訊號優先
+        .sort((a, b) => Number(b.hasReplies) - Number(a.hasReplies))
+        .slice(0, REPLY_CANDIDATES_FOR_AI);
+      if (!candidates.length) {
+        console.log(`[replies] ${brand.slug} 過濾後沒有可回覆的候選貼文`);
+        return;
+      }
+
+      // AI 一次完成:相關性評分 + 真人語氣回覆
+      const voice = getBrandVoice(brand.slug);
+      const agentId = await findBrandAgent(env, brand.id);
+      const listText = candidates
+        .map((p, i) => `${i}. @${p.username ?? '匿名'}:${p.text!.slice(0, 280)}`)
+        .join('\n---\n');
+      const selection = await chatCompleteJson<{ selections: ReplySelection[] }>(env, {
+        temperature: 0.7,
+        messages: [
+          {
+            role: 'system',
+            content: [
+              `你是品牌「${brand.name}」的第一線人員,正在用個人身分逛 Threads、跟大家聊天。${voice.frontlinePersona}`,
+              ANTI_AI_RULES,
+            ].join('\n'),
+          },
+          {
+            role: 'user',
+            content: [
+              `以下是 Threads 上搜到的熱門貼文,挑「最多 ${REPLY_MAX_QUEUED_PER_ROUND} 則」你真的有話想說的來回覆(relevance 至少 ${REPLY_RELEVANCE_MIN} 才選,寧缺勿濫):`,
+              listText,
+              '',
+              '回覆鐵則(違反任何一條就不要選那則):',
+              '1. 像真人搭話:分享自己第一線的經驗、觀點或一個小故事,30-120 字。',
+              '2. 絕對不放連結、不提優惠促銷、不推銷服務、不叫人私訊;可以自然透露你的職業身分。',
+              '3. 不說教、不糾正對方;先同理再補充,或幽默接梗。',
+              '4. 政治、宗教、災難、性別對立等爭議話題一律不回。',
+              '',
+              '回傳 JSON:{"selections":[{"index":清單編號,"relevance":0到1,"reason":"為什麼值得回(30字內)","reply":"回覆全文"}]}',
+              '如果都不值得回,回傳 {"selections":[]}',
+            ].join('\n'),
+          },
+        ],
+      });
+
+      const picked = (selection.selections ?? [])
+        .filter((s) => candidates[s.index] && s.relevance >= REPLY_RELEVANCE_MIN && !replyTextIssue(s.reply))
+        .sort((a, b) => b.relevance - a.relevance)
+        .slice(0, REPLY_MAX_QUEUED_PER_ROUND);
+
+      // 入庫:選中的存 pending;其餘評估過的存 skipped(避免下輪重複評估)
+      const pickedIndexes = new Set(picked.map((s) => s.index));
+      const insertedIds: string[] = [];
+      for (const sel of picked) {
+        const p = candidates[sel.index];
+        const rows = await sql`
+          INSERT INTO threads_reply_targets (
+            brand_id, target_post_id, target_permalink, target_username, target_text, target_timestamp,
+            source_keyword, relevance_score, relevance_reason, reply_text, status, generated_by_agent_id
+          ) VALUES (
+            ${brand.id}::uuid, ${p.id}, ${p.permalink}, ${p.username}, ${p.text}, ${p.timestamp},
+            ${p.sourceKeyword}, ${Math.min(1, Math.max(0, sel.relevance))}, ${sel.reason},
+            ${sel.reply.trim()}, 'pending', ${agentId}
+          ) ON CONFLICT (brand_id, target_post_id) DO NOTHING
+          RETURNING id
+        `;
+        if (rows.length) {
+          const id = (rows[0] as { id: string }).id;
+          insertedIds.push(id);
+          await logActivity(env, {
+            brandId: brand.id,
+            actorType: 'ai_agent',
+            actorAgentId: agentId,
+            action: 'threads_reply.generated',
+            entityType: 'threads_reply_target',
+            entityId: id,
+            afterState: { targetUsername: p.username, keyword: p.sourceKeyword, relevance: sel.relevance },
+          });
+        }
+      }
+      for (const [i, p] of candidates.entries()) {
+        if (pickedIndexes.has(i)) continue;
+        await sql`
+          INSERT INTO threads_reply_targets (
+            brand_id, target_post_id, target_permalink, target_username, target_text, target_timestamp,
+            source_keyword, status
+          ) VALUES (
+            ${brand.id}::uuid, ${p.id}, ${p.permalink}, ${p.username}, ${p.text}, ${p.timestamp},
+            ${p.sourceKeyword}, 'skipped'
+          ) ON CONFLICT (brand_id, target_post_id) DO NOTHING
+        `;
+      }
+      console.log(`[replies] ${brand.slug} 關鍵字=${keywords.join('、')} 候選=${candidates.length} 入庫=${insertedIds.length}`);
+
+      // auto_reply 開啟時每輪自動發布 1 則(需未達上限、距上次回覆超過最小間隔)
+      if (account.autoReply && insertedIds.length && !capReached) {
+        const intervalOk = !state.last_replied_at ||
+          Date.now() - new Date(state.last_replied_at).getTime() >= REPLY_MIN_INTERVAL_MS;
+        if (intervalOk) {
+          const result = await publishReplyTarget(env, { targetId: insertedIds[0], account });
+          if (result.ok) console.log(`[replies] ${brand.slug} 已自動回覆:${result.replyPermalink ?? result.replyPostId}`);
+          else console.error(`[replies] ${brand.slug} 自動回覆失敗:${result.error}`);
+        }
+      }
+    } catch (e) {
+      console.error(`[replies] 品牌 ${brand.slug} 回覆輪失敗`, e);
+    }
+    return; // 每輪只處理一個品牌
+  }
+}
+
+// ============================================================================
 // 主流程 2b:FB/IG 每日主題圖文(每天每品牌 2 篇:早上 8 點檔 + 晚上 8 點檔)
 //   台灣 08:00-09:59 補第 1 篇、20:00-21:59 補第 2 篇;每 tick 只處理一個品牌
 // ============================================================================
@@ -411,7 +633,8 @@ async function generateDailyTheme(env: Env, targetCount: number = DAILY_THEME_TA
 // */30 統一調度:
 //   - 台灣 08:00-09:59 → 補每品牌「當日第 1 篇」FB/IG 主題圖文(早上 8 點檔)
 //   - 台灣 20:00-21:59 → 補每品牌「當日第 2 篇」FB/IG 主題圖文(晚上 8 點檔)
-//   - 其餘 tick 跑 Threads 輪(同品牌 55 分鐘內不重發 → 每品牌每小時一篇)
+//   - 整點 tick 跑 Threads 發文輪;半點 tick 跑 Threads 熱門貼文回覆輪
+//     (兩輪錯開,控制單次 Workers 子請求數量)
 // ============================================================================
 async function halfHourlyDispatch(env: Env): Promise<void> {
   const twHour = (new Date().getUTCHours() + 8) % 24;
@@ -422,7 +645,12 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
     const didTheme = await generateDailyTheme(env, 2);
     if (didTheme) return;
   }
-  await threadsRound(env);
+  const minute = new Date().getUTCMinutes();
+  if (minute >= 15 && minute < 45) {
+    await threadsReplyRound(env);
+  } else {
+    await threadsRound(env);
+  }
 }
 
 // ============================================================================
@@ -465,7 +693,7 @@ export default {
     }
   },
 
-  // 手動觸發除錯用:GET /?task=collect|drafts|threads|themes|cleanup(需帶 secret)
+  // 手動觸發除錯用:GET /?task=collect|drafts|threads|replies|themes|cleanup(需帶 secret)
   // themes 可帶 &target=1|2 指定要補到當日第幾篇
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -477,9 +705,10 @@ export default {
     if (task === 'collect') await collectSignals(env);
     else if (task === 'drafts') await generateSignalDrafts(env);
     else if (task === 'threads') await threadsRound(env);
+    else if (task === 'replies') await threadsReplyRound(env);
     else if (task === 'themes') await generateDailyTheme(env, Number(url.searchParams.get('target') ?? DAILY_THEME_TARGET));
     else if (task === 'cleanup') await cleanupOldMedia(env);
-    else return new Response('task 必須為 collect / drafts / threads / themes / cleanup', { status: 400 });
+    else return new Response('task 必須為 collect / drafts / threads / replies / themes / cleanup', { status: 400 });
     return new Response(JSON.stringify({ ok: true, task }), { headers: { 'Content-Type': 'application/json' } });
   },
 };

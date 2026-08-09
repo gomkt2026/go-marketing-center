@@ -80,7 +80,10 @@ export const api = {
 
   publishing: (slug: string) =>
     request<{
-      jobs: (import('@/types').PublishingJob & { contentTitle?: string; targetPlatform?: string })[];
+      jobs: (import('@/types').PublishingJob & {
+        contentTitle?: string; targetPlatform?: string;
+        body?: string | null; imageUrl?: string | null;
+      })[];
       queue: import('@/types').PublishingQueueItem[];
     }>(`/api/brands/${slug}/publishing`),
 
@@ -216,9 +219,22 @@ export const api = {
   saveSocialAccount: (slug: string, body: {
     platform: string; accountName?: string; externalId?: string;
     accessToken?: string; clearToken?: boolean; notes?: string; autoPublish?: boolean;
+    autoReply?: boolean; replyDailyCap?: number;
   }) =>
     request<{ account: import('@/types').SocialAccount }>(`/api/brands/${slug}/social-accounts`, {
       method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  // -- Threads 熱門貼文回覆佇列 ----------------------------------------------
+  threadReplies: (slug: string, status = 'pending') =>
+    request<{ targets: import('@/types').ThreadsReplyTarget[]; replied24h: number }>(
+      `/api/brands/${slug}/thread-replies?status=${status}`,
+    ),
+
+  actThreadReply: (slug: string, body: { id: string; action: 'approve' | 'skip'; replyText?: string }) =>
+    request<{ ok: boolean; status: string; permalink?: string | null }>(`/api/brands/${slug}/thread-replies`, {
+      method: 'POST',
       body: JSON.stringify(body),
     }),
 

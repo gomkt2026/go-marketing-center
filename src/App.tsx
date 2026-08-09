@@ -17,6 +17,7 @@ import { CollaborationList } from '@/pages/collaboration/CollaborationList';
 import { Campaigns } from '@/pages/campaign/Campaigns';
 import { ContentCenter } from '@/pages/content/ContentCenter';
 import { Publishing } from '@/pages/publishing/Publishing';
+import { ThreadsReplies } from '@/pages/publishing/ThreadsReplies';
 import { Analytics } from '@/pages/analytics/Analytics';
 import { Learning } from '@/pages/learning/Learning';
 import { Timeline } from '@/pages/timeline/Timeline';
@@ -29,6 +30,7 @@ import { EventRegister } from '@/pages/public/EventRegister';
 import { EventTicket } from '@/pages/public/EventTicket';
 import { CheckinEntry } from '@/pages/public/CheckinEntry';
 import { CheckinScan } from '@/pages/public/CheckinScan';
+import { PrivacyPolicy } from '@/pages/public/PrivacyPolicy';
 
 export default function App() {
   return (
@@ -42,6 +44,10 @@ export default function App() {
           <Route path="/e/:slug/ticket" element={<EventTicket />} />
           <Route path="/checkin" element={<CheckinEntry />} />
           <Route path="/checkin/:eventId" element={<CheckinScan />} />
+
+          {/* 公開隱私權政策(供 Meta App Review 使用,無需登入) */}
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/privacy/:brand" element={<PrivacyPolicy />} />
 
           <Route
             path="/*"
@@ -65,6 +71,7 @@ export default function App() {
                         <Route path="/:brand/events/:id" element={<EventDetail />} />
                         <Route path="/:brand/contents" element={<ContentCenter />} />
                         <Route path="/:brand/publishing" element={<Publishing />} />
+                        <Route path="/:brand/thread-replies" element={<ThreadsReplies />} />
                         <Route path="/:brand/social" element={<SocialAccounts />} />
                         <Route path="/personas" element={<AgentPersonas />} />
                         <Route path="/:brand/analytics" element={<Analytics />} />

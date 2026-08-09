@@ -28,6 +28,20 @@ const QUEUE_TABS = [
   { id: 'rejected', label: '已退回' },
 ];
 
+const PLATFORM_FILTERS: { id: string; label: string }[] = [
+  { id: 'all', label: '全部' },
+  { id: 'facebook', label: 'Facebook' },
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'threads', label: 'Threads' },
+];
+
+const platformTone: Record<string, BadgeTone> = {
+  facebook: 'primary', instagram: 'secondary', threads: 'accent',
+};
+const platformLabel: Record<string, string> = {
+  facebook: 'FB', instagram: 'IG', threads: 'Threads',
+};
+
 function latestVersion(content: Content) {
   return content.versions[content.versions.length - 1];
 }
@@ -37,6 +51,7 @@ export function ContentCenter() {
   const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
   const [tab, setTab] = useState('pending_review');
+  const [platform, setPlatform] = useState('all');
   const [items, setItems] = useState<Content[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
@@ -66,8 +81,9 @@ export function ContentCenter() {
   if (loading) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={reload} />;
 
-  const filtered = items.filter((c) => c.status === tab || (tab === 'approved' && c.status === 'published'));
-  const selected = items.find((c) => c.id === selectedId) ?? filtered[0];
+  const inTab = items.filter((c) => c.status === tab || (tab === 'approved' && c.status === 'published'));
+  const filtered = platform === 'all' ? inTab : inTab.filter((c) => c.targetPlatform === platform);
+  const selected = filtered.find((c) => c.id === selectedId) ?? filtered[0];
 
   async function review(action: 'approve' | 'modify' | 'return' | 'postpone' | 'reject') {
     if (!selected) return;
@@ -126,8 +142,29 @@ export function ContentCenter() {
           <Tabs
             tabs={QUEUE_TABS.map((t) => ({ ...t, label: `${t.label} ${items.filter((c) => c.status === t.id || (t.id === 'approved' && c.status === 'published')).length}` }))}
             active={tab}
-            onChange={(id) => { setTab(id); setSelectedId(items.find((c) => c.status === id)?.id ?? null); }}
+            onChange={(id) => { setTab(id); setSelectedId(null); }}
           />
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '10px 16px 12px', borderTop: '1px solid var(--color-border)' }}>
+          {PLATFORM_FILTERS.map((p) => {
+            const count = p.id === 'all' ? inTab.length : inTab.filter((c) => c.targetPlatform === p.id).length;
+            const active = platform === p.id;
+            return (
+              <button
+                key={p.id}
+                onClick={() => { setPlatform(p.id); setSelectedId(null); }}
+                style={{
+                  border: active ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  background: active ? 'var(--color-primary-soft)' : 'var(--color-bg)',
+                  color: active ? 'var(--color-primary-dark)' : 'var(--color-text-muted)',
+                  fontWeight: active ? 700 : 500,
+                  borderRadius: 999, padding: '4px 14px', fontSize: 12.5, cursor: 'pointer',
+                }}
+              >
+                {p.label} {count}
+              </button>
+            );
+          })}
         </div>
       </Card>
 
@@ -143,8 +180,13 @@ export function ContentCenter() {
               }}
             >
               <div style={{ fontSize: 13, fontWeight: 600 }}>{c.title}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                {c.targetPlatform} · v{latestVersion(c)?.versionNumber ?? '-'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                <Badge tone={platformTone[c.targetPlatform] ?? 'default'}>
+                  {platformLabel[c.targetPlatform] ?? c.targetPlatform}
+                </Badge>
+                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                  v{latestVersion(c)?.versionNumber ?? '-'}
+                </span>
               </div>
             </button>
           ))}

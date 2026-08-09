@@ -16,23 +16,43 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const sql = getSql(context.env);
   const [rows, queueRows] = await Promise.all([
+    // 發布紀錄:帶回發布版本的內文與配圖,前端點擊可直接展開檢視
     sql`
-      SELECT pj.*, c.title AS content_title, c.target_platform
+      SELECT pj.*, c.title AS content_title, c.target_platform,
+             v.body, a.file_url AS image_url
       FROM publishing_jobs pj
       JOIN contents c ON c.id = pj.content_id
+      LEFT JOIN content_versions v ON v.id = pj.content_version_id
+      LEFT JOIN LATERAL (
+        SELECT file_url FROM content_assets
+        WHERE content_version_id = v.id AND asset_type = 'image'
+        LIMIT 1
+      ) a ON true
       WHERE c.brand_id = ${brand.id}::uuid
       ORDER BY pj.created_at DESC
       LIMIT 120
     `,
-    // 各平台待發布佇列:尚未發布的內容
+    // 各平台待發布佇列:尚未發布的內容(帶最新版本內文與配圖)
     sql`
-      SELECT id, title, status, target_platform, predicted_engagement_score, created_at,
-             generation_prompt_meta->>'source' AS gen_source
-      FROM contents
-      WHERE brand_id = ${brand.id}::uuid
-        AND target_platform IS NOT NULL
-        AND status IN ('draft', 'pending_review', 'approved', 'needs_revision', 'scheduled')
-      ORDER BY created_at DESC
+      SELECT c.id, c.title, c.status, c.target_platform, c.predicted_engagement_score, c.created_at,
+             c.generation_prompt_meta->>'source' AS gen_source,
+             v.body, v.hashtags, a.file_url AS image_url
+      FROM contents c
+      LEFT JOIN LATERAL (
+        SELECT id, body, hashtags FROM content_versions
+        WHERE content_id = c.id
+        ORDER BY version_number DESC
+        LIMIT 1
+      ) v ON true
+      LEFT JOIN LATERAL (
+        SELECT file_url FROM content_assets
+        WHERE content_version_id = v.id AND asset_type = 'image'
+        LIMIT 1
+      ) a ON true
+      WHERE c.brand_id = ${brand.id}::uuid
+        AND c.target_platform IS NOT NULL
+        AND c.status IN ('draft', 'pending_review', 'approved', 'needs_revision', 'scheduled')
+      ORDER BY c.created_at DESC
       LIMIT 90
     `,
   ]);

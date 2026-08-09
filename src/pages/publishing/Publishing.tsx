@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -7,6 +8,32 @@ import { useMeta } from '@/context/MetaContext';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { PublishingJobStatus, ContentStatus } from '@/types';
+
+/** 點擊展開的貼文內容(內文 + hashtags + 配圖) */
+function PostBody({ body, hashtags, imageUrl }: { body?: string | null; hashtags?: string[] | null; imageUrl?: string | null }) {
+  if (!body && !imageUrl) {
+    return <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 8 }}>這筆內容沒有可顯示的內文</p>;
+  }
+  return (
+    <div style={{ marginTop: 10, borderTop: '1px solid var(--color-border)', paddingTop: 10 }}>
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          alt="貼文配圖"
+          style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }}
+        />
+      )}
+      {body && (
+        <p style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{body}</p>
+      )}
+      {!!hashtags?.length && (
+        <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 6 }}>
+          {hashtags.map((h) => `#${h}`).join(' ')}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const statusTone: Record<PublishingJobStatus, BadgeTone> = {
   queued: 'default', scheduled: 'accent', publishing: 'accent', published: 'primary', failed: 'danger', cancelled: 'default',
@@ -36,10 +63,20 @@ export function Publishing() {
   const { brandBySlug, brandsLoading } = useBrand();
   const { userName } = useMeta();
   const brand = slug ? brandBySlug(slug) : undefined;
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { data, loading, error, reload } = useAsyncData(
     () => slug ? api.publishing(slug) : Promise.reject(new Error('no slug')),
     [slug],
   );
+
+  function toggle(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (loading) return <LoadingState />;
@@ -72,25 +109,46 @@ export function Publishing() {
                 {colQueue.length === 0 && (
                   <Card><p style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>目前沒有待發布內容</p></Card>
                 )}
-                {colQueue.slice(0, 12).map((item) => (
-                  <Card key={item.id}>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-                      <Badge tone={contentStatusTone[item.status] ?? 'default'}>{contentStatusLabel[item.status] ?? item.status}</Badge>
-                      {item.genSource && <Badge tone="secondary">{genSourceLabel[item.genSource] ?? item.genSource}</Badge>}
-                      {item.predictedEngagementScore != null && (
-                        <Badge tone={Number(item.predictedEngagementScore) >= 70 ? 'primary' : 'default'}>
-                          互動 {Math.round(Number(item.predictedEngagementScore))}
-                        </Badge>
+                {colQueue.slice(0, 12).map((item) => {
+                  const key = `q-${item.id}`;
+                  const isOpen = expanded.has(key);
+                  return (
+                    <Card key={item.id} style={{ cursor: 'pointer' }} onClick={() => toggle(key)}>
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                        <Badge tone={contentStatusTone[item.status] ?? 'default'}>{contentStatusLabel[item.status] ?? item.status}</Badge>
+                        {item.genSource && <Badge tone="secondary">{genSourceLabel[item.genSource] ?? item.genSource}</Badge>}
+                        {item.predictedEngagementScore != null && (
+                          <Badge tone={Number(item.predictedEngagementScore) >= 70 ? 'primary' : 'default'}>
+                            互動 {Math.round(Number(item.predictedEngagementScore))}
+                          </Badge>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 600, flex: 1 }}>{item.title}</span>
+                        <span style={{ fontSize: 11, color: 'var(--color-text-muted)', flexShrink: 0 }}>
+                          {isOpen ? '收合 ▲' : '展開 ▼'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                        {new Date(item.createdAt).toLocaleString('zh-TW')}
+                      </div>
+                      {isOpen && (
+                        <>
+                          <PostBody body={item.body} hashtags={item.hashtags} imageUrl={item.imageUrl} />
+                          <div style={{ marginTop: 8 }}>
+                            <Link
+                              to={`/${slug}/contents`}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ fontSize: 12 }}
+                            >
+                              到內容中心審核 / 編輯 ↗
+                            </Link>
+                          </div>
+                        </>
                       )}
-                    </div>
-                    <Link to={`/${slug}/contents`} style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', textDecoration: 'none' }}>
-                      {item.title}
-                    </Link>
-                    <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                      {new Date(item.createdAt).toLocaleString('zh-TW')}
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  );
+                })}
               </div>
 
               <div style={{ display: 'grid', gap: 8 }}>
@@ -98,25 +156,33 @@ export function Publishing() {
                 {colJobs.length === 0 && (
                   <Card><p style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>尚無發布紀錄</p></Card>
                 )}
-                {colJobs.map((job) => (
-                  <Card key={job.id}>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                      <Badge tone={statusTone[job.status]}>{statusLabel[job.status]}</Badge>
-                    </div>
-                    <strong style={{ fontSize: 13.5 }}>{job.contentTitle ?? job.contentId}</strong>
-                    <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                      {job.publishedAt ? `發布於 ${new Date(job.publishedAt).toLocaleString('zh-TW')}` : job.scheduledAt ? `排程於 ${new Date(job.scheduledAt).toLocaleString('zh-TW')}` : ''}
-                      {job.publishedBy ? ` · 發布人:${userName(job.publishedBy)}` : job.publishedAt ? ' · 排程自動發布' : ''}
-                    </div>
-                    {job.externalPostId && (
-                      <div style={{ fontSize: 11.5, marginTop: 4 }}>
-                        {job.externalPostId.startsWith('http')
-                          ? <a href={job.externalPostId} target="_blank" rel="noreferrer">查看貼文 ↗</a>
-                          : `貼文 ID:${job.externalPostId}`}
+                {colJobs.map((job) => {
+                  const key = `j-${job.id}`;
+                  const isOpen = expanded.has(key);
+                  return (
+                    <Card key={job.id} style={{ cursor: 'pointer' }} onClick={() => toggle(key)}>
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                        <Badge tone={statusTone[job.status]}>{statusLabel[job.status]}</Badge>
+                        <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
+                          {isOpen ? '收合 ▲' : '展開 ▼'}
+                        </span>
                       </div>
-                    )}
-                  </Card>
-                ))}
+                      <strong style={{ fontSize: 13.5 }}>{job.contentTitle ?? job.contentId}</strong>
+                      <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                        {job.publishedAt ? `發布於 ${new Date(job.publishedAt).toLocaleString('zh-TW')}` : job.scheduledAt ? `排程於 ${new Date(job.scheduledAt).toLocaleString('zh-TW')}` : ''}
+                        {job.publishedBy ? ` · 發布人:${userName(job.publishedBy)}` : job.publishedAt ? ' · 排程自動發布' : ''}
+                      </div>
+                      {job.externalPostId && (
+                        <div style={{ fontSize: 11.5, marginTop: 4 }}>
+                          {job.externalPostId.startsWith('http')
+                            ? <a href={job.externalPostId} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>查看貼文 ↗</a>
+                            : `貼文 ID:${job.externalPostId}`}
+                        </div>
+                      )}
+                      {isOpen && <PostBody body={job.body} imageUrl={job.imageUrl} />}
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           );

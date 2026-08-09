@@ -5,7 +5,7 @@ import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData } from '@/hooks/useAsyncData';
 
-const BRAND_SCOPED_PREFIXES = ['workspace', 'intelligence', 'market', 'campaigns', 'events', 'contents', 'publishing', 'social', 'analytics', 'learning'];
+const BRAND_SCOPED_PREFIXES = ['workspace', 'intelligence', 'market', 'campaigns', 'events', 'contents', 'publishing', 'thread-replies', 'social', 'analytics', 'learning'];
 
 /** 品牌小圖標:有官方 logo 用 logo(白底 contain),沒有就退回色塊字首 */
 function BrandMark({ brand, size }: { brand: { primaryColor: string; logoInitial: string; logoUrl?: string | null; name: string }; size: number }) {

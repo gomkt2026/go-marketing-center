@@ -12,7 +12,7 @@ import type { SocialAccount, SocialAccountStatus } from '@/types';
 const PLATFORMS: { id: 'facebook' | 'instagram' | 'threads'; label: string; hint: string }[] = [
   { id: 'facebook', label: 'Facebook 粉絲專頁', hint: '需要粉專 Page ID 與 Page Access Token(Meta 開發者 App 審核通過後可自動發文)' },
   { id: 'instagram', label: 'Instagram 商業帳號', hint: '需要 IG 商業帳號 ID(與 FB 粉專綁定)與相同的 Page Token' },
-  { id: 'threads', label: 'Threads', hint: '需要 Threads App 的 access token(threads_basic / threads_content_publish 權限)' },
+  { id: 'threads', label: 'Threads', hint: '需要 Threads App 的 access token(threads_basic / threads_content_publish 權限;要用「自動回覆熱門貼文」需加上 threads_keyword_search 與 threads_manage_replies)' },
 ];
 
 const statusTone: Record<SocialAccountStatus, BadgeTone> = {
@@ -27,6 +27,8 @@ interface FormState {
   externalId: string;
   accessToken: string;
   autoPublish: boolean;
+  autoReply: boolean;
+  replyDailyCap: number;
 }
 
 export function SocialAccounts() {
@@ -34,7 +36,7 @@ export function SocialAccounts() {
   const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>({ accountName: '', externalId: '', accessToken: '', autoPublish: false });
+  const [form, setForm] = useState<FormState>({ accountName: '', externalId: '', accessToken: '', autoPublish: false, autoReply: false, replyDailyCap: 12 });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -56,6 +58,8 @@ export function SocialAccounts() {
       externalId: acc?.externalId ?? '',
       accessToken: '',
       autoPublish: acc?.autoPublish ?? false,
+      autoReply: acc?.autoReply ?? false,
+      replyDailyCap: acc?.replyDailyCap ?? 12,
     });
     setEditing(platform);
     setMessage(null);
@@ -72,6 +76,8 @@ export function SocialAccounts() {
         externalId: form.externalId || undefined,
         accessToken: form.accessToken || undefined,
         autoPublish: form.autoPublish,
+        autoReply: form.autoReply,
+        replyDailyCap: form.replyDailyCap,
       });
       setEditing(null);
       setMessage('已儲存設定');
@@ -136,6 +142,7 @@ export function SocialAccounts() {
                       {acc.externalId && <div>平台 ID:{acc.externalId}</div>}
                       {acc.hasToken && <div>Token:{acc.tokenMasked}</div>}
                       {acc.autoPublish && <div>🚀 排程自動發布:已開啟</div>}
+                      {acc.autoReply && <div>💬 自動回覆熱門貼文:已開啟(每日上限 {acc.replyDailyCap ?? 12} 則)</div>}
                       {acc.notes && <div style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>{acc.notes}</div>}
                     </div>
                   )}
@@ -180,14 +187,35 @@ export function SocialAccounts() {
                     />
                   </label>
                   {p.id === 'threads' && (
-                    <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={form.autoPublish}
-                        onChange={(e) => setForm((f) => ({ ...f, autoPublish: e.target.checked }))}
-                      />
-                      排程自動發布(每 30 分鐘的 Threads 熱門議題貼文直接發布,不經人工審核;需已填入有效 token)
-                    </label>
+                    <>
+                      <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={form.autoPublish}
+                          onChange={(e) => setForm((f) => ({ ...f, autoPublish: e.target.checked }))}
+                        />
+                        排程自動發布(每 30 分鐘的 Threads 熱門議題貼文直接發布,不經人工審核;需已填入有效 token)
+                      </label>
+                      <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={form.autoReply}
+                          onChange={(e) => setForm((f) => ({ ...f, autoReply: e.target.checked }))}
+                        />
+                        自動回覆熱門貼文(AI 生成的高相關回覆直接發布;關閉則進入「Threads 互動」頁待審核。token 需具備 threads_keyword_search 與 threads_manage_replies 權限)
+                      </label>
+                      <label style={{ fontSize: 12.5 }}>
+                        每日回覆上限(建議 10-15,避免被平台判定為 spam)
+                        <input
+                          style={{ ...inputStyle, maxWidth: 120 }}
+                          type="number"
+                          min={1}
+                          max={50}
+                          value={form.replyDailyCap}
+                          onChange={(e) => setForm((f) => ({ ...f, replyDailyCap: Math.max(1, Math.min(50, Number(e.target.value) || 12)) }))}
+                        />
+                      </label>
+                    </>
                   )}
                   <div style={{ display: 'flex', gap: 8 }}>
                     <Button variant="primary" disabled={busy} onClick={() => void save(p.id)}>{busy ? '儲存中...' : '儲存'}</Button>

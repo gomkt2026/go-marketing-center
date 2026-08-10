@@ -16,6 +16,21 @@ import { buildPodcastMediaKey, putMedia } from './media';
 /** 主持群固定順序:阿豪開場帶氣氛 → 小咪 → 阿樂 */
 const HOST_BRAND_ORDER = ['taskgo', 'homigo', 'washgo'];
 
+/** 每集固定的開場自我介紹台詞(依 HOST_BRAND_ORDER 順序播,第一位多一句節目開場) */
+const SHOW_OPENING = '哈囉哈囉~歡迎收聽《三小編熱聊》!一週兩集,三個小編陪你聊最近最熱的話題!';
+const FIXED_SELF_INTROS: Record<string, string> = {
+  taskgo: '我是 Taskgo 的阿豪!裝潢、修繕、找工班,大小工程交給 Taskgo,報價透明不踩雷!',
+  homigo: '大家好~我是 Homigo 的小咪!租屋、收租、包租代管,把租屋大小事整理回同一個地方,房東房客都安心!',
+  washgo: '哈囉!我是 Washgo 的阿樂!衣服棉被送洗、收送到府,髒衣服交給我,你只管當個乾淨的人~',
+};
+
+/** 各品牌可以在節目中自然帶到的系統優勢(給編劇當「業配」素材) */
+const SERVICE_PITCHES: Record<string, string> = {
+  taskgo: '裝修媒合平台:幫屋主找到可靠工班、報價透明、進度看得到,避免被亂報價或工程爛尾',
+  homigo: '包租代管/租屋管理:合約、租金、修繕紀錄整理在同一個地方,房東不用自己追,房客有問題找得到人',
+  washgo: '洗衣送洗服務:線上預約、收送到府,換季棉被床單、名牌衣物都有專業處理,省時間又不怕洗壞',
+};
+
 export interface PodcastHost {
   agentId: string;
   brandSlug: string;
@@ -83,8 +98,8 @@ export async function getPodcastHosts(env: Env): Promise<PodcastHost[]> {
   return hosts;
 }
 
-/** 選題:近 N 天的高分情報,排除近兩週已上過節目的,並讓三品牌都有機會入選 */
-export async function pickTopicsForEpisode(env: Env, days = 3, limit = 4): Promise<PodcastTopic[]> {
+/** 選題:近 N 天的高分情報,排除近兩週已上過節目的,並讓三品牌都有機會入選(2-3 題深聊) */
+export async function pickTopicsForEpisode(env: Env, days = 3, limit = 3): Promise<PodcastTopic[]> {
   const sql = getSql(env);
   const [signalRows, usedRows] = await Promise.all([
     sql`
@@ -135,8 +150,20 @@ function hostIntroBlock(host: PodcastHost): string {
     `- 口頭禪:「${host.catchphrase}」(偶爾自然地用,不要每句都講)`,
     `- 在意的立場:${host.focus}`,
     `- 行業日常:${voice.dailyConcerns}`,
+    SERVICE_PITCHES[host.brandSlug] ? `- 自家服務(業配素材):${SERVICE_PITCHES[host.brandSlug]}` : '',
     host.canInterrupt ? '- 特質:急性子,會搶話打斷別人(開頭用「等等等等!」「欸不是啊…」之類)' : '',
   ].filter(Boolean).join('\n');
+}
+
+/** 每集固定的開場自我介紹(不經 LLM,保證每集一致) */
+function buildFixedIntroLines(hosts: PodcastHost[]): ScriptLine[] {
+  const lines: ScriptLine[] = [];
+  hosts.forEach((h, i) => {
+    const intro = FIXED_SELF_INTROS[h.brandSlug] ?? `大家好,我是 ${h.brandName} 的 ${h.nickname}!`;
+    const text = i === 0 ? `${SHOW_OPENING}${intro}` : intro;
+    lines.push({ order: lines.length, segmentLabel: 'intro', agentId: h.agentId, nickname: h.nickname, text, emotion: 'excited' });
+  });
+  return lines;
 }
 
 interface RawScriptLine {
@@ -173,21 +200,25 @@ export async function generatePodcastScript(
     hosts.map(hostIntroBlock).join('\n\n'),
     '',
     '腳本鐵則:',
-    '- 每個話題至少 3-5 輪來回,不是每人輪流講一句就換話題;要互相吐槽、虧對方、開玩笑,意見不合就吵一下,吵完再收斂出共識或笑著帶過',
+    '- 話題不多但要聊得深:每個話題 6-10 輪來回,從「發生什麼事」→「各自的看法/經驗」→「吵一下或互虧」→「收斂出結論或笑著帶過」,不是每人輪流講一句就換話題',
+    '- 每個話題至少埋 1 個「實用小知識或冷知識」:讓聽眾聽完覺得有帶走東西(例如行情數字、避雷方法、內行人才知道的眉角),但要用聊天口吻講,像朋友爆料,不要像上課',
+    '- 每個話題至少 1 個笑點:吐槽、自嘲、誇張比喻、講自己客人的糗事(匿名)都可以,要讓人聽了會笑出來',
+    '- 業配時間:話題和某個小編的服務相關時,那位小編要自然地「順便」講 1-2 句自家系統的優勢(用上面的業配素材),講的時候可以理直氣壯,其他兩人可以吐槽「又來了又來了」「業配喔!」然後笑著帶過;每集業配 2-3 次就好,不要每題都推銷',
     '- 講話要像「真人」:常用台灣人的發語詞和口頭語(欸、蛤?、哇賽、老實說、講真的、啊不然、對啦、唉唷、嗯…、就是說),偶爾句子講一半停頓(用「…」),會直接叫對方的名字回應(「小咪妳這樣講喔…」),不要每句都文法完整',
     '- 每句台詞 30-90 字,口語、快節奏、有情緒;每個人都要為自己品牌的立場講話',
     '- 阿豪是急性子,一集至少搶話打斷別人 2-3 次(開頭用「等等等等!」「欸不是啊…」「蛤?等一下啦」)',
-    '- 開場(intro)三人簡短打招呼、互虧一下就切入主題,不要冗長自我介紹;結尾(outro)輕鬆總結、互相虧一句、跟聽眾說下集見',
+    '- 節目開頭已經有固定的節目介紹和三人自我介紹(系統會自動加在最前面),所以你寫的開場(intro)不要再自我介紹,直接用 2-4 句互虧、聊近況暖場,然後帶入第一個話題',
+    '- 結尾(outro)輕鬆總結每題重點一句話、互相虧一句、跟聽眾說下集見',
     '- 話題之間的轉場要自然(由某個人吐槽或聯想帶到下一題),不要像念稿',
-    '- 不要讀廣告、不要促銷、不要喊口號;品牌立場透過聊天自然流露',
+    '- 除了業配時間之外不要喊口號、不要促銷;品牌立場透過聊天自然流露',
     ANTI_AI_RULES,
   ].join('\n');
 
   const userPrompt = [
-    `本集要聊的熱門話題(共 ${topics.length} 則,依序討論):`,
+    `本集要聊的熱門話題(共 ${topics.length} 則,每一則都要深入討論):`,
     topicList,
     '',
-    `請寫出完整一集的腳本,總長度 1800-2800 字(不含 JSON 結構),分成這些段落:${segmentLabels.join(' → ')}。`,
+    `請寫出完整一集的腳本,總長度 2000-3000 字(不含 JSON 結構),分成這些段落:${segmentLabels.join(' → ')}。`,
     '回傳 JSON:',
     `{"title":"本集標題(10-20字,像 Podcast 單集標題,吸引人點開)","topicSummary":"一句話介紹本集聊了什麼","script":[{"segment":"${segmentLabels.join('|')} 擇一","speaker":"${hosts.map((h) => h.nickname).join('|')} 擇一","text":"台詞(30-90字)","emotion":"${MEETING_EMOTIONS.join('|')} 中選一個"}]}`,
   ].join('\n');
@@ -211,12 +242,13 @@ export async function generatePodcastScript(
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(result) },
-        { role: 'user', content: `這集只有 ${totalChars} 字,太短了。每個話題再多加 2-3 輪來回(多一點吐槽、吵架、開玩笑),把總長度擴到 1800-2800 字,回傳同格式完整 JSON。` },
+        { role: 'user', content: `這集只有 ${totalChars} 字,太短了。每個話題再多加 2-3 輪來回(多一點吐槽、吵架、開玩笑,知識點講得更細),把總長度擴到 2000-3000 字,回傳同格式完整 JSON。` },
       ],
     });
   }
 
-  const lines: ScriptLine[] = [];
+  // 固定自我介紹放最前面(不經 LLM,每集一致),後面接 LLM 寫的腳本
+  const lines: ScriptLine[] = buildFixedIntroLines(hosts);
   for (const raw of result.script ?? []) {
     const host = hostByNickname.get(raw.speaker?.trim());
     const text = raw.text?.trim();

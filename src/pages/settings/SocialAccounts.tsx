@@ -22,6 +22,19 @@ const statusLabel: Record<SocialAccountStatus, string> = {
   disconnected: '未設定', manual: '手動發布模式', connected: 'API 已連線', error: '連線異常',
 };
 
+function tokenExpiryLabel(expiresAt?: string | null): string {
+  if (!expiresAt) return '⏳ Token 效期確認中(24 小時內系統會自動確認並續期)';
+  const days = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000);
+  if (days < 0) return `⚠️ Token 已過期(${expiresAt.slice(0, 10)}),請重新產生長效 token`;
+  if (days <= 10) return `⚠️ Token 將於 ${days} 天內到期(${expiresAt.slice(0, 10)}),系統會自動續期`;
+  return `✅ Token 效期至 ${expiresAt.slice(0, 10)}(自動續期中,剩 ${days} 天)`;
+}
+function tokenExpiryTone(expiresAt?: string | null): string {
+  if (!expiresAt) return 'var(--color-text-muted)';
+  const days = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000);
+  return days <= 10 ? 'var(--color-danger, #d33)' : 'var(--color-text-muted)';
+}
+
 interface FormState {
   accountName: string;
   externalId: string;
@@ -141,6 +154,11 @@ export function SocialAccounts() {
                       {acc.accountName && <div>帳號名稱:{acc.accountName}</div>}
                       {acc.externalId && <div>平台 ID:{acc.externalId}</div>}
                       {acc.hasToken && <div>Token:{acc.tokenMasked}</div>}
+                      {acc.hasToken && p.id === 'threads' && (
+                        <div style={{ color: tokenExpiryTone(acc.tokenExpiresAt) }}>
+                          {tokenExpiryLabel(acc.tokenExpiresAt)}
+                        </div>
+                      )}
                       {acc.autoPublish && <div>🚀 排程自動發布:已開啟</div>}
                       {acc.autoReply && <div>💬 自動回覆熱門貼文:已開啟(每日上限 {acc.replyDailyCap ?? 12} 則)</div>}
                       {acc.notes && <div style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>{acc.notes}</div>}

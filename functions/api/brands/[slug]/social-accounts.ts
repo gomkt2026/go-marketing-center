@@ -78,10 +78,16 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
   let tokenEnc: string | null = existing.length
     ? ((existing[0] as { access_token_enc: string | null }).access_token_enc)
     : null;
+  let tokenExpiresAt: string | null = existing.length
+    ? ((existing[0] as { token_expires_at: string | null }).token_expires_at)
+    : null;
   if (body.clearToken) {
     tokenEnc = null;
+    tokenExpiresAt = null;
   } else if (body.accessToken?.trim()) {
     tokenEnc = await encryptToken(context.env, body.accessToken.trim());
+    // 換了新 token,舊的到期時間不再有效;24 小時後排程會自動確認新 token 效期並續期
+    tokenExpiresAt = null;
   }
 
   // 有 token 即進入手動發布模式(connected 需通過連線測試)
@@ -92,13 +98,14 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
   const replyDailyCap = Math.max(1, Math.min(50, body.replyDailyCap ?? prev?.reply_daily_cap ?? 12));
 
   const rows = await sql`
-    INSERT INTO brand_social_accounts (brand_id, platform, account_name, external_id, access_token_enc, status, notes, auto_publish, auto_reply, reply_daily_cap, connected_at)
+    INSERT INTO brand_social_accounts (brand_id, platform, account_name, external_id, access_token_enc, token_expires_at, status, notes, auto_publish, auto_reply, reply_daily_cap, connected_at)
     VALUES (${brand.id}::uuid, ${body.platform}, ${body.accountName ?? null}, ${body.externalId ?? null},
-            ${tokenEnc}, ${status}, ${body.notes ?? null}, ${autoPublish}, ${autoReply}, ${replyDailyCap}, ${tokenEnc ? new Date().toISOString() : null})
+            ${tokenEnc}, ${tokenExpiresAt}, ${status}, ${body.notes ?? null}, ${autoPublish}, ${autoReply}, ${replyDailyCap}, ${tokenEnc ? new Date().toISOString() : null})
     ON CONFLICT (brand_id, platform) DO UPDATE SET
       account_name = EXCLUDED.account_name,
       external_id = EXCLUDED.external_id,
       access_token_enc = EXCLUDED.access_token_enc,
+      token_expires_at = EXCLUDED.token_expires_at,
       status = EXCLUDED.status,
       notes = EXCLUDED.notes,
       auto_publish = EXCLUDED.auto_publish,

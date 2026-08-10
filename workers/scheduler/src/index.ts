@@ -8,6 +8,7 @@ import { getThreadsAccount, publishThreadsPost, searchThreadsPosts, type Threads
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, composePostMessage } from '../../../functions/_shared/meta';
 import { toPublicMediaUrl } from '../../../functions/_shared/media';
 import { publishReplyTarget, replyTextIssue } from '../../../functions/_shared/threads-replies';
+import { encryptToken, decryptToken } from '../../../functions/_shared/crypto';
 import { logActivity } from '../../../functions/_shared/activity';
 import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from '../../../functions/_shared/sources';
 import { createPodcastEpisode } from '../../../functions/_shared/podcast';
@@ -691,6 +692,52 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
 }
 
 // ============================================================================
+// 主流程 4:Threads 長效 token 自動續期
+//   Threads 長效 token 效期 60 天,且必須「已存在超過 24 小時」才能續期;
+//   續期本身只需帶著現有 token 呼叫 th_refresh_token,不需要 App Secret。
+//   策略:token_expires_at 距今 < 10 天,或完全未知(NULL,且已建立超過 24 小時)→ 嘗試續期。
+// ============================================================================
+const THREADS_API = 'https://graph.threads.net/v1.0';
+
+async function refreshThreadsTokens(env: Env): Promise<void> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT a.id, a.access_token_enc, b.slug
+    FROM brand_social_accounts a
+    JOIN brands b ON b.id = a.brand_id
+    WHERE a.platform = 'threads' AND a.access_token_enc IS NOT NULL
+      AND (
+        a.token_expires_at IS NULL
+        OR a.token_expires_at < now() + interval '10 days'
+      )
+      AND a.updated_at < now() - interval '24 hours'
+  `;
+  for (const row of rows as { id: string; access_token_enc: string; slug: string }[]) {
+    try {
+      const token = await decryptToken(env, row.access_token_enc);
+      const res = await fetch(`${THREADS_API}/refresh_access_token?grant_type=th_refresh_token&access_token=${encodeURIComponent(token)}`);
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error(`[token-refresh] ${row.slug} threads 續期失敗 (${res.status}): ${text.slice(0, 200)}`);
+        await sql`UPDATE brand_social_accounts SET status = 'error', notes = ${'token 續期失敗,請重新產生長效 token: ' + text.slice(0, 200)}, updated_at = now() WHERE id = ${row.id}::uuid`;
+        continue;
+      }
+      const data = await res.json() as { access_token: string; expires_in: number };
+      const enc = await encryptToken(env, data.access_token);
+      await sql`
+        UPDATE brand_social_accounts
+        SET access_token_enc = ${enc}, token_expires_at = now() + (${data.expires_in} || ' seconds')::interval,
+            status = 'connected', notes = NULL, updated_at = now()
+        WHERE id = ${row.id}::uuid
+      `;
+      console.log(`[token-refresh] ${row.slug} threads token 已續期,效期 ${(data.expires_in / 86400).toFixed(1)} 天`);
+    } catch (e) {
+      console.error(`[token-refresh] ${row.slug} 處理失敗`, e);
+    }
+  }
+}
+
+// ============================================================================
 // 主流程 3:清理超過 31 天的 R2 生成圖片,控制儲存成長
 // ============================================================================
 async function cleanupOldMedia(env: Env): Promise<void> {
@@ -724,6 +771,7 @@ export default {
         break;
       case '30 18 * * *':
         ctx.waitUntil(cleanupOldMedia(env));
+        ctx.waitUntil(refreshThreadsTokens(env).catch((e) => console.error('[token-refresh] 整輪失敗', e)));
         break;
       case '0 23 * * 1,4':
         // 台灣週二、五早上 7 點:生成 Podcast 逐字稿(語音合成由人工在後台觸發,控 ElevenLabs 用量)
@@ -734,7 +782,7 @@ export default {
     }
   },
 
-  // 手動觸發除錯用:GET /?task=collect|drafts|threads|replies|themes|cleanup|podcast(需帶 secret)
+  // 手動觸發除錯用:GET /?task=collect|drafts|threads|replies|themes|cleanup|podcast|refresh-tokens(需帶 secret)
   // themes 可帶 &target=1|2 指定要補到當日第幾篇
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -749,11 +797,12 @@ export default {
     else if (task === 'replies') await threadsReplyRound(env);
     else if (task === 'themes') await generateDailyTheme(env, Number(url.searchParams.get('target') ?? DAILY_THEME_TARGET));
     else if (task === 'cleanup') await cleanupOldMedia(env);
+    else if (task === 'refresh-tokens') await refreshThreadsTokens(env);
     else if (task === 'podcast') {
       const result = await createPodcastEpisode(env);
       return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
     }
-    else return new Response('task 必須為 collect / drafts / threads / replies / themes / cleanup / podcast', { status: 400 });
+    else return new Response('task 必須為 collect / drafts / threads / replies / themes / cleanup / podcast / refresh-tokens', { status: 400 });
     return new Response(JSON.stringify({ ok: true, task }), { headers: { 'Content-Type': 'application/json' } });
   },
 };

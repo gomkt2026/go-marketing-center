@@ -366,6 +366,7 @@ export interface SocialAccount {
   connectedAt?: string | null;
   hasToken?: boolean;
   tokenMasked?: string | null;
+  tokenExpiresAt?: string | null;
 }
 
 export type ThreadsReplyStatus = 'pending' | 'approved' | 'replied' | 'skipped' | 'failed';

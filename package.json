@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "pages:dev": "wrangler pages dev dist --port 8788",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name=go-marketing-center --branch=Ben"
+    "deploy": "npm run build && wrangler pages deploy dist --project-name=go-marketing-center --branch=Ben",
+    "export:podcast": "node scripts/export-podcast.mjs"
   },
   "dependencies": {
     "@cf-wasm/photon": "^0.4.0",

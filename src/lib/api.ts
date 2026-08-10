@@ -378,6 +378,22 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ action }),
     }),
+
+  podcastTheme: () => request<{ url: string | null }>('/api/podcast/theme'),
+
+  uploadPodcastTheme: async (file: File) => {
+    const res = await fetch('/api/podcast/theme', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': file.type || 'audio/mpeg' },
+      body: file,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    return data as { url: string };
+  },
+
+  deletePodcastTheme: () => request<{ ok: boolean }>('/api/podcast/theme', { method: 'DELETE' }),
 };
 
 // -- 活動報名(公開端,無需登入) ----------------------------------------------

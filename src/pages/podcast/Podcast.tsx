@@ -63,8 +63,14 @@ export function Podcast() {
   const [synthesizing, setSynthesizing] = useState(false);
   const [synthProgress, setSynthProgress] = useState<{ completed: number; total: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [themeUrl, setThemeUrl] = useState<string | null>(null);
+  const [uploadingTheme, setUploadingTheme] = useState(false);
   const audioRefs = useRef<Map<number, HTMLAudioElement>>(new Map());
+  const themeInputRef = useRef<HTMLInputElement>(null);
   const stopSynthRef = useRef(false);
+
+  // 片頭音樂在 audioRefs 中的特殊 key(排在所有段落之前)
+  const THEME_ORDER = -1;
 
   const loadEpisodes = useCallback(async () => {
     const { episodes } = await api.podcastEpisodes();
@@ -81,6 +87,7 @@ export function Podcast() {
     loadEpisodes().then((eps) => {
       if (eps.length) setSelectedId((prev) => prev ?? eps[0].id);
     }).catch((e) => setErrorMsg(e instanceof Error ? e.message : '載入失敗'));
+    api.podcastTheme().then(({ url }) => setThemeUrl(url)).catch(() => {});
   }, [loadEpisodes]);
 
   useEffect(() => {
@@ -138,7 +145,7 @@ export function Podcast() {
     }
   };
 
-  // 連續播放:一段播完自動接下一段
+  // 連續播放:一段播完自動接下一段(片頭音樂 order 為 -1,播完自動接開場)
   const handleAudioEnded = (order: number) => {
     if (!detail) return;
     const nextSeg = detail.segments
@@ -149,8 +156,26 @@ export function Podcast() {
 
   const playAll = () => {
     if (!detail) return;
+    if (themeUrl) {
+      const theme = audioRefs.current.get(THEME_ORDER);
+      if (theme) { theme.play().catch(() => {}); return; }
+    }
     const first = detail.segments.filter((s) => s.audioUrl).sort((a, b) => a.segmentOrder - b.segmentOrder)[0];
     if (first) audioRefs.current.get(first.segmentOrder)?.play().catch(() => {});
+  };
+
+  const handleThemeUpload = async (file: File) => {
+    setUploadingTheme(true);
+    setErrorMsg(null);
+    try {
+      const { url } = await api.uploadPodcastTheme(file);
+      // 加時間戳避免瀏覽器快取到舊音檔
+      setThemeUrl(`${url}?v=${Date.now()}`);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : '片頭音樂上傳失敗');
+    } finally {
+      setUploadingTheme(false);
+    }
   };
 
   const agentById = new Map((detail?.agents ?? []).map((a) => [a.id, a]));
@@ -272,8 +297,37 @@ export function Podcast() {
               {/* 逐段音檔播放清單 */}
               {hasAudio && (
                 <Card style={{ marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 14, marginBottom: 10 }}>音檔段落(播完自動接下一段)</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <h3 style={{ fontSize: 14 }}>音檔段落(播完自動接下一段)</h3>
+                    <input
+                      ref={themeInputRef}
+                      type="file"
+                      accept="audio/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleThemeUpload(file);
+                        e.target.value = '';
+                      }}
+                    />
+                    <Button variant="ghost" onClick={() => themeInputRef.current?.click()} disabled={uploadingTheme}>
+                      {uploadingTheme ? '上傳中…' : themeUrl ? '更換片頭音樂' : '上傳片頭音樂'}
+                    </Button>
+                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {themeUrl && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, width: 90, flexShrink: 0 }}>🎵 片頭音樂</span>
+                        <audio
+                          ref={(el) => { if (el) audioRefs.current.set(THEME_ORDER, el); }}
+                          controls
+                          preload="none"
+                          src={themeUrl}
+                          onEnded={() => handleAudioEnded(THEME_ORDER)}
+                          style={{ flex: 1, height: 36 }}
+                        />
+                      </div>
+                    )}
                     {detail!.segments.filter((s) => s.audioUrl).map((s) => (
                       <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: 12, fontWeight: 600, width: 90, flexShrink: 0 }}>{segmentTitle(s.label)}</span>

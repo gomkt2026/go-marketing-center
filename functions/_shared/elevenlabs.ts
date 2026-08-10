@@ -91,3 +91,57 @@ export async function synthesizeDialogue(
   }
   return new Uint8Array(await res.arrayBuffer());
 }
+
+// ============================================================================
+// Instant Voice Cloning(訪談來賓用)
+// 文件:https://elevenlabs.io/docs/api-reference/voices/ivc/create
+// ============================================================================
+
+/**
+ * 用一段聲音樣本建立 Instant Voice Clone,回傳新的 voice_id。
+ * 樣本建議至少 1 分鐘、環境安靜;requiresVerification 為 true 時,
+ * 該聲音可能需要到 ElevenLabs 後台驗證後才能用於 TTS。
+ */
+export async function cloneVoice(
+  env: Env,
+  params: {
+    name: string;
+    description?: string;
+    fileBytes: Uint8Array;
+    fileName: string;
+    mimeType: string;
+  },
+): Promise<{ voiceId: string; requiresVerification: boolean }> {
+  const apiKey = requireApiKey(env);
+
+  const form = new FormData();
+  form.append('name', params.name);
+  if (params.description) form.append('description', params.description);
+  form.append('files', new Blob([params.fileBytes as unknown as ArrayBuffer], { type: params.mimeType }), params.fileName);
+
+  const res = await fetch(`${ELEVENLABS_BASE}/voices/add`, {
+    method: 'POST',
+    headers: { 'xi-api-key': apiKey },
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new ElevenLabsError(res.status, `ElevenLabs voice clone 失敗 (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json() as { voice_id: string; requires_verification?: boolean };
+  return { voiceId: data.voice_id, requiresVerification: !!data.requires_verification };
+}
+
+/** 刪除 cloned voice(刪除來賓時呼叫,避免聲音殘留在 ElevenLabs 帳號) */
+export async function deleteVoice(env: Env, voiceId: string): Promise<void> {
+  const apiKey = requireApiKey(env);
+  const res = await fetch(`${ELEVENLABS_BASE}/voices/${voiceId}`, {
+    method: 'DELETE',
+    headers: { 'xi-api-key': apiKey },
+  });
+  // 404 視為已刪除,不擋流程
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text().catch(() => '');
+    throw new ElevenLabsError(res.status, `ElevenLabs 刪除 voice 失敗 (${res.status}): ${text.slice(0, 300)}`);
+  }
+}

@@ -379,6 +379,32 @@ export const api = {
       body: JSON.stringify({ action }),
     }),
 
+  // -- Podcast 訪談來賓 --------------------------------------------------------
+  podcastGuests: () =>
+    request<{ guests: import('@/types').PodcastGuest[] }>('/api/podcast/guests'),
+
+  createPodcastGuest: async (params: { name: string; title: string; bio: string; audio: File }) => {
+    const form = new FormData();
+    form.append('name', params.name);
+    form.append('title', params.title);
+    form.append('bio', params.bio);
+    form.append('consentConfirmed', 'true');
+    form.append('audio', params.audio);
+    const res = await fetch('/api/podcast/guests', { method: 'POST', credentials: 'include', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    return data as { guest: import('@/types').PodcastGuest };
+  },
+
+  deletePodcastGuest: (id: string) =>
+    request<{ ok: boolean }>(`/api/podcast/guests/${id}`, { method: 'DELETE' }),
+
+  createInterviewEpisode: (guestId: string) =>
+    request<{ episodeId: string; title: string; topicCount: number; lineCount: number; totalChars: number }>(
+      '/api/podcast/interview',
+      { method: 'POST', body: JSON.stringify({ guestId }) },
+    ),
+
   podcastTheme: () => request<{ url: string | null }>('/api/podcast/theme'),
 
   uploadPodcastTheme: async (file: File) => {

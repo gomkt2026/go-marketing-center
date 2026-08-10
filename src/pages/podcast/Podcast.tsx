@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/ui/PageHeader';
-import type { PodcastEpisode, PodcastSegment, PodcastAgentInfo, PodcastScriptLine } from '@/types';
+import type { PodcastEpisode, PodcastSegment, PodcastAgentInfo, PodcastScriptLine, PodcastGuest } from '@/types';
 
 const STATUS_META: Record<string, { label: string; tone: BadgeTone }> = {
   script_draft: { label: '逐字稿待確認', tone: 'accent' },
@@ -19,6 +19,13 @@ const EMOTION_EMOJI: Record<string, string> = {
   happy: '😊', excited: '🤩', annoyed: '😤', angry: '😠', worried: '😟',
   laughing: '😂', proud: '😎', sad: '😢', confident: '💪', determined: '✊',
   surprised: '😲', moved: '🥹',
+};
+
+const GUEST_STATUS_META: Record<string, { label: string; tone: BadgeTone }> = {
+  pending: { label: '待處理', tone: 'default' },
+  cloning: { label: '聲音複製中', tone: 'secondary' },
+  ready: { label: '可用', tone: 'success' },
+  failed: { label: '複製失敗', tone: 'danger' },
 };
 
 /** intro / topic1 / outro(含 #2 分段)轉成中文段落標題 */
@@ -65,6 +72,13 @@ export function Podcast() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [themeUrl, setThemeUrl] = useState<string | null>(null);
   const [uploadingTheme, setUploadingTheme] = useState(false);
+  // 訪談來賓
+  const [guestsOpen, setGuestsOpen] = useState(false);
+  const [guests, setGuests] = useState<PodcastGuest[]>([]);
+  const [guestForm, setGuestForm] = useState({ name: '', title: '', bio: '', consent: false });
+  const [guestAudio, setGuestAudio] = useState<File | null>(null);
+  const [savingGuest, setSavingGuest] = useState(false);
+  const [interviewingGuestId, setInterviewingGuestId] = useState<string | null>(null);
   const [bgmEnabled, setBgmEnabled] = useState(true);
   const [speechPlayingCount, setSpeechPlayingCount] = useState(0);
   const audioRefs = useRef<Map<number, HTMLAudioElement>>(new Map());
@@ -152,6 +166,65 @@ export function Podcast() {
     }
   };
 
+  const loadGuests = useCallback(async () => {
+    const { guests } = await api.podcastGuests();
+    setGuests(guests);
+  }, []);
+
+  useEffect(() => {
+    if (guestsOpen) loadGuests().catch(() => {});
+  }, [guestsOpen, loadGuests]);
+
+  const handleGuestSubmit = async () => {
+    if (!guestForm.name.trim() || !guestForm.bio.trim() || !guestAudio || !guestForm.consent) return;
+    setSavingGuest(true);
+    setErrorMsg(null);
+    try {
+      const { guest } = await api.createPodcastGuest({
+        name: guestForm.name.trim(),
+        title: guestForm.title.trim(),
+        bio: guestForm.bio.trim(),
+        audio: guestAudio,
+      });
+      await loadGuests();
+      setGuestForm({ name: '', title: '', bio: '', consent: false });
+      setGuestAudio(null);
+      if (guest.status === 'failed') {
+        setErrorMsg(`來賓已建立,但聲音複製失敗:${guest.errorMessage ?? '未知錯誤'}`);
+      }
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : '建立來賓失敗');
+    } finally {
+      setSavingGuest(false);
+    }
+  };
+
+  const handleDeleteGuest = async (guest: PodcastGuest) => {
+    if (!window.confirm(`確定刪除來賓「${guest.name}」?ElevenLabs 上的 cloned voice 也會一併刪除。`)) return;
+    setErrorMsg(null);
+    try {
+      await api.deletePodcastGuest(guest.id);
+      await loadGuests();
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : '刪除來賓失敗');
+    }
+  };
+
+  const handleCreateInterview = async (guestId: string) => {
+    setInterviewingGuestId(guestId);
+    setErrorMsg(null);
+    try {
+      const result = await api.createInterviewEpisode(guestId);
+      await loadEpisodes();
+      setSelectedId(result.episodeId);
+      setGuestsOpen(false);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : '生成訪談集失敗');
+    } finally {
+      setInterviewingGuestId(null);
+    }
+  };
+
   const handleReview = async (episodeId: string, action: 'approve' | 'reject' | 'archive') => {
     setErrorMsg(null);
     try {
@@ -217,15 +290,111 @@ export function Podcast() {
         title="Podcast 節目"
         subtitle="三位小編聊近三天熱門話題,每週二、五自動出逐字稿;人工確認後合成語音、試聽審核"
         actions={
-          <Button onClick={handleCreate} disabled={creating}>
-            {creating ? '生成中(約 1 分鐘)…' : '+ 立刻生成一集'}
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="secondary" onClick={() => setGuestsOpen((v) => !v)}>
+              {guestsOpen ? '收合來賓管理' : '🎙 訪談來賓'}
+            </Button>
+            <Button onClick={handleCreate} disabled={creating}>
+              {creating ? '生成中(約 1 分鐘)…' : '+ 立刻生成一集'}
+            </Button>
+          </div>
         }
       />
 
       {errorMsg && (
         <Card style={{ marginBottom: 16, borderColor: 'var(--color-danger-soft)', color: '#B85454', fontSize: 13 }}>
           {errorMsg}
+        </Card>
+      )}
+
+      {guestsOpen && (
+        <Card style={{ marginBottom: 16 }}>
+          <h3 style={{ fontSize: 14, marginBottom: 4 }}>訪談來賓管理</h3>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14 }}>
+            上傳來賓的經歷/故事和一段聲音樣本(建議 1 分鐘以上、環境安靜),系統會用 ElevenLabs 複製聲音;
+            之後就能生成一集「三小編 × 來賓」的訪談節目。訪談回答由 AI 根據資料代寫,發布前請務必人工審稿。
+          </p>
+
+          {/* 既有來賓列表 */}
+          {guests.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              {guests.map((g) => {
+                const meta = GUEST_STATUS_META[g.status] ?? { label: g.status, tone: 'default' as BadgeTone };
+                return (
+                  <div key={g.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                    background: 'var(--color-bg-soft)', borderRadius: 10,
+                  }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{g.name}</span>
+                      {g.title && <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginLeft: 6 }}>{g.title}</span>}
+                      <Badge tone={meta.tone}>{meta.label}</Badge>
+                      {g.errorMessage && (
+                        <div style={{ fontSize: 11, color: '#B85454', marginTop: 2 }}>{g.errorMessage}</div>
+                      )}
+                    </div>
+                    {g.status === 'ready' && (
+                      <Button
+                        variant="accent"
+                        onClick={() => handleCreateInterview(g.id)}
+                        disabled={interviewingGuestId !== null}
+                      >
+                        {interviewingGuestId === g.id ? '生成訪談稿中…' : '生成訪談集'}
+                      </Button>
+                    )}
+                    <Button variant="ghost" onClick={() => handleDeleteGuest(g)}>刪除</Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 新增來賓表單 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <input
+                type="text" placeholder="來賓姓名/暱稱 *" value={guestForm.name}
+                onChange={(e) => setGuestForm((f) => ({ ...f, name: e.target.value }))}
+                style={{ flex: 1, minWidth: 160, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13 }}
+              />
+              <input
+                type="text" placeholder="身分/職稱(例如:二十年裝修老師傅)" value={guestForm.title}
+                onChange={(e) => setGuestForm((f) => ({ ...f, title: e.target.value }))}
+                style={{ flex: 2, minWidth: 220, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13 }}
+              />
+            </div>
+            <textarea
+              placeholder="來賓的經歷、專業或有趣的故事 *(越詳細越好,AI 只會根據這裡的內容代寫訪談回答,不會捏造其他事實)"
+              value={guestForm.bio}
+              onChange={(e) => setGuestForm((f) => ({ ...f, bio: e.target.value }))}
+              rows={5}
+              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <input
+                type="file" accept="audio/*"
+                onChange={(e) => setGuestAudio(e.target.files?.[0] ?? null)}
+                style={{ fontSize: 12 }}
+              />
+              {guestAudio && <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{(guestAudio.size / 1024 / 1024).toFixed(1)} MB</span>}
+            </div>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+              <input
+                type="checkbox" checked={guestForm.consent}
+                onChange={(e) => setGuestForm((f) => ({ ...f, consent: e.target.checked }))}
+                style={{ marginTop: 2 }}
+              />
+              <span>我確認已取得受訪者<strong>本人同意</strong>複製其聲音,並僅用於本節目內容製作 *</span>
+            </label>
+            <div>
+              <Button
+                onClick={handleGuestSubmit}
+                disabled={savingGuest || !guestForm.name.trim() || !guestForm.bio.trim() || !guestAudio || !guestForm.consent}
+              >
+                {savingGuest ? '上傳並複製聲音中(約 30 秒)…' : '建立來賓並複製聲音'}
+              </Button>
+            </div>
+          </div>
         </Card>
       )}
 
@@ -257,6 +426,11 @@ export function Podcast() {
                   </span>
                   <Badge tone={meta.tone}>{meta.label}</Badge>
                 </div>
+                {e.episodeType === 'interview' && (
+                  <div style={{ marginBottom: 4 }}>
+                    <Badge tone="accent">🎙 訪談集{e.guestName ? `・來賓:${e.guestName}` : ''}</Badge>
+                  </div>
+                )}
                 <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{e.title ?? '(未命名)'}</div>
                 {e.topicSummary && (
                   <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.5 }}>{e.topicSummary}</div>
@@ -276,9 +450,12 @@ export function Podcast() {
               <Card style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
                       <h2 style={{ fontSize: 18 }}>{ep.title ?? '(未命名)'}</h2>
                       <Badge tone={status.tone}>{status.label}</Badge>
+                      {ep.episodeType === 'interview' && (
+                        <Badge tone="accent">🎙 訪談集{ep.guestName ? `・來賓:${ep.guestName}` : ''}</Badge>
+                      )}
                     </div>
                     {ep.topicSummary && <p style={{ fontSize: 13, marginBottom: 4 }}>{ep.topicSummary}</p>}
                     <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>

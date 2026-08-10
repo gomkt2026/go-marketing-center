@@ -15,7 +15,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const sql = getSql(context.env);
 
   const epRows = await sql`
-    SELECT * FROM podcast_episodes WHERE id = ${episodeId}::uuid LIMIT 1
+    SELECT e.*, g.name AS guest_name
+    FROM podcast_episodes e
+    LEFT JOIN podcast_guests g ON g.id = e.guest_id
+    WHERE e.id = ${episodeId}::uuid LIMIT 1
   `;
   if (!epRows.length) return error('找不到這集節目', 404);
   const episode = rowsToCamel(epRows as Record<string, unknown>[])[0] as Record<string, unknown>;
@@ -45,10 +48,31 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const totalChunks = script.length ? planSegments(script).length : 0;
   const readyChunks = (segRows as { audio_url: string | null }[]).filter((s) => s.audio_url).length;
 
+  // 訪談集:來賓也放進 agents 陣列(id 用 guest: 前綴,前端用 brandSlug='guest' 識別)
+  const agents = rowsToCamel(agentRows as Record<string, unknown>[]);
+  if (episode.guestId) {
+    const guestRows = await sql`
+      SELECT id, name, title, status FROM podcast_guests WHERE id = ${episode.guestId as string}::uuid LIMIT 1
+    `;
+    if (guestRows.length) {
+      const g = guestRows[0] as { id: string; name: string; title: string | null };
+      agents.push({
+        id: `guest:${g.id}`,
+        displayName: g.name,
+        avatarColor: '#A0785A',
+        nickname: g.name,
+        avatarUrl: null,
+        characterTitle: g.title ?? '特別來賓',
+        brandSlug: 'guest',
+        brandName: '特別來賓',
+      });
+    }
+  }
+
   return json({
     episode,
     segments: rowsToCamel(segRows as Record<string, unknown>[]),
-    agents: rowsToCamel(agentRows as Record<string, unknown>[]),
+    agents,
     progress: { total: totalChunks, completed: readyChunks },
   });
 };

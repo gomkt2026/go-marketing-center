@@ -572,6 +572,8 @@ export interface PodcastScriptLine {
   emotion: string;
 }
 
+export type PodcastEpisodeType = 'regular' | 'interview';
+
 export interface PodcastEpisode {
   id: string;
   weekOf: string;
@@ -582,6 +584,9 @@ export interface PodcastEpisode {
   errorMessage: string | null;
   createdAt: string;
   updatedAt: string;
+  episodeType?: PodcastEpisodeType;
+  guestId?: string | null;
+  guestName?: string | null;
   lineCount?: number;
   segmentsReady?: number;
   sourceSignalIds?: string[];
@@ -607,4 +612,19 @@ export interface PodcastAgentInfo {
   characterTitle: string | null;
   brandSlug: string;
   brandName: string;
+}
+
+export type PodcastGuestStatus = 'pending' | 'cloning' | 'ready' | 'failed';
+
+/** 訪談來賓(聲音已 Clone 到 ElevenLabs) */
+export interface PodcastGuest {
+  id: string;
+  name: string;
+  title: string | null;
+  bio: string;
+  voiceId: string | null;
+  status: PodcastGuestStatus;
+  errorMessage: string | null;
+  consentConfirmedAt: string;
+  createdAt: string;
 }

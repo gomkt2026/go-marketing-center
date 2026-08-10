@@ -18,6 +18,11 @@ export function buildPodcastMediaKey(episodeId: string, segmentOrder: number, ex
   return `podcast/${episodeId}/${String(segmentOrder).padStart(2, '0')}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
 }
 
+/** 訪談來賓的原始聲音樣本 key(podcast/ 前綴,不受排程清理) */
+export function buildGuestVoiceKey(ext = 'mp3'): string {
+  return `podcast/guests/${crypto.randomUUID()}.${ext}`;
+}
+
 export async function putMedia(env: Env, key: string, bytes: Uint8Array, contentType = 'image/png'): Promise<string> {
   if (!env.MEDIA) {
     throw new Error('R2 bucket MEDIA 尚未綁定,請先建立 bucket 並在 wrangler.toml 設定 r2_buckets');

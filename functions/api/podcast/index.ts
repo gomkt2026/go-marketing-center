@@ -16,19 +16,23 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const rows = status
     ? await sql`
         SELECT e.id, e.week_of, e.episode_seq, e.title, e.topic_summary, e.status, e.error_message,
+               e.episode_type, e.guest_id, g.name AS guest_name,
                e.created_at, e.updated_at,
                jsonb_array_length(e.script) AS line_count,
                (SELECT count(*)::int FROM podcast_segments s WHERE s.episode_id = e.id AND s.audio_url IS NOT NULL) AS segments_ready
         FROM podcast_episodes e
+        LEFT JOIN podcast_guests g ON g.id = e.guest_id
         WHERE e.status = ${status}::podcast_episode_status
         ORDER BY e.created_at DESC LIMIT 50
       `
     : await sql`
         SELECT e.id, e.week_of, e.episode_seq, e.title, e.topic_summary, e.status, e.error_message,
+               e.episode_type, e.guest_id, g.name AS guest_name,
                e.created_at, e.updated_at,
                jsonb_array_length(e.script) AS line_count,
                (SELECT count(*)::int FROM podcast_segments s WHERE s.episode_id = e.id AND s.audio_url IS NOT NULL) AS segments_ready
         FROM podcast_episodes e
+        LEFT JOIN podcast_guests g ON g.id = e.guest_id
         ORDER BY e.created_at DESC LIMIT 50
       `;
   return json({ episodes: rowsToCamel(rows as Record<string, unknown>[]) });

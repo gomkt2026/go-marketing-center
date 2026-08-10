@@ -3,8 +3,8 @@ import { getSql } from './db';
 import { chatCompleteJson } from './openai';
 import { getBrandVoice, ANTI_AI_RULES } from './prompts';
 import { MEETING_EMOTIONS, type MeetingEmotion } from './meeting-ai';
-import { synthesizeDialogue, applyEmotionTag, DIALOGUE_CHAR_LIMIT } from './elevenlabs';
-import { buildPodcastMediaKey, putMedia } from './media';
+import { synthesizeDialogue, applyEmotionTag, cloneVoice, DIALOGUE_CHAR_LIMIT } from './elevenlabs';
+import { buildPodcastMediaKey, buildGuestVoiceKey, putMedia } from './media';
 
 // ============================================================================
 // 三小編熱門話題 Podcast
@@ -166,6 +166,10 @@ function buildFixedIntroLines(hosts: PodcastHost[]): ScriptLine[] {
   return lines;
 }
 
+/** 反應性笑聲規則(一般集與訪談集共用) */
+const LAUGHTER_RULE =
+  '- 笑聲要「聽得到」:每個話題/問題至少 1-2 句「純反應」的短台詞——某人講完笑點後,另一人立刻單獨接一句像「哈哈哈哈,不會吧!」「欸你很壞欸哈哈!」「笑死,真的假的?」(這種句子的 emotion 一定填 laughing),不用等講完整段才笑;全集 laughing 情緒至少出現 4-6 次,聽起來才像真的有人在棚裡笑出來';
+
 interface RawScriptLine {
   segment: string;
   speaker: string;
@@ -203,6 +207,7 @@ export async function generatePodcastScript(
     '- 話題不多但要聊得深:每個話題 6-10 輪來回,從「發生什麼事」→「各自的看法/經驗」→「吵一下或互虧」→「收斂出結論或笑著帶過」,不是每人輪流講一句就換話題',
     '- 每個話題至少埋 1 個「實用小知識或冷知識」:讓聽眾聽完覺得有帶走東西(例如行情數字、避雷方法、內行人才知道的眉角),但要用聊天口吻講,像朋友爆料,不要像上課',
     '- 每個話題至少 1 個笑點:吐槽、自嘲、誇張比喻、講自己客人的糗事(匿名)都可以,要讓人聽了會笑出來',
+    LAUGHTER_RULE,
     '- 業配時間:話題和某個小編的服務相關時,那位小編要自然地「順便」講 1-2 句自家系統的優勢(用上面的業配素材),講的時候可以理直氣壯,其他兩人可以吐槽「又來了又來了」「業配喔!」然後笑著帶過;每集業配 2-3 次就好,不要每題都推銷',
     '- 業配鐵則:每個人「只能」推銷自己代表的品牌!阿豪只推 Taskgo、小咪只推 Homigo、阿樂只推 Washgo;別人的品牌絕對不能講成「我們」,只能用吐槽或幫腔的方式提到',
     '- 三個人的名字必須寫對:阿豪、小咪、阿樂,不准出現錯字(例如「阿浩」)',
@@ -310,6 +315,235 @@ export async function createPodcastEpisode(env: Env): Promise<CreatedEpisode> {
 }
 
 // ============================================================================
+// 訪談來賓:Instant Voice Clone + 三小編訪談集
+// ============================================================================
+
+export type PodcastGuestStatus = 'pending' | 'cloning' | 'ready' | 'failed';
+
+export interface PodcastGuest {
+  id: string;
+  name: string;
+  title: string | null;
+  bio: string;
+  voiceId: string | null;
+  status: PodcastGuestStatus;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+/** 來賓在 ScriptLine.agentId 的識別格式(和 ai_agents UUID 區分) */
+export function guestAgentId(guestId: string): string {
+  return `guest:${guestId}`;
+}
+
+function rowToGuest(r: Record<string, unknown>): PodcastGuest {
+  return {
+    id: r.id as string,
+    name: r.name as string,
+    title: (r.title as string) ?? null,
+    bio: r.bio as string,
+    voiceId: (r.voice_id as string) ?? null,
+    status: r.status as PodcastGuestStatus,
+    errorMessage: (r.error_message as string) ?? null,
+    createdAt: String(r.created_at),
+  };
+}
+
+export async function getPodcastGuest(env: Env, guestId: string): Promise<PodcastGuest> {
+  const sql = getSql(env);
+  const rows = await sql`SELECT * FROM podcast_guests WHERE id = ${guestId}::uuid LIMIT 1`;
+  if (!rows.length) throw new Error('找不到這位來賓');
+  return rowToGuest(rows[0] as Record<string, unknown>);
+}
+
+/**
+ * 建立來賓資料:聲音樣本存 R2 → 呼叫 ElevenLabs Instant Voice Clone。
+ * clone 失敗不丟例外,回傳 status='failed' 的來賓(資料保留,可之後重試)。
+ */
+export async function createGuestProfile(
+  env: Env,
+  params: {
+    name: string;
+    title?: string;
+    bio: string;
+    audioBytes: Uint8Array;
+    fileName: string;
+    mimeType: string;
+    consentConfirmed: boolean;
+  },
+): Promise<PodcastGuest> {
+  if (!params.consentConfirmed) throw new Error('必須先確認已取得受訪者本人同意複製聲音');
+  if (!params.name.trim() || !params.bio.trim()) throw new Error('來賓姓名與經歷/故事資料為必填');
+
+  const sql = getSql(env);
+  const ext = params.fileName.split('.').pop()?.toLowerCase() || 'mp3';
+  const sampleKey = buildGuestVoiceKey(ext);
+  await putMedia(env, sampleKey, params.audioBytes, params.mimeType);
+
+  const inserted = await sql`
+    INSERT INTO podcast_guests (name, title, bio, voice_sample_key, consent_confirmed_at, status)
+    VALUES (${params.name.trim()}, ${params.title?.trim() || null}, ${params.bio.trim()}, ${sampleKey}, now(), 'cloning')
+    RETURNING *
+  `;
+  const guestId = (inserted[0] as { id: string }).id;
+
+  try {
+    const { voiceId, requiresVerification } = await cloneVoice(env, {
+      name: `Podcast來賓-${params.name.trim()}`,
+      description: params.title?.trim() || undefined,
+      fileBytes: params.audioBytes,
+      fileName: params.fileName,
+      mimeType: params.mimeType,
+    });
+    const note = requiresVerification ? 'ElevenLabs 要求驗證此聲音,若合成失敗請到 ElevenLabs 後台完成驗證' : null;
+    const updated = await sql`
+      UPDATE podcast_guests SET voice_id = ${voiceId}, status = 'ready', error_message = ${note}
+      WHERE id = ${guestId}::uuid RETURNING *
+    `;
+    return rowToGuest(updated[0] as Record<string, unknown>);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : '聲音複製失敗';
+    const updated = await sql`
+      UPDATE podcast_guests SET status = 'failed', error_message = ${message}
+      WHERE id = ${guestId}::uuid RETURNING *
+    `;
+    console.error(`[podcast] 來賓 ${params.name} 聲音複製失敗`, e);
+    return rowToGuest(updated[0] as Record<string, unknown>);
+  }
+}
+
+const INTERVIEW_MIN_CHARS = 1600;
+
+/** 訪談集腳本:固定開場 + 來賓介紹轉場 → 3 段深入問答 → 感謝結尾 */
+export async function generateInterviewScript(
+  env: Env,
+  hosts: PodcastHost[],
+  guest: PodcastGuest,
+): Promise<{ title: string; topicSummary: string; lines: ScriptLine[] }> {
+  const hostByNickname = new Map(hosts.map((h) => [h.nickname, h]));
+  const segmentLabels = ['intro', 'q1', 'q2', 'q3', 'outro'];
+  const guestLabel = guest.title ? `${guest.title}——${guest.name}` : guest.name;
+
+  const systemPrompt = [
+    `你是台灣 Podcast 節目「三小編熱聊」的資深編劇。本集是「訪談特輯」:三位品牌小編邀請一位真實來賓上節目聊他的經歷與故事,全長約 10 分鐘,氣氛像朋友聚會,不是正式專訪。`,
+    '',
+    '三位主持人的人設(要嚴格照人設寫,聽眾閉著眼睛也要分得出誰在講話):',
+    hosts.map(hostIntroBlock).join('\n\n'),
+    '',
+    `本集來賓:【${guest.name}】${guest.title ? `(${guest.title})` : ''}`,
+    '來賓的背景資料(訪談內容的唯一素材來源):',
+    guest.bio,
+    '',
+    '訪談腳本鐵則:',
+    '- 來賓的每一句回答都要根據上面的背景資料「代寫」:語氣要像真人受訪,口語、自然、有停頓和贅字;可以合理延伸感受和情緒,但「絕對不可以」捏造背景資料以外的具體事實(數字、日期、人名、地點、公司名)',
+    '- 來賓回答每句 60-150 字,講故事的時候可以連續講 2 句;主持人台詞每句 30-90 字',
+    '- 三小編要像真的主持人:聽到有趣的地方會追問「後來咧?」「等等,那個時候你不會怕喔?」、會驚訝、會吐槽、會把來賓的故事連回自己的行業經驗,不是照稿輪流念問題',
+    '- 三段問答(q1/q2/q3)各聊一個不同切角:從背景資料裡挑最有梗的三件事(例如:入行經歷/最難忘的故事/專業眉角或給聽眾的建議),每段 5-8 輪來回',
+    LAUGHTER_RULE,
+    '- 開場(intro):系統已自動加上節目固定開場和來賓介紹,你寫的 intro 從來賓打招呼開始——來賓先簡短自我介紹(根據背景資料,50-100字),三小編熱情回應、簡單寒暄 2-3 句就進第一個問題',
+    '- 結尾(outro):三小編各自講一句今天的收穫或虧來賓一句,誠懇感謝來賓,跟聽眾說下集見;來賓也要講一句收尾',
+    '- 講話要像「真人」:常用台灣人的發語詞和口頭語(欸、蛤?、哇賽、老實說、講真的、啊不然、對啦、唉唷、嗯…、就是說),不要每句都文法完整',
+    `- 名字必須寫對:${hosts.map((h) => h.nickname).join('、')}、${guest.name},不准出現錯字`,
+    '- 不要業配、不要促銷;小編可以自然聊到自己行業,但這集的主角是來賓',
+    ANTI_AI_RULES,
+  ].join('\n');
+
+  const userPrompt = [
+    `請寫出完整一集訪談腳本,總長度 2000-3000 字(不含 JSON 結構),分成這些段落:${segmentLabels.join(' → ')}。`,
+    '回傳 JSON:',
+    `{"title":"本集標題(10-20字,要讓人想點開,包含來賓的亮點)","topicSummary":"一句話介紹本集訪談了誰、聊了什麼","script":[{"segment":"${segmentLabels.join('|')} 擇一","speaker":"${[...hosts.map((h) => h.nickname), guest.name].join('|')} 擇一","text":"台詞","emotion":"${MEETING_EMOTIONS.join('|')} 中選一個"}]}`,
+  ].join('\n');
+
+  let result = await chatCompleteJson<GeneratedScript>(env, {
+    temperature: 0.95,
+    maxTokens: 4000,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  });
+
+  const totalChars = (result.script ?? []).reduce((s, l) => s + (l.text?.length ?? 0), 0);
+  if (totalChars < INTERVIEW_MIN_CHARS) {
+    result = await chatCompleteJson<GeneratedScript>(env, {
+      temperature: 0.9,
+      maxTokens: 4000,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+        { role: 'assistant', content: JSON.stringify(result) },
+        { role: 'user', content: `這集只有 ${totalChars} 字,太短了。每個問答段再多 2-3 輪追問和反應(來賓故事講得更細、小編多吐槽多笑),把總長度擴到 2000-3000 字,回傳同格式完整 JSON。` },
+      ],
+    });
+  }
+
+  // 固定開場 + 來賓介紹轉場(不經 LLM,每集一致)
+  const lines: ScriptLine[] = buildFixedIntroLines(hosts);
+  lines.push({
+    order: lines.length,
+    segmentLabel: 'intro',
+    agentId: hosts[0].agentId,
+    nickname: hosts[0].nickname,
+    text: `欸今天不一樣喔!我們請到一位超特別的來賓——${guestLabel}!等一下就讓他自己跟大家打招呼,掌聲歡迎~`,
+    emotion: 'excited',
+  });
+
+  const guestNickname = guest.name;
+  for (const raw of result.script ?? []) {
+    const speaker = raw.speaker?.trim();
+    const text = raw.text?.trim();
+    if (!speaker || !text) continue;
+    const segment = segmentLabels.includes(raw.segment) ? raw.segment : (lines[lines.length - 1]?.segmentLabel ?? 'intro');
+    const emotion = (MEETING_EMOTIONS as readonly string[]).includes(raw.emotion) ? raw.emotion as MeetingEmotion : 'neutral';
+    const host = hostByNickname.get(speaker);
+    if (host) {
+      lines.push({ order: lines.length, segmentLabel: segment, agentId: host.agentId, nickname: host.nickname, text, emotion });
+    } else if (speaker === guestNickname) {
+      lines.push({ order: lines.length, segmentLabel: segment, agentId: guestAgentId(guest.id), nickname: guestNickname, text, emotion });
+    }
+  }
+  if (lines.length < 12) throw new Error(`訪談腳本生成失敗:只有 ${lines.length} 句有效台詞`);
+  const guestLineCount = lines.filter((l) => l.agentId === guestAgentId(guest.id)).length;
+  if (guestLineCount < 3) throw new Error(`訪談腳本生成失敗:來賓只有 ${guestLineCount} 句台詞`);
+
+  return {
+    title: result.title?.trim() || `三小編熱聊訪談:${guest.name}`,
+    topicSummary: result.topicSummary?.trim() || `本集邀請 ${guestLabel} 來聊聊他的故事`,
+    lines,
+  };
+}
+
+/** 完整流程:讀來賓 → 生成訪談腳本 → 寫入 podcast_episodes(episode_type=interview) */
+export async function createInterviewEpisode(env: Env, guestId: string): Promise<CreatedEpisode> {
+  const sql = getSql(env);
+  const guest = await getPodcastGuest(env, guestId);
+  if (guest.status !== 'ready' || !guest.voiceId) {
+    throw new Error(`來賓「${guest.name}」的聲音還沒準備好(狀態:${guest.status}${guest.errorMessage ? `,${guest.errorMessage}` : ''})`);
+  }
+
+  const hosts = await getPodcastHosts(env);
+  const { title, topicSummary, lines } = await generateInterviewScript(env, hosts, guest);
+
+  const weekOf = taipeiWeekMonday();
+  const seqRows = await sql`
+    SELECT count(*)::int AS n FROM podcast_episodes WHERE week_of = ${weekOf}::date
+  `;
+  const episodeSeq = ((seqRows[0] as { n: number })?.n ?? 0) + 1;
+
+  const inserted = await sql`
+    INSERT INTO podcast_episodes (week_of, episode_seq, title, topic_summary, source_signal_ids, script, status, episode_type, guest_id)
+    VALUES (
+      ${weekOf}::date, ${episodeSeq}, ${title}, ${topicSummary},
+      '[]', ${JSON.stringify(lines)}, 'script_draft', 'interview', ${guestId}::uuid
+    ) RETURNING id
+  `;
+  const episodeId = (inserted[0] as { id: string }).id;
+  const totalChars = lines.reduce((s, l) => s + l.text.length, 0);
+  console.log(`[podcast] 已生成訪談集「${title}」(來賓 ${guest.name}):${lines.length} 句 / ${totalChars} 字`);
+  return { episodeId, title, topicCount: 3, lineCount: lines.length, totalChars };
+}
+
+// ============================================================================
 // 語音合成:把腳本切成段落 chunk,每次呼叫合成一段(控制單一請求時長)
 // ============================================================================
 
@@ -368,15 +602,22 @@ export interface SynthesisProgress {
 export async function synthesizeNextSegment(env: Env, episodeId: string): Promise<SynthesisProgress> {
   const sql = getSql(env);
   const epRows = await sql`
-    SELECT id, script, status FROM podcast_episodes WHERE id = ${episodeId}::uuid LIMIT 1
+    SELECT id, script, status, guest_id FROM podcast_episodes WHERE id = ${episodeId}::uuid LIMIT 1
   `;
   if (!epRows.length) throw new Error('找不到這集節目');
-  const episode = epRows[0] as { id: string; script: ScriptLine[]; status: string };
+  const episode = epRows[0] as { id: string; script: ScriptLine[]; status: string; guest_id: string | null };
   const lines = episode.script ?? [];
   if (!lines.length) throw new Error('這集還沒有腳本');
 
   const hosts = await getPodcastHosts(env);
   const voiceByAgentId = new Map(hosts.map((h) => [h.agentId, h.voiceId]));
+
+  // 訪談集:把來賓的 cloned voice 併入
+  if (episode.guest_id) {
+    const guest = await getPodcastGuest(env, episode.guest_id);
+    if (!guest.voiceId) throw new Error(`來賓「${guest.name}」沒有可用的 cloned voice(狀態:${guest.status})`);
+    voiceByAgentId.set(guestAgentId(guest.id), guest.voiceId);
+  }
 
   const chunks = planSegments(lines);
   const segRows = await sql`

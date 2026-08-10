@@ -10,6 +10,7 @@ import { toPublicMediaUrl } from '../../../functions/_shared/media';
 import { publishReplyTarget, replyTextIssue } from '../../../functions/_shared/threads-replies';
 import { logActivity } from '../../../functions/_shared/activity';
 import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from '../../../functions/_shared/sources';
+import { createPodcastEpisode } from '../../../functions/_shared/podcast';
 
 // 每品牌的議題來源設定;filterKeywords 用於從一般新聞中挑出行業相關文章
 const BRAND_SOURCES: Record<string, { newsQuery: string; filterKeywords: string[]; pttBoard?: string; dcardForum?: string }> = {
@@ -722,12 +723,16 @@ export default {
       case '30 18 * * *':
         ctx.waitUntil(cleanupOldMedia(env));
         break;
+      case '0 23 * * 1,4':
+        // 台灣週二、五早上 7 點:生成 Podcast 逐字稿(語音合成由人工在後台觸發,控 ElevenLabs 用量)
+        ctx.waitUntil(createPodcastEpisode(env).catch((e) => console.error('[podcast] 生成節目失敗', e)));
+        break;
       default:
         ctx.waitUntil(collectSignals(env));
     }
   },
 
-  // 手動觸發除錯用:GET /?task=collect|drafts|threads|replies|themes|cleanup(需帶 secret)
+  // 手動觸發除錯用:GET /?task=collect|drafts|threads|replies|themes|cleanup|podcast(需帶 secret)
   // themes 可帶 &target=1|2 指定要補到當日第幾篇
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -742,7 +747,11 @@ export default {
     else if (task === 'replies') await threadsReplyRound(env);
     else if (task === 'themes') await generateDailyTheme(env, Number(url.searchParams.get('target') ?? DAILY_THEME_TARGET));
     else if (task === 'cleanup') await cleanupOldMedia(env);
-    else return new Response('task 必須為 collect / drafts / threads / replies / themes / cleanup', { status: 400 });
+    else if (task === 'podcast') {
+      const result = await createPodcastEpisode(env);
+      return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    else return new Response('task 必須為 collect / drafts / threads / replies / themes / cleanup / podcast', { status: 400 });
     return new Response(JSON.stringify({ ok: true, task }), { headers: { 'Content-Type': 'application/json' } });
   },
 };

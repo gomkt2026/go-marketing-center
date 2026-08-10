@@ -553,3 +553,57 @@ export interface ActivityLog {
   entityId?: string;
   createdAt: string;
 }
+
+// ============================================================================
+// Podcast(三小編熱門話題節目)
+// ============================================================================
+
+export type PodcastEpisodeStatus =
+  | 'script_draft' | 'audio_generating' | 'ready_for_review'
+  | 'approved' | 'rejected' | 'archived';
+
+export interface PodcastScriptLine {
+  order: number;
+  segmentLabel: string;
+  agentId: string;
+  nickname: string;
+  text: string;
+  emotion: string;
+}
+
+export interface PodcastEpisode {
+  id: string;
+  weekOf: string;
+  episodeSeq: number;
+  title: string | null;
+  topicSummary: string | null;
+  status: PodcastEpisodeStatus;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lineCount?: number;
+  segmentsReady?: number;
+  sourceSignalIds?: string[];
+  script?: PodcastScriptLine[];
+}
+
+export interface PodcastSegment {
+  id: string;
+  segmentOrder: number;
+  label: string;
+  lines: PodcastScriptLine[];
+  audioUrl: string | null;
+  charCount: number | null;
+  createdAt: string;
+}
+
+export interface PodcastAgentInfo {
+  id: string;
+  displayName: string;
+  avatarColor: string | null;
+  nickname: string | null;
+  avatarUrl: string | null;
+  characterTitle: string | null;
+  brandSlug: string;
+  brandName: string;
+}

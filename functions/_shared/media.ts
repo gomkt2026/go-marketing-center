@@ -10,6 +10,14 @@ export function buildMediaKey(brandSlug: string, ext = 'png'): string {
   return `generated/${brandSlug}/${ym}/${crypto.randomUUID()}.${ext}`;
 }
 
+/**
+ * Podcast 逐段音檔的 R2 key。
+ * 注意:不放在 generated/ 底下,避免被排程 Worker 的 cleanupOldMedia(31 天)清掉。
+ */
+export function buildPodcastMediaKey(episodeId: string, segmentOrder: number, ext = 'mp3'): string {
+  return `podcast/${episodeId}/${String(segmentOrder).padStart(2, '0')}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+}
+
 export async function putMedia(env: Env, key: string, bytes: Uint8Array, contentType = 'image/png'): Promise<string> {
   if (!env.MEDIA) {
     throw new Error('R2 bucket MEDIA 尚未綁定,請先建立 bucket 並在 wrangler.toml 設定 r2_buckets');

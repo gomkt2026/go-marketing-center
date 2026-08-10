@@ -346,6 +346,38 @@ export const api = {
     request<import('@/types').EventStats>(`/api/events/${eventId}/stats`),
 
   eventExportUrl: (eventId: string) => `/api/events/${eventId}/export`,
+
+  // -- Podcast(三小編熱門話題節目) ------------------------------------------
+  podcastEpisodes: (status?: string) =>
+    request<{ episodes: import('@/types').PodcastEpisode[] }>(
+      `/api/podcast${status ? `?status=${status}` : ''}`,
+    ),
+
+  createPodcastEpisode: () =>
+    request<{ episodeId: string; title: string; topicCount: number; lineCount: number; totalChars: number }>(
+      '/api/podcast',
+      { method: 'POST' },
+    ),
+
+  podcastEpisode: (id: string) =>
+    request<{
+      episode: import('@/types').PodcastEpisode;
+      segments: import('@/types').PodcastSegment[];
+      agents: import('@/types').PodcastAgentInfo[];
+      progress: { total: number; completed: number };
+    }>(`/api/podcast/${id}`),
+
+  synthesizePodcastSegment: (id: string) =>
+    request<{ done: boolean; completed: number; total: number; label: string | null; audioUrl: string | null }>(
+      `/api/podcast/${id}/synthesize`,
+      { method: 'POST' },
+    ),
+
+  reviewPodcastEpisode: (id: string, action: 'approve' | 'reject' | 'archive') =>
+    request<{ id: string; status: string }>(`/api/podcast/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
 };
 
 // -- 活動報名(公開端,無需登入) ----------------------------------------------

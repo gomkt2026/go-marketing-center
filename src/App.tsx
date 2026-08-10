@@ -16,6 +16,7 @@ import { DecisionCenter } from '@/pages/decision/DecisionCenter';
 import { CollaborationList } from '@/pages/collaboration/CollaborationList';
 import { Campaigns } from '@/pages/campaign/Campaigns';
 import { ContentCenter } from '@/pages/content/ContentCenter';
+import { Podcast } from '@/pages/podcast/Podcast';
 import { Publishing } from '@/pages/publishing/Publishing';
 import { ThreadsReplies } from '@/pages/publishing/ThreadsReplies';
 import { Analytics } from '@/pages/analytics/Analytics';
@@ -77,6 +78,7 @@ export default function App() {
                         <Route path="/:brand/analytics" element={<Analytics />} />
                         <Route path="/:brand/learning" element={<Learning />} />
 
+                        <Route path="/podcast" element={<Podcast />} />
                         <Route path="/meetings" element={<MeetingList />} />
                         <Route path="/meetings/:meetingId" element={<MeetingList />} />
                         <Route path="/decisions" element={<DecisionCenter />} />

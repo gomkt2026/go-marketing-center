@@ -154,6 +154,9 @@ export async function replyToThreadsPost(
   }
   const container = await createRes.json() as { id: string };
 
+  // container 建立後 Threads 端需要一點處理時間,太快發布會出現「Media not found」
+  await new Promise((r) => setTimeout(r, 3000));
+
   const publishRes = await fetch(`${THREADS_API}/${account.threadsUserId}/threads_publish`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

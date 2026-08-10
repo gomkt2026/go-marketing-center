@@ -65,12 +65,16 @@ export function Podcast() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [themeUrl, setThemeUrl] = useState<string | null>(null);
   const [uploadingTheme, setUploadingTheme] = useState(false);
+  const [bgmEnabled, setBgmEnabled] = useState(true);
+  const [speechPlayingCount, setSpeechPlayingCount] = useState(0);
   const audioRefs = useRef<Map<number, HTMLAudioElement>>(new Map());
+  const bgmRef = useRef<HTMLAudioElement>(null);
   const themeInputRef = useRef<HTMLInputElement>(null);
   const stopSynthRef = useRef(false);
 
   // 片頭音樂在 audioRefs 中的特殊 key(排在所有段落之前)
   const THEME_ORDER = -1;
+  const BGM_VOLUME = 0.07;
 
   const loadEpisodes = useCallback(async () => {
     const { episodes } = await api.podcastEpisodes();
@@ -93,10 +97,23 @@ export function Podcast() {
   useEffect(() => {
     if (!selectedId) return;
     setDetail(null);
+    setSpeechPlayingCount(0);
     loadDetail(selectedId).catch((e) => setErrorMsg(e instanceof Error ? e.message : '載入失敗'));
   }, [selectedId, loadDetail]);
 
   useEffect(() => () => { stopSynthRef.current = true; }, []);
+
+  // 襯底音樂:任何聊天段落播放中且開關開啟時,小聲循環播放片頭音樂
+  useEffect(() => {
+    const bgm = bgmRef.current;
+    if (!bgm) return;
+    if (bgmEnabled && speechPlayingCount > 0) {
+      bgm.volume = BGM_VOLUME;
+      bgm.play().catch(() => {});
+    } else {
+      bgm.pause();
+    }
+  }, [bgmEnabled, speechPlayingCount]);
 
   const handleCreate = async () => {
     setCreating(true);
@@ -336,12 +353,31 @@ export function Podcast() {
                           controls
                           preload="none"
                           src={s.audioUrl!}
+                          onPlay={() => setSpeechPlayingCount((n) => n + 1)}
+                          onPause={() => setSpeechPlayingCount((n) => Math.max(0, n - 1))}
                           onEnded={() => handleAudioEnded(s.segmentOrder)}
                           style={{ flex: 1, height: 36 }}
                         />
                       </div>
                     ))}
                   </div>
+                  {themeUrl && (
+                    <>
+                      {/* 襯底音樂:聊天段落播放時小聲循環(僅試聽用) */}
+                      <audio ref={bgmRef} src={themeUrl} loop preload="none" style={{ display: 'none' }} />
+                      <label style={{
+                        display: 'flex', alignItems: 'center', gap: 6, marginTop: 10,
+                        fontSize: 12, color: 'var(--color-text-muted)', cursor: 'pointer', width: 'fit-content',
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={bgmEnabled}
+                          onChange={(e) => setBgmEnabled(e.target.checked)}
+                        />
+                        聊天段落播放時,小聲循環片頭音樂當襯底
+                      </label>
+                    </>
+                  )}
                 </Card>
               )}
 

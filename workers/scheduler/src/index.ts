@@ -275,6 +275,7 @@ async function threadsRound(env: Env): Promise<void> {
         promptMeta: { source: 'threads_hourly', trends: trends.map((t) => t.title), socialTopics },
       });
 
+      let autoPublished = false;
       if (willAutoPublish && account) {
         try {
           const published = await publishThreadsPost(account, { text: result.post.body, imageUrl: toPublicMediaUrl(env, result.imageUrl) });
@@ -284,6 +285,7 @@ async function threadsRound(env: Env): Promise<void> {
                     ${published.permalink ?? published.postId})
           `;
           await sql`UPDATE contents SET status = 'published', updated_at = now() WHERE id = ${contentId}::uuid`;
+          autoPublished = true;
           console.log(`[threads] ${brand.slug} 已自動發布:${published.permalink ?? published.postId}`);
         } catch (pubErr) {
           console.error(`[threads] ${brand.slug} 自動發布失敗,保留草稿`, pubErr);
@@ -297,7 +299,7 @@ async function threadsRound(env: Env): Promise<void> {
         action: 'content.generated',
         entityType: 'content',
         entityId: contentId,
-        afterState: { platform: 'threads', auto: true, autoPublished: willAutoPublish },
+        afterState: { platform: 'threads', auto: true, autoPublished },
       });
     } catch (e) {
       console.error(`[threads] 品牌 ${brand.slug} 生成失敗`, e);

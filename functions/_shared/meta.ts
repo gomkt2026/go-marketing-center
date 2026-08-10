@@ -73,22 +73,41 @@ export function composePostMessage(body: string, hashtags: string[] | null | und
   return tags ? `${text}\n\n${tags}` : text;
 }
 
+/**
+ * 取得可對粉專發文的 Page token。
+ * 後台儲存的常是 System User / User token(IG 發文可用,但 FB 粉專發文必須用 Page token),
+ * 這裡統一向 Graph API 換取;若儲存的已是 Page token,此呼叫會原樣回傳同一把,結果不變。
+ */
+async function resolvePageToken(account: MetaAccount): Promise<string> {
+  try {
+    const res = await fetch(
+      `${GRAPH_API}/${encodeURIComponent(account.externalId)}?fields=access_token&access_token=${encodeURIComponent(account.accessToken)}`,
+    );
+    if (res.ok) {
+      const data = await res.json() as { access_token?: string };
+      if (data.access_token) return data.access_token;
+    }
+  } catch { /* 換不到就用原 token 嘗試 */ }
+  return account.accessToken;
+}
+
 /** 發布 FB 粉專貼文;imageUrl 需為公開絕對網址 */
 export async function publishFacebookPost(
   account: MetaAccount,
   params: { message: string; imageUrl?: string | null },
 ): Promise<MetaPublishResult> {
+  const pageToken = await resolvePageToken(account);
   let postId: string;
   if (params.imageUrl) {
     const data = await graphPost(`${GRAPH_API}/${account.externalId}/photos`, {
-      access_token: account.accessToken,
+      access_token: pageToken,
       url: params.imageUrl,
       caption: params.message,
     });
     postId = String((data.post_id ?? data.id) ?? '');
   } else {
     const data = await graphPost(`${GRAPH_API}/${account.externalId}/feed`, {
-      access_token: account.accessToken,
+      access_token: pageToken,
       message: params.message,
     });
     postId = String(data.id ?? '');
@@ -98,7 +117,7 @@ export async function publishFacebookPost(
   // permalink 查詢失敗不影響發布結果
   let permalink: string | null = null;
   try {
-    const res = await fetch(`${GRAPH_API}/${encodeURIComponent(postId)}?fields=permalink_url&access_token=${encodeURIComponent(account.accessToken)}`);
+    const res = await fetch(`${GRAPH_API}/${encodeURIComponent(postId)}?fields=permalink_url&access_token=${encodeURIComponent(pageToken)}`);
     if (res.ok) {
       const data = await res.json() as { permalink_url?: string };
       permalink = data.permalink_url ?? null;

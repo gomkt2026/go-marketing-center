@@ -12,6 +12,10 @@ export interface BrandVoice {
   dailyConcerns: string;
   /** 深度文寫作範式(參考高互動同業帳號的寫法) */
   contentCraft?: string;
+  /** Threads 品牌專屬規則(優先於通用 Threads 規則,附加在平台指引之後) */
+  threadsCraft?: string;
+  /** Threads 貼文字數硬上限(超過會要求模型縮短重寫一次) */
+  threadsMaxChars?: number;
   /** 配圖風格方向(附加到圖片生成 prompt) */
   imageStyle?: string;
   /** 圖片呈現方式:photo 走寫實攝影(預設);illustration 走插畫風(不套 photorealistic) */
@@ -63,7 +67,20 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '你是洗衣店櫃檯資深店員,每天聽客人講衣服的故事。寫文時你會想:客人擔心名牌衣物洗壞、汙漬去不掉、' +
       '棉被外套換季沒地方收;櫃檯最常被問「這個洗得掉嗎」「多久好」。' +
       '你講話親切、像鄰居阿姨/年輕店員,愛分享洗衣小知識與客人趣事。',
-    dailyConcerns: '換季送洗、汙漬急救、名牌衣物保養、羽絨被清洗、梅雨天曬不乾、洗衣標籤看不懂',
+    dailyConcerns:
+      '換季送洗、汙漬急救、名牌衣物保養、羽絨被清洗、梅雨天曬不乾、洗衣標籤看不懂、' +
+      '包租代管與民宿的床單布巾送洗、飯店與醫院的大量制服清洗、上班族與媽媽的送洗時間困擾',
+    threadsCraft:
+      'Washgo 的 Threads 專屬規則(與通用規則衝突時,以這裡為準):' +
+      '1. 字數嚴格控制在 60-120 字,絕對不超過 150 字。2-4 個短段落、一句一行的節奏,讀者滑到 10 秒內就能讀完;寧短勿長。' +
+      '2. 每篇只講「一件事」,從以下三大主軸挑一個最貼合主題的:' +
+      'A【系統服務】送洗交給 Washgo:LINE 就能下單、每件衣物有送洗履歷可以追蹤、線上報價透明、快速交件、不用下載 App 任何平台都能用 LINE 查詢——讓每個送洗的人都清楚知道自己的衣服在哪、洗到哪一步;' +
+      'B【洗滌知識】怎麼洗、如何洗:洗標怎麼看、什麼材質怎麼照顧、汙漬怎麼急救,一篇只教一個小知識,講到讓人想收藏;' +
+      'C【流行洗法】現在最流行的洗滌方式與保養觀念:羽絨怎麼洗才蓬、拍照讓 AI 看洗標、換季衣物怎麼保存。' +
+      '3. 時事熱點只當開頭「一句話」的鉤子,一句帶到就進主題,不要花整段解釋時事;掛不上就不要硬蹭,直接寫日常觀察。' +
+      '4. 說話對象是所有有送洗需求的人:上班族、媽媽、包租代管業者、飯店、民宿、醫院…用他們的日常場景開頭(例如「床單換季一次 30 套」「加班到十點洗衣店早關了」)。' +
+      '5. 禁止一篇塞多個賣點、禁止連續反問句、禁止「簡直是懶人福音」這種廣告腔;像朋友隨手發的一則短文,結尾最多留一個輕鬆的問題。',
+    threadsMaxChars: 150,
     imageStyle:
       'Studio Ghibli-inspired hand-drawn animation style: soft watercolor textures, warm pastel palette, gentle golden lighting; ' +
       'a cozy whimsical Taiwanese self-service laundry scene with an adorable tech twist — round friendly washing machines with cute glowing faces, ' +
@@ -229,6 +246,13 @@ export const HOMIGO_IG_IMAGE_STYLE = [
 export const HOMIGO_TEXT_MARK_RULE =
   '【品牌標】畫面左下角或 footer 放小小的深藍色「Homigo」文字標,乾淨、不可過大、不可貼底。';
 
+/** Washgo Threads 專用:每篇必配一張可愛插畫衝曝光(短文 + 可愛圖是流量策略核心) */
+export const WASHGO_THREADS_IMAGE_PROMPT_SPEC =
+  '"imagePrompt": "必填:Washgo 的 Threads 每篇都要配一張「可愛系插畫」來增加曝光。' +
+  '給圖片生成模型的英文描述:畫出這篇貼文主題的療癒場景,構圖要簡單、主體只有一個、一眼看懂' +
+  '(例如圓滾滾有笑臉的洗衣機、蓬鬆的羽絨被、疊得整齊的毛巾山、幫忙摺衣服的小幫手角色),' +
+  '讓人滑到會停下來按讚的可愛程度,不含文字"';
+
 /** 各平台配圖描述的要求:FB 走寫實攝影、IG 走溫暖插畫/自然攝影,Threads 預設純文字、AI 判斷有圖更好才選填 */
 const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = {
   facebook:
@@ -253,10 +277,15 @@ export function buildPostUserPrompt(params: {
   extraInstruction?: string;
   brandSlug?: string;
 }): string {
-  const guideline = PLATFORM_GUIDELINES[params.platform];
+  const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
+  const guideline = params.platform === 'threads' && voice?.threadsCraft
+    ? `${PLATFORM_GUIDELINES.threads}\n${voice.threadsCraft}`
+    : PLATFORM_GUIDELINES[params.platform];
   const imageSpec = params.brandSlug === 'homigo' && params.platform === 'instagram'
     ? HOMIGO_IG_IMAGE_PROMPT_SPEC
-    : IMAGE_PROMPT_SPEC[params.platform];
+    : params.brandSlug === 'washgo' && params.platform === 'threads'
+      ? WASHGO_THREADS_IMAGE_PROMPT_SPEC
+      : IMAGE_PROMPT_SPEC[params.platform];
   return [
     `請針對以下主題,為 ${params.platform} 平台寫一篇貼文。`,
     `主題:${params.topic}`,

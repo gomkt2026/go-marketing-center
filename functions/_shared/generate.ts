@@ -1,12 +1,13 @@
 import type { Env } from './env';
 import { getSql } from './db';
-import { chatCompleteJson, generateImage, generateImageWithReference } from './openai';
+import { chatCompleteJson, generateImage } from './openai';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   HOMIGO_IG_IMAGE_STYLE, HOMIGO_TEXT_MARK_RULE,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
 } from './prompts';
 import { buildMediaKey, putMedia } from './media';
+import { compositeLogo } from './watermark';
 import { normalizeMultilineText } from './text';
 
 export type SocialPlatform = 'facebook' | 'instagram' | 'threads';
@@ -34,6 +35,8 @@ export interface GenerationResult {
 
 /** Threads 配圖每品牌每日上限(控制成本;以台灣時區的一天計) */
 const THREADS_IMAGE_DAILY_CAP = 4;
+/** 品牌專屬上限:Washgo 以「短文 + 可愛圖」衝曝光,每篇 Threads 都配圖 */
+const THREADS_IMAGE_DAILY_CAP_BY_BRAND: Record<string, number> = { washgo: 10 };
 
 async function threadsImageCountToday(env: Env, brandId: string): Promise<number> {
   const sql = getSql(env);
@@ -77,14 +80,18 @@ export async function generatePlatformPost(
   // 修正模型偶發輸出的字面 \n(否則會原樣出現在貼文上)
   post.body = normalizeMultilineText(post.body);
 
-  // FB 硬限制 1000 字:超過就要求縮短一次
-  if (platform === 'facebook' && post.body.length > 1000) {
+  // 字數硬限制:FB 1000 字;Threads 依品牌設定(如 Washgo 150 字短文策略)。超過就要求縮短一次
+  const brandThreadsMax = getBrandVoice(brandCtx.slug).threadsMaxChars;
+  const hardLimit = platform === 'facebook' ? 1000
+    : platform === 'threads' && brandThreadsMax ? brandThreadsMax
+    : null;
+  if (hardLimit && post.body.length > hardLimit) {
     post = await chatCompleteJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: brandCtx.systemPrompt },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇 ${post.body.length} 字,超過 1000 字上限。請保留故事核心,縮短到 1000 字以內,回傳同格式 JSON。` },
+        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${hardLimit} 字上限。請只保留一個核心重點,縮短到 ${hardLimit} 字以內,回傳同格式 JSON(imagePrompt 保留不變)。` },
       ],
       temperature: 0.5,
     });
@@ -102,16 +109,18 @@ export async function generatePlatformPost(
   // FB / IG 貼文生成配圖;Threads 由 AI 判斷選填 imagePrompt 才產圖(每品牌每日上限控成本)
   // FB 走寫實攝影(橫式 1536x1024);IG 方形;Homigo IG 走 4:5 直式設計圖(防呆規範)
   // imageRendering = 'illustration' 的品牌(如 Washgo)全部走插畫風,不套 photorealistic
-  // 品牌 logo 已上傳 R2(brand-assets/{slug}/logo.png)時,改走 edits 端點把「真 logo」原樣合成進圖
+  // 品牌 logo 已上傳 R2(brand-assets/{slug}/logo.png)時,生成後由程式把「真 logo」合成到角落
+  // (不再叫模型畫 logo:模型合成常把 logo 畫太大或裁出畫面外)
   let imageUrl: string | null = null;
   let imageError: string | null = null;
   let wantsImage = !!post.imagePrompt;
   if (wantsImage && platform === 'threads') {
     try {
+      const cap = THREADS_IMAGE_DAILY_CAP_BY_BRAND[brandCtx.slug] ?? THREADS_IMAGE_DAILY_CAP;
       const used = await threadsImageCountToday(env, brandCtx.brandId);
-      if (used >= THREADS_IMAGE_DAILY_CAP) {
+      if (used >= cap) {
         wantsImage = false;
-        console.log(`[generate] ${brandCtx.slug} Threads 今日配圖已達上限 ${THREADS_IMAGE_DAILY_CAP},改純文字`);
+        console.log(`[generate] ${brandCtx.slug} Threads 今日配圖已達上限 ${cap},改純文字`);
       }
     } catch {
       wantsImage = false; // 計數失敗就保守不產圖
@@ -127,24 +136,27 @@ export async function generatePlatformPost(
       const voice = getBrandVoice(brandCtx.slug);
       const brandStyle = voice.imageStyle;
       const isIllustration = voice.imageRendering === 'illustration';
-      const logoRule = logo
-        ? '\nThe provided reference image is the official brand logo. Composite this exact logo as a small, clean, unobtrusive watermark (bottom corner). Do NOT redraw, distort, recolor or resize it disproportionately; keep it away from the edges.'
-        : '';
       const prompt = isHomigoIg
         ? `${post.imagePrompt}\n\n${HOMIGO_IG_IMAGE_STYLE}\n${logo
-            ? '【品牌標】參考圖就是官方 Homigo logo:原樣放在畫面左下角或 footer,不可變形、不可重畫、不可過大、不可貼底。'
+            ? '【品牌標】不要在圖上畫任何 logo 或品牌字樣;畫面左下角留乾淨,官方 logo 會在生成後由系統合成上去。'
             : HOMIGO_TEXT_MARK_RULE}`
         : isIllustration
-          ? `${post.imagePrompt}. ${brandStyle ?? 'Warm hand-drawn illustration style.'} Any people shown are Taiwanese, authentic Taiwan daily-life setting. No text.${logoRule || ' No watermark.'}`
+          ? `${post.imagePrompt}. ${brandStyle ?? 'Warm hand-drawn illustration style.'} Any people shown are Taiwanese, authentic Taiwan daily-life setting. No text. No watermark. No logo.`
           : isFb
-            ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text.${logoRule || ' No watermark.'}`
-            : `${post.imagePrompt}. Warm and relatable, ${twPeople}.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text.${logoRule || ' No watermark.'}`;
+            ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text. No watermark. No logo.`
+            : `${post.imagePrompt}. Warm and relatable, ${twPeople}.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text. No watermark. No logo.`;
       const size = isHomigoIg ? '1024x1536' as const : isFb ? '1536x1024' as const : '1024x1024' as const;
       // Homigo 設計圖要在圖上渲染繁中文字,用 high 品質防錯字
       const quality = isHomigoIg ? 'high' as const : 'medium' as const;
-      const bytes = logo
-        ? await generateImageWithReference(env, { prompt, reference: logo, size, quality })
-        : await generateImage(env, { prompt, size, quality });
+      let bytes = await generateImage(env, { prompt, size, quality });
+      if (logo) {
+        try {
+          // Homigo IG 設計圖的 logo 放左下(footer);其他一律右下角
+          bytes = compositeLogo(bytes, logo, { position: isHomigoIg ? 'bottom-left' : 'bottom-right' });
+        } catch (e) {
+          console.error('[generate] logo 合成失敗,改用無 logo 原圖', e);
+        }
+      }
       const key = buildMediaKey(brandCtx.slug, 'jpg');
       imageUrl = await putMedia(env, key, bytes, 'image/jpeg');
     } catch (e) {

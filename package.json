@@ -14,6 +14,7 @@
     "deploy": "npm run build && wrangler pages deploy dist --project-name=go-marketing-center --branch=Ben"
   },
   "dependencies": {
+    "@cf-wasm/photon": "^0.4.0",
     "@neondatabase/serverless": "^1.1.0",
     "framer-motion": "^11.11.17",
     "html5-qrcode": "^2.3.8",

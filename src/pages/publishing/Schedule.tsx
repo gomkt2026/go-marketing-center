@@ -112,14 +112,14 @@ export function Schedule() {
         }
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(160px, 1fr))', gap: 10, overflowX: 'auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(160px, 1fr))', gap: 10, overflowX: 'auto', alignItems: 'start' }}>
         {days.map((date, i) => {
           const dayItems = items
             .filter((it) => sameDay(itemTime(it), date))
             .sort((a, b) => itemTime(a).getTime() - itemTime(b).getTime());
           const isToday = sameDay(date, new Date());
           return (
-            <div key={i} style={{ display: 'grid', gap: 8 }}>
+            <div key={i} style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
               <div
                 style={{
                   textAlign: 'center', padding: '6px 0', borderRadius: 8,
@@ -129,7 +129,7 @@ export function Schedule() {
               >
                 {WEEKDAY_LABELS[i]} {date.getMonth() + 1}/{date.getDate()}
               </div>
-              <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
                 {dayItems.length === 0 && (
                   <p style={{ fontSize: 11.5, color: 'var(--color-text-muted)', textAlign: 'center' }}>—</p>
                 )}

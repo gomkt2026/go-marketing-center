@@ -87,6 +87,22 @@ export const api = {
       queue: import('@/types').PublishingQueueItem[];
     }>(`/api/brands/${slug}/publishing`),
 
+  schedule: (slug: string, params?: { from?: string; to?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.from) qs.set('from', params.from);
+    if (params?.to) qs.set('to', params.to);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<{ items: import('@/types').ScheduleItem[]; from: string; to: string }>(
+      `/api/brands/${slug}/schedule${suffix}`,
+    );
+  },
+
+  retrySchedule: (slug: string, jobId: string) =>
+    request<{ ok: boolean }>(`/api/brands/${slug}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify({ jobId }),
+    }),
+
   analytics: (slug: string) =>
     request<{
       reports: { perf: import('@/types').PerformanceReport; content: { id: string; title: string } }[];

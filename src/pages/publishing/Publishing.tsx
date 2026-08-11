@@ -48,14 +48,14 @@ const contentStatusTone: Partial<Record<ContentStatus, BadgeTone>> = {
   draft: 'default', pending_review: 'accent', approved: 'primary', needs_revision: 'danger', scheduled: 'accent',
 };
 const genSourceLabel: Record<string, string> = {
-  threads_30min: '30分熱議', threads_hourly: '熱議跟風', daily_theme: '每日主題',
+  threads_30min: '30分熱議', threads_hourly: '熱議跟風', threads_offtopic: '生活哏文', daily_theme: '每日主題',
   auto_signal: '情報自動', market_signal: '市場情報', meeting_plan: '會議計畫',
 };
 
 const PLATFORM_COLUMNS: { id: 'facebook' | 'instagram' | 'threads'; label: string; note: string }[] = [
   { id: 'facebook', label: 'Facebook', note: '每日 1-2 主題故事文;連接 API 後可自動發布或批准後一鍵發布' },
   { id: 'instagram', label: 'Instagram', note: '與 FB 共用每日主題,搭配 AI 生成配圖;連接 API 後可自動發布' },
-  { id: 'threads', label: 'Threads', note: '約每 2 小時一篇熱門議題貼文(凌晨 2-6 點停發);連接 API 後可自動發布' },
+  { id: 'threads', label: 'Threads', note: '每天固定 6 檔(00/06/12/18 熱議跟風 + 09/21 生活哏文);連接 API 後可自動發布,詳細時段見「行程表」' },
 ];
 
 export function Publishing() {

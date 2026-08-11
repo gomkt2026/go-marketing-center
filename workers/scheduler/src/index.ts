@@ -3,7 +3,7 @@ import type { Env } from '../../../functions/_shared/env';
 import { getSql } from '../../../functions/_shared/db';
 import { chatCompleteJson } from '../../../functions/_shared/openai';
 import { buildBrandContext, getBrandVoice, ANTI_AI_RULES } from '../../../functions/_shared/prompts';
-import { generatePlatformPost, saveGeneratedContent, findBrandAgent } from '../../../functions/_shared/generate';
+import { generatePlatformPost, generateOfftopicPost, saveGeneratedContent, findBrandAgent, type SocialPlatform } from '../../../functions/_shared/generate';
 import { getThreadsAccount, publishThreadsPost, searchThreadsPosts, type ThreadsSearchPost } from '../../../functions/_shared/threads';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, composePostMessage } from '../../../functions/_shared/meta';
 import { toPublicMediaUrl } from '../../../functions/_shared/media';
@@ -206,30 +206,40 @@ async function generateSignalDrafts(env: Env): Promise<void> {
 }
 
 // ============================================================================
-// 主流程 2:Threads 熱門議題貼文(每品牌每 2 小時一篇;凌晨 2-6 點停發)
-//   - 每 tick 處理最久沒發的 2 個品牌;同品牌 115 分鐘內不重發 → 約每 2 小時一篇
+// 主流程 2:Threads 熱門議題貼文(固定 4 檔:台灣 06:00 / 12:00 / 18:00 / 00:00)
+//   - 降頻避免被平台判定為機器人:每品牌每天最多 4 篇、每檔間隔 6 小時
+//   - 每次處理 2 個品牌;已連 Threads 且開自動發布的品牌(會真正發文)優先
 //   - 熱門議題來源:Google Trends TW + 近期自抓的社群情報(PTT/Dcard)
-//   - 品牌已連 Threads API 且開啟自動發布 → 直接發布;否則存草稿
+//   - 生成與發布拆開:這裡只生成內容 + 存 scheduled 排程,實際發布交給 publishDueJobs
+//     在 scheduled_at(=slotAt,即這篇該發布的時段)到了之後才真正呼叫平台 API
 // ============================================================================
-const THREADS_DAILY_CAP = 10; // 每品牌每日上限(每 2 小時一篇、扣掉凌晨停發時段;以台灣時區的當天計,午夜歸零)
+const THREADS_DAILY_CAP = 4; // 每品牌每日上限(以排定時段所在的台灣時區當天計)
 const THREADS_BRANDS_PER_TICK = 2;
-const THREADS_MIN_INTERVAL_MS = 115 * 60 * 1000; // 每品牌至少間隔 115 分鐘 → 每 2 小時一篇
+const THREADS_MIN_INTERVAL_MS = 5 * 60 * 60 * 1000; // 每品牌至少間隔 5 小時 → 配合 6 小時一檔
 
-async function threadsRound(env: Env): Promise<void> {
+async function generateThreadsSlot(env: Env, slotAt: Date): Promise<void> {
   const sql = getSql(env);
   const trends = await fetchGoogleTrendsTW(8);
   if (!trends.length) return;
 
-  // 取最久沒產出 Threads 內容的品牌優先
+  // 會真正發文的品牌(已連 Threads + 開自動發布)優先,其餘品牌輪流補位
+  // today_count 只算「品牌相關跟風文」(threads_hourly),不受生活哏文(threads_offtopic)影響
   const brands = await sql`
     SELECT b.id, b.slug, b.name,
            (SELECT max(c.created_at) FROM contents c
-            WHERE c.brand_id = b.id AND c.target_platform = 'threads') AS last_at,
+            WHERE c.brand_id = b.id AND c.target_platform = 'threads'
+              AND c.generation_prompt_meta->>'source' = 'threads_hourly') AS last_at,
            (SELECT count(*)::int FROM contents c
             WHERE c.brand_id = b.id AND c.target_platform = 'threads'
-              AND c.created_at >= date_trunc('day', now() + interval '8 hours') - interval '8 hours') AS today_count
+              AND c.generation_prompt_meta->>'source' = 'threads_hourly'
+              AND (c.generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
+              AND (c.generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
+           ) AS today_count,
+           EXISTS(SELECT 1 FROM brand_social_accounts a
+                  WHERE a.brand_id = b.id AND a.platform = 'threads'
+                    AND a.status = 'connected' AND a.auto_publish) AS can_publish
     FROM brands b WHERE b.is_active = true
-    ORDER BY last_at ASC NULLS FIRST
+    ORDER BY can_publish DESC, last_at ASC NULLS FIRST
     LIMIT ${THREADS_BRANDS_PER_TICK}
   `;
 
@@ -272,25 +282,15 @@ async function threadsRound(env: Env): Promise<void> {
         platform: 'threads',
         result,
         generatedByAgentId: agentId,
-        status: 'draft',
-        promptMeta: { source: 'threads_hourly', trends: trends.map((t) => t.title), socialTopics },
+        status: willAutoPublish ? 'scheduled' : 'pending_review',
+        promptMeta: { source: 'threads_hourly', trends: trends.map((t) => t.title), socialTopics, slotAt: slotAt.toISOString() },
       });
 
-      let autoPublished = false;
-      if (willAutoPublish && account) {
-        try {
-          const published = await publishThreadsPost(account, { text: result.post.body, imageUrl: toPublicMediaUrl(env, result.imageUrl) });
-          await sql`
-            INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, published_at, external_post_id)
-            VALUES (${contentId}::uuid, ${versionId}::uuid, 'threads', 'published', now(),
-                    ${published.permalink ?? published.postId})
-          `;
-          await sql`UPDATE contents SET status = 'published', updated_at = now() WHERE id = ${contentId}::uuid`;
-          autoPublished = true;
-          console.log(`[threads] ${brand.slug} 已自動發布:${published.permalink ?? published.postId}`);
-        } catch (pubErr) {
-          console.error(`[threads] ${brand.slug} 自動發布失敗,保留草稿`, pubErr);
-        }
+      if (willAutoPublish) {
+        await sql`
+          INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
+          VALUES (${contentId}::uuid, ${versionId}::uuid, 'threads', 'scheduled', ${slotAt.toISOString()}::timestamptz)
+        `;
       }
 
       await logActivity(env, {
@@ -300,10 +300,83 @@ async function threadsRound(env: Env): Promise<void> {
         action: 'content.generated',
         entityType: 'content',
         entityId: contentId,
-        afterState: { platform: 'threads', auto: true, autoPublished },
+        afterState: { platform: 'threads', auto: true, scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
       });
+      console.log(`[threads] ${brand.slug} 已排定 ${slotAt.toISOString()} 發布(${willAutoPublish ? '自動' : '待審核'})`);
     } catch (e) {
       console.error(`[threads] 品牌 ${brand.slug} 生成失敗`, e);
+    }
+  }
+}
+
+// ============================================================================
+// 主流程 2d:Threads 生活哏文(跟品牌/系統完全無關,衝自然流量與帳號真實感)
+//   - 目前先限定 Washgo(OFFTOPIC_BRANDS),驗證效果後再擴充其他品牌
+//   - 固定 2 檔:台灣 09:00 / 21:00,不佔用/不影響品牌相關貼文的 THREADS_DAILY_CAP
+//   - 完全不套用品牌語氣與知識庫,純文字、不配圖,見 functions/_shared/prompts.ts 的 OFFTOPIC_SYSTEM_PROMPT
+// ============================================================================
+const OFFTOPIC_BRANDS = ['washgo']; // 之後要擴充到其他品牌,直接把 slug 加進來即可
+const THREADS_OFFTOPIC_DAILY_CAP = 2;
+
+async function generateThreadsOfftopicSlot(env: Env, slotAt: Date): Promise<void> {
+  const sql = getSql(env);
+  for (const slug of OFFTOPIC_BRANDS) {
+    try {
+      const brandRows = await sql`SELECT id, slug, name FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1`;
+      if (!brandRows.length) continue;
+      const brand = brandRows[0] as { id: string; slug: string; name: string };
+
+      const todayRows = await sql`
+        SELECT count(*)::int AS n FROM contents
+        WHERE brand_id = ${brand.id}::uuid
+          AND generation_prompt_meta->>'source' = 'threads_offtopic'
+          AND (generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
+          AND (generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
+      `;
+      if ((todayRows[0] as { n: number }).n >= THREADS_OFFTOPIC_DAILY_CAP) continue;
+
+      const usedRows = await sql`
+        SELECT title FROM contents
+        WHERE brand_id = ${brand.id}::uuid AND generation_prompt_meta->>'source' = 'threads_offtopic'
+          AND created_at > now() - interval '14 days'
+        ORDER BY created_at DESC LIMIT 20
+      `;
+      const usedTopics = (usedRows as { title: string }[]).map((r) => r.title);
+
+      const agentId = await findBrandAgent(env, brand.id);
+      const result = await generateOfftopicPost(env, { usedTopics });
+
+      const account = await getThreadsAccount(env, brand.id);
+      const willAutoPublish = !!account?.autoPublish;
+
+      const { contentId, versionId } = await saveGeneratedContent(env, {
+        brandCtx: { brandId: brand.id, slug: brand.slug, name: brand.name, systemPrompt: '' },
+        platform: 'threads',
+        result,
+        generatedByAgentId: agentId,
+        status: willAutoPublish ? 'scheduled' : 'pending_review',
+        promptMeta: { source: 'threads_offtopic', slotAt: slotAt.toISOString() },
+      });
+
+      if (willAutoPublish) {
+        await sql`
+          INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
+          VALUES (${contentId}::uuid, ${versionId}::uuid, 'threads', 'scheduled', ${slotAt.toISOString()}::timestamptz)
+        `;
+      }
+
+      await logActivity(env, {
+        brandId: brand.id,
+        actorType: 'ai_agent',
+        actorAgentId: agentId,
+        action: 'content.generated',
+        entityType: 'content',
+        entityId: contentId,
+        afterState: { platform: 'threads', source: 'threads_offtopic', scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
+      });
+      console.log(`[offtopic] ${brand.slug} 已排定生活哏文,${slotAt.toISOString()} 發布(${willAutoPublish ? '自動' : '待審核'})`);
+    } catch (e) {
+      console.error(`[offtopic] 品牌 ${slug} 生成失敗`, e);
     }
   }
 }
@@ -530,31 +603,34 @@ async function threadsReplyRound(env: Env): Promise<void> {
 }
 
 // ============================================================================
-// 主流程 2b:FB/IG 每日主題圖文(每天每品牌 2 篇:早上 8 點檔 + 晚上 8 點檔)
-//   台灣 08:00-09:59 補第 1 篇、20:00-21:59 補第 2 篇;每 tick 只處理一個品牌
+// 主流程 2b:FB/IG 每日主題圖文(每天每品牌 1 篇,固定台灣 19:00 檔)
+//   生成與發布拆開:這裡只生成 + 存 scheduled 排程,實際發布交給 publishDueJobs
+//   (18:00 整點檔留給 Threads 發文輪,主題生成在 18:00 的 tick 觸發,提前 1 小時)
 // ============================================================================
-const DAILY_THEME_TARGET = 2;
+const DAILY_THEME_TARGET = 1;
+const DAILY_THEME_SOURCE = 'daily_theme';
 
-/**
- * targetCount:這個時段每品牌應達到的當日主題數(早上時窗=1,晚上時窗=2)。
- * 回傳 true 表示這個 tick 已經做了主題生成(呼叫端應跳過 Threads 輪)
- */
-async function generateDailyTheme(env: Env, targetCount: number = DAILY_THEME_TARGET): Promise<boolean> {
+/** 回傳 true 表示這次已經做了主題生成(呼叫端可據此決定要不要跳過其他任務) */
+async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
   const sql = getSql(env);
   // 台灣今天已生成的主題數(以 daily_theme 內容的 themeKey 去重)
+  // 同進度時,已接 FB/IG 且開自動發布的品牌優先 → 會真正發文的品牌固定在當天第一個生成 tick 發出
   const brands = await sql`
     SELECT b.id, b.slug, b.name,
            (SELECT count(DISTINCT c.generation_prompt_meta->>'themeKey')::int FROM contents c
             WHERE c.brand_id = b.id
-              AND c.generation_prompt_meta->>'source' = 'daily_theme'
-              AND c.created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours') AS theme_count
+              AND c.generation_prompt_meta->>'source' = ${DAILY_THEME_SOURCE}
+              AND c.created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours') AS theme_count,
+           EXISTS(SELECT 1 FROM brand_social_accounts a
+                  WHERE a.brand_id = b.id AND a.platform IN ('facebook', 'instagram')
+                    AND a.status = 'connected' AND a.auto_publish) AS can_publish
     FROM brands b WHERE b.is_active = true
-    ORDER BY theme_count ASC
+    ORDER BY theme_count ASC, can_publish DESC
     LIMIT 1
   `;
   if (!brands.length) return false;
   const brand = brands[0] as { id: string; slug: string; name: string; theme_count: number };
-  if (brand.theme_count >= targetCount) return false;
+  if (brand.theme_count >= DAILY_THEME_TARGET) return false;
 
   try {
     // 近 48 小時高分情報 + 今日已用主題(避免重複)
@@ -609,7 +685,7 @@ async function generateDailyTheme(env: Env, targetCount: number = DAILY_THEME_TA
           extraInstruction: `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。`,
         });
 
-        // 帳號開啟排程自動發布 → 生成後直接透過 Graph API 發布;否則存待審核
+        // 帳號開啟排程自動發布 → 生成後存 scheduled 排程,由 publishDueJobs 在 slotAt 到時真正發布;否則存待審核
         const account = await getMetaAccount(env, brand.id, platform);
         const publicImage = toPublicMediaUrl(env, result.imageUrl);
         const willAutoPublish = !!account?.autoPublish && (platform !== 'instagram' || !!publicImage);
@@ -617,28 +693,15 @@ async function generateDailyTheme(env: Env, targetCount: number = DAILY_THEME_TA
         const { contentId, versionId } = await saveGeneratedContent(env, {
           brandCtx, platform, result,
           generatedByAgentId: agentId,
-          status: 'pending_review',
-          promptMeta: { source: 'daily_theme', theme: theme.theme, themeKey },
+          status: willAutoPublish ? 'scheduled' : 'pending_review',
+          promptMeta: { source: DAILY_THEME_SOURCE, theme: theme.theme, themeKey, slotAt: slotAt.toISOString() },
         });
 
-        let autoPublished = false;
-        if (willAutoPublish && account) {
-          try {
-            const message = composePostMessage(result.post.body, result.post.hashtags);
-            const published = platform === 'facebook'
-              ? await publishFacebookPost(account, { message, imageUrl: publicImage })
-              : await publishInstagramPost(account, { caption: message, imageUrl: publicImage! });
-            await sql`
-              INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, published_at, external_post_id)
-              VALUES (${contentId}::uuid, ${versionId}::uuid, ${platform}, 'published', now(),
-                      ${published.permalink ?? published.postId})
-            `;
-            await sql`UPDATE contents SET status = 'published', updated_at = now() WHERE id = ${contentId}::uuid`;
-            autoPublished = true;
-            console.log(`[themes] ${brand.slug}/${platform} 已自動發布:${published.permalink ?? published.postId}`);
-          } catch (pubErr) {
-            console.error(`[themes] ${brand.slug}/${platform} 自動發布失敗,保留待審核`, pubErr);
-          }
+        if (willAutoPublish) {
+          await sql`
+            INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
+            VALUES (${contentId}::uuid, ${versionId}::uuid, ${platform}, 'scheduled', ${slotAt.toISOString()}::timestamptz)
+          `;
         }
 
         await logActivity(env, {
@@ -648,8 +711,9 @@ async function generateDailyTheme(env: Env, targetCount: number = DAILY_THEME_TA
           action: 'content.generated',
           entityType: 'content',
           entityId: contentId,
-          afterState: { platform, auto: true, dailyTheme: theme.theme, autoPublished },
+          afterState: { platform, auto: true, dailyTheme: theme.theme, scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
         });
+        console.log(`[themes] ${brand.slug}/${platform} 已排定 ${slotAt.toISOString()} 發布(${willAutoPublish ? '自動' : '待審核'})`);
       } catch (e) {
         console.error(`[themes] ${brand.slug}/${platform} 主題貼文生成失敗`, e);
       }
@@ -663,31 +727,129 @@ async function generateDailyTheme(env: Env, targetCount: number = DAILY_THEME_TA
 }
 
 // ============================================================================
-// */30 統一調度:
-//   - 台灣 02:00-05:59 → 深夜靜默,不發文也不回覆
-//   - 台灣 08:00-09:59 → 補每品牌「當日第 1 篇」FB/IG 主題圖文(早上 8 點檔)
-//   - 台灣 20:00-21:59 → 補每品牌「當日第 2 篇」FB/IG 主題圖文(晚上 8 點檔)
-//   - 整點 tick 跑 Threads 發文輪;半點 tick 跑 Threads 熱門貼文回覆輪
-//     (兩輪錯開,控制單次 Workers 子請求數量)
+// 生成與發布拆開後的統一調度:
+//   - 固定時段(台灣時間):Threads 品牌相關 00/06/12/18、Threads 生活哏文 09/21、FB+IG 每日主題 19
+//   - 生成階段:每個時段提前 1 小時,在對應的整點 tick 生成內容並存成 scheduled 排程
+//     (例如 06:00 檔在 05:00 的 tick 生成)→ 行程表可以提早看到「已排定、內容是什麼」
+//   - 發布階段:每個 tick 都檢查有沒有到期的 scheduled 排程,到了時間才真正呼叫平台 API 發布
+//     (由 publishDueJobs 負責;因為排程時段本身就避開凌晨 2-6 點,不需要額外的靜默判斷)
+//   - Threads 熱門貼文回覆輪:凌晨 2-6 點靜默(避免被平台判定為機器人),其餘偶數小時的半點 tick 跑一次
 // ============================================================================
+const THREADS_POST_HOURS_TW = [0, 6, 12, 18];       // 品牌相關跟風文
+const THREADS_OFFTOPIC_HOURS_TW = [9, 21];          // 生活哏文(見 generateThreadsOfftopicSlot)
+const DAILY_THEME_HOUR_TW = 19;                     // FB/IG 每日主題
+const GENERATION_LEAD_HOURS = 1;                    // 生成提前量:每個時段提前 1 小時生成
+
+/** 計算「台灣時間 hourTW 點」下一次發生的時間點(已經過去就排到明天) */
+function slotDateFor(hourTW: number): Date {
+  const nowMs = Date.now();
+  const twOffsetMs = 8 * 60 * 60 * 1000;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const twMidnightMs = Math.floor((nowMs + twOffsetMs) / dayMs) * dayMs;
+  let slotUtcMs = twMidnightMs + hourTW * 60 * 60 * 1000 - twOffsetMs;
+  if (slotUtcMs <= nowMs) slotUtcMs += dayMs;
+  return new Date(slotUtcMs);
+}
+
 async function halfHourlyDispatch(env: Env): Promise<void> {
   const twHour = (new Date().getUTCHours() + 8) % 24;
-  if (twHour >= 2 && twHour < 6) {
-    console.log('[dispatch] 台灣凌晨 2-6 點靜默時段,跳過 Threads 發文與回覆');
-    return;
-  }
-  if (twHour >= 8 && twHour < 10) {
-    const didTheme = await generateDailyTheme(env, 1);
-    if (didTheme) return; // 主題生成已耗掉大量子請求,這個 tick 不再跑 Threads
-  } else if (twHour >= 20 && twHour < 22) {
-    const didTheme = await generateDailyTheme(env, 2);
-    if (didTheme) return;
-  }
   const minute = new Date().getUTCMinutes();
-  if (minute >= 15 && minute < 45) {
+  const isTopOfHour = minute < 15 || minute >= 45;
+
+  // 生成階段:提前 1 小時,在整點 tick 幫「下一個時段」把內容生成好存 scheduled
+  if (isTopOfHour) {
+    const genHour = (twHour + GENERATION_LEAD_HOURS) % 24;
+    const slotAt = slotDateFor(genHour);
+    if (THREADS_POST_HOURS_TW.includes(genHour)) await generateThreadsSlot(env, slotAt);
+    if (THREADS_OFFTOPIC_HOURS_TW.includes(genHour)) await generateThreadsOfftopicSlot(env, slotAt);
+    if (genHour === DAILY_THEME_HOUR_TW) await generateDailyTheme(env, slotAt);
+  }
+
+  // 發布階段:每個 tick 都檢查有沒有已經到期的排程要真正發出去(呼叫平台 API)
+  await publishDueJobs(env);
+
+  // Threads 回覆輪:凌晨 2-6 點靜默;其餘偶數小時的半點 tick 跑一次(分散平台請求)
+  if (twHour >= 2 && twHour < 6) return;
+  if (!isTopOfHour && twHour % 2 === 0) {
     await threadsReplyRound(env);
-  } else {
-    await threadsRound(env);
+  }
+}
+
+// ============================================================================
+// 統一發布 Worker:讀取 publishing_jobs 依 scheduled_at 執行(補上 docs/09-api-roadmap.md 早就規劃的缺口)
+//   - 每個 tick 都跑一次,查詢已到期(scheduled_at <= now)且還是 scheduled 狀態的排程
+//   - 依平台呼叫對應的 Graph API / Threads API,成功寫回 published_at + external_post_id、
+//     失敗則標記 failed 並把錯誤訊息記到 publishing_logs(行程表會顯示這個原因)
+// ============================================================================
+async function publishDueJobs(env: Env): Promise<void> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT pj.id AS job_id, pj.content_id, pj.content_version_id, pj.platform,
+           c.brand_id, b.slug AS brand_slug,
+           cv.body, cv.hashtags,
+           a.file_url AS image_url
+    FROM publishing_jobs pj
+    JOIN contents c ON c.id = pj.content_id
+    JOIN brands b ON b.id = c.brand_id
+    LEFT JOIN content_versions cv ON cv.id = pj.content_version_id
+    LEFT JOIN LATERAL (
+      SELECT file_url FROM content_assets WHERE content_version_id = cv.id AND asset_type = 'image' LIMIT 1
+    ) a ON true
+    WHERE pj.status = 'scheduled' AND pj.scheduled_at <= now()
+    ORDER BY pj.scheduled_at ASC
+    LIMIT 10
+  `;
+  if (!rows.length) return;
+
+  for (const row of rows as {
+    job_id: string; content_id: string; content_version_id: string; platform: SocialPlatform;
+    brand_id: string; brand_slug: string; body: string | null; hashtags: string[] | null; image_url: string | null;
+  }[]) {
+    try {
+      await sql`UPDATE publishing_jobs SET status = 'publishing' WHERE id = ${row.job_id}::uuid`;
+      if (!row.body) throw new Error('內容缺少貼文全文(content_versions.body 為空)');
+
+      let published: { postId: string; permalink: string | null };
+      if (row.platform === 'threads') {
+        const account = await getThreadsAccount(env, row.brand_id);
+        if (!account) throw new Error('Threads 帳號未連線或憑證失效');
+        published = await publishThreadsPost(account, { text: row.body, imageUrl: toPublicMediaUrl(env, row.image_url) });
+      } else if (row.platform === 'facebook') {
+        const account = await getMetaAccount(env, row.brand_id, 'facebook');
+        if (!account) throw new Error('Facebook 帳號未連線或憑證失效');
+        const message = composePostMessage(row.body, row.hashtags);
+        published = await publishFacebookPost(account, { message, imageUrl: toPublicMediaUrl(env, row.image_url) });
+      } else if (row.platform === 'instagram') {
+        const account = await getMetaAccount(env, row.brand_id, 'instagram');
+        const publicImage = toPublicMediaUrl(env, row.image_url);
+        if (!account) throw new Error('Instagram 帳號未連線或憑證失效');
+        if (!publicImage) throw new Error('Instagram 發文需要配圖,但這篇內容沒有圖片');
+        const message = composePostMessage(row.body, row.hashtags);
+        published = await publishInstagramPost(account, { caption: message, imageUrl: publicImage });
+      } else {
+        throw new Error(`不支援自動發布的平台:${row.platform}`);
+      }
+
+      await sql`
+        UPDATE publishing_jobs SET status = 'published', published_at = now(),
+          external_post_id = ${published.permalink ?? published.postId}
+        WHERE id = ${row.job_id}::uuid
+      `;
+      await sql`UPDATE contents SET status = 'published', updated_at = now() WHERE id = ${row.content_id}::uuid`;
+      await sql`
+        INSERT INTO publishing_logs (publishing_job_id, event, detail)
+        VALUES (${row.job_id}::uuid, 'published', ${published.permalink ?? published.postId})
+      `;
+      console.log(`[publish] ${row.brand_slug}/${row.platform} 已發布:${published.permalink ?? published.postId}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await sql`UPDATE publishing_jobs SET status = 'failed' WHERE id = ${row.job_id}::uuid`;
+      await sql`
+        INSERT INTO publishing_logs (publishing_job_id, event, detail)
+        VALUES (${row.job_id}::uuid, 'failed', ${msg.slice(0, 500)})
+      `;
+      console.error(`[publish] ${row.brand_slug}/${row.platform} 發布失敗`, e);
+    }
   }
 }
 
@@ -782,8 +944,8 @@ export default {
     }
   },
 
-  // 手動觸發除錯用:GET /?task=collect|drafts|threads|replies|themes|cleanup|podcast|refresh-tokens(需帶 secret)
-  // themes 可帶 &target=1|2 指定要補到當日第幾篇
+  // 手動觸發除錯用:GET /?task=collect|drafts|threads|offtopic|replies|themes|publish|cleanup|podcast|refresh-tokens(需帶 secret)
+  // threads/offtopic/themes 可帶 &slotAt=ISO時間 指定要排定發布的時段(預設現在,方便測試)
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const task = url.searchParams.get('task');
@@ -791,18 +953,21 @@ export default {
     if (!secret || secret !== (env.SESSION_SECRET ?? env.ADMIN_PASSWORD)) {
       return new Response('Unauthorized', { status: 401 });
     }
+    const slotAt = new Date(url.searchParams.get('slotAt') ?? Date.now());
     if (task === 'collect') await collectSignals(env);
     else if (task === 'drafts') await generateSignalDrafts(env);
-    else if (task === 'threads') await threadsRound(env);
+    else if (task === 'threads') await generateThreadsSlot(env, slotAt);
+    else if (task === 'offtopic') await generateThreadsOfftopicSlot(env, slotAt);
     else if (task === 'replies') await threadsReplyRound(env);
-    else if (task === 'themes') await generateDailyTheme(env, Number(url.searchParams.get('target') ?? DAILY_THEME_TARGET));
+    else if (task === 'themes') await generateDailyTheme(env, slotAt);
+    else if (task === 'publish') await publishDueJobs(env);
     else if (task === 'cleanup') await cleanupOldMedia(env);
     else if (task === 'refresh-tokens') await refreshThreadsTokens(env);
     else if (task === 'podcast') {
       const result = await createPodcastEpisode(env);
       return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
     }
-    else return new Response('task 必須為 collect / drafts / threads / replies / themes / cleanup / podcast / refresh-tokens', { status: 400 });
+    else return new Response('task 必須為 collect / drafts / threads / offtopic / replies / themes / publish / cleanup / podcast / refresh-tokens', { status: 400 });
     return new Response(JSON.stringify({ ok: true, task }), { headers: { 'Content-Type': 'application/json' } });
   },
 };

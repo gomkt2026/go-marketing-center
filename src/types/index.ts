@@ -420,6 +420,26 @@ export interface PublishingJob {
   externalPostId?: string | null;
 }
 
+/** 行程表頁面:排程/發布狀態項目(讀取 publishing_jobs,依 scheduled_at 排序) */
+export interface ScheduleItem {
+  id: string;
+  contentId: string;
+  contentVersionId: string;
+  platform: PublishingPlatform;
+  status: PublishingJobStatus;
+  scheduledAt?: string | null;
+  publishedAt?: string | null;
+  externalPostId?: string | null;
+  createdAt: string;
+  title?: string | null;
+  contentStatus?: ContentStatus;
+  genSource?: string | null;
+  body?: string | null;
+  hashtags?: string[] | null;
+  imageUrl?: string | null;
+  lastLogDetail?: string | null;
+}
+
 export interface PerformanceReport {
   id: string;
   publishingJobId: string;

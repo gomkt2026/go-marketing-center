@@ -40,6 +40,7 @@ const groups: MenuGroup[] = [
       { label: '內容中心', path: '/contents', brandScoped: true },
       { label: 'Podcast 節目', path: '/podcast' },
       { label: '發布管理', path: '/publishing', brandScoped: true },
+      { label: '行程表', path: '/schedule', brandScoped: true },
       { label: 'Threads 互動', path: '/thread-replies', brandScoped: true },
       { label: '社群帳號', path: '/social', brandScoped: true },
     ],

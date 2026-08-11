@@ -4,6 +4,7 @@ import { chatCompleteJson, generateImage } from './openai';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   HOMIGO_IG_IMAGE_STYLE, HOMIGO_TEXT_MARK_RULE,
+  OFFTOPIC_SYSTEM_PROMPT, buildOfftopicUserPrompt,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
 } from './prompts';
 import { buildMediaKey, putMedia } from './media';
@@ -167,6 +168,53 @@ export async function generatePlatformPost(
   return { post, prediction, imageUrl, imageError };
 }
 
+/**
+ * Threads 生活哏文:跟品牌/服務完全無關的個人碎念(笑話/省思/感情觀三選一)。
+ * 刻意不套用 brandCtx.systemPrompt(不帶品牌語氣與知識庫),只借 brandCtx.brandId 存檔用。
+ * 不強制配圖:這類貼文用純文字表現最自然,才不會混進品牌視覺風格。
+ */
+export async function generateOfftopicPost(
+  env: Env,
+  params: { usedTopics: string[] },
+): Promise<GenerationResult> {
+  const userPrompt = buildOfftopicUserPrompt(params.usedTopics);
+  let post = await chatCompleteJson<GeneratedPost>(env, {
+    messages: [
+      { role: 'system', content: OFFTOPIC_SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.9,
+  });
+  post.body = normalizeMultilineText(post.body);
+  post.hashtags = [];
+  post.imagePrompt = undefined;
+
+  if (post.body.length > 500) {
+    post = await chatCompleteJson<GeneratedPost>(env, {
+      messages: [
+        { role: 'system', content: OFFTOPIC_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+        { role: 'assistant', content: JSON.stringify(post) },
+        { role: 'user', content: `這篇 ${post.body.length} 字,超過 Threads 500 字上限。只保留一個核心重點,縮短到 500 字以內,回傳同格式 JSON。` },
+      ],
+      temperature: 0.7,
+    });
+    post.body = normalizeMultilineText(post.body);
+    post.hashtags = [];
+    post.imagePrompt = undefined;
+  }
+
+  const prediction = await chatCompleteJson<EngagementPrediction>(env, {
+    messages: [
+      { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
+      { role: 'user', content: buildEngagementEvalPrompt({ platform: 'threads', body: post.body }) },
+    ],
+    temperature: 0.3,
+  });
+
+  return { post, prediction, imageUrl: null, imageError: null };
+}
+
 export interface SavedContent {
   contentId: string;
   versionId: string;
@@ -183,7 +231,7 @@ export async function saveGeneratedContent(
     campaignId?: string | null;
     generatedByAgentId?: string | null;
     promptMeta?: Record<string, unknown>;
-    status?: 'draft' | 'pending_review' | 'published';
+    status?: 'draft' | 'pending_review' | 'published' | 'scheduled';
   },
 ): Promise<SavedContent> {
   const sql = getSql(env);

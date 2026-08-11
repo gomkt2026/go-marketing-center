@@ -18,6 +18,7 @@ import { Campaigns } from '@/pages/campaign/Campaigns';
 import { ContentCenter } from '@/pages/content/ContentCenter';
 import { Podcast } from '@/pages/podcast/Podcast';
 import { Publishing } from '@/pages/publishing/Publishing';
+import { Schedule } from '@/pages/publishing/Schedule';
 import { ThreadsReplies } from '@/pages/publishing/ThreadsReplies';
 import { Analytics } from '@/pages/analytics/Analytics';
 import { Learning } from '@/pages/learning/Learning';
@@ -72,6 +73,7 @@ export default function App() {
                         <Route path="/:brand/events/:id" element={<EventDetail />} />
                         <Route path="/:brand/contents" element={<ContentCenter />} />
                         <Route path="/:brand/publishing" element={<Publishing />} />
+                        <Route path="/:brand/schedule" element={<Schedule />} />
                         <Route path="/:brand/thread-replies" element={<ThreadsReplies />} />
                         <Route path="/:brand/social" element={<SocialAccounts />} />
                         <Route path="/personas" element={<AgentPersonas />} />

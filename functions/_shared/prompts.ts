@@ -299,6 +299,65 @@ export function buildPostUserPrompt(params: {
   ].filter(Boolean).join('\n');
 }
 
+// ============================================================================
+// Threads 生活哏文(跟品牌/服務完全無關的個人碎念,拿來衝自然流量與帳號真實感)
+//   目前先限定 Washgo(見排程 Worker 的 OFFTOPIC_BRANDS),之後要擴充品牌只要加進那個陣列。
+// ============================================================================
+
+/** 生活哏文的通用人設:完全不提品牌,像帳號背後真的有一個會講幹話的人 */
+export const OFFTOPIC_SYSTEM_PROMPT =
+  '你是一個 20-35 歲的台灣人,平常就愛在 Threads 上分享生活觀察、幹話、感情觀,完全不是任何品牌的代言人或行銷帳號,' +
+  '這篇貼文純粹是你的個人碎念,跟任何工作、品牌、商業一律沒有關係。' +
+  '你講話很真實、有個人風格,偶爾自嘲、偶爾毒舌,像朋友圈裡那個很會講話又敢講真心話的人。';
+
+interface OfftopicPostType {
+  label: string;
+  instruction: string;
+}
+
+const OFFTOPIC_TYPES: OfftopicPostType[] = [
+  {
+    label: '好笑生活哏',
+    instruction:
+      '寫一則會讓人邊看邊笑出來的生活觀察或自嘲哏,主題從台灣人共通的日常小尷尬/小崩潰取材' +
+      '(通勤、外送、家人 LINE 群組、減肥、上班、社交軟體、颱風天、租屋室友…都可以),' +
+      '要有畫面感跟意外的收尾,不要是老掉牙的冷笑話,不要條列式。',
+  },
+  {
+    label: '引人省思的一段話',
+    instruction:
+      '寫一段簡短但有記憶點的省思,像是深夜突然想通某件事的感覺,主題可以是成長、時間、選擇、人際關係、與自己相處等,' +
+      '語氣真誠不說教,結尾留一點餘韻讓人想截圖收藏,不要寫成長文說教或條列金句。',
+  },
+  {
+    label: '感情觀/戀愛觀點表態',
+    instruction:
+      '對戀愛/感情/單身/交往相處中的某個現象講出你的真實看法或立場' +
+      '(例如:曖昧該不該講清楚、多久沒聯絡算是不喜歡了、遠距離戀愛、分帳、已讀不回、家人催婚…),' +
+      '可以稍微犀利或有態度,但要讓人覺得「講得對」而不是說教或攻擊某群人。',
+  },
+];
+
+/** 隨機挑一種類型組成生活哏文的 user prompt;usedTopics 是近期已寫過的標題,避免重複哏 */
+export function buildOfftopicUserPrompt(usedTopics: string[]): string {
+  const picked = OFFTOPIC_TYPES[Math.floor(Math.random() * OFFTOPIC_TYPES.length)];
+  return [
+    `請寫一篇 Threads 貼文,類型是「${picked.label}」。`,
+    picked.instruction,
+    '',
+    '鐵則(違反任何一條都不合格):',
+    '1. 完全不能提到任何品牌、公司、產品、服務,或洗衣、送洗、包租代管、裝修裝潢等相關字眼——就是一則單純的個人生活貼文。',
+    '2. 不放連結、不放促銷、不放 CTA、不放 hashtag(hashtags 回傳空陣列,cta 回傳空字串)。',
+    '3. 500 字以內,前 3 行要抓住眼球(數據、衝突、或反常識的一句話),口語、像真人隨手發的短文,不要鋪陳開場。',
+    '4. 避免政治、宗教、災難、性別對立等真正的爭議雷區;感情觀可以有立場,但走輕鬆有共鳴的路線,不要說教或攻擊性言論。',
+    usedTopics.length ? `以下主題最近寫過了,不要重複類似的角度:\n${usedTopics.join('、')}` : '',
+    '',
+    ANTI_AI_RULES,
+    '',
+    '回傳 JSON 物件:{"title": "內部管理用標題(15字內,方便去重比對,不會公開發布)", "body": "貼文全文", "hashtags": [], "cta": ""}',
+  ].filter(Boolean).join('\n');
+}
+
 export function buildEngagementEvalPrompt(params: { platform: string; body: string }): string {
   return [
     `你是台灣社群操盤手,請評估以下 ${params.platform} 貼文的互動潛力(按讚/留言/轉發)。`,

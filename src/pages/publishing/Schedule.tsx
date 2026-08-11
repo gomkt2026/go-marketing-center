@@ -19,6 +19,17 @@ const genSourceLabel: Record<string, string> = {
   threads_hourly: '熱議跟風', threads_offtopic: '生活哏文', daily_theme: '每日主題',
   auto_signal: '情報自動', market_signal: '市場情報', meeting_plan: '會議計畫',
 };
+const contentStatusLabel: Record<string, string> = {
+  draft: '草稿', pending_review: '待審閱', approved: '已批准', needs_revision: '修改中',
+  rejected: '已退回', scheduled: '排程中', published: '已發布', archived: '已封存',
+};
+
+function formatFullTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  return new Date(iso).toLocaleString('zh-TW', {
+    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
 
 const WEEKDAY_LABELS = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
@@ -112,14 +123,19 @@ export function Schedule() {
         }
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(160px, 1fr))', gap: 10, overflowX: 'auto', alignItems: 'start' }}>
+      <div
+        style={{
+          display: 'grid', gridTemplateColumns: 'repeat(7, minmax(180px, 1fr))', gap: 10,
+          overflowX: 'auto', alignItems: 'start',
+        }}
+      >
         {days.map((date, i) => {
           const dayItems = items
             .filter((it) => sameDay(itemTime(it), date))
             .sort((a, b) => itemTime(a).getTime() - itemTime(b).getTime());
           const isToday = sameDay(date, new Date());
           return (
-            <div key={i} style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+            <div key={i} style={{ display: 'grid', gap: 8, alignContent: 'start', minWidth: 0 }}>
               <div
                 style={{
                   textAlign: 'center', padding: '6px 0', borderRadius: 8,
@@ -129,7 +145,7 @@ export function Schedule() {
               >
                 {WEEKDAY_LABELS[i]} {date.getMonth() + 1}/{date.getDate()}
               </div>
-              <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+              <div style={{ display: 'grid', gap: 8, alignContent: 'start', minWidth: 0 }}>
                 {dayItems.length === 0 && (
                   <p style={{ fontSize: 11.5, color: 'var(--color-text-muted)', textAlign: 'center' }}>—</p>
                 )}
@@ -137,8 +153,12 @@ export function Schedule() {
                   const isOpen = expanded.has(item.id);
                   const time = itemTime(item).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
                   return (
-                    <Card key={item.id} style={{ padding: 12, cursor: 'pointer' }} onClick={() => toggle(item.id)}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <Card
+                      key={item.id}
+                      style={{ padding: 12, cursor: 'pointer', minWidth: 0, overflow: 'hidden' }}
+                      onClick={() => toggle(item.id)}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
                         <span style={{ fontSize: 12, fontWeight: 700 }}>{time}</span>
                         <Badge tone={statusTone[item.status]}>{statusLabel[item.status]}</Badge>
                       </div>
@@ -156,10 +176,29 @@ export function Schedule() {
                       </p>
                       {isOpen && (
                         <div style={{ marginTop: 8, borderTop: '1px solid var(--color-border)', paddingTop: 8 }}>
+                          {item.contentStatus && (
+                            <div style={{ marginBottom: 6 }}>
+                              <Badge tone="default">內容狀態:{contentStatusLabel[item.contentStatus] ?? item.contentStatus}</Badge>
+                            </div>
+                          )}
+                          <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', display: 'grid', gap: 2, marginBottom: 6 }}>
+                            {item.scheduledAt && <span>排定發布:{formatFullTime(item.scheduledAt)}</span>}
+                            {item.publishedAt && <span>實際發布:{formatFullTime(item.publishedAt)}</span>}
+                            <span>建立時間:{formatFullTime(item.createdAt)}</span>
+                          </div>
                           {item.imageUrl && (
                             <img src={item.imageUrl} alt="配圖" style={{ width: '100%', borderRadius: 8, marginBottom: 6 }} />
                           )}
-                          {item.body && <p style={{ fontSize: 12, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{item.body}</p>}
+                          {item.body && (
+                            <p style={{ fontSize: 12, whiteSpace: 'pre-wrap', lineHeight: 1.6, wordBreak: 'break-word' }}>
+                              {item.body}
+                            </p>
+                          )}
+                          {!!item.hashtags?.length && (
+                            <p style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 6, wordBreak: 'break-word' }}>
+                              {item.hashtags.map((h) => (h.startsWith('#') ? h : `#${h}`)).join(' ')}
+                            </p>
+                          )}
                           {item.status === 'failed' && (
                             <div style={{ marginTop: 8 }}>
                               {item.lastLogDetail && (

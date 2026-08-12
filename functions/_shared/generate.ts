@@ -5,6 +5,7 @@ import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   HOMIGO_IG_IMAGE_STYLE, HOMIGO_TEXT_MARK_RULE,
   OFFTOPIC_SYSTEM_PROMPT, buildOfftopicUserPrompt,
+  buildImageInspiredThreadsPrompt,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
 } from './prompts';
 import { buildMediaKey, putMedia } from './media';
@@ -215,6 +216,63 @@ export async function generateOfftopicPost(
   return { post, prediction, imageUrl: null, imageError: null };
 }
 
+/**
+ * Threads 圖片靈感貼文:用品牌智慧素材庫上傳的一張圖(系統畫面/實拍照片…)當話題,讓 AI 看圖寫貼文。
+ * 不重新呼叫圖片生成 API,配圖直接沿用原本上傳的那張圖(省成本,也更真實)。
+ */
+export async function generateThreadsFromImage(
+  env: Env,
+  params: {
+    brandCtx: BrandContext;
+    imageUrl: string;
+    caption?: string;
+    imageCategory?: string;
+  },
+): Promise<GenerationResult> {
+  const { brandCtx, imageUrl } = params;
+  const userPrompt = buildImageInspiredThreadsPrompt({
+    platform: 'threads', caption: params.caption, imageCategory: params.imageCategory, brandSlug: brandCtx.slug,
+  });
+  const visionUserMessage = {
+    role: 'user' as const,
+    content: [
+      { type: 'text' as const, text: userPrompt },
+      { type: 'image_url' as const, image_url: { url: imageUrl } },
+    ],
+  };
+
+  let post = await chatCompleteJson<GeneratedPost>(env, {
+    messages: [{ role: 'system', content: brandCtx.systemPrompt }, visionUserMessage],
+  });
+  post.body = normalizeMultilineText(post.body);
+  post.imagePrompt = undefined; // 配圖沿用原圖,不需要另外的圖片生成 prompt
+
+  const brandThreadsMax = getBrandVoice(brandCtx.slug).threadsMaxChars;
+  if (brandThreadsMax && post.body.length > brandThreadsMax) {
+    post = await chatCompleteJson<GeneratedPost>(env, {
+      messages: [
+        { role: 'system', content: brandCtx.systemPrompt },
+        visionUserMessage,
+        { role: 'assistant', content: JSON.stringify(post) },
+        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${brandThreadsMax} 字上限。請只保留一個核心重點,縮短到 ${brandThreadsMax} 字以內,回傳同格式 JSON。` },
+      ],
+      temperature: 0.5,
+    });
+    post.body = normalizeMultilineText(post.body);
+    post.imagePrompt = undefined;
+  }
+
+  const prediction = await chatCompleteJson<EngagementPrediction>(env, {
+    messages: [
+      { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
+      { role: 'user', content: buildEngagementEvalPrompt({ platform: 'threads', body: post.body }) },
+    ],
+    temperature: 0.3,
+  });
+
+  return { post, prediction, imageUrl, imageError: null };
+}
+
 export interface SavedContent {
   contentId: string;
   versionId: string;
@@ -232,6 +290,8 @@ export async function saveGeneratedContent(
     generatedByAgentId?: string | null;
     promptMeta?: Record<string, unknown>;
     status?: 'draft' | 'pending_review' | 'published' | 'scheduled';
+    /** 覆寫 content_assets.metadata;image_inspired 貼文用來標記「圖片沿用素材庫,不是本次生成」 */
+    imageAssetMeta?: Record<string, unknown>;
   },
 ): Promise<SavedContent> {
   const sql = getSql(env);
@@ -267,7 +327,7 @@ export async function saveGeneratedContent(
     await sql`
       INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
       VALUES (${versionId}::uuid, 'image', ${result.imageUrl},
-              ${JSON.stringify({ imagePrompt: result.post.imagePrompt ?? '', generated: true })})
+              ${JSON.stringify(params.imageAssetMeta ?? { imagePrompt: result.post.imagePrompt ?? '', generated: true })})
     `;
   }
 

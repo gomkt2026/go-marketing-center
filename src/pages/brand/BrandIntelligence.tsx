@@ -12,6 +12,7 @@ import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type {
   BrandRule, BrandAudience, BrandPersona, BrandChannel, BrandVisual,
   BrandKeyword, BrandExample, BrandDocument, BrandVersion, VerificationStatus,
+  BrandAsset, BrandAssetImageCategory,
 } from '@/types';
 
 const TABS = [
@@ -37,6 +38,18 @@ const ruleTypeLabel: Record<string, { label: string; tone: BadgeTone }> = {
   negative_rule: { label: '負面表列', tone: 'danger' },
 };
 
+const IMAGE_CATEGORY_OPTIONS: { value: BrandAssetImageCategory; label: string }[] = [
+  { value: 'system_screenshot', label: '系統畫面截圖' },
+  { value: 'real_photo', label: '實際拍攝照片' },
+  { value: 'people', label: '人物照片' },
+  { value: 'scene', label: '場景照片' },
+  { value: 'brand_collab', label: '合作品牌照片' },
+  { value: 'other', label: '其他' },
+];
+const imageCategoryLabel: Record<string, string> = Object.fromEntries(
+  IMAGE_CATEGORY_OPTIONS.map((o) => [o.value, o.label]),
+);
+
 export function BrandIntelligence() {
   const { brand: slug } = useParams();
   const { brandBySlug, brandsLoading } = useBrand();
@@ -44,6 +57,14 @@ export function BrandIntelligence() {
   const [tab, setTab] = useState('core');
   const [rules, setRules] = useState<BrandRule[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [assets, setAssets] = useState<BrandAsset[]>([]);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadCaption, setUploadCaption] = useState('');
+  const [uploadCategory, setUploadCategory] = useState<BrandAssetImageCategory>('system_screenshot');
+  const [uploading, setUploading] = useState(false);
+  const [assetError, setAssetError] = useState<string | null>(null);
+  const [generatingAssetId, setGeneratingAssetId] = useState<string | null>(null);
+  const [generatedContentId, setGeneratedContentId] = useState<string | null>(null);
 
   const brandQuery = useAsyncData(
     () => slug ? api.brand(slug) : Promise.reject(new Error('no slug')),
@@ -57,6 +78,9 @@ export function BrandIntelligence() {
   useEffect(() => {
     if (intelQuery.data?.rules) setRules(intelQuery.data.rules);
   }, [intelQuery.data?.rules]);
+  useEffect(() => {
+    if (intelQuery.data?.assets) setAssets(intelQuery.data.assets);
+  }, [intelQuery.data?.assets]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (brandQuery.loading || intelQuery.loading) return <LoadingState />;
@@ -90,6 +114,48 @@ export function BrandIntelligence() {
     });
     setRules((prev) => [...prev, rule]);
     setEditingId(rule.id);
+  }
+
+  async function uploadAsset() {
+    if (!slug || !uploadFile) return;
+    setUploading(true);
+    setAssetError(null);
+    try {
+      const { asset } = await api.uploadBrandAsset(slug, {
+        file: uploadFile, caption: uploadCaption.trim() || undefined, imageCategory: uploadCategory,
+      });
+      setAssets((prev) => [asset, ...prev]);
+      setUploadFile(null);
+      setUploadCaption('');
+    } catch (e) {
+      setAssetError(e instanceof Error ? e.message : '上傳失敗');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function deleteAsset(id: string) {
+    if (!slug) return;
+    await api.deleteBrandAsset(slug, id);
+    setAssets((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  async function generateFromAsset(id: string) {
+    if (!slug) return;
+    setGeneratingAssetId(id);
+    setAssetError(null);
+    setGeneratedContentId(null);
+    try {
+      const { contentId } = await api.generatePostFromAsset(slug, id);
+      setGeneratedContentId(contentId);
+      setAssets((prev) => prev.map((a) => (a.id === id
+        ? { ...a, usedInThreadsCount: a.usedInThreadsCount + 1, lastUsedAt: new Date().toISOString() }
+        : a)));
+    } catch (e) {
+      setAssetError(e instanceof Error ? e.message : '生成失敗');
+    } finally {
+      setGeneratingAssetId(null);
+    }
   }
 
   return (
@@ -252,16 +318,103 @@ export function BrandIntelligence() {
               )}
 
               {tab === 'library' && (
-                <div style={{ display: 'grid', gap: 10 }}>
-                  {documents.map((d) => (
-                    <div key={d.id} style={{ ...cardBoxStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600 }}>{d.title}</div>
-                        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{d.fileUrl}</div>
+                <div style={{ display: 'grid', gap: 24 }}>
+                  <div>
+                    <Field label="圖片素材庫(系統畫面截圖/實拍照片,可作為 Threads 圖片靈感貼文的話題來源)">
+                      <div />
+                    </Field>
+                    <div style={{ ...cardBoxStyle, marginTop: 8 }}>
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <input
+                          type="file" accept="image/*"
+                          onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                          style={{ fontSize: 12 }}
+                        />
+                        <select
+                          value={uploadCategory}
+                          onChange={(e) => setUploadCategory(e.target.value as BrandAssetImageCategory)}
+                          style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13 }}
+                        >
+                          {IMAGE_CATEGORY_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text" placeholder="說明(選填,例如:LINE 送洗履歷查詢畫面)"
+                          value={uploadCaption}
+                          onChange={(e) => setUploadCaption(e.target.value)}
+                          style={{ flex: 1, minWidth: 200, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13 }}
+                        />
+                        <Button variant="secondary" disabled={!uploadFile || uploading} onClick={() => void uploadAsset()}>
+                          {uploading ? '上傳中…' : '+ 上傳圖片'}
+                        </Button>
                       </div>
-                      <Badge tone="secondary">{d.sourceType}</Badge>
+                      {assetError && <p style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 8 }}>{assetError}</p>}
+                      {generatedContentId && (
+                        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
+                          已生成貼文草稿,請至內容審閱頁查看(content id: {generatedContentId})。
+                        </p>
+                      )}
                     </div>
-                  ))}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+                      {assets.map((a) => (
+                        <div key={a.id} style={cardBoxStyle}>
+                          {a.fileUrl && (
+                            <img
+                              src={a.fileUrl} alt={a.caption ?? a.name}
+                              style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }}
+                            />
+                          )}
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                            {a.imageCategory && <Badge tone="secondary">{imageCategoryLabel[a.imageCategory] ?? a.imageCategory}</Badge>}
+                            {a.usedInThreadsCount > 0 && <Badge tone="default">已用 {a.usedInThreadsCount} 次</Badge>}
+                          </div>
+                          {a.caption && (
+                            <div style={{ fontSize: 12.5, marginBottom: 8, wordBreak: 'break-word' }}>{a.caption}</div>
+                          )}
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <Button
+                              variant="primary" style={{ padding: '4px 10px', fontSize: 12 }}
+                              disabled={generatingAssetId === a.id}
+                              onClick={() => void generateFromAsset(a.id)}
+                            >
+                              {generatingAssetId === a.id ? '生成中…' : '用這張圖生成貼文'}
+                            </Button>
+                            <Button
+                              variant="danger" style={{ padding: '4px 10px', fontSize: 12 }}
+                              onClick={() => void deleteAsset(a.id)}
+                            >
+                              刪除
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {assets.length === 0 && (
+                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>尚未上傳任何圖片素材</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Field label="文件">
+                      <div />
+                    </Field>
+                    <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
+                      {documents.map((d) => (
+                        <div key={d.id} style={{ ...cardBoxStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600 }}>{d.title}</div>
+                            <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{d.fileUrl}</div>
+                          </div>
+                          <Badge tone="secondary">{d.sourceType}</Badge>
+                        </div>
+                      ))}
+                      {documents.length === 0 && (
+                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>尚無文件資料</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -23,6 +23,14 @@ export function buildGuestVoiceKey(ext = 'mp3'): string {
   return `podcast/guests/${crypto.randomUUID()}.${ext}`;
 }
 
+/**
+ * 品牌智慧圖片素材庫的原始上傳圖 key。
+ * 注意:放在 brand-assets/ 前綴(不是 generated/),不會被排程 Worker 的 31 天清理機制刪掉。
+ */
+export function buildBrandLibraryKey(brandSlug: string, ext = 'jpg'): string {
+  return `brand-assets/${brandSlug}/library/${crypto.randomUUID()}.${ext}`;
+}
+
 export async function putMedia(env: Env, key: string, bytes: Uint8Array, contentType = 'image/png'): Promise<string> {
   if (!env.MEDIA) {
     throw new Error('R2 bucket MEDIA 尚未綁定,請先建立 bucket 並在 wrangler.toml 設定 r2_buckets');

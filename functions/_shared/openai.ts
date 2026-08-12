@@ -2,9 +2,15 @@ import type { Env } from './env';
 
 const OPENAI_BASE = 'https://api.openai.com/v1';
 
+/** 多模態訊息內容片段(文字 + 圖片),格式對齊 OpenAI Chat Completions 的 vision 輸入 */
+export type ChatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  /** 純文字或多模態內容(帶圖片時用陣列);預設文字模型(gpt-4o-mini)本身支援 vision */
+  content: string | ChatContentPart[];
 }
 
 export class OpenAIError extends Error {

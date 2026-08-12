@@ -29,6 +29,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     SELECT pj.id, pj.content_id, pj.content_version_id, pj.platform, pj.status,
            pj.scheduled_at, pj.published_at, pj.external_post_id, pj.created_at,
            c.title, c.status AS content_status, c.generation_prompt_meta->>'source' AS gen_source,
+           c.generation_prompt_meta->>'category' AS gen_category,
            v.body, v.hashtags, a.file_url AS image_url,
            lg.detail AS last_log_detail
     FROM publishing_jobs pj

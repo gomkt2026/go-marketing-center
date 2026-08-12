@@ -2,8 +2,14 @@ import type { ScheduledController, ExecutionContext } from '@cloudflare/workers-
 import type { Env } from '../../../functions/_shared/env';
 import { getSql } from '../../../functions/_shared/db';
 import { chatCompleteJson } from '../../../functions/_shared/openai';
-import { buildBrandContext, getBrandVoice, ANTI_AI_RULES } from '../../../functions/_shared/prompts';
-import { generatePlatformPost, generateOfftopicPost, saveGeneratedContent, findBrandAgent, type SocialPlatform } from '../../../functions/_shared/generate';
+import {
+  buildBrandContext, getBrandVoice, ANTI_AI_RULES,
+  THREADS_HOURLY_CATEGORIES, pickThreadsHourlyCategory, type ThreadsHourlyCategoryId,
+} from '../../../functions/_shared/prompts';
+import {
+  generatePlatformPost, generateOfftopicPost, generateThreadsFromImage,
+  saveGeneratedContent, findBrandAgent, type SocialPlatform,
+} from '../../../functions/_shared/generate';
 import { getThreadsAccount, publishThreadsPost, searchThreadsPosts, type ThreadsSearchPost } from '../../../functions/_shared/threads';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, composePostMessage } from '../../../functions/_shared/meta';
 import { toPublicMediaUrl } from '../../../functions/_shared/media';
@@ -224,6 +230,7 @@ async function generateThreadsSlot(env: Env, slotAt: Date): Promise<void> {
 
   // 會真正發文的品牌(已連 Threads + 開自動發布)優先,其餘品牌輪流補位
   // today_count 只算「品牌相關跟風文」(threads_hourly),不受生活哏文(threads_offtopic)影響
+  // recent_categories:最近 2 篇用過的類型(見 THREADS_HOURLY_CATEGORIES),用來排除連續重複的角度(例如連續兩篇都在講換季)
   const brands = await sql`
     SELECT b.id, b.slug, b.name,
            (SELECT max(c.created_at) FROM contents c
@@ -235,6 +242,12 @@ async function generateThreadsSlot(env: Env, slotAt: Date): Promise<void> {
               AND (c.generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
               AND (c.generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
            ) AS today_count,
+           (SELECT array_agg(cat) FROM (
+              SELECT c.generation_prompt_meta->>'category' AS cat FROM contents c
+              WHERE c.brand_id = b.id AND c.target_platform = 'threads'
+                AND c.generation_prompt_meta->>'source' = 'threads_hourly'
+              ORDER BY c.created_at DESC LIMIT 2
+            ) recent) AS recent_categories,
            EXISTS(SELECT 1 FROM brand_social_accounts a
                   WHERE a.brand_id = b.id AND a.platform = 'threads'
                     AND a.status = 'connected' AND a.auto_publish) AS can_publish
@@ -243,7 +256,10 @@ async function generateThreadsSlot(env: Env, slotAt: Date): Promise<void> {
     LIMIT ${THREADS_BRANDS_PER_TICK}
   `;
 
-  for (const brand of brands as { id: string; slug: string; name: string; last_at: string | null; today_count: number }[]) {
+  for (const brand of brands as {
+    id: string; slug: string; name: string; last_at: string | null; today_count: number;
+    recent_categories: (string | null)[] | null;
+  }[]) {
     if (brand.today_count >= THREADS_DAILY_CAP) continue;
     if (brand.last_at && Date.now() - new Date(brand.last_at).getTime() < THREADS_MIN_INTERVAL_MS) continue;
     try {
@@ -261,18 +277,49 @@ async function generateThreadsSlot(env: Env, slotAt: Date): Promise<void> {
       `;
       const socialTopics = (socialRows as { title: string }[]).map((r) => r.title);
 
-      const result = await generatePlatformPost(env, {
-        brandCtx,
-        platform: 'threads',
-        topic: `台灣現在的熱門話題:${trendList}`,
-        extraInstruction: [
-          '從上面的熱門話題挑「一個」最能跟品牌日常自然掛勾的,寫一則 Threads 跟風文。' +
-          '如果全部都掛不上,就寫一則品牌日常 observation 文(第一線工作看到的趣事)。不要硬蹭。',
+      // 圖片靈感類型:只有品牌智慧素材庫裡有可用圖片時才進候選池;挑最少被用過/最久沒用過的一張,讓庫存輪流曝光
+      const imageRows = await sql`
+        SELECT id, file_url, caption, image_category FROM brand_assets
+        WHERE brand_id = ${brand.id}::uuid AND asset_type = 'image'
+        ORDER BY used_in_threads_count ASC, last_used_at ASC NULLS FIRST
+        LIMIT 1
+      `;
+      const candidateImage = imageRows.length
+        ? imageRows[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null }
+        : null;
+
+      const recentCategoryIds = (brand.recent_categories ?? []).filter((c): c is string => !!c) as ThreadsHourlyCategoryId[];
+      const availableCategoryIds = (candidateImage
+        ? THREADS_HOURLY_CATEGORIES
+        : THREADS_HOURLY_CATEGORIES.filter((c) => c.id !== 'image_inspired')
+      ).map((c) => c.id);
+      const category = pickThreadsHourlyCategory(recentCategoryIds, availableCategoryIds);
+
+      let result;
+      if (category.id === 'image_inspired' && candidateImage) {
+        const publicImageUrl = toPublicMediaUrl(env, candidateImage.file_url);
+        if (!publicImageUrl) throw new Error('圖片素材缺少可用網址');
+        result = await generateThreadsFromImage(env, {
+          brandCtx,
+          imageUrl: publicImageUrl,
+          caption: candidateImage.caption ?? undefined,
+          imageCategory: candidateImage.image_category ?? undefined,
+        });
+      } else {
+        const trendsBlock = [
+          `台灣現在的熱門話題:${trendList}`,
           socialTopics.length
             ? `目前社群(PTT/Dcard)正在討論的行業話題,也可以從這裡取材:\n${socialTopics.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
             : '',
-        ].filter(Boolean).join('\n\n'),
-      });
+        ].filter(Boolean).join('\n\n');
+        const topic = category.id === 'seasonal_trend' ? `台灣現在的熱門話題:${trendList}` : `Threads 貼文類型:${category.label}`;
+        result = await generatePlatformPost(env, {
+          brandCtx,
+          platform: 'threads',
+          topic,
+          extraInstruction: category.instruction.replace('{{TRENDS}}', trendsBlock),
+        });
+      }
 
       const account = await getThreadsAccount(env, brand.id);
       const willAutoPublish = !!account?.autoPublish;
@@ -283,8 +330,21 @@ async function generateThreadsSlot(env: Env, slotAt: Date): Promise<void> {
         result,
         generatedByAgentId: agentId,
         status: willAutoPublish ? 'scheduled' : 'pending_review',
-        promptMeta: { source: 'threads_hourly', trends: trends.map((t) => t.title), socialTopics, slotAt: slotAt.toISOString() },
+        promptMeta: {
+          source: 'threads_hourly', category: category.id, trends: trends.map((t) => t.title), socialTopics,
+          slotAt: slotAt.toISOString(), assetId: category.id === 'image_inspired' && candidateImage ? candidateImage.id : undefined,
+        },
+        imageAssetMeta: category.id === 'image_inspired' && candidateImage
+          ? { sourceAssetId: candidateImage.id, generated: false, reused: true }
+          : undefined,
       });
+
+      if (candidateImage && category.id === 'image_inspired') {
+        await sql`
+          UPDATE brand_assets SET used_in_threads_count = used_in_threads_count + 1, last_used_at = now()
+          WHERE id = ${candidateImage.id}::uuid
+        `;
+      }
 
       if (willAutoPublish) {
         await sql`
@@ -300,9 +360,9 @@ async function generateThreadsSlot(env: Env, slotAt: Date): Promise<void> {
         action: 'content.generated',
         entityType: 'content',
         entityId: contentId,
-        afterState: { platform: 'threads', auto: true, scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
+        afterState: { platform: 'threads', category: category.id, auto: true, scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
       });
-      console.log(`[threads] ${brand.slug} 已排定 ${slotAt.toISOString()} 發布(${willAutoPublish ? '自動' : '待審核'})`);
+      console.log(`[threads] ${brand.slug} 已排定 ${slotAt.toISOString()} 發布(類型:${category.label},${willAutoPublish ? '自動' : '待審核'})`);
     } catch (e) {
       console.error(`[threads] 品牌 ${brand.slug} 生成失敗`, e);
     }

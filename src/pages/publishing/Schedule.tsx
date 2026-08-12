@@ -19,6 +19,11 @@ const genSourceLabel: Record<string, string> = {
   threads_hourly: '熱議跟風', threads_offtopic: '生活哏文', daily_theme: '每日主題',
   auto_signal: '情報自動', market_signal: '市場情報', meeting_plan: '會議計畫',
 };
+// threads_hourly 貼文的角度輪替(避免連續發文都落在同一個角度),見 functions/_shared/prompts.ts 的 THREADS_HOURLY_CATEGORIES
+const genCategoryLabel: Record<string, string> = {
+  seasonal_trend: '時事跟風', emotion: '感情視角', weather: '天氣話題',
+  entertainment: '娛樂話題', sports: '運動話題', image_inspired: '圖片靈感',
+};
 const contentStatusLabel: Record<string, string> = {
   draft: '草稿', pending_review: '待審閱', approved: '已批准', needs_revision: '修改中',
   rejected: '已退回', scheduled: '排程中', published: '已發布', archived: '已封存',
@@ -165,6 +170,9 @@ export function Schedule() {
                       <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
                         <Badge tone="secondary">{platformLabel[item.platform] ?? item.platform}</Badge>
                         {item.genSource && <Badge tone="default">{genSourceLabel[item.genSource] ?? item.genSource}</Badge>}
+                        {item.genCategory && (
+                          <Badge tone="accent">{genCategoryLabel[item.genCategory] ?? item.genCategory}</Badge>
+                        )}
                       </div>
                       <p
                         style={{

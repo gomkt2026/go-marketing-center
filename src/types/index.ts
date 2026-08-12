@@ -121,6 +121,22 @@ export interface BrandDocument {
   fileUrl: string;
 }
 
+export type BrandAssetImageCategory =
+  | 'system_screenshot' | 'real_photo' | 'people' | 'scene' | 'brand_collab' | 'other';
+
+export interface BrandAsset {
+  id: string;
+  brandId: string;
+  assetType: string;
+  name: string;
+  fileUrl: string | null;
+  imageCategory: BrandAssetImageCategory | null;
+  caption: string | null;
+  usedInThreadsCount: number;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
 export type MarketSignalType =
   | 'news' | 'policy' | 'current_event' | 'trending_topic'
   | 'industry_trend' | 'social_content' | 'evergreen';
@@ -434,6 +450,7 @@ export interface ScheduleItem {
   title?: string | null;
   contentStatus?: ContentStatus;
   genSource?: string | null;
+  genCategory?: string | null;
   body?: string | null;
   hashtags?: string[] | null;
   imageUrl?: string | null;

@@ -299,6 +299,132 @@ export function buildPostUserPrompt(params: {
   ].filter(Boolean).join('\n');
 }
 
+const IMAGE_CATEGORY_LABEL: Record<string, string> = {
+  system_screenshot: '系統畫面截圖',
+  real_photo: '實際拍攝照片',
+  people: '人物照片',
+  scene: '場景照片',
+  brand_collab: '合作品牌/異業合作照片',
+  other: '其他素材',
+};
+
+/** image_inspired 類型專用:給模型看圖寫 Threads 貼文的文字指示(需搭配 image_url content part 一起送) */
+export function buildImageInspiredThreadsPrompt(params: {
+  platform: 'threads';
+  caption?: string;
+  imageCategory?: string;
+  brandSlug?: string;
+}): string {
+  const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
+  const guideline = voice?.threadsCraft ? `${PLATFORM_GUIDELINES.threads}\n${voice.threadsCraft}` : PLATFORM_GUIDELINES.threads;
+  const categoryLabel = params.imageCategory ? IMAGE_CATEGORY_LABEL[params.imageCategory] ?? '素材照片' : '素材照片';
+  return [
+    `這是品牌上傳的一張${categoryLabel}${params.caption ? `,說明:${params.caption}` : ''}。`,
+    '請仔細看這張圖,挑一個畫面裡真的有的細節或情境當鉤子,寫一篇 Threads 貼文。',
+    '不要憑空描述圖片裡沒有的東西,也不要寫成單純的圖片說明文;要像有人真的看到/用到這個畫面後,寫下的一則真實感想或分享。',
+    '',
+    guideline,
+    '',
+    '回傳 JSON 物件:',
+    '{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"}',
+  ].join('\n');
+}
+
+// ============================================================================
+// Threads 熱議跟風貼文:類型輪替(避免連續發文都落在同一個角度,例如連續兩篇都在講換季)
+//   排程 Worker(generateThreadsSlot)每次會排除最近用過的類型,再從其餘類型權重隨機挑一個;
+//   image_inspired 只有在品牌智慧素材庫裡有可用圖片時才會進入候選池(見 generate.ts 的 generateThreadsFromImage)。
+//   這裡的 instruction 刻意寫成品牌無關:AI 已經從 buildBrandContext 的 systemPrompt 知道
+//   這個品牌的第一線人設與日常關心的議題,不需要在這裡為每個品牌各寫一份。
+// ============================================================================
+
+export type ThreadsHourlyCategoryId =
+  | 'seasonal_trend'   // 現行行為:熱門話題/PTT/Dcard 跟風
+  | 'emotion'          // 人際/感情視角:依品牌自然換成房東房客、業主工班、伴侶室友等關係
+  | 'weather'          // 台灣當下天氣/季節現象(梅雨、颱風、入秋、濕度…)
+  | 'entertainment'    // 影劇/綜藝/明星/動漫等娛樂話題
+  | 'sports'           // 運動賽事/健身風潮
+  | 'image_inspired';  // 用品牌智慧素材庫上傳的圖片當話題
+
+export interface ThreadsHourlyCategory {
+  id: ThreadsHourlyCategoryId;
+  label: string;   // 中文標籤,存進 generation_prompt_meta.category,行程表 UI 顯示用
+  weight: number;  // 權重隨機的相對權重
+  /** 給模型的切入角度指示;{{TRENDS}} 會由呼叫端代換成目前的熱門話題清單(可以是空字串) */
+  instruction: string;
+}
+
+export const THREADS_HOURLY_CATEGORIES: ThreadsHourlyCategory[] = [
+  {
+    id: 'seasonal_trend',
+    label: '熱議跟風',
+    weight: 2,
+    instruction:
+      '從下面這份「台灣現在的熱門話題」挑「一個」最能跟品牌日常自然掛勾的,寫一則 Threads 跟風文。' +
+      '如果全部都掛不上,就寫一則品牌日常 observation 文(第一線工作看到的趣事)。不要硬蹭。\n{{TRENDS}}',
+  },
+  {
+    id: 'emotion',
+    label: '感情/人際視角',
+    weight: 1,
+    instruction:
+      '這篇從「人際互動/感情」的角度切入:依這個行業實際會出現的關係去想' +
+      '(可能是家人、伴侶、室友、房東房客、業主與工班之間,自然會有的摩擦、體貼或溫馨互動),' +
+      '不要生套跟行業無關的戀愛哏。用一個具體的小場景或一句真實對話開頭,自然帶到品牌日常會遇到的情境,' +
+      '結尾不用刻意收在促銷。如果下面的熱門話題裡有適合的人際/感情類話題也可以參考,但不強求:\n{{TRENDS}}',
+  },
+  {
+    id: 'weather',
+    label: '天氣/季節話題',
+    weight: 1,
+    instruction:
+      '這篇從「台灣當下的天氣/季節現象」切入(例如梅雨、颱風、忽冷忽熱、濕度、換季),' +
+      '只寫普遍性的季節觀察,不要捏造具體氣象數據或預報。自然帶到品牌日常會被這種天氣影響到的場景。' +
+      '如果下面的熱門話題裡有天氣相關的可以參考,但不強求:\n{{TRENDS}}',
+  },
+  {
+    id: 'entertainment',
+    label: '娛樂/影視話題',
+    weight: 1,
+    instruction:
+      '這篇從「娛樂/影視話題」切入:如果下面的熱門話題裡有影劇、綜藝、明星、動漫(含日劇/日本動漫,台灣人普遍在追的)相關,' +
+      '挑一個順勢帶到品牌日常;如果都沒有適合的,就寫近期台灣人普遍在討論的娛樂現象(不要捏造具體劇情或未證實的八卦)。\n{{TRENDS}}',
+  },
+  {
+    id: 'sports',
+    label: '運動/賽事話題',
+    weight: 1,
+    instruction:
+      '這篇從「運動/賽事」切入:如果下面的熱門話題裡有運動賽事(棒球、籃球、路跑、健身風潮)相關,' +
+      '挑一個順勢帶到品牌日常;如果都沒有適合的,就寫近期普遍性的運動/健身觀察(不捏造比賽成績或數據)。\n{{TRENDS}}',
+  },
+  {
+    id: 'image_inspired',
+    label: '系統畫面/實績分享',
+    weight: 1,
+    instruction: '(由呼叫端在 generateThreadsFromImage 組專屬 prompt,這裡的 instruction 不會被使用)',
+  },
+];
+
+/** 排除最近用過的類型後,依權重隨機挑一個(排除後池子是空的就退回全部類型) */
+export function pickThreadsHourlyCategory(
+  excludeIds: ThreadsHourlyCategoryId[],
+  availableIds?: ThreadsHourlyCategoryId[],
+): ThreadsHourlyCategory {
+  const base = availableIds
+    ? THREADS_HOURLY_CATEGORIES.filter((c) => availableIds.includes(c.id))
+    : THREADS_HOURLY_CATEGORIES;
+  const pool = base.filter((c) => !excludeIds.includes(c.id));
+  const candidates = pool.length ? pool : base.length ? base : THREADS_HOURLY_CATEGORIES;
+  const totalWeight = candidates.reduce((sum, c) => sum + c.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const c of candidates) {
+    roll -= c.weight;
+    if (roll <= 0) return c;
+  }
+  return candidates[candidates.length - 1];
+}
+
 // ============================================================================
 // Threads 生活哏文(跟品牌/服務完全無關的個人碎念,拿來衝自然流量與帳號真實感)
 //   目前先限定 Washgo(見排程 Worker 的 OFFTOPIC_BRANDS),之後要擴充品牌只要加進那個陣列。

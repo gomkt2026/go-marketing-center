@@ -49,7 +49,29 @@ export const api = {
       examples: import('@/types').BrandExample[];
       documents: import('@/types').BrandDocument[];
       histories: import('@/types').BrandHistory[];
+      assets: import('@/types').BrandAsset[];
     }>(`/api/brands/${slug}/intelligence`),
+
+  // -- 品牌智慧圖片素材庫(系統畫面截圖/實拍照片,可當 Threads 圖片靈感貼文的話題來源) --------
+  brandAssets: (slug: string) =>
+    request<{ assets: import('@/types').BrandAsset[] }>(`/api/brands/${slug}/assets`),
+
+  uploadBrandAsset: async (slug: string, params: { file: File; caption?: string; imageCategory?: string }) => {
+    const form = new FormData();
+    form.append('file', params.file);
+    if (params.caption) form.append('caption', params.caption);
+    if (params.imageCategory) form.append('imageCategory', params.imageCategory);
+    const res = await fetch(`/api/brands/${slug}/assets`, { method: 'POST', credentials: 'include', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    return data as { asset: import('@/types').BrandAsset };
+  },
+
+  deleteBrandAsset: (slug: string, assetId: string) =>
+    request<{ ok: boolean }>(`/api/brands/${slug}/assets/${assetId}`, { method: 'DELETE' }),
+
+  generatePostFromAsset: (slug: string, assetId: string) =>
+    request<{ contentId: string }>(`/api/brands/${slug}/assets/${assetId}/generate-post`, { method: 'POST' }),
 
   brandWorkspace: (slug: string) =>
     request<{

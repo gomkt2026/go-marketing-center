@@ -282,6 +282,48 @@ export const api = {
       body: JSON.stringify({ platform }),
     }),
 
+  // -- Collaboration 範圍的社群帳號(目前僅 Go 生態系共用 X 帳號) --------------
+  collaborationSocialAccounts: (collaborationId: string) =>
+    request<{ accounts: import('@/types').SocialAccount[] }>(`/api/collaborations/${collaborationId}/social-accounts`),
+
+  saveCollaborationSocialAccount: (collaborationId: string, body: {
+    platform: string; accountName?: string; externalId?: string;
+    accessToken?: string; refreshToken?: string; clearToken?: boolean; notes?: string; autoPublish?: boolean;
+  }) =>
+    request<{ account: import('@/types').SocialAccount }>(`/api/collaborations/${collaborationId}/social-accounts`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  testCollaborationSocialAccount: (collaborationId: string, platform: string) =>
+    request<{ ok: boolean; status: string; detail: string }>(`/api/collaborations/${collaborationId}/social-accounts/test`, {
+      method: 'POST',
+      body: JSON.stringify({ platform }),
+    }),
+
+  // -- Collaboration 範圍的行程表(目前僅 Go 生態系共用 X 帳號) --------------
+  collaborationSchedule: (collaborationId: string, params?: { from?: string; to?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.from) qs.set('from', params.from);
+    if (params?.to) qs.set('to', params.to);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<{ items: import('@/types').CollaborationScheduleItem[]; from: string; to: string }>(
+      `/api/collaborations/${collaborationId}/schedule${suffix}`,
+    );
+  },
+
+  retryCollaborationSchedule: (collaborationId: string, jobId: string) =>
+    request<{ ok: boolean }>(`/api/collaborations/${collaborationId}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'retry', jobId }),
+    }),
+
+  approveCollaborationContent: (collaborationId: string, contentId: string) =>
+    request<{ ok: boolean; jobId: string }>(`/api/collaborations/${collaborationId}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'approve_publish', contentId }),
+    }),
+
   manualPublishContent: (contentId: string, body?: { externalPostUrl?: string }) =>
     request<{ ok: boolean; jobId: string }>(`/api/contents/${contentId}/manual-publish`, {
       method: 'POST',

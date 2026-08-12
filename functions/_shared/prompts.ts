@@ -200,6 +200,46 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
 }
 
 // ============================================================================
+// 跨品牌合作內容(Collaboration Workspace):AI 只能讀 collaboration_briefs,
+// 不得跨讀對方完整的 Brand Knowledge(Principle 3)。
+// 用於「Go 生態系」跨品牌導流貼文(例如 Homigo 房東 TA 看見 TaskGo 修繕/Washgo 洗衣)。
+// ============================================================================
+
+/** 讀取指定 Collaboration 最新版 Brief,包成明確分隔、標示「唯一可引用來源」的區塊 */
+export async function buildCollaborationContext(env: Env, collaborationId: string): Promise<string | null> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT title, content_markdown FROM collaboration_briefs
+    WHERE collaboration_id = ${collaborationId}::uuid
+    ORDER BY version_number DESC LIMIT 1
+  `;
+  if (!rows.length) return null;
+  const brief = rows[0] as { title: string; content_markdown: string };
+  return [
+    `【跨品牌合作事實 — 唯一可引用來源:${brief.title}】`,
+    '以下內容是「Go 生態系」Collaboration Workspace 中,經雙方/三方品牌負責人共同維護的合作事實。',
+    '提及其他品牌時,只能引用這個區塊裡的內容,絕對不能自行編造或延伸對方品牌的內部數據、受眾、規則或未公開資訊。',
+    '',
+    brief.content_markdown,
+  ].join('\n');
+}
+
+/** 依 slug 查詢品牌所屬的「Go 生態系」Collaboration id(找不到回傳 null,呼叫端應優雅跳過) */
+export async function findEcosystemCollaborationId(env: Env, brandSlug?: string): Promise<string | null> {
+  const sql = getSql(env);
+  const rows = brandSlug
+    ? await sql`
+        SELECT c.id FROM collaborations c
+        JOIN collaboration_brands cb ON cb.collaboration_id = c.id
+        JOIN brands b ON b.id = cb.brand_id
+        WHERE c.title = 'Go 生態系(Homigo × TaskGo × Washgo)' AND b.slug = ${brandSlug}
+        LIMIT 1
+      `
+    : await sql`SELECT id FROM collaborations WHERE title = 'Go 生態系(Homigo × TaskGo × Washgo)' LIMIT 1`;
+  return rows.length ? (rows[0] as { id: string }).id : null;
+}
+
+// ============================================================================
 // 貼文生成與互動潛力評估的輸出格式
 // ============================================================================
 
@@ -482,6 +522,138 @@ export function buildOfftopicUserPrompt(usedTopics: string[]): string {
     '',
     '回傳 JSON 物件:{"title": "內部管理用標題(15字內,方便去重比對,不會公開發布)", "body": "貼文全文", "hashtags": [], "cta": ""}',
   ].filter(Boolean).join('\n');
+}
+
+// ============================================================================
+// Go 生態系 X(Twitter) 帳號:全新的英文獨立人格,不代表任何單一品牌的翻譯版。
+// 素材只能來自 buildCollaborationContext() 讀到的 Go 生態系 Collaboration Brief
+// (含各品牌 can_claim 等級的公開事實),絕對不能碰任一品牌完整的 Brand Knowledge。
+// ============================================================================
+
+export const ECOSYSTEM_X_SYSTEM_PROMPT = [
+  'You are the voice of "Go Ecosystem" on X (Twitter) — an independent English-language persona, not a translation of any single brand.',
+  'You represent a vertical SaaS ecosystem born in Taiwan: demand from one app becomes supply for another, and a lifestyle layer completes the loop.',
+  'Your background story: you have actually operated inside this ecosystem — watched a landlord\'s repair request flow straight into a contractor\'s dispatch queue, watched a laundry pickup get bundled as a tenant perk.',
+  'Tone: sharp, opinionated, data-aware, mildly contrarian. You write like an operator who ships product, not a marketer chasing engagement.',
+  'Audience: international PropTech / vertical SaaS / startup-builder circles on X — people who follow product strategy, GTM, and platform thinking.',
+  '',
+  'Hard rules (breaking any one of these makes the output invalid):',
+  '1. Never invent aggregate ecosystem numbers (e.g. "500K users across our apps") unless explicitly given in the source material.',
+  '2. Only reference facts that appear in the collaboration brief provided to you. If you want to mention a specific brand fact and it is not in the brief, leave it out.',
+  '3. No hashtag spam — 0 to 2 hashtags max, and only if they add real discovery value.',
+  '4. No generic AI-speak openers ("In today\'s fast-paced world...", "It\'s worth noting that..."). Open with a concrete scene, a number, or a contrarian claim.',
+  '5. Write like a real founder/operator tweeting, not a press release. Short sentences. Confident. No corporate hedging.',
+  '6. Never claim market leadership or use unverifiable superlatives ("the best", "#1", "market leader").',
+].join('\n');
+
+export interface GeneratedXPost {
+  format: 'single' | 'thread';
+  tweets: string[];
+  /** 1-2 句英文視覺場景描述,用來生成配圖的 hero image;固定套用 ECOSYSTEM_X_IMAGE_STYLE 統一視覺風格 */
+  imagePrompt?: string;
+}
+
+/**
+ * Go 生態系 X 帳號的固定配圖風格:科技感、走在趨勢端,吸引國際 PropTech/SaaS 圈與創投的視覺辨識度。
+ * 刻意不放任何真人/品牌 logo/文字,維持抽象未來感,才能跨三品牌通用又不混淆品牌知識邊界。
+ */
+export const ECOSYSTEM_X_IMAGE_STYLE = [
+  'Sleek futuristic tech aesthetic for an international SaaS/startup audience.',
+  'Abstract glowing data-flow network, interconnected nodes and lines representing 3 systems exchanging data in real time.',
+  'Deep navy or near-black background with vivid cyan, electric violet, and magenta gradient light accents.',
+  'Clean minimalist high-end product/VC-deck visual language, subtle glass/3D render quality, dramatic rim lighting.',
+  'Wide 16:9 composition, cinematic depth of field, ultra-detailed digital art, trending on Behance/Dribbble style.',
+  'No people, no text, no logos, no watermark, no UI mockups with readable text.',
+].join(' ');
+
+export interface EcosystemXAngle {
+  id: string;
+  label: string;
+  instruction: string;
+}
+
+/** X 內容形式輪替:單推(觀點) vs Thread(產業敘事/拆解) vs 單品牌聚焦(spotlight) */
+export const ECOSYSTEM_X_ANGLES: EcosystemXAngle[] = [
+  {
+    id: 'single_insight',
+    label: '單推觀點',
+    instruction:
+      'Write ONE sharp, standalone tweet (max 275 characters) — a single opinionated insight about vertical SaaS, ' +
+      'ecosystem thinking, or a concrete scene from how Homigo/TaskGo/Washgo hand off demand and supply to each other. ' +
+      'Return {"format": "single", "tweets": ["..."]} with exactly one item.',
+  },
+  {
+    id: 'thread_narrative',
+    label: 'Thread 產業敘事',
+    instruction:
+      'Write a thread of 4-6 tweets telling a concrete story about how this ecosystem works ' +
+      '(e.g. a repair request flowing from Homigo to TaskGo, or how a lifestyle service like Washgo gets bundled in). ' +
+      'Tweet 1 must be the strongest hook (a claim, number, or scene) — someone scrolling must want to tap "Show this thread". ' +
+      'Each tweet max 270 characters, self-contained enough to make sense on its own but building on the previous one. ' +
+      'Return {"format": "thread", "tweets": ["tweet 1", "tweet 2", ...]} with 4 to 6 items.',
+  },
+  {
+    id: 'thread_builder_pov',
+    label: 'Thread 操盤手視角',
+    instruction:
+      'Write a thread of 3-5 tweets from the point of view of someone who actually built this: a candid, slightly contrarian take on ' +
+      'building three vertical apps that feed each other instead of one all-in-one app. Reference only facts present in the brief below. ' +
+      'Tweet 1 is the hook. Each tweet max 270 characters. ' +
+      'Return {"format": "thread", "tweets": ["tweet 1", "tweet 2", ...]} with 3 to 5 items.',
+  },
+  {
+    id: 'brand_spotlight_taskgo',
+    label: '單品牌聚焦:TaskGo',
+    instruction:
+      'This post is a solo spotlight on ONE product in the ecosystem: TaskGo (construction/field-service dispatch management). ' +
+      'Explicitly name "TaskGo" in the first tweet. Write either one standalone tweet (max 275 characters) OR a thread of 2-4 tweets ' +
+      '(each max 270 characters) — pick whichever better fits the concrete detail available. Only use facts about TaskGo that appear ' +
+      'in the brief below; do not pad it with unrelated Homigo/Washgo facts unless the brief explicitly frames them as a TaskGo benefit. ' +
+      'Open with a concrete scene, number, or contrarian claim about field-service/dispatch work — not a generic intro. ' +
+      'Return {"format": "single"|"thread", "tweets": ["..."]}.',
+  },
+  {
+    id: 'brand_spotlight_homigo',
+    label: '單品牌聚焦:Homigo',
+    instruction:
+      'This post is a solo spotlight on ONE product in the ecosystem: Homigo (LINE-native rental/property management). ' +
+      'Explicitly name "Homigo" in the first tweet. Write either one standalone tweet (max 275 characters) OR a thread of 2-4 tweets ' +
+      '(each max 270 characters) — pick whichever better fits the concrete detail available. Only use facts about Homigo that appear ' +
+      'in the brief below; do not pad it with unrelated TaskGo/Washgo facts unless the brief explicitly frames them as a Homigo benefit. ' +
+      'Open with a concrete scene, number, or contrarian claim about rental/property management — not a generic intro. ' +
+      'Return {"format": "single"|"thread", "tweets": ["..."]}.',
+  },
+  {
+    id: 'brand_spotlight_washgo',
+    label: '單品牌聚焦:Washgo',
+    instruction:
+      'This post is a solo spotlight on ONE product in the ecosystem: Washgo (smart laundry/garment-care platform). ' +
+      'Explicitly name "Washgo" in the first tweet. Write either one standalone tweet (max 275 characters) OR a thread of 2-4 tweets ' +
+      '(each max 270 characters) — pick whichever better fits the concrete detail available. Only use facts about Washgo that appear ' +
+      'in the brief below; do not pad it with unrelated TaskGo/Homigo facts unless the brief explicitly frames them as a Washgo benefit. ' +
+      'Open with a concrete scene, number, or contrarian claim about laundry/garment-care operations — not a generic intro. ' +
+      'Return {"format": "single"|"thread", "tweets": ["..."]}.',
+  },
+];
+
+export function pickEcosystemXAngle(excludeIds: string[]): EcosystemXAngle {
+  const pool = ECOSYSTEM_X_ANGLES.filter((a) => !excludeIds.includes(a.id));
+  const candidates = pool.length ? pool : ECOSYSTEM_X_ANGLES;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+export function buildEcosystemXUserPrompt(params: { angle: EcosystemXAngle; collaborationContext: string }): string {
+  return [
+    params.angle.instruction,
+    '',
+    params.collaborationContext,
+    '',
+    'Every fact you use about Homigo, TaskGo, or Washgo must come from the brief above. Do not add anything beyond it.',
+    '',
+    'Also include an "imagePrompt" field in the JSON: a short 1-2 sentence description of ONE concrete abstract visual scene ' +
+      '(e.g. "three glowing data streams merging into a single pulsing core node") that fits this specific post\'s idea. ' +
+      'Keep it abstract/conceptual, not literal — a fixed tech visual style will be applied on top of it automatically.',
+  ].join('\n');
 }
 
 export function buildEngagementEvalPrompt(params: { platform: string; body: string }): string {

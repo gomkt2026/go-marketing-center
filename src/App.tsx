@@ -14,6 +14,7 @@ import { Trending } from '@/pages/trending/Trending';
 import { MeetingList } from '@/pages/meeting/MeetingList';
 import { DecisionCenter } from '@/pages/decision/DecisionCenter';
 import { CollaborationList } from '@/pages/collaboration/CollaborationList';
+import { EcosystemSchedule } from '@/pages/collaboration/EcosystemSchedule';
 import { Campaigns } from '@/pages/campaign/Campaigns';
 import { ContentCenter } from '@/pages/content/ContentCenter';
 import { Podcast } from '@/pages/podcast/Podcast';
@@ -85,6 +86,7 @@ export default function App() {
                         <Route path="/meetings/:meetingId" element={<MeetingList />} />
                         <Route path="/decisions" element={<DecisionCenter />} />
                         <Route path="/collaborations" element={<CollaborationList />} />
+                        <Route path="/collaborations/:id/schedule" element={<EcosystemSchedule />} />
 
                         <Route path="/timeline" element={<Timeline />} />
                         <Route path="/settings" element={<Settings />} />

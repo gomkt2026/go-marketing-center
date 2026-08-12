@@ -370,7 +370,9 @@ export type SocialAccountStatus = 'disconnected' | 'manual' | 'connected' | 'err
 
 export interface SocialAccount {
   id: string;
-  brandId: string;
+  brandId?: string | null;
+  /** collaboration 範圍的帳號(如 Go 生態系共用 X 帳號)才會有值,與 brandId 二者恰有一個非 null */
+  collaborationId?: string | null;
   platform: PublishingPlatform;
   accountName?: string | null;
   externalId?: string | null;
@@ -383,6 +385,8 @@ export interface SocialAccount {
   hasToken?: boolean;
   tokenMasked?: string | null;
   tokenExpiresAt?: string | null;
+  /** X(Twitter) OAuth2 才需要:是否已存有 refresh token */
+  hasRefreshToken?: boolean;
 }
 
 export type ThreadsReplyStatus = 'pending' | 'approved' | 'replied' | 'skipped' | 'failed';
@@ -449,6 +453,30 @@ export interface ScheduleItem {
   createdAt: string;
   title?: string | null;
   contentStatus?: ContentStatus;
+  genSource?: string | null;
+  genCategory?: string | null;
+  body?: string | null;
+  hashtags?: string[] | null;
+  imageUrl?: string | null;
+  lastLogDetail?: string | null;
+}
+
+/**
+ * Collaboration 範圍的行程表項目(目前只有 Go 生態系共用 X 帳號會用到)。
+ * 跟 ScheduleItem 的差異:以 contents 為主表,jobId/status 可能是 null
+ * (auto_publish 關閉時 pending_review 的內容還沒有 publishing_jobs,但仍要能在行程表看到)。
+ */
+export interface CollaborationScheduleItem {
+  contentId: string;
+  title?: string | null;
+  contentStatus: ContentStatus;
+  platform: PublishingPlatform;
+  jobId?: string | null;
+  jobStatus?: PublishingJobStatus | null;
+  scheduledAt?: string | null;
+  publishedAt?: string | null;
+  externalPostId?: string | null;
+  contentCreatedAt: string;
   genSource?: string | null;
   genCategory?: string | null;
   body?: string | null;

@@ -63,6 +63,7 @@ export const ACTION_LABELS: Record<string, string> = {
   'event.referrer.updated': '更新推薦人',
   'event.referrer.deleted': '刪除推薦人',
   'social_account.updated': '更新社群帳號設定',
+  'content.approved_for_publish': '核准並排入發布(生態系行程表)',
   'threads_reply.generated': '生成 Threads 熱門貼文回覆',
   'threads_reply.published': '發布 Threads 回覆',
   'threads_reply.skipped': '略過 Threads 回覆',

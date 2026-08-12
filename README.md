@@ -20,16 +20,20 @@
 
 ```
 /
-├── docs/                  # 設計文件(原則、Domain Model、資料庫、IA、權限、Brand Intelligence、Collaboration、MD 規格、API Roadmap)
+├── docs/                  # 設計文件(原則、Domain Model、資料庫、IA、權限、Brand Intelligence、Collaboration、MD 規格、API Roadmap、Go生態系X頻道)
 ├── db/
 │   ├── schema.sql         # 完整可執行 PostgreSQL Schema
-│   └── seed.sql           # Homigo / TaskGo / Washgo 三個真實品牌的種子資料
+│   ├── seed.sql           # Homigo / TaskGo / Washgo 三個真實品牌的種子資料
+│   └── migrations/        # 累積式 schema 變更(含 008/009:Go 生態系 Collaboration + 共用 X 帳號;010:Brief 內容擴充)
 ├── data/brands/           # 三份原始品牌行銷文件(brand_documents 原始檔)
-├── src/                   # React + Vite + TypeScript 前端(假資料驅動)
+├── functions/             # Cloudflare Pages Functions(API + 共用邏輯)
+│   ├── api/               # /api/* 路由,含 collaborations/[id]/social-accounts(Go 生態系 X 帳號設定)
+│   └── _shared/           # 共用模組:prompts.ts / generate.ts / meta.ts / threads.ts / x.ts(X API 封裝)…
+├── workers/scheduler/     # Cloudflare Worker:市場情報蒐集、內容生成排程、跨品牌導流、Go生態系X發文、發布佇列
+├── src/                   # React + Vite + TypeScript 前端
 │   ├── components/        # UI 元件(layout / ui)
 │   ├── context/           # 品牌切換 Context
-│   ├── mocks/             # 對應資料庫 Schema 的假資料
-│   ├── pages/              # 各模組頁面
+│   ├── pages/              # 各模組頁面(含 collaboration/CollaborationList.tsx 的 Go 生態系 X 帳號設定)
 │   └── types/              # TypeScript 型別定義
 └── index.html              # Vite 進入點
 ```
@@ -54,6 +58,7 @@
 | [07-collaboration.md](docs/07-collaboration.md) | Collaboration 架構 |
 | [08-brand-markdown-spec.md](docs/08-brand-markdown-spec.md) | Brand Knowledge Markdown 規格 |
 | [09-api-roadmap.md](docs/09-api-roadmap.md) | 未來 API 擴充缺口 |
+| [12-ecosystem-x-channel.md](docs/12-ecosystem-x-channel.md) | Go 生態系跨品牌整合 + 共用 X(Twitter) 頻道 |
 
 ## 本地開發
 

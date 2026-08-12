@@ -6,11 +6,14 @@ import {
   HOMIGO_IG_IMAGE_STYLE, HOMIGO_TEXT_MARK_RULE,
   OFFTOPIC_SYSTEM_PROMPT, buildOfftopicUserPrompt,
   buildImageInspiredThreadsPrompt,
+  ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
+  type GeneratedXPost, type EcosystemXAngle,
 } from './prompts';
 import { buildMediaKey, putMedia } from './media';
 import { compositeLogo } from './watermark';
 import { normalizeMultilineText } from './text';
+import { X_TWEET_MAX_CHARS } from './x';
 
 export type SocialPlatform = 'facebook' | 'instagram' | 'threads';
 
@@ -64,6 +67,11 @@ export async function generatePlatformPost(
     topic: string;
     topicSummary?: string;
     extraInstruction?: string;
+    /**
+     * 跨品牌合作內容(見 prompts.ts 的 buildCollaborationContext),只在需要提及其他品牌時傳入。
+     * 附加在 system prompt 之後,不寫回 brandCtx.systemPrompt,維持品牌知識邊界(Principle 2)。
+     */
+    collaborationContext?: string | null;
   },
 ): Promise<GenerationResult> {
   const { brandCtx, platform } = params;
@@ -72,9 +80,12 @@ export async function generatePlatformPost(
     platform, topic: params.topic, topicSummary: params.topicSummary,
     extraInstruction: params.extraInstruction, brandSlug: brandCtx.slug,
   });
+  const systemPrompt = params.collaborationContext
+    ? `${brandCtx.systemPrompt}\n\n${params.collaborationContext}`
+    : brandCtx.systemPrompt;
   let post = await chatCompleteJson<GeneratedPost>(env, {
     messages: [
-      { role: 'system', content: brandCtx.systemPrompt },
+      { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
   });
@@ -90,7 +101,7 @@ export async function generatePlatformPost(
   if (hardLimit && post.body.length > hardLimit) {
     post = await chatCompleteJson<GeneratedPost>(env, {
       messages: [
-        { role: 'system', content: brandCtx.systemPrompt },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
         { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${hardLimit} 字上限。請只保留一個核心重點,縮短到 ${hardLimit} 字以內,回傳同格式 JSON(imagePrompt 保留不變)。` },
@@ -334,6 +345,124 @@ export async function saveGeneratedContent(
   return { contentId, versionId };
 }
 
+// ============================================================================
+// Go 生態系 X(Twitter) 帳號內容生成
+//   刻意不吃 BrandContext:素材只能來自 collaborationContext(見 prompts.ts 的
+//   buildCollaborationContext),不得讀取任一品牌完整的 Brand Knowledge(Principle 2/3)。
+// ============================================================================
+
+export interface EcosystemXGenerationResult {
+  post: GeneratedXPost;
+  angleId: string;
+  angleLabel: string;
+  imageUrl: string | null;
+  imageError: string | null;
+}
+
+/**
+ * 生成 Go 生態系 X 貼文(單推或 thread);tweets 超字數上限時會要求模型重寫一次。
+ * 同時依模型回傳的 imagePrompt + 固定的 ECOSYSTEM_X_IMAGE_STYLE 產一張科技感 hero image
+ * (16:9,配合 X 卡片顯示比例),配圖失敗不影響文字貼文,只記錄 imageError。
+ */
+export async function generateEcosystemXPost(
+  env: Env,
+  params: { angle: EcosystemXAngle; collaborationContext: string },
+): Promise<EcosystemXGenerationResult> {
+  const userPrompt = buildEcosystemXUserPrompt({ angle: params.angle, collaborationContext: params.collaborationContext });
+  const messages = [
+    { role: 'system' as const, content: ECOSYSTEM_X_SYSTEM_PROMPT },
+    { role: 'user' as const, content: userPrompt },
+  ];
+  let post = await chatCompleteJson<GeneratedXPost>(env, { messages, temperature: 0.7 });
+
+  const overLimit = (p: GeneratedXPost) => !p.tweets?.length || p.tweets.some((t) => t.length > X_TWEET_MAX_CHARS);
+  if (overLimit(post)) {
+    post = await chatCompleteJson<GeneratedXPost>(env, {
+      messages: [
+        ...messages,
+        { role: 'assistant', content: JSON.stringify(post) },
+        {
+          role: 'user',
+          content: `Some tweets exceed ${X_TWEET_MAX_CHARS} characters (or the array was empty/invalid). ` +
+            `Rewrite so every tweet is under ${X_TWEET_MAX_CHARS} characters. Return the same JSON format.`,
+        },
+      ],
+      temperature: 0.5,
+    });
+  }
+  post.tweets = (post.tweets ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 8);
+
+  let imageUrl: string | null = null;
+  let imageError: string | null = null;
+  try {
+    const scene = post.imagePrompt?.trim() || 'Three glowing data streams merging into a single pulsing core node.';
+    const bytes = await generateImage(env, {
+      prompt: `${scene} ${ECOSYSTEM_X_IMAGE_STYLE}`,
+      size: '1536x1024',
+      quality: 'medium',
+    });
+    const key = buildMediaKey('go-ecosystem', 'jpg');
+    imageUrl = await putMedia(env, key, bytes, 'image/jpeg');
+  } catch (e) {
+    imageError = e instanceof Error ? e.message : '配圖生成失敗';
+  }
+
+  return { post, angleId: params.angle.id, angleLabel: params.angle.label, imageUrl, imageError };
+}
+
+export interface SavedEcosystemContent {
+  contentId: string;
+  versionId: string;
+}
+
+/**
+ * 將 Go 生態系 X 貼文寫入 contents(collaboration 範圍,brand_id = NULL)/ content_versions。
+ * Thread 的多則推文存成同一個 body,用 "\n---\n" 分隔,發布時(見 x.ts / scheduler)再切回陣列。
+ */
+export async function saveEcosystemXContent(
+  env: Env,
+  params: {
+    collaborationId: string;
+    result: EcosystemXGenerationResult;
+    generatedByAgentId?: string | null;
+    status?: 'draft' | 'pending_review' | 'published' | 'scheduled';
+  },
+): Promise<SavedEcosystemContent> {
+  const sql = getSql(env);
+  const { result } = params;
+  const body = result.post.tweets.join('\n---\n');
+
+  const contentRows = await sql`
+    INSERT INTO contents (
+      brand_id, collaboration_id, content_type, target_platform, title, status,
+      generated_by_agent_id, generation_prompt_meta
+    ) VALUES (
+      NULL, ${params.collaborationId}::uuid, 'article', 'x',
+      ${`[Go Ecosystem X] ${result.angleLabel}`}, ${params.status ?? 'pending_review'},
+      ${params.generatedByAgentId ?? null},
+      ${JSON.stringify({ source: 'ecosystem_x', angleId: result.angleId, format: result.post.format })}
+    ) RETURNING id
+  `;
+  const contentId = (contentRows[0] as { id: string }).id;
+
+  const versionRows = await sql`
+    INSERT INTO content_versions (content_id, version_number, body, hashtags, cta, generated_by_agent_id)
+    VALUES (${contentId}::uuid, 1, ${body}, ${JSON.stringify([])}, '', ${params.generatedByAgentId ?? null})
+    RETURNING id
+  `;
+  const versionId = (versionRows[0] as { id: string }).id;
+
+  if (result.imageUrl) {
+    await sql`
+      INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
+      VALUES (${versionId}::uuid, 'image', ${result.imageUrl},
+              ${JSON.stringify({ imagePrompt: result.post.imagePrompt ?? '', generated: true, source: 'ecosystem_x' })})
+    `;
+  }
+
+  return { contentId, versionId };
+}
+
 /** 找出品牌的 brand_ai Agent(生成內容的掛名者) */
 export async function findBrandAgent(env: Env, brandId: string): Promise<string | null> {
   const sql = getSql(env);
@@ -342,6 +471,18 @@ export async function findBrandAgent(env: Env, brandId: string): Promise<string 
     JOIN agent_roles r ON r.id = a.role_id
     WHERE a.brand_id = ${brandId}::uuid AND a.is_active = true
     ORDER BY (r.code = 'brand_ai') DESC
+    LIMIT 1
+  `;
+  return rows.length ? (rows[0] as { id: string }).id : null;
+}
+
+/** 找出「Go Ecosystem AI」Agent(brand_id = NULL,見 migration 009);生成內容的掛名者 */
+export async function findEcosystemAgent(env: Env): Promise<string | null> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT a.id FROM ai_agents a
+    JOIN agent_roles r ON r.id = a.role_id
+    WHERE a.brand_id IS NULL AND r.code = 'ecosystem_ai' AND a.is_active = true
     LIMIT 1
   `;
   return rows.length ? (rows[0] as { id: string }).id : null;

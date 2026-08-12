@@ -5,13 +5,16 @@ import { chatCompleteJson } from '../../../functions/_shared/openai';
 import {
   buildBrandContext, getBrandVoice, ANTI_AI_RULES,
   THREADS_HOURLY_CATEGORIES, pickThreadsHourlyCategory, type ThreadsHourlyCategoryId,
+  buildCollaborationContext, findEcosystemCollaborationId, pickEcosystemXAngle,
 } from '../../../functions/_shared/prompts';
 import {
   generatePlatformPost, generateOfftopicPost, generateThreadsFromImage,
   saveGeneratedContent, findBrandAgent, type SocialPlatform,
+  generateEcosystemXPost, saveEcosystemXContent, findEcosystemAgent,
 } from '../../../functions/_shared/generate';
 import { getThreadsAccount, publishThreadsPost, searchThreadsPosts, type ThreadsSearchPost } from '../../../functions/_shared/threads';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, composePostMessage } from '../../../functions/_shared/meta';
+import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '../../../functions/_shared/x';
 import { toPublicMediaUrl } from '../../../functions/_shared/media';
 import { publishReplyTarget, replyTextIssue } from '../../../functions/_shared/threads-replies';
 import { encryptToken, decryptToken } from '../../../functions/_shared/crypto';
@@ -787,6 +790,234 @@ async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
 }
 
 // ============================================================================
+// 主流程 2e:Go 生態系跨品牌導流貼文(Homigo 房東 TA 看見 TaskGo 修繕/Washgo 洗衣等)
+//   - 每週固定 2 檔(週三/週日 台灣 20:00),三品牌輪流:每次挑「近 7 天內做過生態系導流
+//     貼文次數最少」的品牌,確保三品牌長期均勻輪替,而不是每次都同一個品牌
+//   - 內容素材只能來自 Go 生態系 Collaboration Brief(見 prompts.ts 的
+//     buildCollaborationContext),不得跨讀對方完整 Brand Knowledge(Principle 3)
+//   - 平台與角度依品牌各自設定(ECOSYSTEM_ANGLES),沿用該品牌自己的 FB/IG/Threads 帳號發文,
+//     不需要另外的社群帳號;狀態一律先 pending_review,除非帳號已開 auto_publish
+// ============================================================================
+const ECOSYSTEM_CROSS_PROMO_SOURCE = 'ecosystem_cross_promo';
+const ECOSYSTEM_CROSS_PROMO_WEEKLY_TARGET = 1; // 每品牌每週目標 1 篇(輪流機制的判斷基準)
+
+interface EcosystemAngle {
+  platform: SocialPlatform;
+  instruction: string;
+}
+
+// 各品牌對外提及其他品牌時的貼文角度指示;實際可引用的事實仍受 collaborationContext 限制
+const ECOSYSTEM_ANGLES: Record<string, EcosystemAngle[]> = {
+  homigo: [
+    {
+      platform: 'facebook',
+      instruction: '這篇要對「房東」與「包租代管業者」這兩個目標受眾寫:房客報修不用再自己找工班,' +
+        '直接串接 TaskGo 認證師傅完成派工與施工,全程留痕。用房東真實會遇到的深夜報修場景開頭。',
+    },
+    {
+      platform: 'threads',
+      instruction: '這篇要提到:透過 Homigo 管理房子的房東,也可以把 Washgo 洗衣收送服務一起接給房客,' +
+        '當作租屋加值福利(不用租客自己找洗衣店)。用短文、口語的方式帶出,不要寫成正式公告。',
+    },
+  ],
+  taskgo: [
+    {
+      platform: 'threads',
+      instruction: '這篇從工班/師傅的角度寫:最近接到不少透過 Homigo 房東/包租代管業者串接進來的修繕案,' +
+        '案源比以前穩定。用工地日常的口吻帶出,不要寫成業配文。',
+    },
+    {
+      platform: 'facebook',
+      instruction: '這篇寫給工程行老闆看:透過 Homigo 生態系接到的房東案源,如何讓派工排程更穩定、' +
+        '減少空班,用具體場景帶出,結尾不用強力促銷。',
+    },
+  ],
+  washgo: [
+    {
+      platform: 'threads',
+      instruction: '這篇提一下:透過 Homigo 管理房子的租屋族,也可以用 Washgo 到府收送洗衣服務,' +
+        '或者 GoCoin 跨品牌點數可以在 Washgo 折抵。用短文、輕鬆口吻帶出,60-120 字內。',
+    },
+  ],
+};
+
+async function generateEcosystemCrossPromo(env: Env, slotAt: Date): Promise<void> {
+  const sql = getSql(env);
+  // 挑近 7 天內做過生態系導流貼文次數最少的品牌(確保三品牌均勻輪替)
+  const brands = await sql`
+    SELECT b.id, b.slug, b.name,
+      (SELECT count(*)::int FROM contents c
+        WHERE c.brand_id = b.id AND c.generation_prompt_meta->>'source' = ${ECOSYSTEM_CROSS_PROMO_SOURCE}
+          AND c.created_at > now() - interval '7 days') AS recent_count
+    FROM brands b
+    WHERE b.is_active = true AND b.slug IN ('homigo', 'taskgo', 'washgo')
+    ORDER BY recent_count ASC, b.slug ASC
+    LIMIT 1
+  `;
+  if (!brands.length) return;
+  const brand = brands[0] as { id: string; slug: string; name: string; recent_count: number };
+  if (brand.recent_count >= ECOSYSTEM_CROSS_PROMO_WEEKLY_TARGET) {
+    console.log(`[ecosystem] 本輪最少的品牌 ${brand.slug} 這週已輪過,先不生成`);
+    return;
+  }
+
+  const angles = ECOSYSTEM_ANGLES[brand.slug];
+  if (!angles?.length) return;
+  const angle = angles[Math.floor(Math.random() * angles.length)];
+
+  try {
+    const collabId = await findEcosystemCollaborationId(env, brand.slug);
+    if (!collabId) {
+      console.error(`[ecosystem] 找不到 ${brand.slug} 所屬的 Go 生態系 Collaboration(請先執行 008 migration)`);
+      return;
+    }
+    const collaborationContext = await buildCollaborationContext(env, collabId);
+    if (!collaborationContext) {
+      console.error('[ecosystem] Go 生態系 Collaboration 尚無 Brief 版本');
+      return;
+    }
+
+    const brandCtx = await buildBrandContext(env, brand.id);
+    const agentId = await findBrandAgent(env, brand.id);
+
+    const result = await generatePlatformPost(env, {
+      brandCtx,
+      platform: angle.platform,
+      topic: 'Go 生態系跨品牌導流內容',
+      extraInstruction: angle.instruction,
+      collaborationContext,
+    });
+
+    const account = angle.platform === 'threads'
+      ? await getThreadsAccount(env, brand.id)
+      : await getMetaAccount(env, brand.id, angle.platform as 'facebook' | 'instagram');
+    const willAutoPublish = !!account?.autoPublish;
+
+    const { contentId, versionId } = await saveGeneratedContent(env, {
+      brandCtx, platform: angle.platform, result,
+      generatedByAgentId: agentId,
+      status: willAutoPublish ? 'scheduled' : 'pending_review',
+      promptMeta: { source: ECOSYSTEM_CROSS_PROMO_SOURCE, collaborationId: collabId, slotAt: slotAt.toISOString() },
+    });
+
+    if (willAutoPublish) {
+      await sql`
+        INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
+        VALUES (${contentId}::uuid, ${versionId}::uuid, ${angle.platform}, 'scheduled', ${slotAt.toISOString()}::timestamptz)
+      `;
+    }
+
+    await logActivity(env, {
+      brandId: brand.id,
+      collaborationId: collabId,
+      actorType: 'ai_agent',
+      actorAgentId: agentId,
+      action: 'content.generated',
+      entityType: 'content',
+      entityId: contentId,
+      afterState: { platform: angle.platform, source: ECOSYSTEM_CROSS_PROMO_SOURCE, scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
+    });
+    console.log(`[ecosystem] ${brand.slug}/${angle.platform} 已排定生態系導流貼文 ${slotAt.toISOString()}(${willAutoPublish ? '自動' : '待審核'})`);
+  } catch (e) {
+    console.error(`[ecosystem] 品牌 ${brand.slug} 生成失敗`, e);
+  }
+}
+
+// ============================================================================
+// 主流程 2f:Go 生態系 X(Twitter) 帳號 — 英文獨立人格,主打國際 PropTech/SaaS 圈
+//   - 每天固定 2 檔(台灣時間 09:00 / 21:00),角度輪替(單推觀點/Thread敘事/操盤手視角/
+//     單品牌聚焦 TaskGo·Homigo·Washgo),排除最近 3 篇用過的角度,讓生態系整體與單品牌介紹交替出現
+//   - 素材只能來自 Go 生態系 Collaboration Brief(collaborationContext),不吃任何單一品牌
+//     的 BrandContext(Principle 2/3);掛名 Agent 是 brand_id=NULL 的「Go Ecosystem AI」
+//   - 沿用生成/發布分離的既有模式:這裡只生成 + 存 scheduled 排程,真正發布交給 publishDueJobs
+// ============================================================================
+const ECOSYSTEM_X_SOURCE = 'ecosystem_x';
+
+async function generateEcosystemXPostSlot(env: Env, slotAt: Date): Promise<void> {
+  const sql = getSql(env);
+  const collabId = await findEcosystemCollaborationId(env);
+  if (!collabId) {
+    console.error('[ecosystem-x] 找不到 Go 生態系 Collaboration(請先執行 008/009 migration)');
+    return;
+  }
+
+  try {
+    const collaborationContext = await buildCollaborationContext(env, collabId);
+    if (!collaborationContext) {
+      console.error('[ecosystem-x] Go 生態系 Collaboration 尚無 Brief 版本');
+      return;
+    }
+
+    // 避免連續用同一種角度:排除最近 3 篇用過的 angleId
+    const recentRows = await sql`
+      SELECT generation_prompt_meta->>'angleId' AS angle_id FROM contents
+      WHERE collaboration_id = ${collabId}::uuid AND generation_prompt_meta->>'source' = ${ECOSYSTEM_X_SOURCE}
+      ORDER BY created_at DESC LIMIT 3
+    `;
+    const recentAngleIds = (recentRows as { angle_id: string | null }[]).map((r) => r.angle_id).filter((a): a is string => !!a);
+    const angle = pickEcosystemXAngle(recentAngleIds);
+
+    const agentId = await findEcosystemAgent(env);
+    const result = await generateEcosystemXPost(env, { angle, collaborationContext });
+
+    const account = await getXAccount(env, collabId);
+    const willAutoPublish = !!account?.autoPublish;
+
+    const { contentId, versionId } = await saveEcosystemXContent(env, {
+      collaborationId: collabId,
+      result,
+      generatedByAgentId: agentId,
+      status: willAutoPublish ? 'scheduled' : 'pending_review',
+    });
+
+    if (willAutoPublish) {
+      await sql`
+        INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
+        VALUES (${contentId}::uuid, ${versionId}::uuid, 'x', 'scheduled', ${slotAt.toISOString()}::timestamptz)
+      `;
+    }
+
+    await logActivity(env, {
+      collaborationId: collabId,
+      actorType: 'ai_agent',
+      actorAgentId: agentId,
+      action: 'content.generated',
+      entityType: 'content',
+      entityId: contentId,
+      afterState: { platform: 'x', source: ECOSYSTEM_X_SOURCE, angle: angle.id, format: result.post.format, scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
+    });
+    console.log(`[ecosystem-x] 已排定 ${angle.label}(${result.post.format}, ${result.post.tweets.length} 則),${slotAt.toISOString()}(${willAutoPublish ? '自動' : '待審核'})`);
+  } catch (e) {
+    console.error('[ecosystem-x] 生成失敗', e);
+  }
+}
+
+// ============================================================================
+// 主流程 4b:Go 生態系 X 帳號 token 自動續期
+//   X OAuth2 access token 僅 2 小時效期,遠比 Threads 的 60 天短,因此用「快到期就續期」的
+//   輕量檢查(SQL WHERE 已篩選,大部分 tick 都是 no-op),掛在每個 30 分鐘 tick 上而非每天一次
+// ============================================================================
+async function refreshXTokens(env: Env): Promise<void> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT collaboration_id FROM brand_social_accounts
+    WHERE platform = 'x' AND collaboration_id IS NOT NULL
+      AND access_token_enc IS NOT NULL AND refresh_token_enc IS NOT NULL
+      AND (token_expires_at IS NULL OR token_expires_at < now() + interval '20 minutes')
+  `;
+  for (const row of rows as { collaboration_id: string }[]) {
+    try {
+      const account = await getXAccount(env, row.collaboration_id);
+      if (!account) continue;
+      await refreshXToken(env, account);
+      console.log(`[x-token-refresh] collaboration=${row.collaboration_id} 已續期`);
+    } catch (e) {
+      console.error(`[x-token-refresh] collaboration=${row.collaboration_id} 續期失敗`, e);
+    }
+  }
+}
+
+// ============================================================================
 // 生成與發布拆開後的統一調度:
 //   - 固定時段(台灣時間):Threads 品牌相關 00/06/12/18、Threads 生活哏文 09/21、FB+IG 每日主題 19
 //   - 生成階段:每個時段提前 1 小時,在對應的整點 tick 生成內容並存成 scheduled 排程
@@ -798,7 +1029,16 @@ async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
 const THREADS_POST_HOURS_TW = [0, 6, 12, 18];       // 品牌相關跟風文
 const THREADS_OFFTOPIC_HOURS_TW = [9, 21];          // 生活哏文(見 generateThreadsOfftopicSlot)
 const DAILY_THEME_HOUR_TW = 19;                     // FB/IG 每日主題
+const ECOSYSTEM_CROSS_PROMO_HOUR_TW = 20;           // Go 生態系跨品牌導流(僅週三、週日)
+const ECOSYSTEM_CROSS_PROMO_DAYS_TW = [0, 3];       // 0=週日, 3=週三(以台灣時區換算後的星期)
+const ECOSYSTEM_X_HOURS_TW = [9, 21];                // Go 生態系 X 帳號:每天 2 篇(台灣 09:00 / 21:00,對應美東晚間/早晨)
 const GENERATION_LEAD_HOURS = 1;                    // 生成提前量:每個時段提前 1 小時生成
+
+/** 計算「台灣時區」星期幾(0=週日),用於 ECOSYSTEM_CROSS_PROMO_DAYS_TW 的判斷 */
+function weekdayTW(date: Date): number {
+  const twMs = date.getTime() + 8 * 60 * 60 * 1000;
+  return new Date(twMs).getUTCDay();
+}
 
 /** 計算「台灣時間 hourTW 點」下一次發生的時間點(已經過去就排到明天) */
 function slotDateFor(hourTW: number): Date {
@@ -823,7 +1063,16 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
     if (THREADS_POST_HOURS_TW.includes(genHour)) await generateThreadsSlot(env, slotAt);
     if (THREADS_OFFTOPIC_HOURS_TW.includes(genHour)) await generateThreadsOfftopicSlot(env, slotAt);
     if (genHour === DAILY_THEME_HOUR_TW) await generateDailyTheme(env, slotAt);
+    if (genHour === ECOSYSTEM_CROSS_PROMO_HOUR_TW && ECOSYSTEM_CROSS_PROMO_DAYS_TW.includes(weekdayTW(slotAt))) {
+      await generateEcosystemCrossPromo(env, slotAt);
+    }
+    if (ECOSYSTEM_X_HOURS_TW.includes(genHour)) {
+      await generateEcosystemXPostSlot(env, slotAt);
+    }
   }
+
+  // X access token 僅 2 小時效期,每個 30 分鐘 tick 都順手檢查一次(SQL 已篩選快到期才動作)
+  await refreshXTokens(env);
 
   // 發布階段:每個 tick 都檢查有沒有已經到期的排程要真正發出去(呼叫平台 API)
   await publishDueJobs(env);
@@ -845,12 +1094,12 @@ async function publishDueJobs(env: Env): Promise<void> {
   const sql = getSql(env);
   const rows = await sql`
     SELECT pj.id AS job_id, pj.content_id, pj.content_version_id, pj.platform,
-           c.brand_id, b.slug AS brand_slug,
+           c.brand_id, c.collaboration_id, b.slug AS brand_slug,
            cv.body, cv.hashtags,
            a.file_url AS image_url
     FROM publishing_jobs pj
     JOIN contents c ON c.id = pj.content_id
-    JOIN brands b ON b.id = c.brand_id
+    LEFT JOIN brands b ON b.id = c.brand_id
     LEFT JOIN content_versions cv ON cv.id = pj.content_version_id
     LEFT JOIN LATERAL (
       SELECT file_url FROM content_assets WHERE content_version_id = cv.id AND asset_type = 'image' LIMIT 1
@@ -862,32 +1111,44 @@ async function publishDueJobs(env: Env): Promise<void> {
   if (!rows.length) return;
 
   for (const row of rows as {
-    job_id: string; content_id: string; content_version_id: string; platform: SocialPlatform;
-    brand_id: string; brand_slug: string; body: string | null; hashtags: string[] | null; image_url: string | null;
+    job_id: string; content_id: string; content_version_id: string; platform: SocialPlatform | 'x';
+    brand_id: string | null; collaboration_id: string | null; brand_slug: string | null;
+    body: string | null; hashtags: string[] | null; image_url: string | null;
   }[]) {
+    const label = row.brand_slug ?? 'go-ecosystem';
     try {
       await sql`UPDATE publishing_jobs SET status = 'publishing' WHERE id = ${row.job_id}::uuid`;
       if (!row.body) throw new Error('內容缺少貼文全文(content_versions.body 為空)');
 
       let published: { postId: string; permalink: string | null };
-      if (row.platform === 'threads') {
+      if (row.platform === 'threads' && row.brand_id) {
         const account = await getThreadsAccount(env, row.brand_id);
         if (!account) throw new Error('Threads 帳號未連線或憑證失效');
         published = await publishThreadsPost(account, { text: row.body, imageUrl: toPublicMediaUrl(env, row.image_url) });
-      } else if (row.platform === 'facebook') {
+      } else if (row.platform === 'facebook' && row.brand_id) {
         const account = await getMetaAccount(env, row.brand_id, 'facebook');
         if (!account) throw new Error('Facebook 帳號未連線或憑證失效');
         const message = composePostMessage(row.body, row.hashtags);
         published = await publishFacebookPost(account, { message, imageUrl: toPublicMediaUrl(env, row.image_url) });
-      } else if (row.platform === 'instagram') {
+      } else if (row.platform === 'instagram' && row.brand_id) {
         const account = await getMetaAccount(env, row.brand_id, 'instagram');
         const publicImage = toPublicMediaUrl(env, row.image_url);
         if (!account) throw new Error('Instagram 帳號未連線或憑證失效');
         if (!publicImage) throw new Error('Instagram 發文需要配圖,但這篇內容沒有圖片');
         const message = composePostMessage(row.body, row.hashtags);
         published = await publishInstagramPost(account, { caption: message, imageUrl: publicImage });
+      } else if (row.platform === 'x' && row.collaboration_id) {
+        const account = await getXAccount(env, row.collaboration_id);
+        if (!account) throw new Error('X 帳號未連線或憑證失效');
+        // Thread 的多則推文存成同一個 body,用 "\n---\n" 分隔(見 saveEcosystemXContent)
+        const tweets = row.body.split('\n---\n').map((t) => t.trim()).filter(Boolean);
+        const publicImage = toPublicMediaUrl(env, row.image_url);
+        const firstTweet = tweets.length > 1
+          ? (await publishTweetThread(account, tweets, publicImage))[0]
+          : await publishTweet(account, { text: tweets[0] ?? row.body, imageUrl: publicImage });
+        published = { postId: firstTweet.tweetId, permalink: firstTweet.permalink };
       } else {
-        throw new Error(`不支援自動發布的平台:${row.platform}`);
+        throw new Error(`不支援自動發布的平台或缺少對應的帳號範圍:${row.platform}`);
       }
 
       await sql`
@@ -900,7 +1161,7 @@ async function publishDueJobs(env: Env): Promise<void> {
         INSERT INTO publishing_logs (publishing_job_id, event, detail)
         VALUES (${row.job_id}::uuid, 'published', ${published.permalink ?? published.postId})
       `;
-      console.log(`[publish] ${row.brand_slug}/${row.platform} 已發布:${published.permalink ?? published.postId}`);
+      console.log(`[publish] ${label}/${row.platform} 已發布:${published.permalink ?? published.postId}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await sql`UPDATE publishing_jobs SET status = 'failed' WHERE id = ${row.job_id}::uuid`;
@@ -908,7 +1169,7 @@ async function publishDueJobs(env: Env): Promise<void> {
         INSERT INTO publishing_logs (publishing_job_id, event, detail)
         VALUES (${row.job_id}::uuid, 'failed', ${msg.slice(0, 500)})
       `;
-      console.error(`[publish] ${row.brand_slug}/${row.platform} 發布失敗`, e);
+      console.error(`[publish] ${label}/${row.platform} 發布失敗`, e);
     }
   }
 }
@@ -1004,7 +1265,7 @@ export default {
     }
   },
 
-  // 手動觸發除錯用:GET /?task=collect|drafts|threads|offtopic|replies|themes|publish|cleanup|podcast|refresh-tokens(需帶 secret)
+  // 手動觸發除錯用:GET /?task=collect|drafts|threads|offtopic|replies|themes|ecosystem|ecosystem-x|publish|cleanup|podcast|refresh-tokens|refresh-x-tokens(需帶 secret)
   // threads/offtopic/themes 可帶 &slotAt=ISO時間 指定要排定發布的時段(預設現在,方便測試)
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -1020,14 +1281,17 @@ export default {
     else if (task === 'offtopic') await generateThreadsOfftopicSlot(env, slotAt);
     else if (task === 'replies') await threadsReplyRound(env);
     else if (task === 'themes') await generateDailyTheme(env, slotAt);
+    else if (task === 'ecosystem') await generateEcosystemCrossPromo(env, slotAt);
+    else if (task === 'ecosystem-x') await generateEcosystemXPostSlot(env, slotAt);
     else if (task === 'publish') await publishDueJobs(env);
     else if (task === 'cleanup') await cleanupOldMedia(env);
     else if (task === 'refresh-tokens') await refreshThreadsTokens(env);
+    else if (task === 'refresh-x-tokens') await refreshXTokens(env);
     else if (task === 'podcast') {
       const result = await createPodcastEpisode(env);
       return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
     }
-    else return new Response('task 必須為 collect / drafts / threads / offtopic / replies / themes / publish / cleanup / podcast / refresh-tokens', { status: 400 });
+    else return new Response('task 必須為 collect / drafts / threads / offtopic / replies / themes / ecosystem / ecosystem-x / publish / cleanup / podcast / refresh-tokens / refresh-x-tokens', { status: 400 });
     return new Response(JSON.stringify({ ok: true, task }), { headers: { 'Content-Type': 'application/json' } });
   },
 };

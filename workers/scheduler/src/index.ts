@@ -678,19 +678,27 @@ async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
   const sql = getSql(env);
   // 台灣今天已生成的主題數(以 daily_theme 內容的 themeKey 去重)
   // 同進度時,已接 FB/IG 且開自動發布的品牌優先 → 會真正發文的品牌固定在當天第一個生成 tick 發出
-  const brands = await sql`
-    SELECT b.id, b.slug, b.name,
-           (SELECT count(DISTINCT c.generation_prompt_meta->>'themeKey')::int FROM contents c
-            WHERE c.brand_id = b.id
-              AND c.generation_prompt_meta->>'source' = ${DAILY_THEME_SOURCE}
-              AND c.created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours') AS theme_count,
-           EXISTS(SELECT 1 FROM brand_social_accounts a
-                  WHERE a.brand_id = b.id AND a.platform IN ('facebook', 'instagram')
-                    AND a.status = 'connected' AND a.auto_publish) AS can_publish
-    FROM brands b WHERE b.is_active = true
-    ORDER BY theme_count ASC, can_publish DESC
-    LIMIT 1
-  `;
+  let brands;
+  try {
+    brands = await sql`
+      SELECT b.id, b.slug, b.name,
+             (SELECT count(DISTINCT c.generation_prompt_meta->>'themeKey')::int FROM contents c
+              WHERE c.brand_id = b.id
+                AND c.generation_prompt_meta->>'source' = ${DAILY_THEME_SOURCE}
+                AND c.created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours') AS theme_count,
+             EXISTS(SELECT 1 FROM brand_social_accounts a
+                    WHERE a.brand_id = b.id AND a.platform IN ('facebook', 'instagram')
+                      AND a.status = 'connected' AND a.auto_publish) AS can_publish
+      FROM brands b WHERE b.is_active = true
+      ORDER BY theme_count ASC, can_publish DESC
+      LIMIT 1
+    `;
+  } catch (e) {
+    // 這裡若失敗(例如資料庫連線暫時性問題)不能讓例外往上拋,
+    // 否則會中斷同一輪 halfHourlyDispatch 後面的 publishDueJobs / 回覆輪等其他任務
+    console.error('[themes] 品牌篩選查詢失敗', e);
+    return false;
+  }
   if (!brands.length) return false;
   const brand = brands[0] as { id: string; slug: string; name: string; theme_count: number };
   if (brand.theme_count >= DAILY_THEME_TARGET) return false;

@@ -53,6 +53,22 @@ function itemTime(item: ScheduleItem): Date {
   return new Date(item.scheduledAt ?? item.publishedAt ?? item.createdAt);
 }
 
+// 失敗訊息通常是 "OO 發布失敗 (400): {...平台原始 JSON...}",嘗試把 JSON 裡對人類較好懂的
+// error_user_msg / message 抽出來,抽不到就原樣顯示(平台格式不保證一致,失敗就退回原文)
+function formatFailureReason(raw: string): string {
+  const jsonStart = raw.indexOf('{');
+  if (jsonStart === -1) return raw;
+  const prefix = raw.slice(0, jsonStart).trim();
+  try {
+    const parsed = JSON.parse(raw.slice(jsonStart)) as {
+      error?: { error_user_msg?: string; message?: string; error_user_title?: string };
+    };
+    const friendly = parsed.error?.error_user_msg ?? parsed.error?.message;
+    if (friendly) return prefix ? `${prefix} ${friendly}` : friendly;
+  } catch { /* 不是預期的 JSON 格式,原樣顯示 */ }
+  return raw;
+}
+
 export function Schedule() {
   const { brand: slug } = useParams();
   const { brandBySlug, brandsLoading } = useBrand();
@@ -182,6 +198,17 @@ export function Schedule() {
                       >
                         {item.title ?? '(無標題)'}
                       </p>
+                      {item.status === 'failed' && item.lastLogDetail && !isOpen && (
+                        <p
+                          style={{
+                            fontSize: 11, marginTop: 4, color: '#B85454',
+                            overflow: 'hidden', textOverflow: 'ellipsis',
+                            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                          }}
+                        >
+                          失敗原因:{formatFailureReason(item.lastLogDetail)}
+                        </p>
+                      )}
                       {isOpen && (
                         <div style={{ marginTop: 8, borderTop: '1px solid var(--color-border)', paddingTop: 8 }}>
                           {item.contentStatus && (
@@ -210,7 +237,9 @@ export function Schedule() {
                           {item.status === 'failed' && (
                             <div style={{ marginTop: 8 }}>
                               {item.lastLogDetail && (
-                                <p style={{ fontSize: 11.5, color: '#B85454' }}>失敗原因:{item.lastLogDetail}</p>
+                                <p style={{ fontSize: 11.5, color: '#B85454', wordBreak: 'break-word' }}>
+                                  失敗原因:{formatFailureReason(item.lastLogDetail)}
+                                </p>
                               )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleRetry(item.id); }}

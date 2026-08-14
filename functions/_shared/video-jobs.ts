@@ -111,11 +111,40 @@ const TARGET_SECONDS = 30;
 const FADE_MS = 30;
 const PAD_MS = 80;
 
+/** 模型有時把 speakers 回成「阿豪、小咪」字串,統一收成字串陣列 */
+export function normalizeSpeakers(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((s) => String(s ?? '').trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value.split(/[,，、/|]+/).map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function normalizeCandidate(c: Partial<ClipCandidate> & { speakers?: unknown }, index: number): ClipCandidate {
+  const speakers = normalizeSpeakers(c.speakers);
+  return {
+    id: c.id || `c${index + 1}`,
+    hook: String(c.hook ?? ''),
+    title: String(c.title ?? ''),
+    summary: String(c.summary ?? ''),
+    strategy: String(c.strategy ?? ''),
+    estimatedSeconds: Math.max(20, Math.min(40, Math.round(Number(c.estimatedSeconds) || TARGET_SECONDS))),
+    startLineOrder: Number(c.startLineOrder) || 0,
+    endLineOrder: Number(c.endLineOrder) || 0,
+    speakers,
+    cta: String(c.cta || '聽完整集《三小編熱聊》'),
+    brandSlug: c.brandSlug ?? null,
+  };
+}
+
 export function mapVideoJob(row: Record<string, unknown>): VideoJobRow {
   const job = rowToCamel<VideoJobRow>(row);
+  const rawCandidates = Array.isArray(job.candidates) ? job.candidates : [];
   return {
     ...job,
-    candidates: (job.candidates ?? []) as ClipCandidate[],
+    candidates: rawCandidates.map((c, i) => normalizeCandidate(c, i)),
     strategy: (job.strategy ?? null) as VideoStrategy | null,
     edl: (job.edl ?? null) as EdlSegment[] | null,
     editPack: (job.editPack ?? null) as EditPack | null,
@@ -256,7 +285,8 @@ export async function proposePodcastClips(
           '每段要有 Hook(前 3 秒)、主線、可刪的開場/客套不要。繁體中文。' +
           'strategy 寫 4–8 句白話:受眾、為什麼這段能停滑、節奏、字幕方向、結尾 CTA。' +
           'startLineOrder / endLineOrder 必須是稿上的 order,且估時 26–32 秒。' +
-          'cta 用「聽完整集《三小編熱聊》」或跟最相關品牌的一句話。',
+          'cta 用「聽完整集《三小編熱聊》」或跟最相關品牌的一句話。' +
+          'speakers 必須是字串陣列,例如 ["阿豪","小咪"],不要回傳單一字串。',
       },
       {
         role: 'user',
@@ -271,20 +301,8 @@ export async function proposePodcastClips(
   });
 
   const candidates: ClipCandidate[] = (proposed.candidates ?? []).slice(0, 4).map((c, i) => {
-    const speakers = c.speakers?.length ? c.speakers : [];
-    return {
-      id: `c${i + 1}`,
-      hook: c.hook,
-      title: c.title,
-      summary: c.summary,
-      strategy: c.strategy,
-      estimatedSeconds: Math.max(20, Math.min(40, Math.round(c.estimatedSeconds || TARGET_SECONDS))),
-      startLineOrder: c.startLineOrder,
-      endLineOrder: c.endLineOrder,
-      speakers,
-      cta: c.cta || '聽完整集《三小編熱聊》',
-      brandSlug: pickBrandFromSpeakers(speakers, hosts),
-    };
+    const next = normalizeCandidate(c, i);
+    return { ...next, brandSlug: pickBrandFromSpeakers(next.speakers, hosts) };
   });
   if (!candidates.length) throw new Error('模型沒有產出可用的短影音候選');
 
@@ -836,7 +854,7 @@ async function proposeFromTranscript(env: Env, transcript: ScribeTranscript): Pr
     estimatedSeconds: Math.max(20, Math.min(40, Math.round(c.estimatedSeconds || TARGET_SECONDS))),
     startLineOrder: c.startLineOrder ?? 0,
     endLineOrder: c.endLineOrder ?? 0,
-    speakers: c.speakers ?? [],
+    speakers: normalizeSpeakers(c.speakers),
     cta: c.cta || '追蹤我們看下一段',
     brandSlug: null,
   }));

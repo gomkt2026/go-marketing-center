@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/Button';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import type { VideoJob, VideoJobStatus } from '@/types';
 
+function speakerLabel(speakers: unknown): string {
+  const list = Array.isArray(speakers)
+    ? speakers.map((s) => String(s ?? '').trim())
+    : String(speakers ?? '').split(/[,，、/|]+/).map((s) => s.trim());
+  return list.filter(Boolean).join('、') || '口播';
+}
+
 const STATUS_META: Record<VideoJobStatus, { label: string; tone: BadgeTone }> = {
   analyzing: { label: '分析中', tone: 'secondary' },
   strategy_review: { label: '待核准策略', tone: 'accent' },
@@ -98,7 +105,7 @@ export function VideoJobPanel({
                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{c.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.5 }}>{c.hook}</div>
                 <div style={{ fontSize: 11, marginTop: 6, color: 'var(--color-text-muted)' }}>
-                  約 {c.estimatedSeconds} 秒 · {c.speakers.join('、') || '口播'}
+                  約 {c.estimatedSeconds} 秒 · {speakerLabel(c.speakers)}
                 </div>
               </button>
             );

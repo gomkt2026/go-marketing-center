@@ -14,6 +14,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# 短影音本機渲染產物(原始素材不進這裡)
+edit/
+
 # 建置輸出
 dist/
 .output/

@@ -126,6 +126,52 @@ export async function publishFacebookPost(
   return { postId, permalink };
 }
 
+/** 發布 IG Reels;videoUrl 必須是 Meta 抓得到的公開 mp4 */
+export async function publishInstagramReel(
+  account: MetaAccount,
+  params: { caption: string; videoUrl: string },
+): Promise<MetaPublishResult> {
+  const container = await graphPost(`${GRAPH_API}/${account.externalId}/media`, {
+    access_token: account.accessToken,
+    media_type: 'REELS',
+    video_url: params.videoUrl,
+    caption: params.caption,
+    share_to_feed: 'true',
+  });
+  const containerId = String(container.id ?? '');
+  if (!containerId) throw new Error('IG Reels container 建立失敗:回應缺少 ID');
+
+  for (let i = 0; i < 12; i++) {
+    await new Promise((r) => setTimeout(r, 5000));
+    try {
+      const res = await fetch(`${GRAPH_API}/${containerId}?fields=status_code&access_token=${encodeURIComponent(account.accessToken)}`);
+      if (!res.ok) continue;
+      const data = await res.json() as { status_code?: string };
+      if (data.status_code === 'FINISHED') break;
+      if (data.status_code === 'ERROR') throw new Error('IG Reels container 處理失敗(影片網址無法抓取或規格不符)');
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('container 處理失敗')) throw e;
+    }
+  }
+
+  const published = await graphPost(`${GRAPH_API}/${account.externalId}/media_publish`, {
+    access_token: account.accessToken,
+    creation_id: containerId,
+  });
+  const mediaId = String(published.id ?? '');
+  if (!mediaId) throw new Error('IG Reels 發布回應缺少 media ID');
+
+  let permalink: string | null = null;
+  try {
+    const res = await fetch(`${GRAPH_API}/${mediaId}?fields=permalink&access_token=${encodeURIComponent(account.accessToken)}`);
+    if (res.ok) {
+      const data = await res.json() as { permalink?: string };
+      permalink = data.permalink ?? null;
+    }
+  } catch { /* 忽略 */ }
+  return { postId: mediaId, permalink };
+}
+
 /** 發布 IG 商業帳號圖文;IG API 不支援純文字,必須帶公開的 JPEG 圖片網址 */
 export async function publishInstagramPost(
   account: MetaAccount,

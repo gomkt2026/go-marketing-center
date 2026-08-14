@@ -24,6 +24,32 @@ export function buildGuestVoiceKey(ext = 'mp3'): string {
 }
 
 /**
+ * 短影音產物 key。放 videos/ 前綴,不受 generated/ 31 天清理。
+ * 例: videos/{jobId}/source.mp4、preview.mp4、final.mp4、edit/pack.json
+ */
+export function buildVideoJobKey(jobId: string, filename: string): string {
+  return `videos/${jobId}/${filename.replace(/^\/+/, '')}`;
+}
+
+/** 從 /api/media/{key} 或完整 URL 還原 R2 object key */
+export function mediaUrlToKey(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.split('?')[0];
+  const marker = '/api/media/';
+  const idx = trimmed.indexOf(marker);
+  if (idx >= 0) return decodeURIComponent(trimmed.slice(idx + marker.length));
+  if (!/^https?:\/\//i.test(trimmed)) return trimmed.replace(/^\//, '');
+  return null;
+}
+
+export async function getMediaBytes(env: Env, key: string): Promise<Uint8Array | null> {
+  if (!env.MEDIA) return null;
+  const obj = await env.MEDIA.get(key);
+  if (!obj) return null;
+  return new Uint8Array(await obj.arrayBuffer());
+}
+
+/**
  * 品牌智慧圖片素材庫的原始上傳圖 key。
  * 注意:放在 brand-assets/ 前綴(不是 generated/),不會被排程 Worker 的 31 天清理機制刪掉。
  */

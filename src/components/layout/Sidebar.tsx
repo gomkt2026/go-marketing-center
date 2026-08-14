@@ -39,6 +39,7 @@ const groups: MenuGroup[] = [
       { label: '活動報名', path: '/events', brandScoped: true },
       { label: '內容中心', path: '/contents', brandScoped: true },
       { label: 'Podcast 節目', path: '/podcast' },
+      { label: '短影音', path: '/shorts', brandScoped: true },
       { label: '發布管理', path: '/publishing', brandScoped: true },
       { label: '行程表', path: '/schedule', brandScoped: true },
       { label: 'Threads 互動', path: '/thread-replies', brandScoped: true },

@@ -4,7 +4,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/ui/PageHeader';
-import type { PodcastEpisode, PodcastSegment, PodcastAgentInfo, PodcastScriptLine, PodcastGuest } from '@/types';
+import type { PodcastEpisode, PodcastSegment, PodcastAgentInfo, PodcastScriptLine, PodcastGuest, VideoJob } from '@/types';
+import { VideoJobPanel } from '@/components/video/VideoJobPanel';
 
 const STATUS_META: Record<string, { label: string; tone: BadgeTone }> = {
   script_draft: { label: '逐字稿待確認', tone: 'accent' },
@@ -79,6 +80,9 @@ export function Podcast() {
   const [guestAudio, setGuestAudio] = useState<File | null>(null);
   const [savingGuest, setSavingGuest] = useState(false);
   const [interviewingGuestId, setInterviewingGuestId] = useState<string | null>(null);
+  const [clipJobs, setClipJobs] = useState<VideoJob[]>([]);
+  const [clipConsent, setClipConsent] = useState(false);
+  const [clipping, setClipping] = useState(false);
   const [bgmEnabled, setBgmEnabled] = useState(true);
   const [speechPlayingCount, setSpeechPlayingCount] = useState(0);
   const audioRefs = useRef<Map<number, HTMLAudioElement>>(new Map());
@@ -108,12 +112,19 @@ export function Podcast() {
     api.podcastTheme().then(({ url }) => setThemeUrl(url)).catch(() => {});
   }, [loadEpisodes]);
 
+  const loadClipJobs = useCallback(async (episodeId: string) => {
+    const { jobs } = await api.videoJobs({ episodeId });
+    setClipJobs(jobs);
+  }, []);
+
   useEffect(() => {
     if (!selectedId) return;
     setDetail(null);
     setSpeechPlayingCount(0);
+    setClipJobs([]);
     loadDetail(selectedId).catch((e) => setErrorMsg(e instanceof Error ? e.message : '載入失敗'));
-  }, [selectedId, loadDetail]);
+    loadClipJobs(selectedId).catch(() => {});
+  }, [selectedId, loadDetail, loadClipJobs]);
 
   useEffect(() => () => { stopSynthRef.current = true; }, []);
 
@@ -222,6 +233,19 @@ export function Podcast() {
       setErrorMsg(e instanceof Error ? e.message : '生成訪談集失敗');
     } finally {
       setInterviewingGuestId(null);
+    }
+  };
+
+  const handleCreateClips = async (episodeId: string) => {
+    setClipping(true);
+    setErrorMsg(null);
+    try {
+      const { job } = await api.createPodcastClips(episodeId, clipConsent);
+      setClipJobs((prev) => [job, ...prev.filter((j) => j.id !== job.id)]);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : '切短影音失敗');
+    } finally {
+      setClipping(false);
     }
   };
 
@@ -484,9 +508,36 @@ export function Podcast() {
                     {(ep.status === 'approved' || ep.status === 'rejected') && (
                       <Button variant="ghost" onClick={() => handleReview(ep.id, 'archive')}>封存</Button>
                     )}
+                    {ep.status === 'approved' && (
+                      <Button variant="accent" onClick={() => handleCreateClips(ep.id)} disabled={clipping}>
+                        {clipping ? '找 30 秒精華中…' : '切成 30 秒短影音'}
+                      </Button>
+                    )}
                   </div>
                 </div>
+                {ep.status === 'approved' && (
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 12, fontSize: 12, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={clipConsent}
+                      onChange={(e) => setClipConsent(e.target.checked)}
+                      style={{ marginTop: 2 }}
+                    />
+                    <span>
+                      我同意把本集音檔送到 ElevenLabs Scribe v2 做時間碼對齊（可能消耗額度）。
+                      不勾選仍可依逐字稿估時切杯。
+                    </span>
+                  </label>
+                )}
               </Card>
+
+              {clipJobs.map((job) => (
+                <VideoJobPanel
+                  key={job.id}
+                  job={job}
+                  onChange={(next) => setClipJobs((prev) => prev.map((j) => (j.id === next.id ? next : j)))}
+                />
+              ))}
 
               {/* 逐段音檔播放清單 */}
               {hasAudio && (

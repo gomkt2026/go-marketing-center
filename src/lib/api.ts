@@ -500,6 +500,86 @@ export const api = {
   },
 
   deletePodcastTheme: () => request<{ ok: boolean }>('/api/podcast/theme', { method: 'DELETE' }),
+
+  // -- 短影音(Podcast 切杯 / 長影片精華) ------------------------------------
+  createPodcastClips: (episodeId: string, consentScribe: boolean) =>
+    request<{ job: import('@/types').VideoJob }>(`/api/podcast/${episodeId}/clips`, {
+      method: 'POST',
+      body: JSON.stringify({ consentScribe }),
+    }),
+
+  videoJobs: (params?: { brand?: string; episodeId?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.brand) qs.set('brand', params.brand);
+    if (params?.episodeId) qs.set('episodeId', params.episodeId);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<{ jobs: import('@/types').VideoJob[] }>(`/api/video-jobs${suffix}`);
+  },
+
+  videoJob: (id: string) =>
+    request<{
+      job: import('@/types').VideoJob;
+      urls: { previewUrl: string | null; finalUrl: string | null; sourceMediaUrl: string | null };
+    }>(`/api/video-jobs/${id}`),
+
+  approveVideoStrategy: (id: string, body: {
+    candidateId: string; title?: string; cta?: string; subtitleStyle?: 'large' | 'standard';
+  }) =>
+    request<{ job: import('@/types').VideoJob }>(`/api/video-jobs/${id}/approve-strategy`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  approveVideoPreview: (id: string) =>
+    request<{ job: import('@/types').VideoJob }>(`/api/video-jobs/${id}/approve-preview`, { method: 'POST' }),
+
+  adjustVideoJob: (id: string, body: {
+    action: 'retitle' | 'cta' | 'subtitle_large' | 'subtitle_standard' | 'pick_candidate';
+    value?: string;
+  }) =>
+    request<{ job: import('@/types').VideoJob }>(`/api/video-jobs/${id}/adjust`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  rejectVideoJob: (id: string, reason?: string) =>
+    request<{ job: import('@/types').VideoJob }>(`/api/video-jobs/${id}`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reject', reason }),
+    }),
+
+  uploadVideoRender: async (id: string, kind: 'preview' | 'final', file: File) => {
+    const form = new FormData();
+    form.append('kind', kind);
+    form.append('file', file);
+    const res = await fetch(`/api/video-jobs/${id}/render-result`, {
+      method: 'POST', credentials: 'include', body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    return data as { job: import('@/types').VideoJob };
+  },
+
+  promoteVideoJob: (id: string, platform: 'instagram' | 'threads' | 'facebook') =>
+    request<{ contentId: string; job: import('@/types').VideoJob }>(`/api/video-jobs/${id}/promote`, {
+      method: 'POST',
+      body: JSON.stringify({ platform }),
+    }),
+
+  brandShorts: (slug: string) =>
+    request<{ jobs: import('@/types').VideoJob[] }>(`/api/brands/${slug}/shorts`),
+
+  uploadBrandShort: async (slug: string, params: { file: File; consentScribe: boolean }) => {
+    const form = new FormData();
+    form.append('file', params.file);
+    form.append('consentScribe', params.consentScribe ? 'true' : 'false');
+    const res = await fetch(`/api/brands/${slug}/shorts`, {
+      method: 'POST', credentials: 'include', body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    return data as { job: import('@/types').VideoJob };
+  },
 };
 
 // -- 活動報名(公開端,無需登入) ----------------------------------------------

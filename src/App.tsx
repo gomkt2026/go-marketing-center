@@ -18,6 +18,7 @@ import { EcosystemSchedule } from '@/pages/collaboration/EcosystemSchedule';
 import { Campaigns } from '@/pages/campaign/Campaigns';
 import { ContentCenter } from '@/pages/content/ContentCenter';
 import { Podcast } from '@/pages/podcast/Podcast';
+import { Shorts } from '@/pages/shorts/Shorts';
 import { Publishing } from '@/pages/publishing/Publishing';
 import { Schedule } from '@/pages/publishing/Schedule';
 import { ThreadsReplies } from '@/pages/publishing/ThreadsReplies';
@@ -73,6 +74,7 @@ export default function App() {
                         <Route path="/:brand/events" element={<EventList />} />
                         <Route path="/:brand/events/:id" element={<EventDetail />} />
                         <Route path="/:brand/contents" element={<ContentCenter />} />
+                        <Route path="/:brand/shorts" element={<Shorts />} />
                         <Route path="/:brand/publishing" element={<Publishing />} />
                         <Route path="/:brand/schedule" element={<Schedule />} />
                         <Route path="/:brand/thread-replies" element={<ThreadsReplies />} />

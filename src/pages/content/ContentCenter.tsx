@@ -240,6 +240,15 @@ export function ContentCenter() {
                     style={{ maxWidth: 320, width: '100%', borderRadius: 12, marginBottom: 14, border: '1px solid var(--color-border)' }}
                   />
                 ))}
+                {(latestVersion(selected).assets ?? []).filter((a) => a.assetType === 'video').map((a) => (
+                  <video
+                    key={a.id}
+                    src={a.fileUrl}
+                    controls
+                    playsInline
+                    style={{ maxWidth: 280, width: '100%', borderRadius: 12, marginBottom: 14, background: '#111' }}
+                  />
+                ))}
 
                 <div
                   style={{
@@ -281,7 +290,7 @@ export function ContentCenter() {
                     <strong style={{ fontSize: 13 }}>發布</strong>
                     <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '4px 0 10px' }}>
                       {API_PUBLISH_PLATFORMS.includes(selected.targetPlatform ?? '')
-                        ? `已連接 ${apiPublishLabel[selected.targetPlatform ?? '']} API 的品牌可一鍵發布;或複製文案手動貼文後標記已發布${selected.targetPlatform === 'instagram' ? '(IG API 發布必須有配圖)' : ''}`
+                        ? `已連接 ${apiPublishLabel[selected.targetPlatform ?? '']} API 的品牌可一鍵發布;或複製文案手動貼文後標記已發布${selected.targetPlatform === 'instagram' ? '(IG 圖文需 JPEG,短影音走 Reels)' : ''}`
                         : `複製文案與下載配圖後貼到 ${selected.targetPlatform},再回來標記已發布`}
                     </p>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -294,6 +303,11 @@ export function ContentCenter() {
                       {(latestVersion(selected).assets ?? []).filter((a) => a.assetType === 'image').map((a) => (
                         <a key={a.id} href={a.fileUrl} download target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
                           <Button variant="secondary" style={{ fontSize: 12, padding: '5px 12px' }}>🖼 下載配圖</Button>
+                        </a>
+                      ))}
+                      {(latestVersion(selected).assets ?? []).filter((a) => a.assetType === 'video').map((a) => (
+                        <a key={a.id} href={a.fileUrl} download target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                          <Button variant="secondary" style={{ fontSize: 12, padding: '5px 12px' }}>下載短影音</Button>
                         </a>
                       ))}
                       {selected.status === 'approved' && (

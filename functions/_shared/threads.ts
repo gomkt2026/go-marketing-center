@@ -180,17 +180,20 @@ export async function replyToThreadsPost(
   return { postId: published.id, permalink };
 }
 
-/** 發布一則 Threads 貼文(純文字或帶單張圖片);失敗會 throw */
+/** 發布一則 Threads 貼文(純文字、單張圖或單支影片);失敗會 throw */
 export async function publishThreadsPost(
   account: ThreadsAccount,
-  params: { text: string; imageUrl?: string | null },
+  params: { text: string; imageUrl?: string | null; videoUrl?: string | null },
 ): Promise<ThreadsPublishResult> {
   // 1. 建立 media container(發布前把字面 \n 修成真換行,保險舊資料)
   const containerParams = new URLSearchParams({
     access_token: account.accessToken,
     text: normalizeMultilineText(params.text).slice(0, 500), // Threads 上限 500 字
   });
-  if (params.imageUrl) {
+  if (params.videoUrl) {
+    containerParams.set('media_type', 'VIDEO');
+    containerParams.set('video_url', params.videoUrl);
+  } else if (params.imageUrl) {
     containerParams.set('media_type', 'IMAGE');
     containerParams.set('image_url', params.imageUrl);
   } else {
@@ -208,8 +211,9 @@ export async function publishThreadsPost(
   }
   const container = await createRes.json() as { id: string };
 
-  // 2. 帶圖片時官方建議稍等 container 處理完成
-  if (params.imageUrl) await new Promise((r) => setTimeout(r, 5000));
+  // 2. 帶圖/影片時官方建議稍等 container 處理完成
+  if (params.videoUrl) await new Promise((r) => setTimeout(r, 8000));
+  else if (params.imageUrl) await new Promise((r) => setTimeout(r, 5000));
 
   // 3. 發布 container
   const publishRes = await fetch(`${THREADS_API}/${account.threadsUserId}/threads_publish`, {

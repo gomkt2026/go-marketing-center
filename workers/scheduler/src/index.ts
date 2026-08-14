@@ -13,7 +13,7 @@ import {
   generateEcosystemXPost, saveEcosystemXContent, findEcosystemAgent,
 } from '../../../functions/_shared/generate';
 import { getThreadsAccount, publishThreadsPost, searchThreadsPosts, type ThreadsSearchPost } from '../../../functions/_shared/threads';
-import { getMetaAccount, publishFacebookPost, publishInstagramPost, composePostMessage } from '../../../functions/_shared/meta';
+import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage } from '../../../functions/_shared/meta';
 import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '../../../functions/_shared/x';
 import { toPublicMediaUrl } from '../../../functions/_shared/media';
 import { publishReplyTarget, replyTextIssue } from '../../../functions/_shared/threads-replies';
@@ -1104,7 +1104,8 @@ async function publishDueJobs(env: Env): Promise<void> {
     SELECT pj.id AS job_id, pj.content_id, pj.content_version_id, pj.platform,
            c.brand_id, c.collaboration_id, b.slug AS brand_slug,
            cv.body, cv.hashtags,
-           a.file_url AS image_url
+           a.file_url AS image_url,
+           v.file_url AS video_url
     FROM publishing_jobs pj
     JOIN contents c ON c.id = pj.content_id
     LEFT JOIN brands b ON b.id = c.brand_id
@@ -1112,6 +1113,9 @@ async function publishDueJobs(env: Env): Promise<void> {
     LEFT JOIN LATERAL (
       SELECT file_url FROM content_assets WHERE content_version_id = cv.id AND asset_type = 'image' LIMIT 1
     ) a ON true
+    LEFT JOIN LATERAL (
+      SELECT file_url FROM content_assets WHERE content_version_id = cv.id AND asset_type = 'video' LIMIT 1
+    ) v ON true
     WHERE pj.status = 'scheduled' AND pj.scheduled_at <= now()
     ORDER BY pj.scheduled_at ASC
     LIMIT 10
@@ -1121,7 +1125,7 @@ async function publishDueJobs(env: Env): Promise<void> {
   for (const row of rows as {
     job_id: string; content_id: string; content_version_id: string; platform: SocialPlatform | 'x';
     brand_id: string | null; collaboration_id: string | null; brand_slug: string | null;
-    body: string | null; hashtags: string[] | null; image_url: string | null;
+    body: string | null; hashtags: string[] | null; image_url: string | null; video_url: string | null;
   }[]) {
     const label = row.brand_slug ?? 'go-ecosystem';
     try {
@@ -1132,7 +1136,11 @@ async function publishDueJobs(env: Env): Promise<void> {
       if (row.platform === 'threads' && row.brand_id) {
         const account = await getThreadsAccount(env, row.brand_id);
         if (!account) throw new Error('Threads 帳號未連線或憑證失效');
-        published = await publishThreadsPost(account, { text: row.body, imageUrl: toPublicMediaUrl(env, row.image_url) });
+        published = await publishThreadsPost(account, {
+          text: row.body,
+          imageUrl: toPublicMediaUrl(env, row.image_url),
+          videoUrl: toPublicMediaUrl(env, row.video_url),
+        });
       } else if (row.platform === 'facebook' && row.brand_id) {
         const account = await getMetaAccount(env, row.brand_id, 'facebook');
         if (!account) throw new Error('Facebook 帳號未連線或憑證失效');
@@ -1141,10 +1149,16 @@ async function publishDueJobs(env: Env): Promise<void> {
       } else if (row.platform === 'instagram' && row.brand_id) {
         const account = await getMetaAccount(env, row.brand_id, 'instagram');
         const publicImage = toPublicMediaUrl(env, row.image_url);
+        const publicVideo = toPublicMediaUrl(env, row.video_url);
         if (!account) throw new Error('Instagram 帳號未連線或憑證失效');
-        if (!publicImage) throw new Error('Instagram 發文需要配圖,但這篇內容沒有圖片');
         const message = composePostMessage(row.body, row.hashtags);
-        published = await publishInstagramPost(account, { caption: message, imageUrl: publicImage });
+        if (publicVideo) {
+          published = await publishInstagramReel(account, { caption: message, videoUrl: publicVideo });
+        } else if (publicImage) {
+          published = await publishInstagramPost(account, { caption: message, imageUrl: publicImage });
+        } else {
+          throw new Error('Instagram 發文需要配圖或短影音');
+        }
       } else if (row.platform === 'x' && row.collaboration_id) {
         const account = await getXAccount(env, row.collaboration_id);
         if (!account) throw new Error('X 帳號未連線或憑證失效');

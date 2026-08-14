@@ -72,4 +72,10 @@ export const ACTION_LABELS: Record<string, string> = {
   'brand_rule.adopted': '採納會議結論為品牌規則',
   'agent.persona_updated': '更新小編人設',
   'meeting.plan_executed': '執行會議發文計畫',
+  'video_job.created': '建立短影音工作',
+  'video_job.strategy_approved': '核准短影音策略',
+  'video_job.preview_approved': '核准短影音預覽',
+  'video_job.preview_uploaded': '上傳短影音預覽',
+  'video_job.final_uploaded': '上傳短影音定稿',
+  'video_job.promoted': '短影音寫入內容中心',
 };

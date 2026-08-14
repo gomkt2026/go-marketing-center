@@ -314,7 +314,7 @@ export interface Campaign {
   endDate: string;
 }
 
-export type ContentType = 'article' | 'image' | 'video_prompt' | 'video_script' | 'edm' | 'live_stream_plan';
+export type ContentType = 'article' | 'image' | 'video' | 'video_prompt' | 'video_script' | 'edm' | 'live_stream_plan';
 export type ContentStatus =
   | 'draft' | 'pending_review' | 'approved' | 'needs_revision'
   | 'rejected' | 'scheduled' | 'published' | 'archived';
@@ -677,6 +677,74 @@ export interface PodcastAgentInfo {
   characterTitle: string | null;
   brandSlug: string;
   brandName: string;
+}
+
+export type VideoSourceType = 'podcast_clip' | 'upload';
+export type VideoJobStatus =
+  | 'analyzing' | 'strategy_review' | 'rendering_preview'
+  | 'preview_review' | 'rendering_final' | 'ready' | 'rejected';
+
+export interface VideoClipCandidate {
+  id: string;
+  hook: string;
+  title: string;
+  summary: string;
+  strategy: string;
+  estimatedSeconds: number;
+  startLineOrder: number;
+  endLineOrder: number;
+  speakers: string[];
+  cta: string;
+  brandSlug: string | null;
+}
+
+export interface VideoStrategy {
+  candidateId: string;
+  title: string;
+  hook: string;
+  narrative: string;
+  estimatedSeconds: number;
+  subtitleStyle: 'large' | 'standard';
+  cta: string;
+  brandSlug: string | null;
+}
+
+export interface VideoEdlSegment {
+  id: string;
+  sourceKey: string | null;
+  sourceUrl: string | null;
+  startMs: number;
+  endMs: number;
+  speaker: string;
+  brandSlug: string | null;
+  text: string;
+  fadeInMs: number;
+  fadeOutMs: number;
+}
+
+export interface VideoJob {
+  id: string;
+  sourceType: VideoSourceType;
+  status: VideoJobStatus;
+  brandId: string | null;
+  podcastEpisodeId: string | null;
+  contentId: string | null;
+  title: string | null;
+  sourceMediaKey: string | null;
+  sourceMediaUrl: string | null;
+  consentScribe: boolean;
+  candidates: VideoClipCandidate[];
+  selectedCandidateId: string | null;
+  strategy: VideoStrategy | null;
+  edl: VideoEdlSegment[] | null;
+  srt: string | null;
+  previewUrl: string | null;
+  finalUrl: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  episodeTitle?: string | null;
+  brandSlug?: string | null;
 }
 
 export type PodcastGuestStatus = 'pending' | 'cloning' | 'ready' | 'failed';

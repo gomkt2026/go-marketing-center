@@ -3,7 +3,7 @@ import type { Env } from '../../../_shared/env';
 import { requireAuth } from '../../../_shared/auth';
 import { getSql } from '../../../_shared/db';
 import { getThreadsAccount, publishThreadsPost } from '../../../_shared/threads';
-import { getMetaAccount, publishFacebookPost, publishInstagramPost, composePostMessage } from '../../../_shared/meta';
+import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage } from '../../../_shared/meta';
 import { toPublicMediaUrl } from '../../../_shared/media';
 import { logActivity } from '../../../_shared/activity';
 import { json, error } from '../../../_shared/response';
@@ -38,30 +38,35 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!versionRows.length) return error('內容沒有版本', 400);
   const version = versionRows[0] as { id: string; body: string; hashtags: string[] | null };
 
-  // 最新版本若有配圖則一併帶上(轉成公開絕對網址,Meta 伺服器才抓得到)
+  // 最新版本配圖 / 短影音(轉成公開絕對網址,Meta 伺服器才抓得到)
   const assetRows = await sql`
-    SELECT file_url FROM content_assets
-    WHERE content_version_id = ${version.id}::uuid AND asset_type = 'image'
-    LIMIT 1
+    SELECT file_url, asset_type FROM content_assets
+    WHERE content_version_id = ${version.id}::uuid AND asset_type IN ('image', 'video')
+    ORDER BY created_at DESC
   `;
-  const imageUrl = toPublicMediaUrl(
-    context.env,
-    assetRows.length ? (assetRows[0] as { file_url: string }).file_url : null,
-  );
+  const imageRow = (assetRows as { file_url: string; asset_type: string }[]).find((a) => a.asset_type === 'image');
+  const videoRow = (assetRows as { file_url: string; asset_type: string }[]).find((a) => a.asset_type === 'video');
+  const imageUrl = toPublicMediaUrl(context.env, imageRow?.file_url ?? null);
+  const videoUrl = toPublicMediaUrl(context.env, videoRow?.file_url ?? null);
 
   let published: { postId: string; permalink: string | null };
   try {
     if (platform === 'threads') {
       const account = await getThreadsAccount(context.env, content.brand_id);
       if (!account) return error('品牌尚未連接 Threads 帳號(社群帳號頁需填入有效 token)', 400);
-      published = await publishThreadsPost(account, { text: version.body, imageUrl });
+      published = await publishThreadsPost(account, { text: version.body, imageUrl, videoUrl });
     } else {
       const account = await getMetaAccount(context.env, content.brand_id, platform);
       if (!account) return error(`品牌尚未連接 ${PLATFORM_LABELS[platform]} 帳號(社群帳號頁需填入平台 ID 與有效 token)`, 400);
       const message = composePostMessage(version.body, version.hashtags);
       if (platform === 'instagram') {
-        if (!imageUrl) return error('IG API 發布必須有配圖,此內容沒有圖片', 400);
-        published = await publishInstagramPost(account, { caption: message, imageUrl });
+        if (videoUrl) {
+          published = await publishInstagramReel(account, { caption: message, videoUrl });
+        } else if (imageUrl) {
+          published = await publishInstagramPost(account, { caption: message, imageUrl });
+        } else {
+          return error('IG API 發布必須有配圖或短影音', 400);
+        }
       } else {
         published = await publishFacebookPost(account, { message, imageUrl });
       }

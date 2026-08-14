@@ -13,6 +13,7 @@
     "pages:dev": "wrangler pages dev dist --port 8788",
     "deploy": "npm run build && wrangler pages deploy dist --project-name=go-marketing-center --branch=Ben",
     "export:podcast": "node scripts/export-podcast.mjs",
+    "render:short": "python3 scripts/render-short-video.py",
     "x:oauth": "node scripts/x-oauth-setup.mjs"
   },
   "dependencies": {

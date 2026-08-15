@@ -26,6 +26,7 @@ export interface Brand {
   logoInitial: string;
   logoUrl: string | null;
   currentVersionId: string;
+  versionNumber?: number | null;
 }
 
 export interface BrandVersion {

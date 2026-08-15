@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import type { Brand } from '@/types';
+import { brandSlugFromPath } from '@/lib/constants';
 
 interface BrandContextValue {
   currentBrand: Brand | null;
@@ -15,7 +16,9 @@ interface BrandContextValue {
 const BrandContext = createContext<BrandContextValue | undefined>(undefined);
 
 export function BrandProvider({ children }: { children: ReactNode }) {
-  const [slug, setSlug] = useState<string | null>(null);
+  const [slug, setSlug] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : brandSlugFromPath(window.location.pathname),
+  );
   const [brands, setBrands] = useState<Brand[]>([]);
   const [brandsLoading, setBrandsLoading] = useState(true);
 

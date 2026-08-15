@@ -3,10 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBrand } from '@/context/BrandContext';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/lib/api';
-import { useAsyncData } from '@/hooks/useAsyncData';
-
-const BRAND_SCOPED_PREFIXES = ['workspace', 'intelligence', 'market', 'campaigns', 'events', 'contents', 'publishing', 'thread-replies', 'social', 'analytics', 'learning'];
+import { BRAND_SCOPED_PREFIXES } from '@/lib/constants';
 
 /** 品牌小圖標:有官方 logo 用 logo(白底 contain),沒有就退回色塊字首 */
 function BrandMark({ brand, size }: { brand: { primaryColor: string; logoInitial: string; logoUrl?: string | null; name: string }; size: number }) {
@@ -49,12 +46,6 @@ export function BrandSwitcher() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  const versionQuery = useAsyncData(
-    () => currentBrand ? api.brand(currentBrand.slug).then((r) => r.version) : Promise.resolve(null),
-    [currentBrand?.slug],
-  );
-  const version = versionQuery.data;
-
   function handleSelect(slug: string | null) {
     setBrandBySlug(slug);
     setOpen(false);
@@ -88,7 +79,7 @@ export function BrandSwitcher() {
             <div style={{ textAlign: 'left' }}>
               <div style={{ fontSize: 13, fontWeight: 700 }}>{currentBrand.name}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                {version ? `v${version.versionNumber} 已發布` : ''}
+                {currentBrand.versionNumber ? `v${currentBrand.versionNumber} 已發布` : ''}
               </div>
             </div>
           </>

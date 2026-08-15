@@ -113,6 +113,7 @@ export function Sidebar() {
                 <NavLink
                   key={item.path}
                   to={to}
+                  end={item.path === '/settings' || item.path === '/'}
                   style={({ isActive }) => ({
                     display: 'block',
                     position: 'relative',

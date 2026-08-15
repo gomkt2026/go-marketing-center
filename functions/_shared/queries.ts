@@ -10,6 +10,7 @@ export interface DbBrand {
   primaryColor: string | null;
   logoUrl: string | null;
   currentVersionId: string | null;
+  versionNumber?: number | null;
 }
 
 export function mapBrand(row: Record<string, unknown>): DbBrand & { logoInitial: string } {
@@ -25,8 +26,12 @@ export function mapBrand(row: Record<string, unknown>): DbBrand & { logoInitial:
 export async function getAllBrands(env: Env) {
   const sql = getSql(env);
   const rows = await sql`
-    SELECT id, slug, name, tagline, primary_color, logo_url, current_version_id
-    FROM brands WHERE is_active = true ORDER BY name
+    SELECT b.id, b.slug, b.name, b.tagline, b.primary_color, b.logo_url, b.current_version_id,
+           v.version_number
+    FROM brands b
+    LEFT JOIN brand_versions v ON v.id = b.current_version_id
+    WHERE b.is_active = true
+    ORDER BY b.name
   `;
   return (rows as Record<string, unknown>[]).map(mapBrand);
 }

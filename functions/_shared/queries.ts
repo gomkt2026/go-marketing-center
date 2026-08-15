@@ -31,6 +31,13 @@ export async function getAllBrands(env: Env) {
   return (rows as Record<string, unknown>[]).map(mapBrand);
 }
 
+export async function getBrandsForUser(env: Env, user: { role: string; brandIds: string[] }) {
+  const all = await getAllBrands(env);
+  if (user.role === 'super_admin') return all;
+  const allowed = new Set(user.brandIds);
+  return all.filter((b) => allowed.has(b.id));
+}
+
 export async function getBrandBySlug(env: Env, slug: string) {
   const sql = getSql(env);
   const rows = await sql`

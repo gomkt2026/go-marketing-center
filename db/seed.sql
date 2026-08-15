@@ -34,16 +34,19 @@ DECLARE
   u_homigo_mgr   UUID := gen_random_uuid();
   u_taskgo_mgr   UUID := gen_random_uuid();
   u_washgo_mgr   UUID := gen_random_uuid();
+  u_fixer_mgr    UUID := gen_random_uuid();
 
   -- 品牌
   b_homigo       UUID := gen_random_uuid();
   b_taskgo       UUID := gen_random_uuid();
   b_washgo       UUID := gen_random_uuid();
+  b_fixer        UUID := gen_random_uuid();
 
   -- 品牌版本
   v_homigo_1     UUID := gen_random_uuid();
   v_taskgo_1     UUID := gen_random_uuid();
   v_washgo_1     UUID := gen_random_uuid();
+  v_fixer_1      UUID := gen_random_uuid();
 
   -- AI Agent 角色 id(對應 schema.sql 已種入的 agent_roles)
   r_brand_ai     UUID;
@@ -111,6 +114,8 @@ DECLARE
   ev_senraku     UUID := gen_random_uuid();
   sess_am        UUID := gen_random_uuid();
   sess_pm        UUID := gen_random_uuid();
+  ev_fixer       UUID := gen_random_uuid();
+  sess_fixer     UUID := gen_random_uuid();
   ref_senraku    UUID := gen_random_uuid();
   ref_partner    UUID := gen_random_uuid();
   reg_demo_1     UUID := gen_random_uuid();
@@ -132,7 +137,8 @@ BEGIN
     (u_admin,      'admin@go-mkt.tw',    '張大高(集團管理者)', 'super_admin'),
     (u_homigo_mgr, 'manager@homigo.tw',  'Homigo 品牌負責人',  'brand_manager'),
     (u_taskgo_mgr, 'manager@taskgo.tw',  'TaskGo 品牌負責人',  'brand_manager'),
-    (u_washgo_mgr, 'manager@washgo.tw',  'Washgo 品牌負責人',  'brand_manager');
+    (u_washgo_mgr, 'manager@washgo.tw',  'Washgo 品牌負責人',  'brand_manager'),
+    (u_fixer_mgr,  'manager@fixercowork.tw', 'FIXERCOWORK 品牌負責人', 'brand_manager');
 
   -- ==========================================================================
   -- 品牌與版本
@@ -140,24 +146,31 @@ BEGIN
   INSERT INTO brands (id, slug, name, tagline, primary_color, is_active) VALUES
     (b_homigo, 'homigo', 'Homigo', '不是管理房子,而是讓房子自己運作。', '#A7C18D', true),
     (b_taskgo, 'taskgo', 'TaskGo', '讓工程專案管理更簡單、更智能', '#ED9121', true),
-    (b_washgo, 'washgo', 'Washgo', '衣物送洗,交給 Washgo', '#A87C64', true);
+    (b_washgo, 'washgo', 'Washgo', '衣物送洗,交給 Washgo', '#A87C64', true),
+    (b_fixer,  'fixercowork', 'FIXERCOWORK', 'REPAIR & MAINTAIN SOLUTIONS', '#1A2F4B', true);
+
+  UPDATE brands SET logo_url = '/brands/fixercowork-logo.png' WHERE id = b_fixer;
 
   INSERT INTO brand_members (brand_id, user_id, role) VALUES
     (b_homigo, u_admin, 'super_admin'),
     (b_taskgo, u_admin, 'super_admin'),
     (b_washgo, u_admin, 'super_admin'),
+    (b_fixer,  u_admin, 'super_admin'),
     (b_homigo, u_homigo_mgr, 'brand_manager'),
     (b_taskgo, u_taskgo_mgr, 'brand_manager'),
-    (b_washgo, u_washgo_mgr, 'brand_manager');
+    (b_washgo, u_washgo_mgr, 'brand_manager'),
+    (b_fixer,  u_fixer_mgr, 'brand_manager');
 
   INSERT INTO brand_versions (id, brand_id, version_number, status, summary_of_changes, confidence_score, published_by, published_at) VALUES
     (v_homigo_1, b_homigo, 1, 'published', '首版發布:依 HOMIGO_BRAND_PROFILE.md v1.0 拆解建立', 0.93, u_homigo_mgr, now() - interval '20 days'),
     (v_taskgo_1, b_taskgo, 1, 'published', '首版發布:依 TaskGo_品牌行銷資料.md 拆解建立',      0.90, u_taskgo_mgr, now() - interval '18 days'),
-    (v_washgo_1, b_washgo, 1, 'published', '首版發布:依 WASHGO_BRAND_MARKETING.md 拆解建立',    0.88, u_washgo_mgr, now() - interval '15 days');
+    (v_washgo_1, b_washgo, 1, 'published', '首版發布:依 WASHGO_BRAND_MARKETING.md 拆解建立',    0.88, u_washgo_mgr, now() - interval '15 days'),
+    (v_fixer_1,  b_fixer,  1, 'published', '首版:FIXERCOWORK 修繕共創品牌',                   0.90, u_fixer_mgr,  now());
 
   UPDATE brands SET current_version_id = v_homigo_1 WHERE id = b_homigo;
   UPDATE brands SET current_version_id = v_taskgo_1 WHERE id = b_taskgo;
   UPDATE brands SET current_version_id = v_washgo_1 WHERE id = b_washgo;
+  UPDATE brands SET current_version_id = v_fixer_1  WHERE id = b_fixer;
 
   -- ==========================================================================
   -- Brand Documents(原始資料索引,永久保留)
@@ -492,6 +505,44 @@ BEGIN
 
   INSERT INTO activity_logs (brand_id, actor_type, actor_user_id, action, entity_type, entity_id, after_state, created_at) VALUES
     (b_washgo, 'user', u_washgo_mgr, 'event.created', 'event', ev_senraku, '{"title":"洗楽 小小洗衣師職人體驗營"}', now() - interval '2 days');
+
+  -- ==========================================================================
+  -- FIXERCOWORK 商業交流會議(8/28)
+  -- ==========================================================================
+  INSERT INTO events (
+    id, brand_id, slug, title, description, location, event_date, status,
+    staff_token, form_fields, created_by
+  ) VALUES (
+    ev_fixer, b_fixer, 'fixercowork-biz-exchange-0828',
+    '商業交流會議',
+    E'攜手合作 · 共創商機 · 共贏未來\n\n會議流程\n1. 商會介紹與本次交流目的\n2. 目前合作產業說明\n3. 共同產業鏈的建立\n4. 報價方式與分潤模式\n5. 與會者自我介紹\n6. 各產業優惠與廣告行銷策略\n7. 市場開發與未來展望\n\n市場焦點\n已成熟市場：包租代管、社宅\n積極開發中：居服、社區大樓',
+    '台中市五權西路二段666號15樓',
+    TIMESTAMPTZ '2026-08-28 13:30:00+08',
+    'open',
+    encode(gen_random_bytes(24), 'hex'),
+    '[
+      {"key":"company","label":"公司名稱","type":"text","required":true},
+      {"key":"industry","label":"產業別","type":"select","required":true,"options":["房仲業","包租代管業","室內裝修","油漆防水","水電工程","清潔除蟲","拆除清運","工程整合","居服","社區大樓管理","其他"]},
+      {"key":"expertise","label":"專長","type":"text","required":true},
+      {"key":"years_experience","label":"該產業年資（年）","type":"number","required":true},
+      {"key":"how_heard","label":"如何得知商會","type":"select","required":true,"options":["朋友介紹","商會成員轉介","LINE 或社群","EDM 或傳單","其他"]},
+      {"key":"chambers","label":"現行加入的商會","type":"checkbox","required":true,"options":["扶輪社","獅子會","BNI","21克拉工程聯盟","其他","尚未加入"]},
+      {"key":"chambers_other","label":"其他商會名稱","type":"text","required":false},
+      {"key":"introducer","label":"本次活動介紹人","type":"text","required":false},
+      {"key":"amway_heard","label":"是否聽過安麗課程或內容（含淨水器、空氣清淨機）","type":"select","required":true,"options":["是","略有聽過","否"]},
+      {"key":"amway_branch","label":"安麗分會","type":"text","required":false},
+      {"key":"accept_repair_jobs","label":"是否願意承接修繕中心派案","type":"select","required":true,"options":["是","再考慮","否"]},
+      {"key":"uses_site_system","label":"是否用系統做案場管理","type":"select","required":true,"options":["是","否"]},
+      {"key":"site_system_name","label":"使用的系統名稱","type":"text","required":false}
+    ]'::jsonb,
+    u_fixer_mgr
+  );
+
+  INSERT INTO event_sessions (id, event_id, label, starts_at, capacity, sort_order) VALUES
+    (sess_fixer, ev_fixer, '8/28（五）13:30 入場 · 16:30 結束', TIMESTAMPTZ '2026-08-28 13:30:00+08', NULL, 1);
+
+  INSERT INTO activity_logs (brand_id, actor_type, actor_user_id, action, entity_type, entity_id, after_state, created_at) VALUES
+    (b_fixer, 'user', u_fixer_mgr, 'event.created', 'event', ev_fixer, '{"title":"商業交流會議"}', now());
 
   -- ==========================================================================
   -- Collaboration 的提案(修繕串接週年回顧)

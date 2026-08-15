@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
-import { requireAuth } from '../../_shared/auth';
+import { requireAuth, isSuperAdmin } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
 import { rowsToCamel } from '../../_shared/case';
 import { json } from '../../_shared/response';
@@ -30,8 +30,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     sql`SELECT * FROM decisions ORDER BY decided_at DESC`,
   ]);
 
+  const allowed = new Set(auth.brandIds);
+  const scopedProposals = isSuperAdmin(auth)
+    ? proposals
+    : (proposals as { brandId?: string }[]).filter((p) => p.brandId && allowed.has(p.brandId));
+
   return json({
-    proposals,
+    proposals: scopedProposals,
     decisions: rowsToCamel(decisions as Record<string, unknown>[]),
   });
 };

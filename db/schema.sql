@@ -124,6 +124,8 @@ CREATE TYPE agent_permission_scope AS ENUM (
 CREATE TABLE users (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email             CITEXT NOT NULL UNIQUE,
+  username          CITEXT UNIQUE,                   -- 品牌登入帳號,super_admin 可為 NULL
+  password_hash     TEXT,                            -- PBKDF2,僅品牌帳號使用
   display_name      TEXT NOT NULL,
   avatar_url        TEXT,
   role              user_role NOT NULL DEFAULT 'viewer',

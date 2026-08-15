@@ -25,7 +25,7 @@ export interface DbEvent {
 export interface FormFieldDef {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'textarea';
+  type: 'text' | 'number' | 'select' | 'textarea' | 'checkbox';
   required?: boolean;
   options?: string[];
 }

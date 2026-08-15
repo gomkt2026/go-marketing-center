@@ -15,14 +15,20 @@ interface BrandContextValue {
 const BrandContext = createContext<BrandContextValue | undefined>(undefined);
 
 export function BrandProvider({ children }: { children: ReactNode }) {
-  const [slug, setSlug] = useState<string | null>('homigo');
+  const [slug, setSlug] = useState<string | null>(null);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [brandsLoading, setBrandsLoading] = useState(true);
 
   useEffect(() => {
     setBrandsLoading(true);
     api.brands()
-      .then(({ brands: list }) => setBrands(list))
+      .then(({ brands: list }) => {
+        setBrands(list);
+        setSlug((current) => {
+          if (current && list.some((b) => b.slug === current)) return current;
+          return list[0]?.slug ?? null;
+        });
+      })
       .catch(() => setBrands([]))
       .finally(() => setBrandsLoading(false));
   }, []);

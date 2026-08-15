@@ -4,6 +4,9 @@ export interface Env {
   DATABASE_URL: string;
   ADMIN_USERNAME: string;
   ADMIN_PASSWORD: string;
+  /** FIXERCOWORK 品牌限定登入(明文比對,僅存伺服器端) */
+  FIXERCOWORK_USERNAME?: string;
+  FIXERCOWORK_PASSWORD?: string;
   SESSION_SECRET?: string;
   /** OpenAI API key(文案與圖片生成) */
   OPENAI_API_KEY?: string;

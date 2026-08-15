@@ -1,11 +1,17 @@
 import { useState, type FormEvent } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { PublicShell, PublicMessage, publicInputStyle, publicLabelStyle } from '@/components/public/PublicShell';
+import { PublicShell, PublicMessage, publicInputStyle, publicLabelStyle, brandAccent } from '@/components/public/PublicShell';
 import { Button } from '@/components/ui/Button';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import { publicApi, ApiError } from '@/lib/api';
 
 const REFERRER_OTHER = '__other__';
+
+type CustomAnswers = Record<string, string | string[]>;
+
+function selectedList(value: string | string[] | undefined): string[] {
+  return Array.isArray(value) ? value : [];
+}
 
 export function EventRegister() {
   const { slug } = useParams();
@@ -22,18 +28,19 @@ export function EventRegister() {
   const [sessionId, setSessionId] = useState('');
   const [referrerChoice, setReferrerChoice] = useState('');
   const [referrerName, setReferrerName] = useState('');
-  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
+  const [customAnswers, setCustomAnswers] = useState<CustomAnswers>({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
   if (loading) return <PublicShell><LoadingState /></PublicShell>;
   if (error || !data) return <PublicShell><ErrorState message={error ?? '載入失敗'} onRetry={reload} /></PublicShell>;
 
-  const { event, sessions, referrers } = data;
+  const { event, sessions, referrers, brand } = data;
+  const accent = brandAccent(brand);
 
   if (event.status !== 'open') {
     return (
-      <PublicShell>
+      <PublicShell brand={brand}>
         <PublicMessage title="此活動目前未開放報名" tone="danger" body="請聯繫主辦單位確認報名時間。" />
       </PublicShell>
     );
@@ -43,6 +50,17 @@ export function EventRegister() {
     e.preventDefault();
     setFormError('');
     if (!slug) return;
+
+    for (const field of event.formFields) {
+      if (!field.required) continue;
+      const value = customAnswers[field.key];
+      const empty = value === undefined || value === '' || (Array.isArray(value) && value.length === 0);
+      if (empty) {
+        setFormError(`請填寫「${field.label}」`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const { registration } = await publicApi.register(slug, {
@@ -64,14 +82,20 @@ export function EventRegister() {
   }
 
   return (
-    <PublicShell>
+    <PublicShell brand={brand}>
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 20, marginBottom: 6 }}>{event.title}</h1>
-        {event.description && <p style={{ fontSize: 13, lineHeight: 1.6 }}>{event.description}</p>}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 10, fontSize: 12, color: 'var(--color-text-muted)' }}>
-          {event.location && <span>📍 {event.location}</span>}
-          {event.eventDate && <span>🗓 {new Date(event.eventDate).toLocaleString('zh-TW')}</span>}
-          {event.priceLabel && <span>💰 {event.priceLabel}</span>}
+        <h1 style={{ fontSize: 22, marginBottom: 6, color: brand?.slug === 'fixercowork' ? '#1A2F4B' : undefined }}>
+          {event.title}
+        </h1>
+        {event.description && (
+          <p style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--color-text)' }}>
+            {event.description}
+          </p>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 12, fontSize: 12, color: 'var(--color-text-muted)' }}>
+          {event.location && <span>地點 {event.location}</span>}
+          {event.eventDate && <span>時間 {new Date(event.eventDate).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</span>}
+          {event.priceLabel && <span>{event.priceLabel}</span>}
         </div>
       </div>
 
@@ -115,35 +139,57 @@ export function EventRegister() {
         )}
 
         {event.formFields.map((field) => (
-          <label key={field.key} style={publicLabelStyle}>
+          <div key={field.key} style={publicLabelStyle}>
             <span>{field.label}{field.required ? ' *' : ''}</span>
             {field.type === 'textarea' ? (
               <textarea
                 required={field.required}
-                value={customAnswers[field.key] ?? ''}
+                value={typeof customAnswers[field.key] === 'string' ? customAnswers[field.key] as string : ''}
                 onChange={(e) => setCustomAnswers((prev) => ({ ...prev, [field.key]: e.target.value }))}
                 style={{ ...publicInputStyle, minHeight: 80, resize: 'vertical' }}
               />
             ) : field.type === 'select' ? (
               <select
                 required={field.required}
-                value={customAnswers[field.key] ?? ''}
+                value={typeof customAnswers[field.key] === 'string' ? customAnswers[field.key] as string : ''}
                 onChange={(e) => setCustomAnswers((prev) => ({ ...prev, [field.key]: e.target.value }))}
                 style={publicInputStyle}
               >
                 <option value="" disabled>請選擇</option>
                 {(field.options ?? []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
               </select>
+            ) : field.type === 'checkbox' ? (
+              <div style={{ display: 'grid', gap: 8, fontWeight: 500 }}>
+                {(field.options ?? []).map((opt) => {
+                  const selected = selectedList(customAnswers[field.key]);
+                  return (
+                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(opt)}
+                        onChange={(e) => {
+                          setCustomAnswers((prev) => {
+                            const curr = selectedList(prev[field.key]);
+                            const next = e.target.checked ? [...curr, opt] : curr.filter((x) => x !== opt);
+                            return { ...prev, [field.key]: next };
+                          });
+                        }}
+                      />
+                      {opt}
+                    </label>
+                  );
+                })}
+              </div>
             ) : (
               <input
                 type={field.type === 'number' ? 'number' : 'text'}
                 required={field.required}
-                value={customAnswers[field.key] ?? ''}
+                value={typeof customAnswers[field.key] === 'string' ? customAnswers[field.key] as string : ''}
                 onChange={(e) => setCustomAnswers((prev) => ({ ...prev, [field.key]: e.target.value }))}
                 style={publicInputStyle}
               />
             )}
-          </label>
+          </div>
         ))}
 
         {referrers.length > 0 && (
@@ -165,7 +211,17 @@ export function EventRegister() {
 
         {formError && <PublicMessage title={formError} tone="danger" />}
 
-        <Button type="submit" variant="primary" disabled={submitting} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={submitting}
+          style={{
+            width: '100%',
+            justifyContent: 'center',
+            marginTop: 4,
+            ...(accent ? { background: accent, borderColor: accent } : {}),
+          }}
+        >
           {submitting ? '送出中…' : '確認報名'}
         </Button>
       </form>

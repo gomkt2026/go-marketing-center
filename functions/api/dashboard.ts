@@ -1,8 +1,8 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../_shared/env';
-import { requireAuth } from '../_shared/auth';
+import { requireAuth, isSuperAdmin } from '../_shared/auth';
 import { getSql } from '../_shared/db';
-import { getAllBrands } from '../_shared/queries';
+import { getBrandsForUser } from '../_shared/queries';
 import { rowsToCamel } from '../_shared/case';
 import { json } from '../_shared/response';
 import { ACTION_LABELS } from '../_shared/activity';
@@ -13,7 +13,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const sql = getSql(context.env);
   const [brands, pendingProposals, pendingContents, marketSignals, activityRows, campaignStats] = await Promise.all([
-    getAllBrands(context.env),
+    getBrandsForUser(context.env, auth),
     sql`SELECT id, title, brand_id, collaboration_id, status FROM proposals WHERE status = 'pending_decision' ORDER BY created_at DESC`,
     sql`SELECT id, title, brand_id, status FROM contents WHERE status = 'pending_review' ORDER BY updated_at DESC`,
     sql`SELECT id, title, brand_id, status, discovered_at FROM market_signals ORDER BY discovered_at DESC LIMIT 10`,
@@ -39,12 +39,16 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     return acc;
   }, {});
 
+  const allowed = new Set(brands.map((b) => b.id));
+  const scoped = <T extends { brandId?: string }>(rows: T[]) =>
+    (isSuperAdmin(auth) ? rows : rows.filter((r) => r.brandId && allowed.has(r.brandId)));
+
   return json({
     brands,
-    pendingProposals: rowsToCamel(pendingProposals as Record<string, unknown>[]),
-    pendingContents: rowsToCamel(pendingContents as Record<string, unknown>[]),
-    marketSignals: rowsToCamel(marketSignals as Record<string, unknown>[]),
-    recentActivity: rowsToCamel(activityRows as Record<string, unknown>[]),
+    pendingProposals: scoped(rowsToCamel(pendingProposals as Record<string, unknown>[]) as { brandId?: string }[]),
+    pendingContents: scoped(rowsToCamel(pendingContents as Record<string, unknown>[]) as { brandId?: string }[]),
+    marketSignals: scoped(rowsToCamel(marketSignals as Record<string, unknown>[]) as { brandId?: string }[]),
+    recentActivity: scoped(rowsToCamel(activityRows as Record<string, unknown>[]) as { brandId?: string }[]),
     actionLabels: ACTION_LABELS,
     brandStats: brands.map((b) => ({
       brandId: b.id,

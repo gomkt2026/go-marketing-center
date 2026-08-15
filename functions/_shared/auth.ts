@@ -17,6 +17,8 @@ export interface AuthUser {
   displayName: string;
   role: string;
   avatarUrl?: string;
+  brandIds: string[];
+  brandSlugs: string[];
 }
 
 function encodeBase64Url(bytes: Uint8Array): string {
@@ -94,6 +96,55 @@ export function getSessionTokenFromRequest(request: Request): string | null {
   return match?.[1] ?? null;
 }
 
+async function loadBrandMemberships(env: Env, userId: string): Promise<{ brandIds: string[]; brandSlugs: string[] }> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT b.id, b.slug
+    FROM brand_members m
+    JOIN brands b ON b.id = m.brand_id
+    WHERE m.user_id = ${userId}::uuid AND b.is_active = true
+    ORDER BY b.name
+  `;
+  return {
+    brandIds: (rows as { id: string }[]).map((r) => r.id),
+    brandSlugs: (rows as { slug: string }[]).map((r) => r.slug),
+  };
+}
+
+function mapUserRow(row: Record<string, unknown>, memberships: { brandIds: string[]; brandSlugs: string[] }): AuthUser {
+  const user = rowToCamel<AuthUser>(row);
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName ?? (row.display_name as string),
+    role: user.role,
+    avatarUrl: user.avatarUrl ?? undefined,
+    brandIds: memberships.brandIds,
+    brandSlugs: memberships.brandSlugs,
+  };
+}
+
+export function isSuperAdmin(user: AuthUser): boolean {
+  return user.role === 'super_admin';
+}
+
+export function canAccessBrand(user: AuthUser, brandId: string): boolean {
+  if (isSuperAdmin(user)) return true;
+  return user.brandIds.includes(brandId);
+}
+
+export function forbidden(message = 'Forbidden'): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export function requireBrandAccess(user: AuthUser, brandId: string): true | Response {
+  if (canAccessBrand(user, brandId)) return true;
+  return forbidden();
+}
+
 export async function getAuthUser(request: Request, env: Env): Promise<AuthUser | null> {
   const token = getSessionTokenFromRequest(request);
   if (!token) return null;
@@ -108,14 +159,8 @@ export async function getAuthUser(request: Request, env: Env): Promise<AuthUser 
     LIMIT 1
   `;
   if (!rows.length) return null;
-  const user = rowToCamel<AuthUser & { display_name?: string; avatar_url?: string }>(rows[0] as Record<string, unknown>);
-  return {
-    id: user.id,
-    email: user.email,
-    displayName: (user as { displayName?: string }).displayName ?? (rows[0] as { display_name: string }).display_name,
-    role: user.role,
-    avatarUrl: (user as { avatarUrl?: string }).avatarUrl ?? undefined,
-  };
+  const memberships = await loadBrandMemberships(env, session.userId);
+  return mapUserRow(rows[0] as Record<string, unknown>, memberships);
 }
 
 export async function requireAuth(request: Request, env: Env): Promise<AuthUser | Response> {
@@ -140,11 +185,39 @@ export async function findAdminUser(env: Env): Promise<AuthUser | null> {
   `;
   if (!rows.length) return null;
   const row = rows[0] as Record<string, unknown>;
-  const user = rowToCamel<AuthUser>(row);
+  const memberships = await loadBrandMemberships(env, row.id as string);
+  return mapUserRow(row, memberships);
+}
+
+export async function findUserByUsername(env: Env, username: string): Promise<(AuthUser & { passwordHash: string }) | null> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT id, email, display_name, role, avatar_url, password_hash
+    FROM users
+    WHERE username = ${username} AND is_active = true AND password_hash IS NOT NULL
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  const row = rows[0] as Record<string, unknown>;
+  const memberships = await loadBrandMemberships(env, row.id as string);
   return {
-    ...user,
-    displayName: user.displayName ?? (row.display_name as string),
+    ...mapUserRow(row, memberships),
+    passwordHash: row.password_hash as string,
   };
+}
+
+export async function findUserByEmail(env: Env, email: string): Promise<AuthUser | null> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT id, email, display_name, role, avatar_url
+    FROM users
+    WHERE email = ${email} AND is_active = true
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  const row = rows[0] as Record<string, unknown>;
+  const memberships = await loadBrandMemberships(env, row.id as string);
+  return mapUserRow(row, memberships);
 }
 
 export { SESSION_MAX_AGE_SEC };

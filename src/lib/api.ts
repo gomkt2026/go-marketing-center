@@ -219,6 +219,19 @@ export const api = {
 
   meta: () => request<{ users: User[]; agents: AIAgent[] }>('/api/meta'),
 
+  adminUsers: () => request<{ users: User[] }>('/api/admin/users'),
+
+  createAdminUser: (body: {
+    displayName: string; username: string; password: string; email?: string; role: User['role']; brandIds: string[];
+  }) =>
+    request<{ user: User }>('/api/admin/users', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateAdminUser: (id: string, body: {
+    displayName?: string; username?: string; password?: string; email?: string;
+    role?: User['role']; brandIds?: string[]; isActive?: boolean;
+  }) =>
+    request<{ user: User }>(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
   trending: () =>
     request<{
       trends: { title: string; url: string | null; snippet: string | null }[];
@@ -587,6 +600,7 @@ export const publicApi = {
   event: (slug: string) =>
     request<{
       event: Pick<import('@/types').EventRecord, 'id' | 'slug' | 'title' | 'description' | 'location' | 'eventDate' | 'status' | 'formFields' | 'priceLabel' | 'lineAddFriendUrl'>;
+      brand: { name: string; slug: string; logoUrl?: string | null; primaryColor?: string | null; tagline?: string | null } | null;
       sessions: import('@/types').EventSession[];
       referrers: import('@/types').EventReferrer[];
     }>(`/api/public/events/${slug}`),

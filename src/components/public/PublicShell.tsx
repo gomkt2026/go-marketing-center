@@ -1,14 +1,38 @@
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 
+export interface PublicBrandInfo {
+  name: string;
+  slug: string;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  tagline?: string | null;
+}
+
+const FIXER_ORANGE = '#E86B19';
+const FIXER_NAVY = '#1A2F4B';
+
+export function brandAccent(brand?: PublicBrandInfo | null): string | undefined {
+  if (!brand) return undefined;
+  if (brand.slug === 'fixercowork') return FIXER_ORANGE;
+  return brand.primaryColor ?? undefined;
+}
+
 export function PublicShell({
-  children, maxWidth = 480, accentColor,
-}: { children: ReactNode; maxWidth?: number; accentColor?: string }) {
+  children, maxWidth = 480, accentColor, brand,
+}: { children: ReactNode; maxWidth?: number; accentColor?: string; brand?: PublicBrandInfo | null }) {
+  const accent = accentColor ?? brandAccent(brand);
+  const isFixer = brand?.slug === 'fixercowork';
+  const headerColor = isFixer ? FIXER_NAVY : (accent ?? 'var(--color-primary-dark)');
+  const pageBg = isFixer
+    ? 'linear-gradient(160deg, #FFF4EB 0%, #F7F4F0 55%)'
+    : 'linear-gradient(160deg, var(--color-primary-soft) 0%, var(--color-bg-soft) 55%)';
+
   return (
     <div
       style={{
         minHeight: '100vh',
-        background: 'linear-gradient(160deg, var(--color-primary-soft) 0%, var(--color-bg-soft) 55%)',
+        background: pageBg,
         display: 'flex',
         justifyContent: 'center',
         padding: '32px 16px',
@@ -21,9 +45,21 @@ export function PublicShell({
         style={{ width: '100%', maxWidth, alignSelf: 'flex-start' }}
       >
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: accentColor ?? 'var(--color-primary-dark)', letterSpacing: 1 }}>
-            GO 行銷中心 · 活動報名
+          {brand?.logoUrl ? (
+            <img
+              src={brand.logoUrl}
+              alt={brand.name}
+              style={{ maxHeight: 72, maxWidth: 220, objectFit: 'contain', marginBottom: 8 }}
+            />
+          ) : null}
+          <div style={{ fontSize: 13, fontWeight: 700, color: headerColor, letterSpacing: 1 }}>
+            {brand ? brand.name : 'GO 行銷中心 · 活動報名'}
           </div>
+          {brand?.tagline && (
+            <div style={{ fontSize: 11, color: accent ?? 'var(--color-text-muted)', letterSpacing: 1.2, marginTop: 4 }}>
+              {brand.tagline}
+            </div>
+          )}
         </div>
         <div
           style={{

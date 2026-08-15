@@ -296,7 +296,12 @@ function SessionsFormTab({
                 <option value="number">數字</option>
                 <option value="textarea">長文字</option>
                 <option value="select">選單</option>
+                <option value="checkbox">多選</option>
               </select>
+              {(f.type === 'select' || f.type === 'checkbox') && (
+                <input style={inputStyle} placeholder="選項（逗號分隔）" value={(f.options ?? []).join('、')}
+                  onChange={(e) => setFields((prev) => prev.map((p, idx) => (idx === i ? { ...p, options: e.target.value.split(/[,、]/).map((s) => s.trim()).filter(Boolean) } : p)))} />
+              )}
               <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, whiteSpace: 'nowrap' }}>
                 <input type="checkbox" checked={!!f.required}
                   onChange={(e) => setFields((prev) => prev.map((p, idx) => (idx === i ? { ...p, required: e.target.checked } : p)))} />
@@ -456,6 +461,8 @@ function RegistrationsTab({
               <tr style={{ textAlign: 'left', color: 'var(--color-text-muted)', fontSize: 12 }}>
                 <th style={{ padding: '8px 6px' }}>姓名</th>
                 <th style={{ padding: '8px 6px' }}>手機</th>
+                <th style={{ padding: '8px 6px' }}>公司</th>
+                <th style={{ padding: '8px 6px' }}>產業</th>
                 <th style={{ padding: '8px 6px' }}>場次</th>
                 <th style={{ padding: '8px 6px' }}>推薦人</th>
                 <th style={{ padding: '8px 6px' }}>狀態</th>
@@ -467,6 +474,8 @@ function RegistrationsTab({
                 <tr key={r.id} style={{ borderTop: '1px solid var(--color-border)' }}>
                   <td style={{ padding: '8px 6px', fontWeight: 600 }}>{r.name}</td>
                   <td style={{ padding: '8px 6px' }}>{r.phone}</td>
+                  <td style={{ padding: '8px 6px' }}>{String(r.customAnswers?.company ?? '—')}</td>
+                  <td style={{ padding: '8px 6px' }}>{String(r.customAnswers?.industry ?? '—')}</td>
                   <td style={{ padding: '8px 6px' }}>{r.sessionLabel ?? '—'}</td>
                   <td style={{ padding: '8px 6px' }}>{r.referrerDisplayName ?? '—'}</td>
                   <td style={{ padding: '8px 6px' }}>

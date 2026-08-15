@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
-import { requireAuth } from '../../_shared/auth';
+import { requireAuth, isSuperAdmin } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
 import { rowsToCamel } from '../../_shared/case';
 import { json } from '../../_shared/response';
@@ -21,9 +21,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const briefs = await sql`
       SELECT * FROM collaboration_briefs WHERE collaboration_id = ${c.id}::uuid ORDER BY version_number DESC LIMIT 1
     `;
+    const brandIds = (brands as { brand_id: string }[]).map((b) => b.brand_id);
+    if (!isSuperAdmin(auth) && !brandIds.some((id) => auth.brandIds.includes(id))) continue;
     collaborations.push({
       ...c,
-      brandIds: (brands as { brand_id: string }[]).map((b) => b.brand_id),
+      brandIds,
       latestBrief: briefs.length ? rowsToCamel(briefs as Record<string, unknown>[])[0] : null,
     });
   }

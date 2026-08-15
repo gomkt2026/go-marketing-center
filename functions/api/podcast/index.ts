@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
-import { requireAuth } from '../../_shared/auth';
+import { requireAuth, isSuperAdmin } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
 import { rowsToCamel } from '../../_shared/case';
 import { json, error } from '../../_shared/response';
@@ -10,6 +10,7 @@ import { createPodcastEpisode } from '../../_shared/podcast';
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
+  if (!isSuperAdmin(auth)) return json({ episodes: [] });
 
   const sql = getSql(context.env);
   const status = new URL(context.request.url).searchParams.get('status');
@@ -42,6 +43,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
+  if (!isSuperAdmin(auth)) return error('Forbidden', 403);
 
   try {
     const result = await createPodcastEpisode(context.env);

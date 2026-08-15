@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
@@ -7,7 +7,6 @@ import { ApiError } from '@/lib/api';
 
 export function Login() {
   const { user, login } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? '/';
 
@@ -16,7 +15,14 @@ export function Login() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (user) return <Navigate to={from} replace />;
+  if (user) {
+    if (user.role !== 'super_admin') {
+      const home = user.brandSlugs?.[0] ? `/${user.brandSlugs[0]}/events` : '/';
+      const allowed = user.brandSlugs?.some((s) => from.startsWith(`/${s}/`));
+      return <Navigate to={allowed ? from : home} replace />;
+    }
+    return <Navigate to={from} replace />;
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -24,7 +30,6 @@ export function Login() {
     setSubmitting(true);
     try {
       await login(username.trim(), password);
-      navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '登入失敗,請稍後再試');
     } finally {
@@ -61,7 +66,7 @@ export function Login() {
           <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--color-primary-dark)' }}>GO</div>
           <h1 style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>行銷中心</h1>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6 }}>
-            上帝視角登入 · 可管理所有品牌
+            請輸入帳號密碼登入
           </p>
         </div>
 

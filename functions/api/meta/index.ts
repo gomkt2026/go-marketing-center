@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
-import { requireAuth } from '../../_shared/auth';
+import { requireAuth, isSuperAdmin } from '../../_shared/auth';
 import { getUsers, getAgents } from '../../_shared/queries';
 import { json } from '../../_shared/response';
 
@@ -13,5 +13,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     getAgents(context.env),
   ]);
 
-  return json({ users, agents });
+  if (isSuperAdmin(auth)) return json({ users, agents });
+
+  const allowed = new Set(auth.brandIds);
+  const scopedAgents = (agents as { brandId?: string }[]).filter((a) => !a.brandId || allowed.has(a.brandId));
+  const scopedUsers = (users as { id: string; role: string }[]).filter((u) => u.id === auth.id || u.role === 'super_admin');
+  return json({ users: scopedUsers, agents: scopedAgents });
 };

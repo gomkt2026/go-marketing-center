@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
-import { requireAuth } from '../../_shared/auth';
+import { requireAuth, isSuperAdmin, canAccessBrand, forbidden } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
 import { rowsToCamel } from '../../_shared/case';
 import { json, error } from '../../_shared/response';
@@ -11,7 +11,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const sql = getSql(context.env);
-  const meetingRows = await sql`SELECT * FROM meetings ORDER BY created_at DESC`;
+  const allMeetings = await sql`SELECT * FROM meetings ORDER BY created_at DESC`;
+  const meetingRows = isSuperAdmin(auth)
+    ? allMeetings
+    : (allMeetings as { brand_id: string }[]).filter((r) => auth.brandIds.includes(r.brand_id));
 
   const meetings = [];
   for (const row of meetingRows as Record<string, unknown>[]) {
@@ -56,6 +59,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   // 會議必須綁一個品牌(schema 限制);跨品牌討論以第一個品牌掛名,參與者涵蓋全部品牌 Agent
   const hostBrand = body.brandSlug ? brands.find((b) => b.slug === body.brandSlug) : brands[0];
   if (!hostBrand) return error('找不到品牌', 404);
+  if (!canAccessBrand(auth, hostBrand.id)) return forbidden();
 
   const meetingRows = await sql`
     INSERT INTO meetings (brand_id, title, topic, status, initiated_by_type, initiated_by_user_id, mode)

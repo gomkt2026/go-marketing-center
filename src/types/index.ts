@@ -8,6 +8,11 @@ export interface User {
   email: string;
   role: UserRole;
   avatarUrl?: string;
+  brandIds?: string[];
+  brandSlugs?: string[];
+  username?: string | null;
+  hasPassword?: boolean;
+  isActive?: boolean;
 }
 
 export type BrandVersionStatus = 'draft' | 'published' | 'archived';
@@ -516,7 +521,7 @@ export interface LearningRecord {
 export type EventStatus = 'draft' | 'open' | 'closed' | 'completed';
 export type EventRegistrationStatus = 'registered' | 'cancelled';
 export type EventReferrerCommissionType = 'percentage' | 'fixed';
-export type EventFormFieldType = 'text' | 'number' | 'select' | 'textarea';
+export type EventFormFieldType = 'text' | 'number' | 'select' | 'textarea' | 'checkbox';
 
 export interface EventFormField {
   key: string;
@@ -709,6 +714,11 @@ export interface VideoStrategy {
   brandSlug: string | null;
 }
 
+export interface VideoEdlChunkLine {
+  order: number;
+  text: string;
+}
+
 export interface VideoEdlSegment {
   id: string;
   sourceKey: string | null;
@@ -720,6 +730,7 @@ export interface VideoEdlSegment {
   text: string;
   fadeInMs: number;
   fadeOutMs: number;
+  chunkLines?: VideoEdlChunkLine[];
 }
 
 export interface VideoJob {

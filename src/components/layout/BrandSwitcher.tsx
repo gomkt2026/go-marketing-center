@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBrand } from '@/context/BrandContext';
+import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { useAsyncData } from '@/hooks/useAsyncData';
 
@@ -33,6 +34,8 @@ function BrandMark({ brand, size }: { brand: { primaryColor: string; logoInitial
 
 export function BrandSwitcher() {
   const { currentBrand, brands, setBrandBySlug, isAllBrands } = useBrand();
+  const { user } = useAuth();
+  const canSeeAllBrands = user?.role === 'super_admin';
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -123,18 +126,22 @@ export function BrandSwitcher() {
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{b.name}</div>
               </button>
             ))}
-            <div style={{ height: 1, background: 'var(--color-border)', margin: '6px 4px' }} />
-            <button
-              onClick={() => handleSelect(null)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                padding: '8px 10px', borderRadius: 8, border: 'none',
-                background: isAllBrands ? 'var(--color-primary-soft)' : 'transparent',
-                cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600,
-              }}
-            >
-              🌐 全部品牌
-            </button>
+            {canSeeAllBrands && (
+              <>
+                <div style={{ height: 1, background: 'var(--color-border)', margin: '6px 4px' }} />
+                <button
+                  onClick={() => handleSelect(null)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                    padding: '8px 10px', borderRadius: 8, border: 'none',
+                    background: isAllBrands ? 'var(--color-primary-soft)' : 'transparent',
+                    cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600,
+                  }}
+                >
+                  全部品牌
+                </button>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

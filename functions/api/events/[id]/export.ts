@@ -51,7 +51,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const customAnswers = (r.custom_answers as Record<string, unknown>) ?? {};
     lines.push([
       r.name, r.phone, r.email, r.line_id, r.session_label, r.referrer_display,
-      ...customKeys.map((k) => customAnswers[k]),
+      ...customKeys.map((k) => {
+        const v = customAnswers[k];
+        return Array.isArray(v) ? v.join('、') : v;
+      }),
       r.status === 'cancelled' ? '已取消' : '已報名',
       r.checked_in_at ? new Date(r.checked_in_at as string).toLocaleString('zh-TW') : '',
       new Date(r.created_at as string).toLocaleString('zh-TW'),

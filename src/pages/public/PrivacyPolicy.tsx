@@ -21,6 +21,7 @@ const BRANDS: Record<string, BrandInfo> = {
   homigo: { name: 'Homigo', service: '租屋管理與包租代管服務' },
   taskgo: { name: 'TaskGo', service: '裝修工程媒合與工班管理服務' },
   washgo: { name: 'Washgo', service: '衣物清洗與保養服務' },
+  fixercowork: { name: 'FIXERCOWORK', service: '房屋修繕與工程整合服務' },
 };
 
 const sectionTitle: React.CSSProperties = {

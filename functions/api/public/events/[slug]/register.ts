@@ -39,7 +39,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   for (const field of event.formFields) {
     if (field.required) {
       const value = body.customAnswers?.[field.key];
-      if (value === undefined || value === null || value === '') {
+      const emptyArray = Array.isArray(value) && value.length === 0;
+      if (value === undefined || value === null || value === '' || emptyArray) {
         return error(`請填寫「${field.label}」`, 400);
       }
     }

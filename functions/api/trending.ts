@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../_shared/env';
-import { requireAuth } from '../_shared/auth';
+import { requireAuth, isSuperAdmin } from '../_shared/auth';
 import { getSql } from '../_shared/db';
 import { json } from '../_shared/response';
 import { fetchGoogleTrendsTW, fetchTaiwanNews, type TrendItem } from '../_shared/sources';
@@ -95,11 +95,14 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     `,
   ]);
 
-  const signals = signalRows as {
+  const allSignals = signalRows as {
     id: string; title: string; summary: string | null; source_url: string | null;
     source_platform: string | null; relevance_score: number | null; discovered_at: string;
     brand_slug: string; brand_name: string;
   }[];
+  const signals = isSuperAdmin(auth)
+    ? allSignals
+    : allSignals.filter((s) => auth.brandSlugs.includes(s.brand_slug));
 
   // FB/IG 面向:品牌精選情報(新聞/RSS 類)+ 即時台灣新聞
   const curatedNews: HotNewsItem[] = signals

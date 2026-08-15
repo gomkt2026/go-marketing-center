@@ -84,6 +84,12 @@ export function EventDetail() {
               <input readOnly value={registerUrl} style={inputStyle} />
               <Button variant="ghost" onClick={() => void copy(registerUrl, '報名連結')}>複製</Button>
             </div>
+            {event.slug === 'fixercowork-biz-exchange-0828' && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                <a href="/events/fixercowork-edm-meeting.png" target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#F26522' }}>商業交流會議 EDM</a>
+                <a href="/events/fixercowork-edm-alliance.png" target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#1B2B47' }}>21克拉工程聯盟 EDM</a>
+              </div>
+            )}
           </div>
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>工作人員報到連結(授權碼)</div>

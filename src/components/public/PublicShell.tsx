@@ -9,8 +9,10 @@ export interface PublicBrandInfo {
   tagline?: string | null;
 }
 
-const FIXER_ORANGE = '#E86B19';
-const FIXER_NAVY = '#1A2F4B';
+export const FIXER_ORANGE = '#F26522';
+export const FIXER_NAVY = '#1B2B47';
+export const FIXER_ORANGE_SOFT = '#FFF1E8';
+export const FIXER_NAVY_SOFT = '#E8EEF6';
 
 export function brandAccent(brand?: PublicBrandInfo | null): string | undefined {
   if (!brand) return undefined;
@@ -25,7 +27,7 @@ export function PublicShell({
   const isFixer = brand?.slug === 'fixercowork';
   const headerColor = isFixer ? FIXER_NAVY : (accent ?? 'var(--color-primary-dark)');
   const pageBg = isFixer
-    ? 'linear-gradient(160deg, #FFF4EB 0%, #F7F4F0 55%)'
+    ? `linear-gradient(165deg, ${FIXER_ORANGE_SOFT} 0%, #FFFFFF 42%, ${FIXER_NAVY_SOFT} 100%)`
     : 'linear-gradient(160deg, var(--color-primary-soft) 0%, var(--color-bg-soft) 55%)';
 
   return (
@@ -42,31 +44,43 @@ export function PublicShell({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        style={{ width: '100%', maxWidth, alignSelf: 'flex-start' }}
+        style={{ width: '100%', maxWidth: isFixer ? Math.max(maxWidth, 560) : maxWidth, alignSelf: 'flex-start' }}
       >
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           {brand?.logoUrl ? (
             <img
               src={brand.logoUrl}
               alt={brand.name}
-              style={{ maxHeight: 72, maxWidth: 220, objectFit: 'contain', marginBottom: 8 }}
+              style={{ maxHeight: 88, maxWidth: 240, objectFit: 'contain', marginBottom: 8 }}
             />
           ) : null}
-          <div style={{ fontSize: 13, fontWeight: 700, color: headerColor, letterSpacing: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: headerColor, letterSpacing: 1.4 }}>
             {brand ? brand.name : 'GO 行銷中心 · 活動報名'}
           </div>
           {brand?.tagline && (
-            <div style={{ fontSize: 11, color: accent ?? 'var(--color-text-muted)', letterSpacing: 1.2, marginTop: 4 }}>
-              {brand.tagline}
+            <div style={{
+              fontSize: 11,
+              color: isFixer ? FIXER_NAVY : (accent ?? 'var(--color-text-muted)'),
+              letterSpacing: 1.6,
+              marginTop: 4,
+              fontWeight: 600,
+            }}
+            >
+              {isFixer ? (
+                <>
+                  <span style={{ color: FIXER_ORANGE }}>REPAIR</span>
+                  <span style={{ color: FIXER_NAVY }}> & MAINTAIN SOLUTIONS</span>
+                </>
+              ) : brand.tagline}
             </div>
           )}
         </div>
         <div
           style={{
-            background: 'var(--color-bg)',
-            border: '1px solid var(--color-border)',
+            background: '#fff',
+            border: isFixer ? `1.5px solid ${FIXER_NAVY}22` : '1px solid var(--color-border)',
             borderRadius: 20,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
+            boxShadow: isFixer ? `0 12px 36px ${FIXER_NAVY}14` : '0 8px 32px rgba(0,0,0,0.06)',
             padding: '28px 24px',
           }}
         >
@@ -80,7 +94,7 @@ export function PublicShell({
 export function PublicMessage({ title, body, tone = 'default' }: { title: string; body?: string; tone?: 'default' | 'success' | 'danger' }) {
   const colors = {
     default: { bg: 'var(--color-bg-soft)', color: 'var(--color-text)' },
-    success: { bg: 'var(--color-primary-soft)', color: 'var(--color-primary-dark)' },
+    success: { bg: FIXER_ORANGE_SOFT, color: FIXER_ORANGE },
     danger: { bg: 'var(--color-danger-soft)', color: '#B85454' },
   }[tone];
   return (

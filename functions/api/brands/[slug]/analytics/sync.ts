@@ -28,3 +28,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     console.error('[analytics/sync] 同步失敗', message);
     return error(message || '同步成效失敗', 500);
   }
+};

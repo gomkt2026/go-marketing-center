@@ -50,6 +50,8 @@ export const api = {
       documents: import('@/types').BrandDocument[];
       histories: import('@/types').BrandHistory[];
       assets: import('@/types').BrandAsset[];
+      pressCoverages: import('@/types').PressCoverage[];
+      pressReleases: import('@/types').PressRelease[];
     }>(`/api/brands/${slug}/intelligence`),
 
   // -- 品牌智慧圖片素材庫(系統畫面截圖/實拍照片,可當 Threads 圖片靈感貼文的話題來源) --------
@@ -77,7 +79,65 @@ export const api = {
     request<{
       stats: { activeCampaigns: number; pendingContents: number; marketSignals: number; learningRecords: number };
       histories: import('@/types').BrandHistory[];
+      pressCoverages: import('@/types').PressCoverage[];
     }>(`/api/brands/${slug}/workspace`),
+
+  createPressCoverage: (slug: string, body: {
+    outlet: string; headline: string; articleUrl?: string; publishedOn?: string;
+    storyKey?: string; summary?: string; keyQuotes?: string[]; claimableFacts?: string[];
+    isPrimary?: boolean; relatedBrandSlugs?: string[]; status?: string;
+  }) =>
+    request<{ coverage: import('@/types').PressCoverage }>(`/api/brands/${slug}/press-coverages`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+
+  updatePressCoverage: (slug: string, id: string, body: Record<string, unknown>) =>
+    request<{ coverage: import('@/types').PressCoverage }>(`/api/brands/${slug}/press-coverages/${id}`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+
+  approvePressCoverage: (slug: string, id: string, body?: {
+    isPrimary?: boolean; storyKey?: string; summary?: string;
+    keyQuotes?: string[]; claimableFacts?: string[]; dismiss?: boolean;
+  }) =>
+    request<{ coverage: import('@/types').PressCoverage }>(`/api/brands/${slug}/press-coverages/${id}/approve`, {
+      method: 'POST', body: JSON.stringify(body ?? {}),
+    }),
+
+  generateFromPressCoverage: (slug: string, id: string) =>
+    request<{ created: { contentId: string; platform: string }[]; failures: { platform: string; error: string }[] }>(
+      `/api/brands/${slug}/press-coverages/${id}/generate`, { method: 'POST', body: JSON.stringify({}) },
+    ),
+
+  generateArticleFromPressCoverage: (slug: string, id: string) =>
+    request<{ contentId: string; title: string }>(
+      `/api/brands/${slug}/press-coverages/${id}/generate-article`, { method: 'POST', body: JSON.stringify({}) },
+    ),
+
+  createPressRelease: (slug: string, body: { title: string; body: string; embargoOn?: string }) =>
+    request<{ release: import('@/types').PressRelease }>(`/api/brands/${slug}/press-releases`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+
+  updatePressRelease: (slug: string, id: string, body: { title?: string; body?: string; embargoOn?: string | null }) =>
+    request<{ release: import('@/types').PressRelease }>(`/api/brands/${slug}/press-releases/${id}`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+
+  reviewPressRelease: (slug: string, id: string, action: 'submit' | 'approve' | 'return' | 'finalize', note?: string) =>
+    request<{ release: import('@/types').PressRelease }>(`/api/brands/${slug}/press-releases/${id}/review`, {
+      method: 'POST', body: JSON.stringify({ action, note }),
+    }),
+
+  generateFromPressRelease: (slug: string, id: string) =>
+    request<{ created: { contentId: string; platform: string }[]; failures: { platform: string; error: string }[] }>(
+      `/api/brands/${slug}/press-releases/${id}/generate`, { method: 'POST', body: JSON.stringify({}) },
+    ),
+
+  generateArticleFromPressRelease: (slug: string, id: string) =>
+    request<{ contentId: string; title: string }>(
+      `/api/brands/${slug}/press-releases/${id}/generate-article`, { method: 'POST', body: JSON.stringify({}) },
+    ),
 
   marketSignals: (slug: string) =>
     request<{ signals: import('@/types').MarketSignal[] }>(`/api/brands/${slug}/market-signals`),

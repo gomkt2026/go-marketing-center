@@ -21,7 +21,7 @@ export function BrandWorkspace() {
   }
 
   const version = brandQuery.data?.version;
-  const { stats, histories } = workspaceQuery.data;
+  const { stats, histories, pressCoverages = [] } = workspaceQuery.data;
 
   return (
     <div>
@@ -74,6 +74,23 @@ export function BrandWorkspace() {
           {histories.length === 0 && <p>尚無里程碑紀錄</p>}
         </Card>
       </div>
+
+      <Card delay={0.18} style={{ marginTop: 16 }}>
+        <strong style={{ display: 'block', marginBottom: 12 }}>最新媒體露出</strong>
+        {pressCoverages.map((c) => (
+          <div key={c.id} style={{ padding: '8px 0', borderTop: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              {c.publishedOn ? new Date(c.publishedOn).toLocaleDateString('zh-TW') : ''} · {c.outlet}
+              {c.isPrimary ? ' · 主稿' : ' · 轉載'}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{c.headline}</div>
+            {c.articleUrl && (
+              <a href={c.articleUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>原文 →</a>
+            )}
+          </div>
+        ))}
+        {pressCoverages.length === 0 && <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>尚無已核准的媒體報導</p>}
+      </Card>
     </div>
   );
 }

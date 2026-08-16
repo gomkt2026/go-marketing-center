@@ -21,22 +21,36 @@ import { encryptToken, decryptToken } from '../../../functions/_shared/crypto';
 import { logActivity } from '../../../functions/_shared/activity';
 import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from '../../../functions/_shared/sources';
 import { createPodcastEpisode } from '../../../functions/_shared/podcast';
+import { slugifyStoryKey } from '../../../functions/_shared/press';
 
 // 每品牌的議題來源設定;filterKeywords 用於從一般新聞中挑出行業相關文章
-const BRAND_SOURCES: Record<string, { newsQuery: string; filterKeywords: string[]; pttBoard?: string; dcardForum?: string }> = {
+const BRAND_SOURCES: Record<string, {
+  newsQuery: string;
+  filterKeywords: string[];
+  brandQueries: string[];
+  brandNames: string[];
+  pttBoard?: string;
+  dcardForum?: string;
+}> = {
   homigo: {
     newsQuery: '租屋 OR 租金補貼 OR 包租代管 OR 房東 房客',
     filterKeywords: ['租屋', '租金', '房東', '房客', '租客', '包租', '社宅', '房市', '押金', '租約', '囤房'],
+    brandQueries: ['Homigo', '匠管 Homigo', 'Inforcraft 租屋'],
+    brandNames: ['Homigo', '匠管', 'Inforcraft'],
     pttBoard: 'home-sale', dcardForum: 'rent',
   },
   taskgo: {
     newsQuery: '裝修 OR 室內裝潢 OR 工班 OR 老屋翻新',
     filterKeywords: ['裝修', '裝潢', '工班', '翻新', '缺工', '工地', '建材', '室內設計', '水電', '漏水'],
+    brandQueries: ['TaskGo', 'Task Go', '匠管 Task'],
+    brandNames: ['TaskGo', 'Task Go', '匠管'],
     pttBoard: 'Interior', dcardForum: 'interior_design',
   },
   washgo: {
     newsQuery: '洗衣店 OR 乾洗 OR 衣物保養 OR 換季收納',
     filterKeywords: ['洗衣', '乾洗', '衣物', '棉被', '羽絨', '換季', '收納', '梅雨', '潮濕', '黴'],
+    brandQueries: ['Washgo', 'WashGo', '匠管 洗衣'],
+    brandNames: ['Washgo', 'WashGo'],
     dcardForum: 'life',
   },
 };
@@ -78,7 +92,7 @@ async function collectSignals(env: Env): Promise<void> {
 
   for (const brand of brands as { id: string; slug: string; name: string }[]) {
     try {
-      const config = BRAND_SOURCES[brand.slug] ?? { newsQuery: brand.name, filterKeywords: [] };
+      const config = BRAND_SOURCES[brand.slug] ?? { newsQuery: brand.name, filterKeywords: [], brandQueries: [brand.name], brandNames: [brand.name] };
       const [news, ptt, dcard] = await Promise.all([
         fetchGoogleNews(config.newsQuery),
         config.pttBoard ? fetchPttBoard(config.pttBoard) : Promise.resolve([]),
@@ -157,6 +171,107 @@ async function collectSignals(env: Env): Promise<void> {
       }
     } catch (e) {
       console.error(`[collect] 品牌 ${brand.slug} 蒐集失敗`, e);
+    }
+  }
+}
+
+// ============================================================================
+// 品牌名監測:Google News + 台灣媒體 RSS → press_coverages.inbox
+//   不自動核准、不自動發文。Google News 503 時仍可靠台灣 RSS。
+// ============================================================================
+async function collectPressMentions(env: Env): Promise<void> {
+  const sql = getSql(env);
+  const brands = await sql`SELECT id, slug, name FROM brands WHERE is_active = true`;
+  const generalNews = await fetchTaiwanNews();
+  const analystId = await findMarketAnalystAgent(env);
+
+  for (const brand of brands as { id: string; slug: string; name: string }[]) {
+    try {
+      const config = BRAND_SOURCES[brand.slug] ?? {
+        newsQuery: brand.name, filterKeywords: [], brandQueries: [brand.name], brandNames: [brand.name],
+      };
+      const gnews = (await Promise.all(config.brandQueries.map((q) => fetchGoogleNews(q, 6)))).flat();
+      const nameHits = generalNews.filter((n) =>
+        config.brandNames.some((name) => (n.title + (n.snippet ?? '')).includes(name)),
+      );
+      const seen = new Set<string>();
+      const candidates = [...gnews, ...nameHits].filter((c) => {
+        const key = (c.url || c.title).toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, 20);
+      if (!candidates.length) continue;
+
+      const existing = await sql`
+        SELECT article_url, headline FROM press_coverages WHERE brand_id = ${brand.id}::uuid
+      `;
+      const existingUrls = new Set((existing as { article_url: string | null }[]).map((r) => r.article_url).filter(Boolean));
+      const existingTitles = new Set((existing as { headline: string }[]).map((r) => r.headline));
+      const fresh = candidates.filter((c) => {
+        if (c.url && existingUrls.has(c.url)) return false;
+        if (existingTitles.has(c.title)) return false;
+        return true;
+      });
+      if (!fresh.length) continue;
+
+      const listText = fresh.map((c, i) => `${i}. ${c.title}${c.snippet ? ` — ${c.snippet.slice(0, 120)}` : ''}`).join('\n');
+      const classified = await chatCompleteJson<{ items: { index: number; kind: string; outlet: string; summary: string }[] }>(env, {
+        temperature: 0.1,
+        messages: [
+          {
+            role: 'system',
+            content: `你在幫品牌「${brand.name}」分辨新聞。own_coverage=這則是在報導或點名本品牌/產品;industry_news=產業新聞但沒有報導本品牌;noise=無關。`,
+          },
+          {
+            role: 'user',
+            content: [
+              `品牌名/產品名:${config.brandNames.join('、')}`,
+              listText,
+              '回傳 JSON:{"items":[{"index":編號,"kind":"own_coverage|industry_news|noise","outlet":"媒體名(不知道就寫來源網站)","summary":"40字內摘要,不可抄全文"}]}',
+            ].join('\n'),
+          },
+        ],
+      });
+
+      for (const item of classified.items ?? []) {
+        if (item.kind !== 'own_coverage') continue;
+        const src = fresh[item.index];
+        if (!src) continue;
+        try {
+          await sql`
+            INSERT INTO press_coverages (
+              brand_id, story_key, outlet, headline, article_url, published_on,
+              status, discovery_source, summary, key_quotes, claimable_facts, is_primary
+            ) VALUES (
+              ${brand.id}::uuid,
+              ${slugifyStoryKey(`${brand.slug}-${src.title}`)},
+              ${item.outlet || '未標示媒體'},
+              ${src.title},
+              ${src.url ?? null},
+              ${new Date().toISOString().slice(0, 10)},
+              'inbox',
+              'scheduler',
+              ${item.summary || null},
+              ${JSON.stringify([])},
+              ${JSON.stringify([])},
+              true
+            )
+          `;
+          await logActivity(env, {
+            brandId: brand.id,
+            actorType: 'ai_agent',
+            actorAgentId: analystId,
+            action: 'press_coverage.created',
+            entityType: 'press_coverage',
+            afterState: { headline: src.title, source: 'scheduler' },
+          });
+        } catch (e) {
+          console.log(`[press] ${brand.slug} 略過重複或寫入失敗`, e instanceof Error ? e.message : e);
+        }
+      }
+    } catch (e) {
+      console.error(`[press] 品牌 ${brand.slug} 監測失敗`, e);
     }
   }
 }
@@ -1267,6 +1382,7 @@ export default {
     switch (controller.cron) {
       case '15 */3 * * *':
         ctx.waitUntil(collectSignals(env));
+        ctx.waitUntil(collectPressMentions(env));
         break;
       case '45 * * * *':
         ctx.waitUntil(generateSignalDrafts(env));
@@ -1284,6 +1400,7 @@ export default {
         break;
       default:
         ctx.waitUntil(collectSignals(env));
+        ctx.waitUntil(collectPressMentions(env));
     }
   },
 
@@ -1298,6 +1415,7 @@ export default {
     }
     const slotAt = new Date(url.searchParams.get('slotAt') ?? Date.now());
     if (task === 'collect') await collectSignals(env);
+    else if (task === 'press') await collectPressMentions(env);
     else if (task === 'drafts') await generateSignalDrafts(env);
     else if (task === 'threads') await generateThreadsSlot(env, slotAt);
     else if (task === 'offtopic') await generateThreadsOfftopicSlot(env, slotAt);
@@ -1313,7 +1431,7 @@ export default {
       const result = await createPodcastEpisode(env);
       return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
     }
-    else return new Response('task 必須為 collect / drafts / threads / offtopic / replies / themes / ecosystem / ecosystem-x / publish / cleanup / podcast / refresh-tokens / refresh-x-tokens', { status: 400 });
+    else return new Response('task 必須為 collect / press / drafts / threads / offtopic / replies / themes / ecosystem / ecosystem-x / publish / cleanup / podcast / refresh-tokens / refresh-x-tokens', { status: 400 });
     return new Response(JSON.stringify({ ok: true, task }), { headers: { 'Content-Type': 'application/json' } });
   },
 };

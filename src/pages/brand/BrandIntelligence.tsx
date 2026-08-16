@@ -12,7 +12,7 @@ import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type {
   BrandRule, BrandAudience, BrandPersona, BrandChannel, BrandVisual,
   BrandKeyword, BrandExample, BrandDocument, BrandVersion, VerificationStatus,
-  BrandAsset, BrandAssetImageCategory,
+  BrandAsset, BrandAssetImageCategory, PressCoverage, PressRelease,
 } from '@/types';
 
 const TABS = [
@@ -20,6 +20,8 @@ const TABS = [
   { id: 'audience', label: '受眾' },
   { id: 'channel', label: '平台調性' },
   { id: 'rules', label: '規則邊界' },
+  { id: 'press', label: '媒體報導' },
+  { id: 'releases', label: '新聞稿' },
   { id: 'visual', label: '視覺' },
   { id: 'library', label: '素材庫' },
   { id: 'raw', label: '原始檢視' },
@@ -44,6 +46,7 @@ const IMAGE_CATEGORY_OPTIONS: { value: BrandAssetImageCategory; label: string }[
   { value: 'people', label: '人物照片' },
   { value: 'scene', label: '場景照片' },
   { value: 'brand_collab', label: '合作品牌照片' },
+  { value: 'press_clipping', label: '見報截圖' },
   { value: 'other', label: '其他' },
 ];
 const imageCategoryLabel: Record<string, string> = Object.fromEntries(
@@ -65,6 +68,13 @@ export function BrandIntelligence() {
   const [assetError, setAssetError] = useState<string | null>(null);
   const [generatingAssetId, setGeneratingAssetId] = useState<string | null>(null);
   const [generatedContentId, setGeneratedContentId] = useState<string | null>(null);
+  const [coverages, setCoverages] = useState<PressCoverage[]>([]);
+  const [releases, setReleases] = useState<PressRelease[]>([]);
+  const [pressBusyId, setPressBusyId] = useState<string | null>(null);
+  const [pressMessage, setPressMessage] = useState<string | null>(null);
+  const [newCoverage, setNewCoverage] = useState({ outlet: '', headline: '', articleUrl: '', publishedOn: '', summary: '' });
+  const [newRelease, setNewRelease] = useState({ title: '', body: '' });
+  const [editingReleaseId, setEditingReleaseId] = useState<string | null>(null);
 
   const brandQuery = useAsyncData(
     () => slug ? api.brand(slug) : Promise.reject(new Error('no slug')),
@@ -81,6 +91,12 @@ export function BrandIntelligence() {
   useEffect(() => {
     if (intelQuery.data?.assets) setAssets(intelQuery.data.assets);
   }, [intelQuery.data?.assets]);
+  useEffect(() => {
+    if (intelQuery.data?.pressCoverages) setCoverages(intelQuery.data.pressCoverages);
+  }, [intelQuery.data?.pressCoverages]);
+  useEffect(() => {
+    if (intelQuery.data?.pressReleases) setReleases(intelQuery.data.pressReleases);
+  }, [intelQuery.data?.pressReleases]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (brandQuery.loading || intelQuery.loading) return <LoadingState />;
@@ -155,6 +171,137 @@ export function BrandIntelligence() {
       setAssetError(e instanceof Error ? e.message : '生成失敗');
     } finally {
       setGeneratingAssetId(null);
+    }
+  }
+
+  async function addCoverage() {
+    if (!slug || !newCoverage.outlet.trim() || !newCoverage.headline.trim()) return;
+    setPressMessage(null);
+    try {
+      const { coverage } = await api.createPressCoverage(slug, {
+        outlet: newCoverage.outlet.trim(),
+        headline: newCoverage.headline.trim(),
+        articleUrl: newCoverage.articleUrl.trim() || undefined,
+        publishedOn: newCoverage.publishedOn || undefined,
+        summary: newCoverage.summary.trim() || undefined,
+      });
+      setCoverages((prev) => [coverage, ...prev]);
+      setNewCoverage({ outlet: '', headline: '', articleUrl: '', publishedOn: '', summary: '' });
+      setPressMessage('已新增報導');
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '新增失敗');
+    }
+  }
+
+  async function approveCoverage(id: string, dismiss = false) {
+    if (!slug) return;
+    setPressBusyId(id);
+    setPressMessage(null);
+    try {
+      const { coverage } = await api.approvePressCoverage(slug, id, { dismiss });
+      setCoverages((prev) => prev.map((c) => (c.id === id ? coverage : c)));
+      setPressMessage(dismiss ? '已忽略' : '已核准,之後生成文案可引用');
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '操作失敗');
+    } finally {
+      setPressBusyId(null);
+    }
+  }
+
+  async function generateCoveragePosts(id: string) {
+    if (!slug) return;
+    setPressBusyId(id);
+    setPressMessage(null);
+    try {
+      const res = await api.generateFromPressCoverage(slug, id);
+      setPressMessage(`已生成 ${res.created.length} 則社群草稿,請到內容中心審閱`);
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '生成失敗');
+    } finally {
+      setPressBusyId(null);
+    }
+  }
+
+  async function generateCoverageArticle(id: string) {
+    if (!slug) return;
+    setPressBusyId(id);
+    setPressMessage(null);
+    try {
+      const res = await api.generateArticleFromPressCoverage(slug, id);
+      setPressMessage(`已生成 SEO 長文「${res.title}」,請到內容中心審閱`);
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '生成失敗');
+    } finally {
+      setPressBusyId(null);
+    }
+  }
+
+  async function addRelease() {
+    if (!slug || !newRelease.title.trim() || !newRelease.body.trim()) return;
+    setPressMessage(null);
+    try {
+      const { release } = await api.createPressRelease(slug, newRelease);
+      setReleases((prev) => [release, ...prev]);
+      setNewRelease({ title: '', body: '' });
+      setPressMessage('已建立新聞稿草稿');
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '建立失敗');
+    }
+  }
+
+  async function saveRelease(r: PressRelease) {
+    if (!slug) return;
+    setPressBusyId(r.id);
+    try {
+      const { release } = await api.updatePressRelease(slug, r.id, { title: r.title, body: r.body });
+      setReleases((prev) => prev.map((x) => (x.id === r.id ? release : x)));
+      setEditingReleaseId(null);
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '儲存失敗');
+    } finally {
+      setPressBusyId(null);
+    }
+  }
+
+  async function reviewRelease(id: string, action: 'submit' | 'approve' | 'return' | 'finalize') {
+    if (!slug) return;
+    setPressBusyId(id);
+    setPressMessage(null);
+    try {
+      const { release } = await api.reviewPressRelease(slug, id, action);
+      setReleases((prev) => prev.map((x) => (x.id === id ? release : x)));
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '審核失敗');
+    } finally {
+      setPressBusyId(null);
+    }
+  }
+
+  async function generateReleasePosts(id: string) {
+    if (!slug) return;
+    setPressBusyId(id);
+    setPressMessage(null);
+    try {
+      const res = await api.generateFromPressRelease(slug, id);
+      setPressMessage(`已準備 ${res.created.length} 則社群素材(不會寫成已見報),請到內容中心審閱`);
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '生成失敗');
+    } finally {
+      setPressBusyId(null);
+    }
+  }
+
+  async function generateReleaseArticle(id: string) {
+    if (!slug) return;
+    setPressBusyId(id);
+    setPressMessage(null);
+    try {
+      const res = await api.generateArticleFromPressRelease(slug, id);
+      setPressMessage(`已生成 SEO 長文「${res.title}」,請到內容中心審閱`);
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '生成失敗');
+    } finally {
+      setPressBusyId(null);
     }
   }
 
@@ -299,6 +446,127 @@ export function BrandIntelligence() {
                   <Button variant="secondary" style={{ justifySelf: 'start' }} onClick={() => void addRule()}>
                     + 新增規則
                   </Button>
+                </div>
+              )}
+
+              {tab === 'press' && (
+                <div style={{ display: 'grid', gap: 16 }}>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0 }}>
+                    第三方報導只存標題、出處、摘要與短金句,不存全文。監測進來的先待確認,核准後才會被 AI 引用。
+                  </p>
+                  {pressMessage && <p style={{ fontSize: 13, color: 'var(--color-primary-dark)' }}>{pressMessage}</p>}
+                  <div style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
+                    <strong style={{ fontSize: 13 }}>手動新增已見報內容</strong>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input placeholder="媒體名稱" value={newCoverage.outlet} onChange={(e) => setNewCoverage((s) => ({ ...s, outlet: e.target.value }))} style={inputStyle} />
+                      <input placeholder="見報日期" type="date" value={newCoverage.publishedOn} onChange={(e) => setNewCoverage((s) => ({ ...s, publishedOn: e.target.value }))} style={inputStyle} />
+                    </div>
+                    <input placeholder="標題" value={newCoverage.headline} onChange={(e) => setNewCoverage((s) => ({ ...s, headline: e.target.value }))} style={inputStyle} />
+                    <input placeholder="原文連結" value={newCoverage.articleUrl} onChange={(e) => setNewCoverage((s) => ({ ...s, articleUrl: e.target.value }))} style={inputStyle} />
+                    <textarea placeholder="摘要(我們整理的,不是原文)" value={newCoverage.summary} onChange={(e) => setNewCoverage((s) => ({ ...s, summary: e.target.value }))} style={{ ...inputStyle, minHeight: 64 }} />
+                    <Button variant="secondary" style={{ justifySelf: 'start' }} onClick={() => void addCoverage()}>+ 新增報導</Button>
+                  </div>
+                  {coverages.map((c) => (
+                    <div key={c.id} style={cardBoxStyle}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <Badge tone={c.status === 'inbox' ? 'accent' : c.status === 'published' ? 'primary' : c.status === 'dismissed' ? 'danger' : 'secondary'}>
+                          {c.status === 'inbox' ? '待確認' : c.status === 'published' ? '已核准主稿' : c.status === 'syndicated' ? '轉載' : '已忽略'}
+                        </Badge>
+                        <Badge tone="default">{c.outlet}</Badge>
+                        {c.publishedOn && <Badge tone="default">{String(c.publishedOn).slice(0, 10)}</Badge>}
+                        {c.discoverySource === 'scheduler' && <Badge tone="secondary">監測</Badge>}
+                      </div>
+                      <strong style={{ fontSize: 14 }}>{c.headline}</strong>
+                      {c.summary && <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6 }}>{c.summary}</div>}
+                      {c.keyQuotes.length > 0 && <div style={{ fontSize: 12, marginTop: 6 }}>金句:{c.keyQuotes.join(' / ')}</div>}
+                      {c.claimableFacts.length > 0 && <div style={{ fontSize: 12, marginTop: 4 }}>可引用:{c.claimableFacts.join('、')}</div>}
+                      {c.articleUrl && (
+                        <a href={c.articleUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, display: 'inline-block', marginTop: 8 }}>
+                          原文連結 →
+                        </a>
+                      )}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                        {c.status === 'inbox' && (
+                          <>
+                            <Button variant="primary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pressBusyId === c.id} onClick={() => void approveCoverage(c.id)}>核准</Button>
+                            <Button variant="ghost" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pressBusyId === c.id} onClick={() => void approveCoverage(c.id, true)}>忽略</Button>
+                          </>
+                        )}
+                        {(c.status === 'published' || c.status === 'syndicated') && (
+                          <>
+                            <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pressBusyId === c.id} onClick={() => void generateCoveragePosts(c.id)}>生成社群貼文</Button>
+                            <Button variant="ghost" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pressBusyId === c.id} onClick={() => void generateCoverageArticle(c.id)}>生成 SEO 長文</Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {coverages.length === 0 && <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>尚無媒體報導</p>}
+                </div>
+              )}
+
+              {tab === 'releases' && (
+                <div style={{ display: 'grid', gap: 16 }}>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0 }}>
+                    自家新聞稿可存全文。流程:草稿 → 送審 → 核准 → 定稿。定稿前不可讓 AI 寫成「已被媒體報導」。
+                  </p>
+                  {pressMessage && <p style={{ fontSize: 13, color: 'var(--color-primary-dark)' }}>{pressMessage}</p>}
+                  <div style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
+                    <strong style={{ fontSize: 13 }}>新草稿</strong>
+                    <input placeholder="標題" value={newRelease.title} onChange={(e) => setNewRelease((s) => ({ ...s, title: e.target.value }))} style={inputStyle} />
+                    <textarea placeholder="全文" value={newRelease.body} onChange={(e) => setNewRelease((s) => ({ ...s, body: e.target.value }))} style={{ ...inputStyle, minHeight: 120 }} />
+                    <Button variant="secondary" style={{ justifySelf: 'start' }} onClick={() => void addRelease()}>+ 建立草稿</Button>
+                  </div>
+                  {releases.map((r) => {
+                    const editing = editingReleaseId === r.id;
+                    return (
+                      <div key={r.id} style={cardBoxStyle}>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                          <Badge tone={r.status === 'final' ? 'primary' : r.status === 'pending_review' ? 'accent' : 'default'}>
+                            {r.status === 'draft' ? '草稿' : r.status === 'pending_review' ? '待審核' : r.status === 'approved' ? '已核准' : '已定稿'}
+                          </Badge>
+                          {r.embargoOn && <Badge tone="secondary">禁載 {String(r.embargoOn).slice(0, 10)}</Badge>}
+                        </div>
+                        {editing ? (
+                          <>
+                            <input defaultValue={r.title} onBlur={(e) => { r.title = e.target.value; }} style={{ ...inputStyle, marginBottom: 8 }} />
+                            <textarea defaultValue={r.body} onBlur={(e) => { r.body = e.target.value; }} style={{ ...inputStyle, minHeight: 160 }} />
+                          </>
+                        ) : (
+                          <>
+                            <strong style={{ fontSize: 14 }}>{r.title}</strong>
+                            <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 8, whiteSpace: 'pre-wrap', maxHeight: 180, overflow: 'auto' }}>{r.body}</div>
+                          </>
+                        )}
+                        {r.reviewNote && <div style={{ fontSize: 12, marginTop: 8 }}>審核意見:{r.reviewNote}</div>}
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                          {r.status !== 'final' && (
+                            <Button variant="ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => {
+                              if (editing) void saveRelease(r);
+                              else setEditingReleaseId(r.id);
+                            }}>
+                              {editing ? '儲存' : '編輯'}
+                            </Button>
+                          )}
+                          {r.status === 'draft' && <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pressBusyId === r.id} onClick={() => void reviewRelease(r.id, 'submit')}>送審</Button>}
+                          {r.status === 'pending_review' && (
+                            <>
+                              <Button variant="primary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pressBusyId === r.id} onClick={() => void reviewRelease(r.id, 'approve')}>核准</Button>
+                              <Button variant="ghost" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pressBusyId === r.id} onClick={() => void reviewRelease(r.id, 'return')}>退回</Button>
+                            </>
+                          )}
+                          {r.status === 'approved' && <Button variant="primary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pressBusyId === r.id} onClick={() => void reviewRelease(r.id, 'finalize')}>定稿</Button>}
+                          {(r.status === 'approved' || r.status === 'final') && (
+                            <>
+                              <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pressBusyId === r.id} onClick={() => void generateReleasePosts(r.id)}>準備社群素材</Button>
+                              <Button variant="ghost" style={{ padding: '4px 10px', fontSize: 12 }} disabled={pressBusyId === r.id} onClick={() => void generateReleaseArticle(r.id)}>生成 SEO 長文</Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {releases.length === 0 && <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>尚無新聞稿</p>}
                 </div>
               )}
 
@@ -461,4 +729,9 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 const cardBoxStyle: CSSProperties = {
   border: '1px solid var(--color-border)', borderRadius: 10, padding: 14, background: 'var(--color-bg)',
+};
+
+const inputStyle: CSSProperties = {
+  width: '100%', padding: '7px 12px', borderRadius: 8, border: '1px solid var(--color-border)',
+  fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box',
 };

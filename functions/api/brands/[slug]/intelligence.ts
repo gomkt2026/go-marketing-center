@@ -5,6 +5,7 @@ import { getSql } from '../../../_shared/db';
 import { getBrandBySlug } from '../../../_shared/queries';
 import { rowsToCamel } from '../../../_shared/case';
 import { json, error } from '../../../_shared/response';
+import { toPressCoverage } from '../../../_shared/press';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -17,7 +18,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const sql = getSql(context.env);
   const brandId = brand.id;
 
-  const [rules, audiences, personas, channels, visuals, keywords, examples, documents, histories, assets] = await Promise.all([
+  const [rules, audiences, personas, channels, visuals, keywords, examples, documents, histories, assets, coverages, releases] = await Promise.all([
     sql`SELECT * FROM brand_rules WHERE brand_id = ${brandId}::uuid ORDER BY sort_order, created_at`,
     sql`SELECT * FROM brand_audiences WHERE brand_id = ${brandId}::uuid ORDER BY sort_order`,
     sql`SELECT * FROM brand_personas WHERE brand_id = ${brandId}::uuid ORDER BY sort_order`,
@@ -28,6 +29,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     sql`SELECT * FROM brand_documents WHERE brand_id = ${brandId}::uuid ORDER BY created_at DESC`,
     sql`SELECT * FROM brand_histories WHERE brand_id = ${brandId}::uuid ORDER BY happened_on DESC`,
     sql`SELECT * FROM brand_assets WHERE brand_id = ${brandId}::uuid AND asset_type = 'image' ORDER BY created_at DESC`,
+    sql`SELECT * FROM press_coverages WHERE brand_id = ${brandId}::uuid ORDER BY CASE status WHEN 'inbox' THEN 0 WHEN 'published' THEN 1 WHEN 'syndicated' THEN 2 ELSE 3 END, published_on DESC NULLS LAST`.catch(() => []),
+    sql`SELECT * FROM press_releases WHERE brand_id = ${brandId}::uuid ORDER BY updated_at DESC`.catch(() => []),
   ]);
 
   return json({
@@ -41,5 +44,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     documents: rowsToCamel(documents as Record<string, unknown>[]),
     histories: rowsToCamel(histories as Record<string, unknown>[]),
     assets: rowsToCamel(assets as Record<string, unknown>[]),
+    pressCoverages: (coverages as Record<string, unknown>[]).map(toPressCoverage),
+    pressReleases: rowsToCamel(releases as Record<string, unknown>[]),
   });
 };

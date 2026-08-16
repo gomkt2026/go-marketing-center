@@ -61,8 +61,16 @@
 
 ## 10. Hashtag / CTA / 關鍵字庫
 
+## 11. 媒體報導／社會證明(Press Coverage)
+- 只列入 `press_coverages.status = published` 且 `is_primary = true` 的條目
+- 每則:日期、媒體名、標題、可引用事實、短金句、原文 URL
+- 轉載不重複列出,避免被 AI 誇大成多次專訪
+- inbox／dismissed／未見報新聞稿不得出現在此節
+- 第三方全文不編入
+
 ## 附錄:原始資料索引
 - 列出對應的 brand_documents(不內嵌全文,僅索引與連結)
+- 自家新聞稿(`press_releases`)僅列標題與狀態,定稿全文不混入 Brand Knowledge 編譯(避免未見報就被當成已報導)
 ```
 
 ## 編譯規則

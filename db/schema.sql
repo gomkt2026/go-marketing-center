@@ -59,8 +59,13 @@ CREATE TYPE brand_rule_type AS ENUM (
 
 CREATE TYPE document_source_type AS ENUM (
   'website', 'presentation', 'logo', 'social_post', 'product_intro',
-  'past_article', 'video', 'pdf', 'image', 'brand_manual', 'faq', 'other'
+  'past_article', 'video', 'pdf', 'image', 'brand_manual', 'faq',
+  'press_article', 'press_release', 'other'
 );
+
+CREATE TYPE press_coverage_status AS ENUM ('inbox', 'published', 'syndicated', 'dismissed');
+CREATE TYPE press_discovery_source AS ENUM ('manual', 'scheduler');
+CREATE TYPE press_release_status AS ENUM ('draft', 'pending_review', 'approved', 'final');
 
 CREATE TYPE asset_type AS ENUM ('logo', 'image', 'video', 'document', 'color_palette', 'font');
 
@@ -343,6 +348,51 @@ CREATE TABLE brand_examples (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_brand_examples_brand ON brand_examples(brand_id, category);
+
+-- 自家新聞稿(可存全文;內部草稿 → 審核 → 定稿)
+CREATE TABLE press_releases (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id          UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  title             TEXT NOT NULL,
+  body              TEXT NOT NULL,
+  status            press_release_status NOT NULL DEFAULT 'draft',
+  embargo_on        DATE,
+  review_note       TEXT,
+  created_by        UUID REFERENCES users(id),
+  updated_by        UUID REFERENCES users(id),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_press_releases_brand ON press_releases(brand_id, status, updated_at DESC);
+CREATE TRIGGER trg_press_releases_updated_at BEFORE UPDATE ON press_releases
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- 第三方媒體露出(不存全文,只存出處/摘要/短金句/可宣稱事實)
+CREATE TABLE press_coverages (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id              UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  press_release_id      UUID REFERENCES press_releases(id) ON DELETE SET NULL,
+  story_key             TEXT NOT NULL,
+  outlet                TEXT NOT NULL,
+  headline              TEXT NOT NULL,
+  article_url           TEXT,
+  published_on          DATE,
+  status                press_coverage_status NOT NULL DEFAULT 'inbox',
+  discovery_source      press_discovery_source NOT NULL DEFAULT 'manual',
+  summary               TEXT,
+  key_quotes            JSONB NOT NULL DEFAULT '[]',
+  claimable_facts       JSONB NOT NULL DEFAULT '[]',
+  is_primary            BOOLEAN NOT NULL DEFAULT true,
+  related_brand_slugs   JSONB NOT NULL DEFAULT '[]',
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_press_coverages_brand ON press_coverages(brand_id, status, published_on DESC);
+CREATE INDEX idx_press_coverages_story ON press_coverages(brand_id, story_key);
+CREATE UNIQUE INDEX idx_press_coverages_url ON press_coverages(brand_id, article_url)
+  WHERE article_url IS NOT NULL;
+CREATE TRIGGER trg_press_coverages_updated_at BEFORE UPDATE ON press_coverages
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================================
 -- Market Intelligence(市場情報)

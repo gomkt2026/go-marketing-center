@@ -33,6 +33,7 @@ const PLATFORM_FILTERS: { id: string; label: string }[] = [
   { id: 'facebook', label: 'Facebook' },
   { id: 'instagram', label: 'Instagram' },
   { id: 'threads', label: 'Threads' },
+  { id: 'seo', label: 'SEO 長文' },
 ];
 
 const platformTone: Record<string, BadgeTone> = {
@@ -87,7 +88,9 @@ export function ContentCenter() {
   if (error) return <ErrorState message={error} onRetry={reload} />;
 
   const inTab = items.filter((c) => c.status === tab || (tab === 'approved' && c.status === 'published'));
-  const filtered = platform === 'all' ? inTab : inTab.filter((c) => c.targetPlatform === platform);
+  const filtered = platform === 'all' ? inTab
+    : platform === 'seo' ? inTab.filter((c) => !c.targetPlatform && c.contentType === 'article')
+    : inTab.filter((c) => c.targetPlatform === platform);
   const selected = filtered.find((c) => c.id === selectedId) ?? filtered[0];
 
   async function review(action: 'approve' | 'modify' | 'return' | 'postpone' | 'reject') {
@@ -168,7 +171,9 @@ export function ContentCenter() {
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '10px 16px 12px', borderTop: '1px solid var(--color-border)' }}>
           {PLATFORM_FILTERS.map((p) => {
-            const count = p.id === 'all' ? inTab.length : inTab.filter((c) => c.targetPlatform === p.id).length;
+            const count = p.id === 'all' ? inTab.length
+              : p.id === 'seo' ? inTab.filter((c) => !c.targetPlatform && c.contentType === 'article').length
+              : inTab.filter((c) => c.targetPlatform === p.id).length;
             const active = platform === p.id;
             return (
               <button
@@ -202,8 +207,8 @@ export function ContentCenter() {
             >
               <div style={{ fontSize: 13, fontWeight: 600 }}>{c.title}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                <Badge tone={platformTone[c.targetPlatform] ?? 'default'}>
-                  {platformLabel[c.targetPlatform] ?? c.targetPlatform}
+                <Badge tone={platformTone[c.targetPlatform ?? ''] ?? 'default'}>
+                  {c.targetPlatform ? (platformLabel[c.targetPlatform] ?? c.targetPlatform) : 'SEO'}
                 </Badge>
                 <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
                   v{latestVersion(c)?.versionNumber ?? '-'}
@@ -261,6 +266,20 @@ export function ContentCenter() {
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--color-secondary)', marginTop: 10, fontWeight: 700 }}>{latestVersion(selected).cta}</div>
                 </div>
+
+                {latestVersion(selected).seoMeta && (
+                  <div style={{ marginBottom: 14, borderRadius: 12, border: '1px solid var(--color-border)', padding: 14 }}>
+                    <strong style={{ fontSize: 13 }}>SEO metadata</strong>
+                    <div style={{ fontSize: 12.5, marginTop: 8, lineHeight: 1.6 }}>
+                      <div><strong>title:</strong> {latestVersion(selected).seoMeta?.title}</div>
+                      <div><strong>description:</strong> {latestVersion(selected).seoMeta?.description}</div>
+                      <div><strong>slug:</strong> {latestVersion(selected).seoMeta?.slug}</div>
+                      {latestVersion(selected).seoMeta?.keywords?.length ? (
+                        <div><strong>keywords:</strong> {latestVersion(selected).seoMeta?.keywords?.join('、')}</div>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
 
                 {selected.predictedEngagementScore != null && (
                   <div style={{ marginBottom: 14, borderRadius: 12, border: '1px solid var(--color-border)', padding: 14 }}>

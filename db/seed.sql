@@ -21,6 +21,7 @@ TRUNCATE TABLE
   collaboration_briefs, collaboration_brands, collaborations,
   agent_permissions, ai_agents,
   market_signals,
+  press_coverages, press_releases,
   brand_examples, brand_histories, brand_keywords, brand_channels, brand_visuals,
   brand_rules, brand_personas, brand_audiences, brand_assets, brand_documents,
   brand_versions, brand_members, brands,
@@ -225,7 +226,11 @@ BEGIN
     (b_washgo, v_washgo_1, 'cannot_claim', '5,000+ 服務客戶 / 98% 客戶滿意度', '官網宣稱數字,未經核實,需人工確認後才可使用', 'pending', 1),
     (b_washgo, v_washgo_1, 'can_claim', 'GoCoin 1 點 = NT$1,跨品牌通用,永久不過期', '產品事實', 'verified', 2),
     (b_washgo, v_washgo_1, 'marketing_rule', '新會員禮:加入 @washgo 領 100 GoCoin', '時效性內容,發文前需確認活動仍有效', 'claimed', 3),
-    (b_washgo, v_washgo_1, 'negative_rule', 'Washgo 是衣物洗滌/乾洗平台,不是洗車,不得出現洗車聯想', NULL, 'verified', 4);
+    (b_washgo, v_washgo_1, 'negative_rule', 'Washgo 是衣物洗滌/乾洗平台,不是洗車,不得出現洗車聯想', NULL, 'verified', 4),
+    (b_taskgo, v_taskgo_1, 'can_claim', '工商時報、三立曾報導 TaskGo 工班數位回報', '可引用媒體名與已見報事實,不可把轉載數說成全台專訪', 'verified', 20),
+    (b_taskgo, v_taskgo_1, 'cannot_claim', '保證接案量、保證數位轉型成功、全台各大媒體專訪', '見報不代表保證成效', 'verified', 21),
+    (b_homigo, v_homigo_1, 'can_claim', '匠管攜手達觀推出 Homigo,見報於民眾日報／Yahoo', '提及 300 萬租屋人口必須帶「根據市場統計」', 'verified', 20),
+    (b_washgo, v_washgo_1, 'cannot_claim', '不可宣稱 Washgo 已被媒體報導', '新聞稿尚未見報前絕對禁止', 'verified', 20);
 
   UPDATE brand_rules SET valid_until = (now() + interval '60 days')::date
     WHERE brand_id = b_washgo AND statement LIKE '新會員禮%';
@@ -281,6 +286,33 @@ BEGIN
     (b_taskgo, (now() - interval '120 days')::date, '點工Go 上線', '全台點工媒合平台正式推出'),
     (b_washgo, (now() - interval '60 days')::date, 'GoCoin 跨品牌點數上線', '消費者可跨品牌通用點數折抵');
 
+  INSERT INTO press_coverages (
+    brand_id, story_key, outlet, headline, article_url, published_on,
+    status, discovery_source, summary, key_quotes, claimable_facts, is_primary, related_brand_slugs
+  ) VALUES
+    (b_taskgo, 'taskgo-2025-10-launch', '工商時報',
+     '數位工具平民化「匠管 Task Go」助攻工班資訊透明 打破紙本施工紀錄迷思',
+     'https://www.ctee.com.tw/news/20251021701575-431206', '2025-10-21', 'published', 'manual',
+     '匠管推出 Task Go,主打簡單、即時、透明,讓工班用手機拍照與語音完成回報。',
+     '["Task Go 的初衷就是要讓沒有 IT 背景的師傅,也能用得安心、用得開心。"]',
+     '["簡單、即時、透明","現場拍照上傳與語音紀錄","一個月免費試用"]', true, '[]'),
+    (b_taskgo, 'taskgo-2025-10-launch', '三立新聞網',
+     '打破紙本施工紀錄　數位工具助攻工班資訊',
+     'https://www.setn.com/News.aspx?NewsID=1739028', '2025-10-21', 'syndicated', 'manual',
+     '三立轉載 Task Go 亮相稿。', '[]', '[]', false, '[]'),
+    (b_homigo, 'homigo-2026-07-launch', '民眾日報',
+     '匠管攜手達觀跨足PropTech市場！ 推出Homigo智慧租屋管理平台',
+     'https://tw.news.yahoo.com/%E5%8C%A0%E7%AE%A1%E6%94%9C%E6%89%8B%E9%81%94%E8%A7%80%E8%B7%A8%E8%B6%B3proptech%E5%B8%82%E5%A0%B4-%E6%8E%A8%E5%87%BAhomigo%E6%99%BA%E6%85%A7%E7%A7%9F%E5%B1%8B%E7%AE%A1%E7%90%86%E5%B9%B3%E5%8F%B0-080153567.html',
+     '2026-07-01', 'published', 'manual',
+     '匠管攜手達觀推出 Homigo,以 LINE Bot 整合招租到退租,開發經驗源自 TaskGo。',
+     '["未來企業競爭將不僅是系統功能,而是管理能力的數位化。"]',
+     '["匠管攜手達觀推出 Homigo","房東房客免下載 App","開發經驗源自 TaskGo"]', true, '["taskgo"]');
+
+  INSERT INTO press_releases (brand_id, title, body, status, embargo_on) VALUES
+    (b_washgo, '匠管打造生活工程管理生態系,Washgo 再補一塊拼圖',
+     E'匠管今日宣布推出面向洗衣、乾洗營運的數位化平台 Washgo,以 LINE 讓洗滌業真正用得起數位化,首個落地場域為洗楽。\n\n文中僅陳述導入事實,不放洗楽執行長引言。定稿前不可宣稱已被媒體報導。',
+     'pending_review', '2026-08-16');
+
   -- ==========================================================================
   -- Brand Examples(內容支柱 / 敘事素材 / 熱點主題庫)
   -- ==========================================================================
@@ -335,7 +367,7 @@ BEGIN
     (collab_1, b_homigo), (collab_1, b_taskgo);
 
   INSERT INTO collaboration_briefs (collaboration_id, title, content_markdown, version_number, created_by) VALUES
-    (collab_1, 'Homigo × TaskGo 修繕串接 Brief', E'# Homigo × TaskGo 修繕串接\n\n## 事實(唯一版本,取代雙方文件中互相矛盾的描述)\n\n- 依 Homigo 目前市場調查,為包租代管軟體首創的 TaskGo 串接(已上線)\n- 流程:房客報修 → Homigo 建立案件 → 自動流向 TaskGo 修繕廠商(指定派工或市集競價)→ 廠商施工回報 → 進度自動回流 Homigo\n- Washgo 現況:狀態由各品牌自行維護,不在此 Brief 中背書,亦不得作為本合作案的內容素材\n\n## 貼文角度授權\n\n- 房東視角(Homigo 發布)、廠商視角(TaskGo 發布)皆可各自使用,但雙方發布前仍需各自品牌負責人核准', 1, u_admin);
+    (collab_1, 'Homigo × TaskGo 修繕串接 Brief', E'# Homigo × TaskGo 修繕串接\n\n## 事實(唯一版本,取代雙方文件中互相矛盾的描述)\n\n- 依 Homigo 目前市場調查,為包租代管軟體首創的 TaskGo 串接(已上線)\n- 流程:房客報修 → Homigo 建立案件 → 自動流向 TaskGo 修繕廠商(指定派工或市集競價)→ 廠商施工回報 → 進度自動回流 Homigo\n- Washgo 現況:狀態由各品牌自行維護,不在此 Brief 中背書,亦不得作為本合作案的內容素材\n\n## 已公開媒體事實\n\n- Homigo 的開發經驗源自 TaskGo(2026-07-01 民眾日報／Yahoo 見報,可公開引用)\n- 不可把同一則轉載算成多次獨立專訪\n\n## 貼文角度授權\n\n- 房東視角(Homigo 發布)、廠商視角(TaskGo 發布)皆可各自使用,但雙方發布前仍需各自品牌負責人核准', 1, u_admin);
 
   -- ==========================================================================
   -- 流程一:Homigo 中秋檔期(完整走完 會議→提案→決策→活動→內容→審閱→發布→成效→學習)

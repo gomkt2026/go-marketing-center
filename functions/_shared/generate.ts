@@ -463,6 +463,108 @@ export async function saveEcosystemXContent(
   return { contentId, versionId };
 }
 
+export interface SeoArticleResult {
+  title: string;
+  body: string;
+  outline: string[];
+  faq: { q: string; a: string }[];
+  cta: string;
+  seoMeta: {
+    title: string;
+    description: string;
+    keywords: string[];
+    slug: string;
+    canonicalHint: string;
+  };
+}
+
+/** 從已核准報導或定稿新聞稿改寫 SEO 長文;不可整段複製原文 */
+export async function generateSeoArticle(
+  env: Env,
+  params: {
+    brandCtx: BrandContext;
+    sourceTitle: string;
+    sourceSummary: string;
+    extraInstruction?: string;
+  },
+): Promise<SeoArticleResult> {
+  const article = await chatCompleteJson<SeoArticleResult>(env, {
+    messages: [
+      {
+        role: 'system',
+        content: [
+          params.brandCtx.systemPrompt,
+          '',
+          '你現在要寫一篇給官網/部落格的原創 SEO 長文,不是社群貼文。',
+          '必須改寫,不可整段複製媒體原文或新聞稿。引用媒體時只帶出處 + 一句事實 + 原文 URL。',
+          '不可發明媒體名稱、專訪、轉載數量或未經驗證的數據。',
+          '繁體中文,800 到 1500 字,用 H2 小標分段,語氣像台灣產業觀察而不是新聞稿複讀。',
+        ].join('\n'),
+      },
+      {
+        role: 'user',
+        content: [
+          `題目來源:${params.sourceTitle}`,
+          params.sourceSummary,
+          params.extraInstruction ?? '',
+          '',
+          '回傳 JSON:{"title":"文章標題","body":"正文(可用 markdown ## 小標)","outline":["H2 1","H2 2"],"faq":[{"q":"","a":""}],"cta":"結尾行動呼籲","seoMeta":{"title":"50-60字內 title","description":"120-160字 description","keywords":["關鍵字"],"slug":"英文或拼音 slug","canonicalHint":"建議放在哪個官網路徑"}}',
+        ].filter(Boolean).join('\n'),
+      },
+    ],
+    temperature: 0.6,
+    maxTokens: 3500,
+  });
+  article.body = normalizeMultilineText(article.body);
+  article.seoMeta = {
+    title: article.seoMeta?.title || article.title,
+    description: article.seoMeta?.description || article.body.slice(0, 140),
+    keywords: article.seoMeta?.keywords ?? [],
+    slug: article.seoMeta?.slug || 'article',
+    canonicalHint: article.seoMeta?.canonicalHint || '',
+  };
+  return article;
+}
+
+export async function saveSeoArticle(
+  env: Env,
+  params: {
+    brandCtx: BrandContext;
+    article: SeoArticleResult;
+    generatedByAgentId?: string | null;
+    promptMeta?: Record<string, unknown>;
+  },
+): Promise<SavedContent> {
+  const sql = getSql(env);
+  const faqBlock = params.article.faq?.length
+    ? `\n\n## FAQ\n${params.article.faq.map((f) => `**${f.q}**\n${f.a}`).join('\n\n')}`
+    : '';
+  const body = `${params.article.body}${faqBlock}`;
+
+  const contentRows = await sql`
+    INSERT INTO contents (
+      campaign_id, brand_id, content_type, target_platform, title, status,
+      generated_by_agent_id, generation_prompt_meta
+    ) VALUES (
+      NULL, ${params.brandCtx.brandId}::uuid, 'article', NULL,
+      ${params.article.title}, 'pending_review',
+      ${params.generatedByAgentId ?? null},
+      ${JSON.stringify(params.promptMeta ?? { source: 'seo_article' })}
+    ) RETURNING id
+  `;
+  const contentId = (contentRows[0] as { id: string }).id;
+
+  const versionRows = await sql`
+    INSERT INTO content_versions (content_id, version_number, body, hashtags, cta, seo_meta, generated_by_agent_id)
+    VALUES (
+      ${contentId}::uuid, 1, ${body}, ${JSON.stringify([])},
+      ${params.article.cta ?? ''}, ${JSON.stringify(params.article.seoMeta)},
+      ${params.generatedByAgentId ?? null}
+    ) RETURNING id
+  `;
+  return { contentId, versionId: (versionRows[0] as { id: string }).id };
+}
+
 /** 找出品牌的 brand_ai Agent(生成內容的掛名者) */
 export async function findBrandAgent(env: Env, brandId: string): Promise<string | null> {
   const sql = getSql(env);

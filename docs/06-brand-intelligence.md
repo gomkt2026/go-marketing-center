@@ -17,6 +17,8 @@ Brand Knowledge 不是一份 Markdown，而是一組結構化資料，Markdown �
 | History（里程碑） | `brand_histories` |
 | Assets（Logo / Media / Documents） | `brand_assets`, `brand_documents` |
 | Website / FAQ | `brand_documents`(source_type = website / faq) |
+| Press Coverage（媒體報導／社會證明） | `press_coverages`（第三方露出；不存全文） |
+| Press Release（自家新聞稿） | `press_releases`（可存全文；草稿→審核→定稿） |
 
 原始資料（官網截圖、簡報 PDF、舊版 MD 檔）永久保留在 `brand_documents`，不會因為結構化拆解而遺失，確保未來重新解讀或稽核時可回到源頭。
 

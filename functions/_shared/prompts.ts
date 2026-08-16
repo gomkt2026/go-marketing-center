@@ -1,5 +1,6 @@
 import type { Env } from './env';
 import { getSql } from './db';
+import { loadPublishedPrimaryCoverages, publishedCoveragePrompt } from './press';
 
 // ============================================================================
 // 品牌第一線角色視角:讓 AI 用「行業最前端人員」的思維寫貼文,而不是 AI 腔
@@ -132,7 +133,8 @@ export const ANTI_AI_RULES =
   '5. 不要每句都完美通順,真人發文有節奏變化。' +
   '6. 絕對不捏造數據、優惠、法規;不確定的就不寫。' +
   '7. 只用台灣用語,出現中國用語就重寫:影片(不是視頻)、品質(不是質量)、網路(不是網絡)、資訊(不是信息)、馬鈴薯(不是土豆)。' +
-  '8. 內容要長在台灣的生活場景裡:超商、騎樓、捷運、機車、夜市、梅雨、颱風假、報稅季…讓台灣讀者一看就覺得「這就是我的日常」。';
+  '8. 內容要長在台灣的生活場景裡:超商、騎樓、捷運、機車、夜市、梅雨、颱風假、報稅季…讓台灣讀者一看就覺得「這就是我的日常」。' +
+  '9. 沒有「已驗證媒體報導」清單時,禁止寫「媒體報導」「登上 XX」「全台媒體」。有清單也只能引用列出的出處與事實,不可發明媒體名或把轉載算成多次專訪。';
 
 // ============================================================================
 // 品牌知識組裝:從 DB 撈品牌設定組成 system prompt
@@ -147,13 +149,14 @@ export interface BrandContext {
 
 export async function buildBrandContext(env: Env, brandId: string): Promise<BrandContext> {
   const sql = getSql(env);
-  const [brandRows, personaRows, ruleRows, channelRows, keywordRows, learningRows] = await Promise.all([
+  const [brandRows, personaRows, ruleRows, channelRows, keywordRows, learningRows, coverages] = await Promise.all([
     sql`SELECT id, slug, name, tagline FROM brands WHERE id = ${brandId}::uuid LIMIT 1`,
     sql`SELECT name, age_range, profile, pain_points, appeal_angle FROM brand_personas WHERE brand_id = ${brandId}::uuid ORDER BY sort_order LIMIT 6`,
     sql`SELECT rule_type, statement, condition_note FROM brand_rules WHERE brand_id = ${brandId}::uuid ORDER BY sort_order LIMIT 30`,
     sql`SELECT platform, tone_of_voice, length_guideline, format_guideline, hashtag_count_min, hashtag_count_max FROM brand_channels WHERE brand_id = ${brandId}::uuid`,
     sql`SELECT category, value FROM brand_keywords WHERE brand_id = ${brandId}::uuid LIMIT 40`,
     sql`SELECT insight FROM learning_records WHERE brand_id = ${brandId}::uuid ORDER BY created_at DESC LIMIT 8`,
+    loadPublishedPrimaryCoverages(env, brandId, 4),
   ]);
   if (!brandRows.length) throw new Error('Brand not found');
 
@@ -192,6 +195,7 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     channels ? `各平台既有調性設定:\n${channels}` : '',
     keywords ? `品牌關鍵字/CTA 庫(自然使用,不要硬塞):${keywords}` : '',
     learnings ? `過往經營累積的品牌心得(寫文時參考這些洞察):\n${learnings}` : '',
+    publishedCoveragePrompt(coverages),
     '',
     ANTI_AI_RULES,
   ].filter(Boolean).join('\n');

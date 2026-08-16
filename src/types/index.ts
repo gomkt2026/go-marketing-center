@@ -128,7 +128,44 @@ export interface BrandDocument {
 }
 
 export type BrandAssetImageCategory =
-  | 'system_screenshot' | 'real_photo' | 'people' | 'scene' | 'brand_collab' | 'other';
+  | 'system_screenshot' | 'real_photo' | 'people' | 'scene'
+  | 'brand_collab' | 'press_clipping' | 'other';
+
+export type PressCoverageStatus = 'inbox' | 'published' | 'syndicated' | 'dismissed';
+export type PressDiscoverySource = 'manual' | 'scheduler';
+export type PressReleaseStatus = 'draft' | 'pending_review' | 'approved' | 'final';
+
+export interface PressCoverage {
+  id: string;
+  brandId: string;
+  pressReleaseId?: string | null;
+  storyKey: string;
+  outlet: string;
+  headline: string;
+  articleUrl: string | null;
+  publishedOn: string | null;
+  status: PressCoverageStatus;
+  discoverySource: PressDiscoverySource;
+  summary: string | null;
+  keyQuotes: string[];
+  claimableFacts: string[];
+  isPrimary: boolean;
+  relatedBrandSlugs: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PressRelease {
+  id: string;
+  brandId: string;
+  title: string;
+  body: string;
+  status: PressReleaseStatus;
+  embargoOn: string | null;
+  reviewNote: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface BrandAsset {
   id: string;
@@ -341,6 +378,13 @@ export interface ContentVersion {
   body: string;
   hashtags: string[];
   cta: string;
+  seoMeta?: {
+    title?: string;
+    description?: string;
+    keywords?: string[];
+    slug?: string;
+    canonicalHint?: string;
+  } | null;
   createdAt: string;
   assets?: ContentAsset[];
 }
@@ -361,7 +405,7 @@ export interface Content {
   brandId: string;
   brandVersionId: string;
   contentType: ContentType;
-  targetPlatform: PublishingPlatform;
+  targetPlatform: PublishingPlatform | null;
   title: string;
   status: ContentStatus;
   generatedByAgentId: string;

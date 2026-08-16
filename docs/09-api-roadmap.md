@@ -50,9 +50,16 @@ flowchart LR
 ### Campaign / Content
 
 - 文字生成（文章、Hashtag、CTA、SEO metadata）
+- 從已核准 `press_coverages`／定稿 `press_releases` 生成 SEO 長文（寫入 `contents.article` + `content_versions.seo_meta`；不自動上架官網）
 - 圖片生成 API
 - 影片腳本/Prompt 生成
 - 內容規則檢查器（依 `brand_rules` 自動檢查生成內容是否違反事實邊界）
+
+### Press / Earned Media
+
+- `press_coverages`：第三方露出知識庫（標題／出處／摘要／短金句；不存全文）
+- `press_releases`：自家新聞稿內部審稿（草稿 → 送審 → 核准 → 定稿）
+- Scheduler 品牌名監測寫入 inbox，人工核准後才可被 `buildBrandContext` 引用
 
 ### Publishing
 

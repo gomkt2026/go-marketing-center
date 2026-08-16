@@ -1,15 +1,15 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
-import type { Env } from '../../../../../../_shared/env';
-import { requireAuth } from '../../../../../../_shared/auth';
-import { getSql } from '../../../../../../_shared/db';
-import { getBrandBySlug } from '../../../../../../_shared/queries';
-import { json, error } from '../../../../../../_shared/response';
-import { logActivity } from '../../../../../../_shared/activity';
-import { buildBrandContext } from '../../../../../../_shared/prompts';
+import type { Env } from '../../../../../_shared/env';
+import { requireAuth } from '../../../../../_shared/auth';
+import { getSql } from '../../../../../_shared/db';
+import { getBrandBySlug } from '../../../../../_shared/queries';
+import { json, error } from '../../../../../_shared/response';
+import { logActivity } from '../../../../../_shared/activity';
+import { buildBrandContext } from '../../../../../_shared/prompts';
 import {
   generatePlatformPost, saveGeneratedContent, findBrandAgent,
   SUPPORTED_PLATFORMS, type SocialPlatform,
-} from '../../../../../../_shared/generate';
+} from '../../../../../_shared/generate';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);

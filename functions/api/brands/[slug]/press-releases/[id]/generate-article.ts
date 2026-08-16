@@ -1,12 +1,12 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
-import type { Env } from '../../../../../../_shared/env';
-import { requireAuth } from '../../../../../../_shared/auth';
-import { getSql } from '../../../../../../_shared/db';
-import { getBrandBySlug } from '../../../../../../_shared/queries';
-import { json, error } from '../../../../../../_shared/response';
-import { logActivity } from '../../../../../../_shared/activity';
-import { buildBrandContext } from '../../../../../../_shared/prompts';
-import { generateSeoArticle, saveSeoArticle, findBrandAgent } from '../../../../../../_shared/generate';
+import type { Env } from '../../../../../_shared/env';
+import { requireAuth } from '../../../../../_shared/auth';
+import { getSql } from '../../../../../_shared/db';
+import { getBrandBySlug } from '../../../../../_shared/queries';
+import { json, error } from '../../../../../_shared/response';
+import { logActivity } from '../../../../../_shared/activity';
+import { buildBrandContext } from '../../../../../_shared/prompts';
+import { generateSeoArticle, saveSeoArticle, findBrandAgent } from '../../../../../_shared/generate';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);

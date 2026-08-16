@@ -91,6 +91,25 @@ export const api = {
       method: 'POST', body: JSON.stringify(body),
     }),
 
+  parsePressCoverage: (slug: string, url: string) =>
+    request<{ parsed: import('@/types').ParsedPressCoverage }>(`/api/brands/${slug}/press-coverages/parse`, {
+      method: 'POST', body: JSON.stringify({ url }),
+    }),
+
+  discoverPressCoverages: (slug: string) =>
+    request<{ items: import('@/types').DiscoveredPressItem[] }>(`/api/brands/${slug}/press-coverages/discover`, {
+      method: 'POST', body: JSON.stringify({}),
+    }),
+
+  convertPressCoverage: (slug: string, body: {
+    url?: string; outlet?: string; headline?: string; articleUrl?: string; publishedOn?: string;
+    summary?: string; keyQuotes?: string[]; claimableFacts?: string[]; storyKey?: string; status?: string;
+  }) =>
+    request<{ coverage: import('@/types').PressCoverage; parseNotes?: string[] }>(
+      `/api/brands/${slug}/press-coverages/convert`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   updatePressCoverage: (slug: string, id: string, body: Record<string, unknown>) =>
     request<{ coverage: import('@/types').PressCoverage }>(`/api/brands/${slug}/press-coverages/${id}`, {
       method: 'PATCH', body: JSON.stringify(body),

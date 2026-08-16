@@ -12,7 +12,7 @@ import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type {
   BrandRule, BrandAudience, BrandPersona, BrandChannel, BrandVisual,
   BrandKeyword, BrandExample, BrandDocument, BrandVersion, VerificationStatus,
-  BrandAsset, BrandAssetImageCategory, PressCoverage, PressRelease,
+  BrandAsset, BrandAssetImageCategory, PressCoverage, PressRelease, DiscoveredPressItem,
 } from '@/types';
 
 const TABS = [
@@ -72,7 +72,14 @@ export function BrandIntelligence() {
   const [releases, setReleases] = useState<PressRelease[]>([]);
   const [pressBusyId, setPressBusyId] = useState<string | null>(null);
   const [pressMessage, setPressMessage] = useState<string | null>(null);
-  const [newCoverage, setNewCoverage] = useState({ outlet: '', headline: '', articleUrl: '', publishedOn: '', summary: '' });
+  const emptyCoverage = { outlet: '', headline: '', articleUrl: '', publishedOn: '', summary: '', keyQuotes: '', claimableFacts: '' };
+  const [newCoverage, setNewCoverage] = useState(emptyCoverage);
+  const [parseBusy, setParseBusy] = useState(false);
+  const [discoverBusy, setDiscoverBusy] = useState(false);
+  const [convertBusy, setConvertBusy] = useState(false);
+  const [convertingUrl, setConvertingUrl] = useState<string | null>(null);
+  const [parseNotes, setParseNotes] = useState<string[]>([]);
+  const [discovered, setDiscovered] = useState<DiscoveredPressItem[]>([]);
   const [newRelease, setNewRelease] = useState({ title: '', body: '' });
   const [editingReleaseId, setEditingReleaseId] = useState<string | null>(null);
 
@@ -174,22 +181,92 @@ export function BrandIntelligence() {
     }
   }
 
-  async function addCoverage() {
-    if (!slug || !newCoverage.outlet.trim() || !newCoverage.headline.trim()) return;
+  function coveragePayload() {
+    return {
+      url: newCoverage.articleUrl.trim() || undefined,
+      articleUrl: newCoverage.articleUrl.trim() || undefined,
+      outlet: newCoverage.outlet.trim() || undefined,
+      headline: newCoverage.headline.trim() || undefined,
+      publishedOn: newCoverage.publishedOn || undefined,
+      summary: newCoverage.summary.trim() || undefined,
+      keyQuotes: newCoverage.keyQuotes.split('\n').map((s) => s.trim()).filter(Boolean),
+      claimableFacts: newCoverage.claimableFacts.split('\n').map((s) => s.trim()).filter(Boolean),
+    };
+  }
+
+  async function parseCoverageUrl() {
+    if (!slug || !newCoverage.articleUrl.trim()) {
+      setPressMessage('請先貼上原文連結');
+      return;
+    }
+    setParseBusy(true);
     setPressMessage(null);
     try {
-      const { coverage } = await api.createPressCoverage(slug, {
-        outlet: newCoverage.outlet.trim(),
-        headline: newCoverage.headline.trim(),
-        articleUrl: newCoverage.articleUrl.trim() || undefined,
-        publishedOn: newCoverage.publishedOn || undefined,
-        summary: newCoverage.summary.trim() || undefined,
+      const { parsed } = await api.parsePressCoverage(slug, newCoverage.articleUrl.trim());
+      setNewCoverage({
+        outlet: parsed.outlet,
+        headline: parsed.headline,
+        articleUrl: parsed.canonicalUrl || parsed.articleUrl,
+        publishedOn: parsed.publishedOn ?? '',
+        summary: parsed.summary,
+        keyQuotes: parsed.keyQuotes.join('\n'),
+        claimableFacts: parsed.claimableFacts.join('\n'),
       });
-      setCoverages((prev) => [coverage, ...prev]);
-      setNewCoverage({ outlet: '', headline: '', articleUrl: '', publishedOn: '', summary: '' });
-      setPressMessage('已新增報導');
+      setParseNotes(parsed.parseNotes);
+      setPressMessage(parsed.headline ? '已解析，請確認後按「轉換並存入行銷中心」' : '只解析到部分欄位，請補齊標題後再轉換');
     } catch (e) {
-      setPressMessage(e instanceof Error ? e.message : '新增失敗');
+      setPressMessage(e instanceof Error ? e.message : '解析失敗');
+    } finally {
+      setParseBusy(false);
+    }
+  }
+
+  async function discoverCoverages() {
+    if (!slug) return;
+    setDiscoverBusy(true);
+    setPressMessage(null);
+    try {
+      const { items } = await api.discoverPressCoverages(slug);
+      setDiscovered(items);
+      setPressMessage(items.length ? `從網路撈到 ${items.length} 則候選，確認後按轉換即可入庫` : '這輪沒有撈到品牌相關報導');
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '撈取失敗');
+    } finally {
+      setDiscoverBusy(false);
+    }
+  }
+
+  async function convertCoverage(source?: DiscoveredPressItem) {
+    if (!slug) return;
+    const body = source
+      ? { url: source.url ?? undefined, headline: source.title, outlet: source.outletGuess, summary: source.snippet ?? undefined }
+      : coveragePayload();
+    if (!source && !body.url && (!body.outlet || !body.headline)) {
+      setPressMessage('請貼上原文連結，或先填媒體名稱與標題');
+      return;
+    }
+    const busyKey = source?.url ?? source?.title ?? 'form';
+    setConvertBusy(true);
+    setConvertingUrl(busyKey);
+    setPressMessage(null);
+    try {
+      const { coverage, parseNotes: notes } = await api.convertPressCoverage(slug, body);
+      setCoverages((prev) => [coverage, ...prev.filter((c) => c.id !== coverage.id)]);
+      if (source) {
+        setDiscovered((prev) => prev.map((item) => (
+          item.url === source.url && item.title === source.title ? { ...item, alreadySaved: true } : item
+        )));
+      } else {
+        setNewCoverage(emptyCoverage);
+        setParseNotes([]);
+      }
+      if (notes?.length) setParseNotes(notes);
+      setPressMessage('已轉換並存入行銷中心，之後生成文案可引用');
+    } catch (e) {
+      setPressMessage(e instanceof Error ? e.message : '轉換失敗');
+    } finally {
+      setConvertBusy(false);
+      setConvertingUrl(null);
     }
   }
 
@@ -452,20 +529,78 @@ export function BrandIntelligence() {
               {tab === 'press' && (
                 <div style={{ display: 'grid', gap: 16 }}>
                   <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0 }}>
-                    第三方報導只存標題、出處、摘要與短金句,不存全文。監測進來的先待確認,核准後才會被 AI 引用。
+                    貼上新聞連結可自動解析媒體名、日期、標題與摘要；也可從網路撈取品牌相關報導，再按轉換寫入行銷中心。第三方只存標題、出處、摘要與短金句，不存全文。監測進來的先待確認，核准後才會被 AI 引用。
                   </p>
                   {pressMessage && <p style={{ fontSize: 13, color: 'var(--color-primary-dark)' }}>{pressMessage}</p>}
                   <div style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
-                    <strong style={{ fontSize: 13 }}>手動新增已見報內容</strong>
+                    <strong style={{ fontSize: 13 }}>從連結解析或從網路撈取</strong>
+                    <input
+                      placeholder="貼上新聞原文連結"
+                      value={newCoverage.articleUrl}
+                      onChange={(e) => setNewCoverage((s) => ({ ...s, articleUrl: e.target.value }))}
+                      style={inputStyle}
+                    />
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <Button variant="secondary" disabled={parseBusy || convertBusy} onClick={() => void parseCoverageUrl()}>
+                        {parseBusy ? '解析中…' : '解析連結'}
+                      </Button>
+                      <Button variant="ghost" disabled={discoverBusy} onClick={() => void discoverCoverages()}>
+                        {discoverBusy ? '撈取中…' : '從網路撈取'}
+                      </Button>
+                    </div>
+                    {parseNotes.length > 0 && (
+                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--color-text-muted)' }}>
+                        {parseNotes.map((note) => <li key={note}>{note}</li>)}
+                      </ul>
+                    )}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <input placeholder="媒體名稱" value={newCoverage.outlet} onChange={(e) => setNewCoverage((s) => ({ ...s, outlet: e.target.value }))} style={inputStyle} />
                       <input placeholder="見報日期" type="date" value={newCoverage.publishedOn} onChange={(e) => setNewCoverage((s) => ({ ...s, publishedOn: e.target.value }))} style={inputStyle} />
                     </div>
                     <input placeholder="標題" value={newCoverage.headline} onChange={(e) => setNewCoverage((s) => ({ ...s, headline: e.target.value }))} style={inputStyle} />
-                    <input placeholder="原文連結" value={newCoverage.articleUrl} onChange={(e) => setNewCoverage((s) => ({ ...s, articleUrl: e.target.value }))} style={inputStyle} />
-                    <textarea placeholder="摘要(我們整理的,不是原文)" value={newCoverage.summary} onChange={(e) => setNewCoverage((s) => ({ ...s, summary: e.target.value }))} style={{ ...inputStyle, minHeight: 64 }} />
-                    <Button variant="secondary" style={{ justifySelf: 'start' }} onClick={() => void addCoverage()}>+ 新增報導</Button>
+                    <textarea placeholder="摘要（我們整理的，不是原文）" value={newCoverage.summary} onChange={(e) => setNewCoverage((s) => ({ ...s, summary: e.target.value }))} style={{ ...inputStyle, minHeight: 64 }} />
+                    <textarea placeholder="短金句（每行一句，可空白）" value={newCoverage.keyQuotes} onChange={(e) => setNewCoverage((s) => ({ ...s, keyQuotes: e.target.value }))} style={{ ...inputStyle, minHeight: 48 }} />
+                    <textarea placeholder="可宣稱事實（每行一則，可空白）" value={newCoverage.claimableFacts} onChange={(e) => setNewCoverage((s) => ({ ...s, claimableFacts: e.target.value }))} style={{ ...inputStyle, minHeight: 48 }} />
+                    <Button variant="primary" style={{ justifySelf: 'start' }} disabled={convertBusy} onClick={() => void convertCoverage()}>
+                      {convertBusy && convertingUrl === 'form' ? '轉換中…' : '轉換並存入行銷中心'}
+                    </Button>
                   </div>
+                  {discovered.length > 0 && (
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      <strong style={{ fontSize: 13 }}>網路撈取結果</strong>
+                      {discovered.map((item) => {
+                        const busyKey = item.url ?? item.title;
+                        return (
+                          <div key={`${item.url ?? ''}-${item.title}`} style={cardBoxStyle}>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                              <Badge tone={item.kind === 'own_coverage' ? 'primary' : item.kind === 'noise' ? 'danger' : 'secondary'}>
+                                {item.kind === 'own_coverage' ? '品牌相關' : item.kind === 'industry_news' ? '產業新聞' : item.kind === 'noise' ? '可能無關' : '待分辨'}
+                              </Badge>
+                              <Badge tone="default">{item.outletGuess}</Badge>
+                              {item.alreadySaved && <Badge tone="accent">已在庫中</Badge>}
+                            </div>
+                            <strong style={{ fontSize: 14 }}>{item.title}</strong>
+                            {item.snippet && <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6 }}>{item.snippet}</div>}
+                            {item.url && (
+                              <a href={item.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, display: 'inline-block', marginTop: 8 }}>
+                                原文連結 →
+                              </a>
+                            )}
+                            <div style={{ marginTop: 10 }}>
+                              <Button
+                                variant="primary"
+                                style={{ padding: '4px 10px', fontSize: 12 }}
+                                disabled={item.alreadySaved || !item.url || convertingUrl === busyKey}
+                                onClick={() => void convertCoverage(item)}
+                              >
+                                {convertingUrl === busyKey ? '轉換中…' : '轉換並存入'}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   {coverages.map((c) => (
                     <div key={c.id} style={cardBoxStyle}>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>

@@ -135,6 +135,29 @@ export type PressCoverageStatus = 'inbox' | 'published' | 'syndicated' | 'dismis
 export type PressDiscoverySource = 'manual' | 'scheduler';
 export type PressReleaseStatus = 'draft' | 'pending_review' | 'approved' | 'final';
 
+export interface ParsedPressCoverage {
+  articleUrl: string;
+  canonicalUrl: string;
+  outlet: string;
+  headline: string;
+  publishedOn: string | null;
+  summary: string;
+  keyQuotes: string[];
+  claimableFacts: string[];
+  storyKey: string;
+  fetched: boolean;
+  parseNotes: string[];
+}
+
+export interface DiscoveredPressItem {
+  title: string;
+  url: string | null;
+  snippet: string | null;
+  outletGuess: string;
+  kind: 'own_coverage' | 'industry_news' | 'noise' | 'unknown';
+  alreadySaved: boolean;
+}
+
 export interface PressCoverage {
   id: string;
   brandId: string;

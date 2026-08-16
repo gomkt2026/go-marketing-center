@@ -5,7 +5,7 @@ import { getSql } from '../../../../_shared/db';
 import { getBrandBySlug } from '../../../../_shared/queries';
 import { json, error } from '../../../../_shared/response';
 import { logActivity } from '../../../../_shared/activity';
-import { toPressCoverage, slugifyStoryKey } from '../../../../_shared/press';
+import { toPressCoverage, slugifyStoryKey, insertPressCoverage } from '../../../../_shared/press';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -55,31 +55,24 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   const status = body.status === 'inbox' || body.status === 'syndicated' ? body.status : 'published';
   const storyKey = body.storyKey?.trim() || slugifyStoryKey(`${slug}-${body.headline}`);
-  const sql = getSql(context.env);
 
   try {
-    const inserted = await sql`
-      INSERT INTO press_coverages (
-        brand_id, press_release_id, story_key, outlet, headline, article_url, published_on,
-        status, discovery_source, summary, key_quotes, claimable_facts, is_primary, related_brand_slugs
-      ) VALUES (
-        ${brand.id}::uuid,
-        ${body.pressReleaseId ?? null},
-        ${storyKey},
-        ${body.outlet.trim()},
-        ${body.headline.trim()},
-        ${body.articleUrl?.trim() || null},
-        ${body.publishedOn || null},
-        ${status},
-        'manual',
-        ${body.summary?.trim() || null},
-        ${JSON.stringify(body.keyQuotes ?? [])},
-        ${JSON.stringify(body.claimableFacts ?? [])},
-        ${body.isPrimary ?? true},
-        ${JSON.stringify(body.relatedBrandSlugs ?? [])}
-      ) RETURNING *
-    `;
-    const coverage = toPressCoverage(inserted[0] as Record<string, unknown>);
+    const coverage = await insertPressCoverage(context.env, {
+      brandId: brand.id,
+      pressReleaseId: body.pressReleaseId ?? null,
+      storyKey,
+      outlet: body.outlet,
+      headline: body.headline,
+      articleUrl: body.articleUrl,
+      publishedOn: body.publishedOn,
+      status,
+      discoverySource: 'manual',
+      summary: body.summary,
+      keyQuotes: body.keyQuotes,
+      claimableFacts: body.claimableFacts,
+      isPrimary: body.isPrimary,
+      relatedBrandSlugs: body.relatedBrandSlugs,
+    });
     await logActivity(context.env, {
       brandId: brand.id,
       actorType: 'user',

@@ -91,3 +91,50 @@ export function slugifyStoryKey(input: string): string {
     .slice(0, 48);
   return ascii || `story-${Date.now()}`;
 }
+
+export async function insertPressCoverage(
+  env: Env,
+  params: {
+    brandId: string;
+    pressReleaseId?: string | null;
+    storyKey: string;
+    outlet: string;
+    headline: string;
+    articleUrl?: string | null;
+    publishedOn?: string | null;
+    status?: PressCoverageStatus;
+    discoverySource?: 'manual' | 'scheduler';
+    summary?: string | null;
+    keyQuotes?: string[];
+    claimableFacts?: string[];
+    isPrimary?: boolean;
+    relatedBrandSlugs?: string[];
+  },
+): Promise<PressCoverageRow> {
+  const sql = getSql(env);
+  const status = params.status === 'inbox' || params.status === 'syndicated' || params.status === 'dismissed'
+    ? params.status
+    : 'published';
+  const inserted = await sql`
+    INSERT INTO press_coverages (
+      brand_id, press_release_id, story_key, outlet, headline, article_url, published_on,
+      status, discovery_source, summary, key_quotes, claimable_facts, is_primary, related_brand_slugs
+    ) VALUES (
+      ${params.brandId}::uuid,
+      ${params.pressReleaseId ?? null},
+      ${params.storyKey},
+      ${params.outlet.trim()},
+      ${params.headline.trim()},
+      ${params.articleUrl?.trim() || null},
+      ${params.publishedOn || null},
+      ${status},
+      ${params.discoverySource ?? 'manual'},
+      ${params.summary?.trim() || null},
+      ${JSON.stringify(params.keyQuotes ?? [])},
+      ${JSON.stringify(params.claimableFacts ?? [])},
+      ${params.isPrimary ?? true},
+      ${JSON.stringify(params.relatedBrandSlugs ?? [])}
+    ) RETURNING *
+  `;
+  return toPressCoverage(inserted[0] as Record<string, unknown>);
+}

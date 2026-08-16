@@ -79,6 +79,7 @@ export const ACTION_LABELS: Record<string, string> = {
   'video_job.final_uploaded': '上傳短影音定稿',
   'video_job.promoted': '短影音寫入內容中心',
   'press_coverage.created': '新增媒體報導',
+  'press_coverage.converted': '轉換媒體報導入庫',
   'press_coverage.updated': '更新媒體報導',
   'press_coverage.approved': '核准媒體報導',
   'press_coverage.dismissed': '忽略媒體報導',

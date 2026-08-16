@@ -58,6 +58,9 @@ flowchart LR
 ### Press / Earned Media
 
 - `press_coverages`：第三方露出知識庫（標題／出處／摘要／短金句；不存全文）
+- `POST /api/brands/:slug/press-coverages/parse`：抓原文連結的 OG／JSON-LD／有限摘錄，回傳可編輯預覽（不寫庫、不存全文）
+- `POST /api/brands/:slug/press-coverages/discover`：從 Google News + 台灣媒體 RSS 撈品牌名相關報導，只回候選清單
+- `POST /api/brands/:slug/press-coverages/convert`：把解析結果或連結轉換寫入 `press_coverages`
 - `press_releases`：自家新聞稿內部審稿（草稿 → 送審 → 核准 → 定稿）
 - Scheduler 品牌名監測寫入 inbox，人工核准後才可被 `buildBrandContext` 引用
 

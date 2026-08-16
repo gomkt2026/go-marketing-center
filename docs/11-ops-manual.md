@@ -57,6 +57,9 @@ npm run dev
 - `GET /api/brands` — 品牌列表
 - `GET /api/brands/:slug` — 品牌詳情 + 版本
 - `GET /api/brands/:slug/intelligence` — 品牌智慧資料
+- `POST /api/brands/:slug/press-coverages/parse` — 解析新聞連結（不寫庫、不存全文）
+- `POST /api/brands/:slug/press-coverages/discover` — 從網路撈取品牌相關報導候選
+- `POST /api/brands/:slug/press-coverages/convert` — 轉換解析結果寫入媒體報導
 - `GET /api/brands/:slug/workspace` — 工作區統計
 - `GET /api/brands/:slug/market-signals` — 市場情報
 - `PATCH /api/market-signals/:id` — 更新信號狀態

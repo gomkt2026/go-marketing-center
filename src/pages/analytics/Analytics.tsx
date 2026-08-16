@@ -165,7 +165,11 @@ export function Analytics() {
               onClick={() => run('sync', async () => {
                 const res = await api.syncAnalytics(slug!);
                 if (!res.attempted) return '近 28 天沒有可同步的已發布貼文(需有平台貼文 ID)';
-                return `已同步 ${res.synced}/${res.attempted} 篇${res.failed ? `;失敗 ${res.failed} 篇可改手動補登` : ''}`;
+                const failNote = res.failed
+                  ? `;失敗 ${res.failed} 篇${res.results.find((r) => !r.ok)?.error ? `:${res.results.find((r) => !r.ok)?.error}` : ',可改手動補登'}`
+                  : '';
+                const more = res.remaining > 0 ? `;還有 ${res.remaining} 篇未回收,請再按一次同步` : '';
+                return `已同步 ${res.synced}/${res.attempted} 篇${failNote}${more}`;
               })}
             >
               {busy === 'sync' ? '同步中…' : '同步成效'}

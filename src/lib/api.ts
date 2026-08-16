@@ -213,7 +213,7 @@ export const api = {
     request<import('@/types').AnalyticsPayload>(`/api/brands/${slug}/analytics`),
 
   syncAnalytics: (slug: string, jobId?: string) =>
-    request<{ attempted: number; synced: number; failed: number; skipped: number; results: { jobId: string; ok: boolean; error?: string }[] }>(
+    request<{ attempted: number; synced: number; failed: number; skipped: number; remaining: number; results: { jobId: string; ok: boolean; error?: string }[] }>(
       `/api/brands/${slug}/analytics/sync`,
       { method: 'POST', body: JSON.stringify(jobId ? { jobId } : {}) },
     ),

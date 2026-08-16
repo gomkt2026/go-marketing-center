@@ -15,13 +15,16 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!brand) return error('Brand not found', 404);
 
   const body = await context.request.json().catch(() => ({})) as { jobId?: string };
-  const result = await syncJobs(context.env, { brandId: brand.id, jobId: body.jobId });
-
-  await logActivity(context.env, {
-    brandId: brand.id, actorType: 'user', actorUserId: auth.id,
-    action: 'analytics.synced', entityType: 'brand', entityId: brand.id,
-    afterState: { attempted: result.attempted, synced: result.synced, failed: result.failed },
-  });
-
-  return json(result);
-};
+  try {
+    const result = await syncJobs(context.env, { brandId: brand.id, jobId: body.jobId });
+    await logActivity(context.env, {
+      brandId: brand.id, actorType: 'user', actorUserId: auth.id,
+      action: 'analytics.synced', entityType: 'brand', entityId: brand.id,
+      afterState: { attempted: result.attempted, synced: result.synced, failed: result.failed, remaining: result.remaining },
+    }).catch((e) => console.error('[analytics/sync] 寫入 activity 失敗', e));
+    return json(result);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error('[analytics/sync] 同步失敗', message);
+    return error(message || '同步成效失敗', 500);
+  }

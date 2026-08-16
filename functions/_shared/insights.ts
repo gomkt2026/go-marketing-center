@@ -8,8 +8,8 @@ const THREADS_API = 'https://graph.threads.net/v1.0';
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 const X_API = 'https://api.x.com/2';
 
-const INSIGHTS_WINDOW_DAYS = 28;
-const MAX_JOBS_PER_BRAND = 40;
+/** 單次 HTTP / cron 只處理這麼多篇,避免 Pages Function 子請求上限與逾時變成 500 */
+const MAX_JOBS_PER_RUN = 8;
 
 export interface NormalizedMetrics {
   impressions: number;
@@ -34,7 +34,14 @@ export interface SyncBrandResult {
   synced: number;
   failed: number;
   skipped: number;
+  remaining: number;
   results: SyncJobResult[];
+}
+
+interface AccountBundle {
+  threads: Awaited<ReturnType<typeof getThreadsAccount>>;
+  facebook: Awaited<ReturnType<typeof getMetaAccount>>;
+  instagram: Awaited<ReturnType<typeof getMetaAccount>>;
 }
 
 interface PublishedJob {
@@ -242,19 +249,23 @@ async function fetchXInsights(env: Env, collaborationId: string, tweetId: string
   };
 }
 
-export async function fetchJobInsights(env: Env, job: PublishedJob): Promise<NormalizedMetrics> {
+export async function fetchJobInsights(
+  env: Env,
+  job: PublishedJob,
+  accounts?: AccountBundle,
+): Promise<NormalizedMetrics> {
   if (job.platform === 'threads') {
-    const account = await getThreadsAccount(env, job.brandId);
+    const account = accounts?.threads ?? await getThreadsAccount(env, job.brandId);
     if (!account) throw new Error('尚未連接 Threads 帳號');
     return fetchThreadsInsights(account, job.externalPostId);
   }
   if (job.platform === 'facebook') {
-    const account = await getMetaAccount(env, job.brandId, 'facebook');
+    const account = accounts?.facebook ?? await getMetaAccount(env, job.brandId, 'facebook');
     if (!account) throw new Error('尚未連接 Facebook 帳號');
     return fetchFacebookInsights(account, job.externalPostId);
   }
   if (job.platform === 'instagram') {
-    const account = await getMetaAccount(env, job.brandId, 'instagram');
+    const account = accounts?.instagram ?? await getMetaAccount(env, job.brandId, 'instagram');
     if (!account) throw new Error('尚未連接 Instagram 帳號');
     return fetchInstagramInsights(account, job.externalPostId);
   }
@@ -265,29 +276,18 @@ export async function fetchJobInsights(env: Env, job: PublishedJob): Promise<Nor
   throw new Error(`平台 ${job.platform} 尚不支援成效回收`);
 }
 
+async function loadAccounts(env: Env, brandId: string): Promise<AccountBundle> {
+  const [threads, facebook, instagram] = await Promise.all([
+    getThreadsAccount(env, brandId),
+    getMetaAccount(env, brandId, 'facebook'),
+    getMetaAccount(env, brandId, 'instagram'),
+  ]);
+  return { threads, facebook, instagram };
+}
+
 export async function upsertPerformanceReport(env: Env, jobId: string, metrics: NormalizedMetrics): Promise<void> {
   const sql = getSql(env);
-  const existing = await sql`
-    SELECT impressions, clicks, comments, shares, saves, raw_metrics
-    FROM performance_reports
-    WHERE publishing_job_id = ${jobId}::uuid
-    LIMIT 1
-  `;
-  const prev = existing[0] as {
-    impressions: number; clicks: number; comments: number; shares: number; saves: number; raw_metrics: unknown;
-  } | undefined;
-  const raw = {
-    ...metrics.raw,
-    likes: metrics.likes,
-    previous: prev ? {
-      impressions: Number(prev.impressions),
-      clicks: Number(prev.clicks),
-      comments: Number(prev.comments),
-      shares: Number(prev.shares),
-      saves: Number(prev.saves),
-    } : undefined,
-  };
-
+  const raw = { ...metrics.raw, likes: metrics.likes };
   await sql`
     INSERT INTO performance_reports (
       publishing_job_id, impressions, clicks, comments, shares, saves, engagement_rate, raw_metrics, captured_at
@@ -325,12 +325,13 @@ async function loadPublishedJobs(env: Env, brandId?: string, jobId?: string): Pr
       SELECT pj.id, pj.platform, pj.external_post_id, c.brand_id, c.collaboration_id
       FROM publishing_jobs pj
       JOIN contents c ON c.id = pj.content_id
+      LEFT JOIN performance_reports pr ON pr.publishing_job_id = pj.id
       WHERE c.brand_id = ${brandId}::uuid
         AND pj.status = 'published'
         AND pj.external_post_id IS NOT NULL
         AND pj.published_at >= now() - interval '28 days'
-      ORDER BY pj.published_at DESC
-      LIMIT ${MAX_JOBS_PER_BRAND}
+      ORDER BY (pr.id IS NULL) DESC, pj.published_at DESC
+      LIMIT ${MAX_JOBS_PER_RUN}
     `;
     return (rows as Record<string, unknown>[]).map(mapJob);
   }
@@ -339,11 +340,12 @@ async function loadPublishedJobs(env: Env, brandId?: string, jobId?: string): Pr
     SELECT pj.id, pj.platform, pj.external_post_id, c.brand_id, c.collaboration_id
     FROM publishing_jobs pj
     JOIN contents c ON c.id = pj.content_id
+    LEFT JOIN performance_reports pr ON pr.publishing_job_id = pj.id
     WHERE pj.status = 'published'
       AND pj.external_post_id IS NOT NULL
       AND pj.published_at >= now() - interval '28 days'
-    ORDER BY pj.published_at DESC
-    LIMIT 120
+    ORDER BY (pr.id IS NULL) DESC, pj.published_at DESC
+    LIMIT ${MAX_JOBS_PER_RUN}
   `;
   return (rows as Record<string, unknown>[]).map(mapJob);
 }
@@ -370,36 +372,58 @@ async function logInsightEvent(env: Env, jobId: string, event: 'insights_synced'
   }
 }
 
+async function countRemaining(env: Env, brandId?: string): Promise<number> {
+  if (!brandId) return 0;
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT count(*)::int AS n
+    FROM publishing_jobs pj
+    JOIN contents c ON c.id = pj.content_id
+    LEFT JOIN performance_reports pr ON pr.publishing_job_id = pj.id
+    WHERE c.brand_id = ${brandId}::uuid
+      AND pj.status = 'published'
+      AND pj.external_post_id IS NOT NULL
+      AND pj.published_at >= now() - interval '28 days'
+      AND pr.id IS NULL
+  `;
+  return rows.length ? (rows[0] as { n: number }).n : 0;
+}
+
 export async function syncJobs(env: Env, params: { brandId?: string; jobId?: string } = {}): Promise<SyncBrandResult> {
   const jobs = await loadPublishedJobs(env, params.brandId, params.jobId);
   const results: SyncJobResult[] = [];
   let synced = 0;
   let failed = 0;
-  let skipped = 0;
+  const accountsByBrand = new Map<string, AccountBundle>();
 
   for (const job of jobs) {
     try {
-      const metrics = await fetchJobInsights(env, job);
+      let accounts = accountsByBrand.get(job.brandId);
+      if (!accounts) {
+        accounts = await loadAccounts(env, job.brandId);
+        accountsByBrand.set(job.brandId, accounts);
+      }
+      const metrics = await fetchJobInsights(env, job, accounts);
       await upsertPerformanceReport(env, job.id, metrics);
-      await logInsightEvent(env, job.id, 'insights_synced', `impressions=${metrics.impressions};comments=${metrics.comments}`);
       results.push({ jobId: job.id, ok: true });
       synced += 1;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      await logInsightEvent(env, job.id, 'insights_failed', message.slice(0, 400));
+      if (params.jobId) await logInsightEvent(env, job.id, 'insights_failed', message.slice(0, 400));
       results.push({ jobId: job.id, ok: false, error: message });
       failed += 1;
     }
   }
 
-  if (!jobs.length) skipped = 1;
+  const remaining = await countRemaining(env, params.brandId ?? jobs[0]?.brandId);
 
   return {
     brandId: params.brandId ?? jobs[0]?.brandId ?? '',
     attempted: jobs.length,
     synced,
     failed,
-    skipped,
+    skipped: jobs.length ? 0 : 1,
+    remaining,
     results,
   };
 }

@@ -22,6 +22,8 @@ import { logActivity } from '../../../functions/_shared/activity';
 import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from '../../../functions/_shared/sources';
 import { createPodcastEpisode } from '../../../functions/_shared/podcast';
 import { slugifyStoryKey } from '../../../functions/_shared/press';
+import { syncPerformanceInsights } from '../../../functions/_shared/insights';
+import { analyzeAllBrandPerformance } from '../../../functions/_shared/performance-learn';
 
 // 每品牌的議題來源設定;filterKeywords 用於從一般新聞中挑出行業相關文章
 const BRAND_SOURCES: Record<string, {
@@ -1383,6 +1385,11 @@ export default {
       case '15 */3 * * *':
         ctx.waitUntil(collectSignals(env));
         ctx.waitUntil(collectPressMentions(env));
+        ctx.waitUntil(
+          syncPerformanceInsights(env)
+            .then(() => analyzeAllBrandPerformance(env))
+            .catch((e) => console.error('[insights] 成效回收或歸因失敗', e)),
+        );
         break;
       case '45 * * * *':
         ctx.waitUntil(generateSignalDrafts(env));
@@ -1404,7 +1411,7 @@ export default {
     }
   },
 
-  // 手動觸發除錯用:GET /?task=collect|drafts|threads|offtopic|replies|themes|ecosystem|ecosystem-x|publish|cleanup|podcast|refresh-tokens|refresh-x-tokens(需帶 secret)
+  // 手動觸發除錯用:GET /?task=collect|drafts|threads|offtopic|replies|themes|ecosystem|ecosystem-x|publish|cleanup|podcast|refresh-tokens|refresh-x-tokens|insights|learn(需帶 secret)
   // threads/offtopic/themes 可帶 &slotAt=ISO時間 指定要排定發布的時段(預設現在,方便測試)
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -1427,11 +1434,19 @@ export default {
     else if (task === 'cleanup') await cleanupOldMedia(env);
     else if (task === 'refresh-tokens') await refreshThreadsTokens(env);
     else if (task === 'refresh-x-tokens') await refreshXTokens(env);
+    else if (task === 'insights') {
+      const result = await syncPerformanceInsights(env);
+      return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    else if (task === 'learn') {
+      const result = await analyzeAllBrandPerformance(env);
+      return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
+    }
     else if (task === 'podcast') {
       const result = await createPodcastEpisode(env);
       return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
     }
-    else return new Response('task 必須為 collect / press / drafts / threads / offtopic / replies / themes / ecosystem / ecosystem-x / publish / cleanup / podcast / refresh-tokens / refresh-x-tokens', { status: 400 });
+    else return new Response('task 必須為 collect / press / drafts / threads / offtopic / replies / themes / ecosystem / ecosystem-x / publish / cleanup / podcast / refresh-tokens / refresh-x-tokens / insights / learn', { status: 400 });
     return new Response(JSON.stringify({ ok: true, task }), { headers: { 'Content-Type': 'application/json' } });
   },
 };

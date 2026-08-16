@@ -6,7 +6,7 @@ main = "src/index.ts"
 compatibility_date = "2024-09-23"
 
 [triggers]
-# 每 3 小時第 15 分:蒐集熱門議題 → AI 篩選寫入 market_signals
+# 每 3 小時第 15 分:蒐集熱門議題 → AI 篩選寫入 market_signals;同時回收近 28 天貼文 Insights 並產生成效學習建議
 # 每小時第 45 分:為一則高分情報生成三平台草稿(拆開避免超過子請求上限)
 # 每 30 分鐘統一調度(halfHourlyDispatch,生成與發布已拆開):
 #   - 整點 tick:提前 1 小時生成下個時段的內容,存成 scheduled 排程(Threads 品牌相關 00/06/12/18、

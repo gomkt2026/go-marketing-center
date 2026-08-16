@@ -566,20 +566,66 @@ export interface PerformanceReport {
   comments: number;
   shares: number;
   saves: number;
+  likes?: number;
   engagementRate: number;
   capturedAt: string;
+  rawMetrics?: Record<string, unknown>;
 }
 
 export type LearningRecordType = 'content_performance' | 'cta_effectiveness' | 'audience_engagement' | 'channel_insight' | 'other';
+export type LearningRecordStatus = 'pending_review' | 'approved' | 'dismissed';
+
+export interface LearningSupportingData {
+  source?: string;
+  doMore?: string[];
+  doLess?: string[];
+  winningHooks?: string[];
+  weakCta?: string[];
+  platform?: string;
+  genSource?: string;
+  do_more?: string[];
+  do_less?: string[];
+  winning_hooks?: string[];
+  weak_cta?: string[];
+  gen_source?: string;
+}
 
 export interface LearningRecord {
   id: string;
   brandId: string;
   recordType: LearningRecordType;
   insight: string;
+  supportingData?: LearningSupportingData;
   relatedContentId?: string;
   generatedByAgentId: string;
+  status?: LearningRecordStatus;
   createdAt: string;
+}
+
+export interface AnalyticsPost {
+  job: {
+    id: string;
+    platform: string;
+    publishedAt: string | null;
+    externalPostId: string | null;
+  };
+  content: {
+    id: string;
+    title: string | null;
+    genSource: string | null;
+    predictedScore: number | null;
+    body: string | null;
+    cta: string | null;
+  };
+  perf: PerformanceReport | null;
+}
+
+export interface AnalyticsPayload {
+  posts: AnalyticsPost[];
+  suggestions: LearningRecord[];
+  totals: { impressions: number; clicks: number; comments: number; shares: number; saves: number; likes: number };
+  publishedCount: number;
+  syncedCount: number;
 }
 
 // ============================================================================

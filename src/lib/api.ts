@@ -210,13 +210,35 @@ export const api = {
     }),
 
   analytics: (slug: string) =>
-    request<{
-      reports: { perf: import('@/types').PerformanceReport; content: { id: string; title: string } }[];
-      totals: { impressions: number; clicks: number; comments: number; shares: number; saves: number };
-    }>(`/api/brands/${slug}/analytics`),
+    request<import('@/types').AnalyticsPayload>(`/api/brands/${slug}/analytics`),
+
+  syncAnalytics: (slug: string, jobId?: string) =>
+    request<{ attempted: number; synced: number; failed: number; skipped: number; results: { jobId: string; ok: boolean; error?: string }[] }>(
+      `/api/brands/${slug}/analytics/sync`,
+      { method: 'POST', body: JSON.stringify(jobId ? { jobId } : {}) },
+    ),
+
+  saveAnalyticsReport: (slug: string, body: {
+    jobId: string; impressions?: number; clicks?: number; comments?: number; shares?: number; saves?: number; likes?: number;
+  }) =>
+    request<{ ok: boolean }>(`/api/brands/${slug}/analytics/reports`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  requestAnalyticsLearn: (slug: string) =>
+    request<{ brandId: string; created: number; skipped: string | null }>(`/api/brands/${slug}/analytics/learn`, {
+      method: 'POST',
+    }),
 
   learning: (slug: string) =>
     request<{ records: import('@/types').LearningRecord[] }>(`/api/brands/${slug}/learning`),
+
+  decideLearning: (slug: string, id: string, body: { action: 'approve' | 'dismiss'; insight?: string }) =>
+    request<{ record: import('@/types').LearningRecord }>(`/api/brands/${slug}/learning/${id}/decide`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   dashboard: () =>
     request<{

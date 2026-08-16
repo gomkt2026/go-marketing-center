@@ -101,10 +101,13 @@ DECLARE
   cv_taskgo_1_1  UUID := gen_random_uuid();
   pj_taskgo_1    UUID := gen_random_uuid();
 
-  -- Washgo 第三條流程(換季收納,待審閱中)
+  -- Washgo 第三條流程(換季收納待審 + 已發布生活哏,示範成效閉環)
   camp_washgo_1  UUID := gen_random_uuid();
   ct_washgo_1    UUID := gen_random_uuid();
   cv_washgo_1_1  UUID := gen_random_uuid();
+  ct_washgo_pub  UUID := gen_random_uuid();
+  cv_washgo_pub  UUID := gen_random_uuid();
+  pj_washgo_1    UUID := gen_random_uuid();
 
   -- Collaboration proposal(修繕串接里程碑)
   p_collab_1     UUID := gen_random_uuid();
@@ -410,8 +413,8 @@ BEGIN
 
   INSERT INTO campaign_brands (campaign_id, brand_id) VALUES (camp_homigo_1, b_homigo);
 
-  INSERT INTO contents (id, campaign_id, brand_id, brand_version_id, content_type, target_platform, title, status, generated_by_agent_id) VALUES
-    (ct_homigo_1, camp_homigo_1, b_homigo, v_homigo_1, 'image', 'instagram', '連假前,把報修處理完', 'approved', a_content);
+  INSERT INTO contents (id, campaign_id, brand_id, brand_version_id, content_type, target_platform, title, status, generated_by_agent_id, predicted_engagement_score, generation_prompt_meta) VALUES
+    (ct_homigo_1, camp_homigo_1, b_homigo, v_homigo_1, 'image', 'instagram', '連假前,把報修處理完', 'approved', a_content, 68.0, '{"source":"daily_theme"}'::jsonb);
 
   INSERT INTO content_versions (id, content_id, version_number, body, hashtags, cta, generated_by_agent_id, created_at) VALUES
     (cv_homigo_1_1, ct_homigo_1, 1, '中秋連假想放空,卻還在等師傅回電?報修交給Homigo,一鍵找師傅、進度同步不用問。', '["#Homigo","#租屋","#報修"]', '加 LINE 免費開始', a_content, now() - interval '7 days'),
@@ -430,11 +433,14 @@ BEGIN
   INSERT INTO publishing_logs (publishing_job_id, event, detail) VALUES
     (pj_homigo_1, 'published', '已成功發布至 Instagram');
 
-  INSERT INTO performance_reports (publishing_job_id, impressions, clicks, comments, shares, saves, engagement_rate, captured_at) VALUES
-    (pj_homigo_1, 18500, 620, 34, 58, 112, 0.0442, now() - interval '2 days');
+  INSERT INTO performance_reports (publishing_job_id, impressions, clicks, comments, shares, saves, engagement_rate, captured_at, raw_metrics) VALUES
+    (pj_homigo_1, 18500, 620, 34, 58, 112, 0.0442, now() - interval '2 days', '{"likes":614,"source":"seed"}'::jsonb);
 
-  INSERT INTO learning_records (brand_id, brand_version_id, record_type, insight, related_content_id, generated_by_agent_id) VALUES
-    (b_homigo, v_homigo_1, 'content_performance', '報修場景類圖文的收藏率明顯高於平均,建議提高此類內容佔比', ct_homigo_1, a_content);
+  INSERT INTO learning_records (brand_id, brand_version_id, record_type, insight, supporting_data, related_content_id, generated_by_agent_id, status) VALUES
+    (b_homigo, v_homigo_1, 'content_performance',
+     '報修場景類圖文的收藏率明顯高於平均,建議提高此類內容佔比',
+     '{"source":"seed","do_more":["報修場景圖文","連假前務實提醒"],"do_less":["純節慶抽獎"]}'::jsonb,
+     ct_homigo_1, a_content, 'approved');
 
   -- ==========================================================================
   -- 流程二:TaskGo 缺工國安話題(已發布完成)
@@ -460,8 +466,8 @@ BEGIN
 
   INSERT INTO campaign_brands (campaign_id, brand_id) VALUES (camp_taskgo_1, b_taskgo);
 
-  INSERT INTO contents (id, campaign_id, brand_id, brand_version_id, content_type, target_platform, title, status, generated_by_agent_id) VALUES
-    (ct_taskgo_1, camp_taskgo_1, b_taskgo, v_taskgo_1, 'article', 'threads', '缺工是國安問題,工地人自己想辦法', 'published', a_content);
+  INSERT INTO contents (id, campaign_id, brand_id, brand_version_id, content_type, target_platform, title, status, generated_by_agent_id, predicted_engagement_score, generation_prompt_meta) VALUES
+    (ct_taskgo_1, camp_taskgo_1, b_taskgo, v_taskgo_1, 'article', 'threads', '缺工是國安問題,工地人自己想辦法', 'published', a_content, 81.0, '{"source":"threads_hourly"}'::jsonb);
 
   INSERT INTO content_versions (id, content_id, version_number, body, hashtags, cta, generated_by_agent_id, created_at) VALUES
     (cv_taskgo_1_1, ct_taskgo_1, 1, '缺工是國安問題沒人否認,但工地人不能等政策。點工Go上架接案,案子自己找上門。', '["#做工的人","#缺工","#點工"]', '留言 +1,教你怎麼設定。', a_content, now() - interval '12 days');
@@ -472,14 +478,17 @@ BEGIN
   INSERT INTO publishing_jobs (id, content_id, content_version_id, platform, status, scheduled_at, published_at, published_by) VALUES
     (pj_taskgo_1, ct_taskgo_1, cv_taskgo_1_1, 'threads', 'published', now() - interval '11 days', now() - interval '11 days', u_taskgo_mgr);
 
-  INSERT INTO performance_reports (publishing_job_id, impressions, clicks, comments, shares, saves, engagement_rate, captured_at) VALUES
-    (pj_taskgo_1, 42300, 980, 156, 210, 88, 0.0562, now() - interval '9 days');
+  INSERT INTO performance_reports (publishing_job_id, impressions, clicks, comments, shares, saves, engagement_rate, captured_at, raw_metrics) VALUES
+    (pj_taskgo_1, 42300, 980, 156, 210, 88, 0.0562, now() - interval '9 days', '{"likes":1840,"source":"seed"}'::jsonb);
 
-  INSERT INTO learning_records (brand_id, brand_version_id, record_type, insight, related_content_id, generated_by_agent_id) VALUES
-    (b_taskgo, v_taskgo_1, 'audience_engagement', '產業趨勢蹭熱度型貼文在Threads的留言互動率最高,建議維持每週至少一篇', ct_taskgo_1, a_market);
+  INSERT INTO learning_records (brand_id, brand_version_id, record_type, insight, supporting_data, related_content_id, generated_by_agent_id, status) VALUES
+    (b_taskgo, v_taskgo_1, 'audience_engagement',
+     '產業趨勢蹭熱度型貼文在Threads的留言互動率最高,建議維持每週至少一篇',
+     '{"source":"seed","do_more":["站在做工的人這邊談缺工"],"do_less":["純數據自我表揚"]}'::jsonb,
+     ct_taskgo_1, a_market, 'approved');
 
   -- ==========================================================================
-  -- 流程三:Washgo 換季收納(待審閱中,示範 pending 狀態)
+  -- 流程三:Washgo 換季收納(一則待審 + 一則已發布生活哏,示範成效閉環)
   -- ==========================================================================
   INSERT INTO campaigns (id, primary_brand_id, title, status, start_date, end_date) VALUES
     (camp_washgo_1, b_washgo, 'Washgo 換季收納檔期', 'planning', (now())::date, (now() + interval '14 days')::date);
@@ -491,6 +500,27 @@ BEGIN
 
   INSERT INTO content_versions (id, content_id, version_number, body, hashtags, cta, generated_by_agent_id, created_at) VALUES
     (cv_washgo_1_1, ct_washgo_1, 1, '換季收納前,先讓外套洗好曬乾再收起來。到府收送+專業洗護,明年拿出來不再有霉味。', '["#Washgo","#衣物送洗","#換季"]', '加入 @washgo 領取 100 GoCoin', a_content, now() - interval '1 days');
+
+  INSERT INTO contents (id, campaign_id, brand_id, brand_version_id, content_type, target_platform, title, status, generated_by_agent_id, predicted_engagement_score, generation_prompt_meta) VALUES
+    (ct_washgo_pub, camp_washgo_1, b_washgo, v_washgo_1, 'article', 'threads', '洗衣機響了三天都沒人理', 'published', a_content, 74.0, '{"source":"threads_offtopic","category":"daily_pain"}'::jsonb);
+
+  INSERT INTO content_versions (id, content_id, version_number, body, hashtags, cta, generated_by_agent_id, created_at) VALUES
+    (cv_washgo_pub, ct_washgo_pub, 1, '洗衣機響了三天,衣服還在桶子裡發酸。這種時候最想有人直接上門收走。', '["#Washgo"]', '你們家洗衣機最近有沒有罷工?', a_content, now() - interval '4 days');
+
+  INSERT INTO publishing_jobs (id, content_id, content_version_id, platform, status, scheduled_at, published_at, published_by, external_post_id) VALUES
+    (pj_washgo_1, ct_washgo_pub, cv_washgo_pub, 'threads', 'published', now() - interval '4 days', now() - interval '4 days', u_washgo_mgr, 'seed-washgo-threads-1');
+
+  INSERT INTO publishing_logs (publishing_job_id, event, detail) VALUES
+    (pj_washgo_1, 'published', '已成功發布至 Threads');
+
+  INSERT INTO performance_reports (publishing_job_id, impressions, clicks, comments, shares, saves, engagement_rate, captured_at, raw_metrics) VALUES
+    (pj_washgo_1, 12680, 0, 47, 19, 6, 0.0087, now() - interval '1 days', '{"likes":38,"source":"seed"}'::jsonb);
+
+  INSERT INTO learning_records (brand_id, brand_version_id, record_type, insight, supporting_data, related_content_id, generated_by_agent_id, status) VALUES
+    (b_washgo, v_washgo_1, 'content_performance',
+     'Washgo Threads 生活哏用「洗衣機故障當下」開頭的留言率高於品牌介紹文;下次 09/21 檔優先用場景痛點而非品牌口號。',
+     '{"source":"seed","do_more":["用故障/來不及洗的當下場景開頭"],"do_less":["開頭就講品牌口號或 GoCoin"],"winning_hooks":["洗衣機響了三天都沒人理"],"platform":"threads","gen_source":"threads_offtopic"}'::jsonb,
+     ct_washgo_pub, a_content, 'pending_review');
 
   -- ==========================================================================
   -- 活動報名與報到示範:Washgo × 合作廠商「洗楽」小小洗衣師職人體驗營

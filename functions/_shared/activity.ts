@@ -89,4 +89,9 @@ export const ACTION_LABELS: Record<string, string> = {
   'press_release.approve': '核准新聞稿',
   'press_release.return': '退回新聞稿',
   'press_release.finalize': '定稿新聞稿',
+  'analytics.report_manual': '手動補登成效',
+  'analytics.synced': '同步社群成效',
+  'analytics.learn_requested': '產生成效學習建議',
+  'learning.approved': '核准學習洞察',
+  'learning.dismissed': '駁回學習洞察',
 };

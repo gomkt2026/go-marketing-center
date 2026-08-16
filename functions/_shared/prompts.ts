@@ -147,6 +147,14 @@ export interface BrandContext {
   systemPrompt: string;
 }
 
+function formatApprovedLearning(row: { insight: string; supporting_data: unknown }): string {
+  const data = (row.supporting_data ?? {}) as { do_more?: string[]; do_less?: string[] };
+  const extras: string[] = [];
+  if (data.do_more?.length) extras.push(`多做:${data.do_more.join('、')}`);
+  if (data.do_less?.length) extras.push(`少做:${data.do_less.join('、')}`);
+  return extras.length ? `- ${row.insight}（${extras.join(';')}）` : `- ${row.insight}`;
+}
+
 export async function buildBrandContext(env: Env, brandId: string): Promise<BrandContext> {
   const sql = getSql(env);
   const [brandRows, personaRows, ruleRows, channelRows, keywordRows, learningRows, coverages] = await Promise.all([
@@ -155,7 +163,7 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     sql`SELECT rule_type, statement, condition_note FROM brand_rules WHERE brand_id = ${brandId}::uuid ORDER BY sort_order LIMIT 30`,
     sql`SELECT platform, tone_of_voice, length_guideline, format_guideline, hashtag_count_min, hashtag_count_max FROM brand_channels WHERE brand_id = ${brandId}::uuid`,
     sql`SELECT category, value FROM brand_keywords WHERE brand_id = ${brandId}::uuid LIMIT 40`,
-    sql`SELECT insight FROM learning_records WHERE brand_id = ${brandId}::uuid ORDER BY created_at DESC LIMIT 8`,
+    sql`SELECT insight, supporting_data FROM learning_records WHERE brand_id = ${brandId}::uuid AND status = 'approved' ORDER BY created_at DESC LIMIT 8`,
     loadPublishedPrimaryCoverages(env, brandId, 4),
   ]);
   if (!brandRows.length) throw new Error('Brand not found');
@@ -179,8 +187,8 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     .map((k) => `${k.category}:${k.value}`)
     .join('、');
 
-  const learnings = (learningRows as { insight: string }[])
-    .map((l) => `- ${l.insight}`)
+  const learnings = (learningRows as { insight: string; supporting_data: unknown }[])
+    .map((l) => formatApprovedLearning(l))
     .join('\n');
 
   const systemPrompt = [
@@ -194,7 +202,7 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     rules ? `品牌規則(必須遵守,cannot_claim 與 negative_rule 絕對禁止觸犯):\n${rules}` : '',
     channels ? `各平台既有調性設定:\n${channels}` : '',
     keywords ? `品牌關鍵字/CTA 庫(自然使用,不要硬塞):${keywords}` : '',
-    learnings ? `過往經營累積的品牌心得(寫文時參考這些洞察):\n${learnings}` : '',
+    learnings ? `過往經營累積的操盤心得(寫文時參考,不可改品牌定位):\n${learnings}` : '',
     publishedCoveragePrompt(coverages),
     '',
     ANTI_AI_RULES,

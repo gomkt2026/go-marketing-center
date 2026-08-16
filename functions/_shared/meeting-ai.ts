@@ -174,7 +174,7 @@ async function buildMeetingMemory(env: Env, meetingId: string, brandId: string |
     `,
     brandId ? sql`
       SELECT insight FROM learning_records
-      WHERE brand_id = ${brandId}::uuid
+      WHERE brand_id = ${brandId}::uuid AND status = 'approved'
       ORDER BY created_at DESC LIMIT 6
     ` : Promise.resolve([]),
   ]);

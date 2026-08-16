@@ -69,7 +69,7 @@ export function MarketIntelligence() {
       />
       {genMessage && (
         <Card style={{ marginBottom: 12, borderLeft: '4px solid var(--color-primary)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div className="card-row" style={{ alignItems: 'center' }}>
             <p style={{ fontSize: 13 }}>{genMessage}</p>
             <Button variant="primary" style={{ fontSize: 12, padding: '4px 12px', flexShrink: 0 }} onClick={() => navigate(`/${brand.slug}/contents`)}>
               前往內容中心
@@ -80,8 +80,8 @@ export function MarketIntelligence() {
       <div style={{ display: 'grid', gap: 12 }}>
         {signals.map((s) => (
           <Card key={s.id} hoverable>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="card-row" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Badge tone="secondary">{typeLabel[s.signalType]}</Badge>
                 <Badge tone={statusTone[s.status]}>{statusLabel[s.status]}</Badge>
                 {s.sourcePlatform && <Badge tone="default">{s.sourcePlatform}</Badge>}

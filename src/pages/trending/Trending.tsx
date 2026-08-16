@@ -132,7 +132,7 @@ export function Trending() {
       </Card>
 
       {/* 雙欄:FB/IG 題材 vs Threads 題材 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 }}>
+      <div className="grid-2">
         <Card>
           <strong style={{ display: 'block', marginBottom: 4 }}>📰 FB / IG 題材:熱門新聞</strong>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>

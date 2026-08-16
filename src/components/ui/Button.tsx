@@ -39,7 +39,10 @@ export function Button({ variant = 'primary', style, children, ...rest }: Button
         cursor: 'pointer',
         display: 'inline-flex',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: 6,
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
         ...style,
       }}
     >

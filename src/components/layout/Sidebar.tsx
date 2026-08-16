@@ -1,6 +1,10 @@
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
+import { useLayout } from '@/context/LayoutContext';
+import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
 
 interface MenuItem {
   label: string;
@@ -62,91 +66,107 @@ const groups: MenuGroup[] = [
 
 export function Sidebar() {
   const { currentBrand, brands } = useBrand();
+  const { user, logout } = useAuth();
+  const { isMobile, sidebarOpen, closeSidebar } = useLayout();
   // 「全部品牌」模式下,品牌 scoped 連結退回第一個品牌,避免產生無效路徑
   const scopedBrand = currentBrand ?? brands[0];
 
   return (
-    <aside
-      style={{
-        width: 232,
-        flexShrink: 0,
-        borderRight: '1px solid var(--color-border)',
-        background: 'var(--color-bg)',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        position: 'sticky',
-        top: 0,
-        overflowY: 'auto',
-      }}
-    >
-      <div style={{ padding: '20px 20px 12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div
-            style={{
-              width: 32, height: 32, borderRadius: 8, background: 'var(--color-primary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2E3B26', fontWeight: 800,
-            }}
-          >
-            G
+    <>
+      {isMobile && sidebarOpen && (
+        <div className="sidebar-backdrop" onClick={closeSidebar} aria-hidden />
+      )}
+      <aside
+        className={`app-sidebar${sidebarOpen ? ' is-open' : ''}`}
+        aria-hidden={isMobile && !sidebarOpen}
+      >
+        <div style={{ padding: '20px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div
+              style={{
+                width: 32, height: 32, borderRadius: 8, background: 'var(--color-primary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2E3B26', fontWeight: 800,
+              }}
+            >
+              G
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>GO 行銷中心</div>
           </div>
-          <div style={{ fontWeight: 800, fontSize: 15 }}>GO 行銷中心</div>
+          {isMobile && (
+            <button className="app-icon-btn" aria-label="關閉選單" onClick={closeSidebar}>
+              ✕
+            </button>
+          )}
         </div>
-      </div>
 
-      <nav style={{ flex: 1, padding: '4px 12px 20px' }}>
-        {groups.map((group, gi) => (
-          <div key={gi} style={{ marginBottom: 16 }}>
-            {group.title && (
-              <div
-                style={{
-                  fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)',
-                  textTransform: 'uppercase', letterSpacing: 0.5, padding: '4px 12px 6px',
-                }}
-              >
-                {group.title}
-              </div>
-            )}
-            {group.items.map((item) => {
-              const to = item.brandScoped && scopedBrand ? `/${scopedBrand.slug}${item.path}` : item.path;
-              return (
-                <NavLink
-                  key={item.path}
-                  to={to}
-                  end={item.path === '/settings' || item.path === '/'}
-                  style={({ isActive }) => ({
-                    display: 'block',
-                    position: 'relative',
-                    padding: '9px 12px',
-                    borderRadius: 8,
-                    fontSize: 14,
-                    fontWeight: isActive ? 700 : 500,
-                    color: isActive ? 'var(--color-primary-dark)' : 'var(--color-text-muted)',
-                    textDecoration: 'none',
-                    marginBottom: 2,
-                  })}
+        <nav style={{ flex: 1, padding: '4px 12px 20px' }}>
+          {groups.map((group, gi) => (
+            <div key={gi} style={{ marginBottom: 16 }}>
+              {group.title && (
+                <div
+                  style={{
+                    fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)',
+                    textTransform: 'uppercase', letterSpacing: 0.5, padding: '4px 12px 6px',
+                  }}
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <motion.div
-                          layoutId="sidebar-active"
-                          transition={{ duration: 0.2, ease: 'easeOut' }}
-                          style={{
-                            position: 'absolute', inset: 0, background: 'var(--color-primary-soft)',
-                            borderRadius: 8, zIndex: -1,
-                          }}
-                        />
-                      )}
-                      {item.label}
-                    </>
-                  )}
-                </NavLink>
-              );
-            })}
+                  {group.title}
+                </div>
+              )}
+              {group.items.map((item) => {
+                const to = item.brandScoped && scopedBrand ? `/${scopedBrand.slug}${item.path}` : item.path;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={to}
+                    end={item.path === '/settings' || item.path === '/'}
+                    onClick={closeSidebar}
+                    className="app-sidebar-nav-link"
+                    style={({ isActive }) => ({
+                      fontWeight: isActive ? 700 : 500,
+                      color: isActive ? 'var(--color-primary-dark)' : 'var(--color-text-muted)',
+                    })}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {isActive && (
+                          <motion.div
+                            layoutId="sidebar-active"
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
+                            style={{
+                              position: 'absolute', inset: 0, background: 'var(--color-primary-soft)',
+                              borderRadius: 8, zIndex: -1,
+                            }}
+                          />
+                        )}
+                        {item.label}
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {isMobile && user && (
+          <div style={{ padding: 16, borderTop: '1px solid var(--color-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <Avatar label={user.displayName} color="var(--color-secondary)" size={36} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{user.displayName}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>上帝視角 · {user.role}</div>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              onClick={() => void logout()}
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              登出
+            </Button>
           </div>
-        ))}
-      </nav>
-    </aside>
+        )}
+      </aside>
+    </>
   );
 }

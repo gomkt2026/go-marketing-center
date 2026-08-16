@@ -58,7 +58,7 @@ export function Login() {
           background: 'var(--color-bg)',
           border: '1px solid var(--color-border)',
           borderRadius: 16,
-          padding: '36px 32px',
+          padding: '32px 24px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
         }}
       >

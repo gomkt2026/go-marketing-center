@@ -22,7 +22,7 @@ export function StatCard({
 }: { label: string; value: number; suffix?: string; tone?: string; delay?: number }) {
   const animated = useCountUp(value);
   return (
-    <Card delay={delay} style={{ flex: 1, minWidth: 160 }}>
+    <Card delay={delay} style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>{label}</div>
       <div style={{ fontSize: 28, fontWeight: 800, color: tone ?? 'var(--color-text)' }}>
         {animated.toLocaleString()}{suffix}

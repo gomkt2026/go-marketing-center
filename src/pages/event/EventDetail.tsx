@@ -80,7 +80,7 @@ export function EventDetail() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>公開報名連結</div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="copy-row">
               <input readOnly value={registerUrl} style={inputStyle} />
               <Button variant="ghost" onClick={() => void copy(registerUrl, '報名連結')}>複製</Button>
             </div>
@@ -93,7 +93,7 @@ export function EventDetail() {
           </div>
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>工作人員報到連結(授權碼)</div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="copy-row">
               <input readOnly value={checkinUrl} style={inputStyle} />
               <Button variant="ghost" onClick={() => void copy(checkinUrl, '報到連結')}>複製</Button>
             </div>
@@ -184,7 +184,7 @@ function SettingsTab({ event, onSaved }: { event: EventRecord; onSaved: () => vo
         <label style={labelStyle}><span>活動說明</span>
           <textarea style={{ ...inputStyle, minHeight: 80 }} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
         </label>
-        <div style={{ display: 'flex', gap: 14 }}>
+        <div className="form-row" style={{ gap: 14 }}>
           <label style={{ ...labelStyle, flex: 1 }}><span>地點</span>
             <input style={inputStyle} value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} />
           </label>
@@ -192,7 +192,7 @@ function SettingsTab({ event, onSaved }: { event: EventRecord; onSaved: () => vo
             <input type="datetime-local" style={inputStyle} value={form.eventDate} onChange={(e) => setForm((f) => ({ ...f, eventDate: e.target.value }))} />
           </label>
         </div>
-        <div style={{ display: 'flex', gap: 14 }}>
+        <div className="form-row" style={{ gap: 14 }}>
           <label style={{ ...labelStyle, flex: 1 }}><span>狀態</span>
             <select style={inputStyle} value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as EventStatus }))}>
               <option value="draft">草稿</option>
@@ -275,7 +275,7 @@ function SessionsFormTab({
         <h3 style={{ fontSize: 15, marginBottom: 12 }}>場次與名額</h3>
         <div style={{ display: 'grid', gap: 10 }}>
           {sessionDrafts.map((s, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div key={i} className="form-row">
               <input style={inputStyle} placeholder="場次名稱(例:上午場 10:00)" value={s.label}
                 onChange={(e) => setSessionDrafts((prev) => prev.map((p, idx) => (idx === i ? { ...p, label: e.target.value } : p)))} />
               <input type="datetime-local" style={inputStyle} value={s.startsAt}
@@ -293,7 +293,7 @@ function SessionsFormTab({
         <h3 style={{ fontSize: 15, marginBottom: 12 }}>自訂報名欄位</h3>
         <div style={{ display: 'grid', gap: 10 }}>
           {fields.map((f, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div key={i} className="form-row">
               <input style={inputStyle} placeholder="欄位名稱(例:小朋友姓名)" value={f.label}
                 onChange={(e) => setFields((prev) => prev.map((p, idx) => (idx === i ? { ...p, label: e.target.value } : p)))} />
               <select style={{ ...inputStyle, maxWidth: 130 }} value={f.type}
@@ -383,9 +383,10 @@ function ReferrersTab({
         {referrers.length === 0 && <p>尚無推薦人,新增後會出現在報名表單的下拉選單中</p>}
         <div style={{ display: 'grid', gap: 8 }}>
           {referrers.map((r) => (
-            <div key={r.id} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            <div key={r.id} className="card-row" style={{
+              alignItems: 'center',
               padding: '10px 12px', borderRadius: 10, background: 'var(--color-bg-soft)',
+              flexWrap: 'wrap',
             }}
             >
               <div>

@@ -90,7 +90,7 @@ export function Publishing() {
         title={`${brand.name} 發布管理`}
         subtitle="FB / IG / Threads 三平台獨立佇列;發布保留時間、平台、版本、發布人"
       />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14, alignItems: 'start' }}>
+      <div className="grid-auto" style={{ gap: 14, alignItems: 'start' }}>
         {PLATFORM_COLUMNS.map((col) => {
           const colQueue = queue.filter((q) => q.targetPlatform === col.id);
           const colJobs = data.jobs.filter((j) => (j.targetPlatform ?? j.platform) === col.id).slice(0, 10);

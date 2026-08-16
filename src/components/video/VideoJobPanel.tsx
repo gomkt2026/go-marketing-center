@@ -81,7 +81,7 @@ export function VideoJobPanel({
       )}
 
       {job.candidates.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10, marginBottom: 14 }}>
+        <div className="grid-auto" style={{ marginBottom: 14 }}>
           {job.candidates.map((c) => {
             const active = c.id === selectedId;
             return (

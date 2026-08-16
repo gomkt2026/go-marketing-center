@@ -39,7 +39,7 @@ export function Dashboard() {
     <div>
       <PageHeader title="總覽 Dashboard" subtitle="跨品牌的待辦事項與最新動態" />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
+      <div className="grid-3" style={{ marginBottom: 20 }}>
         <Card delay={0}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <strong>待你決策</strong>
@@ -77,7 +77,7 @@ export function Dashboard() {
 
       <Card delay={0.15} style={{ marginBottom: 20 }}>
         <strong style={{ display: 'block', marginBottom: 14 }}>三品牌狀態總覽</strong>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div className="grid-3" style={{ gap: 12 }}>
           {(data.brands.length ? data.brands : brands).map((b) => {
             const stats = data.brandStats.find((s) => s.brandId === b.id);
             return (

@@ -462,7 +462,7 @@ export function BrandIntelligence() {
               )}
 
               {tab === 'audience' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                <div className="grid-2" style={{ gap: 12 }}>
                   {audiences.map((a) => (
                     <div key={a.id} style={cardBoxStyle}>
                       <strong style={{ fontSize: 14 }}>{a.name}</strong>
@@ -485,7 +485,7 @@ export function BrandIntelligence() {
               )}
 
               {tab === 'channel' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                <div className="grid-2" style={{ gap: 12 }}>
                   {channels.map((c) => (
                     <div key={c.id} style={cardBoxStyle}>
                       <Badge tone="primary">{c.platform}</Badge>
@@ -505,7 +505,7 @@ export function BrandIntelligence() {
                     const isEditing = editingId === r.id;
                     return (
                       <motion.div key={r.id} layout style={cardBoxStyle}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <div className="card-row" style={{ flexWrap: 'wrap' }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
                               <Badge tone={meta.tone}>{meta.label}</Badge>
@@ -565,7 +565,7 @@ export function BrandIntelligence() {
                         {parseNotes.map((note) => <li key={note}>{note}</li>)}
                       </ul>
                     )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div className="grid-2" style={{ gap: 8 }}>
                       <input placeholder="媒體名稱" value={newCoverage.outlet} onChange={(e) => setNewCoverage((s) => ({ ...s, outlet: e.target.value }))} style={inputStyle} />
                       <input placeholder="見報日期" type="date" value={newCoverage.publishedOn} onChange={(e) => setNewCoverage((s) => ({ ...s, publishedOn: e.target.value }))} style={inputStyle} />
                     </div>
@@ -718,7 +718,7 @@ export function BrandIntelligence() {
               )}
 
               {tab === 'visual' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                <div className="grid-4" style={{ gap: 12 }}>
                   {visuals.map((v) => (
                     <div key={v.id} style={cardBoxStyle}>
                       {v.category === 'color' && (
@@ -772,7 +772,7 @@ export function BrandIntelligence() {
                       )}
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+                    <div className="grid-auto" style={{ marginTop: 12 }}>
                       {assets.map((a) => (
                         <div key={a.id} style={cardBoxStyle}>
                           {a.fileUrl && (
@@ -817,7 +817,7 @@ export function BrandIntelligence() {
                     </Field>
                     <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
                       {documents.map((d) => (
-                        <div key={d.id} style={{ ...cardBoxStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div key={d.id} className="card-row" style={{ ...cardBoxStyle, alignItems: 'center', flexWrap: 'wrap' }}>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600 }}>{d.title}</div>
                             <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{d.fileUrl}</div>

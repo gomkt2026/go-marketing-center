@@ -25,7 +25,7 @@ export function Analytics() {
     <div>
       <PageHeader title={`${brand.name} 成效分析`} subtitle="依平台追蹤曝光、點擊、留言、分享、收藏與互動率" />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div className="grid-5" style={{ marginBottom: 20 }}>
         <StatCard label="曝光" value={totals.impressions} delay={0} tone="var(--color-primary-dark)" />
         <StatCard label="點擊" value={totals.clicks} delay={0.03} />
         <StatCard label="留言" value={totals.comments} delay={0.06} />
@@ -36,13 +36,13 @@ export function Analytics() {
       <div style={{ display: 'grid', gap: 12 }}>
         {reports.map(({ content, perf }) => (
           <Card key={perf.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div className="card-row" style={{ marginBottom: 10 }}>
               <strong style={{ fontSize: 14 }}>{content.title}</strong>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary-dark)' }}>
                 互動率 {(Number(perf.engagementRate) * 100).toFixed(2)}%
               </span>
             </div>
-            <div style={{ display: 'flex', gap: 20, fontSize: 12, color: 'var(--color-text-muted)' }}>
+            <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--color-text-muted)', flexWrap: 'wrap' }}>
               <span>曝光 {Number(perf.impressions).toLocaleString()}</span>
               <span>點擊 {Number(perf.clicks).toLocaleString()}</span>
               <span>留言 {perf.comments}</span>

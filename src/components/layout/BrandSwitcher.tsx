@@ -76,9 +76,9 @@ export function BrandSwitcher() {
         {currentBrand ? (
           <>
             <BrandMark brand={currentBrand} size={26} />
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>{currentBrand.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+            <div style={{ textAlign: 'left', minWidth: 0 }}>
+              <div className="brand-switcher-name">{currentBrand.name}</div>
+              <div className="brand-switcher-meta" style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
                 {currentBrand.versionNumber ? `v${currentBrand.versionNumber} 已發布` : ''}
               </div>
             </div>
@@ -98,6 +98,7 @@ export function BrandSwitcher() {
             transition={{ duration: 0.15, ease: 'easeOut' }}
             style={{
               position: 'absolute', top: '110%', left: 0, minWidth: 220,
+              maxWidth: 'min(280px, calc(100vw - 24px))',
               background: 'var(--color-bg)', border: '1px solid var(--color-border)',
               borderRadius: 12, boxShadow: 'var(--shadow-card-hover)', padding: 6, zIndex: 50,
             }}

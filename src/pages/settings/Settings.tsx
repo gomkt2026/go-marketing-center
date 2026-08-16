@@ -70,7 +70,7 @@ export function Settings() {
       </Card>
 
       {tab === 'agents' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+        <div className="grid-2" style={{ gap: 12 }}>
           {agents.map((a) => {
             const brand = a.brandId ? brandById(a.brandId) : undefined;
             return (

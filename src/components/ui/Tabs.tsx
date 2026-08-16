@@ -8,7 +8,7 @@ interface TabsProps {
 
 export function Tabs({ tabs, active, onChange }: TabsProps) {
   return (
-    <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--color-border)', overflowX: 'auto' }}>
+    <div className="tabs-bar">
       {tabs.map((tab) => {
         const isActive = tab.id === active;
         return (

@@ -57,7 +57,7 @@ export function Campaigns() {
           const contentCount = allContents.filter((ct) => ct.campaignId === c.id).length;
           return (
             <Card key={c.id} hoverable>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div className="card-row">
                 <div>
                   <strong style={{ fontSize: 16 }}>{c.title}</strong>
                   {c.objective && <p style={{ fontSize: 13, marginTop: 4 }}>{c.objective}</p>}

@@ -108,7 +108,7 @@ export function EventRegister() {
       {isFixer && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: FIXER_NAVY, marginBottom: 8 }}>活動 EDM（點圖放大）</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="grid-2" style={{ gap: 10 }}>
             {[
               { src: '/events/fixercowork-edm-meeting.png', label: '商業交流會議' },
               { src: '/events/fixercowork-edm-alliance.png', label: '21克拉工程聯盟' },

@@ -31,7 +31,7 @@ export function BrandWorkspace() {
         actions={<Badge tone="primary">v{version?.versionNumber ?? '-'} 已發布</Badge>}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+      <div className="grid-4" style={{ marginBottom: 20 }}>
         <Card delay={0}>
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>進行中活動</div>
           <div style={{ fontSize: 24, fontWeight: 800 }}>{stats.activeCampaigns}</div>
@@ -50,7 +50,7 @@ export function BrandWorkspace() {
         </Card>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="grid-2">
         <Card delay={0.12}>
           <strong style={{ display: 'block', marginBottom: 12 }}>快速前往</strong>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

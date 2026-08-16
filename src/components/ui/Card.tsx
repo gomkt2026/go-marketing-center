@@ -25,6 +25,7 @@ export function Card({ children, style, className, hoverable, delay = 0, onClick
         borderRadius: 'var(--radius-lg)',
         boxShadow: 'var(--shadow-card)',
         padding: '20px',
+        minWidth: 0,
         ...style,
       }}
     >

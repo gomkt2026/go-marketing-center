@@ -54,7 +54,7 @@ export function EventList() {
         {data.events.map((e) => (
           <Link key={e.id} to={`/${slug}/events/${e.id}`} style={{ textDecoration: 'none' }}>
             <Card hoverable>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <div className="card-row">
                 <div>
                   <strong style={{ fontSize: 16 }}>{e.title}</strong>
                   <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>

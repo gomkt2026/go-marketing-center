@@ -87,7 +87,7 @@ export function AgentPersonas() {
         </Card>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, alignItems: 'start' }}>
+      <div className="grid-auto" style={{ gap: 14, alignItems: 'start' }}>
         {editors.map((agent) => {
           const p = agent.persona;
           const isEditing = editing === agent.id;

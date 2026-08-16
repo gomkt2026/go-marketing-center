@@ -194,8 +194,8 @@ export function ContentCenter() {
         </div>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16 }}>
-        <div style={{ display: 'grid', gap: 8 }}>
+      <div className="grid-split">
+        <div className="content-queue">
           {filtered.map((c) => (
             <button
               key={c.id}
@@ -229,7 +229,7 @@ export function ContentCenter() {
               transition={{ duration: 0.2, ease: 'easeOut' }}
             >
               <Card>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div className="card-row" style={{ marginBottom: 14 }}>
                   <div>
                     <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{brand.name} · {selected.targetPlatform}</div>
                     <strong style={{ fontSize: 16 }}>{selected.title}</strong>

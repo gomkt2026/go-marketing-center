@@ -72,7 +72,7 @@ function EcosystemXAccountPanel({ collaborationId }: { collaborationId: string }
 
   return (
     <div style={{ marginTop: 16, borderTop: '1px solid var(--color-border)', paddingTop: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+      <div className="card-row" style={{ flexWrap: 'wrap' }}>
         <div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
             <strong style={{ fontSize: 14 }}>Go 生態系共用 X(Twitter) 帳號</strong>

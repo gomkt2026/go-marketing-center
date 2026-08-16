@@ -80,7 +80,7 @@ export function MeetingList() {
     : data.meetings;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20, alignItems: 'start' }}>
+    <div className="grid-split" style={{ gap: 20, alignItems: 'start' }}>
       <div>
         <PageHeader title="AI 會議室" />
         <Button variant="primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }} disabled={creating} onClick={() => void createLiveMeeting()}>

@@ -78,7 +78,7 @@ export function DecisionCenter() {
             {resolved.map((p) => {
               const decision = decisions.find((d) => d.proposalId === p.id);
               return (
-                <Card key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.85 }}>
+                <Card key={p.id} className="card-row" style={{ alignItems: 'center', opacity: 0.85 }}>
                   <div>
                     <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{scopeLabel(p)}</div>
                     <strong style={{ fontSize: 14 }}>{p.title}</strong>
@@ -107,7 +107,7 @@ function ProposalCard({
   return (
     <motion.div layout>
       <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div className="card-row" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{scope} · 來自 AI 會議</div>
             <strong style={{ fontSize: 16 }}>{proposal.title}</strong>
@@ -115,7 +115,7 @@ function ProposalCard({
           <Badge tone={statusTone[proposal.status]}>{statusLabel[proposal.status]}</Badge>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${proposal.options.length}, 1fr)`, gap: 12, marginBottom: 16 }}>
+        <div className="grid-auto" style={{ marginBottom: 16 }}>
           {proposal.options.map((opt) => (
             <motion.div
               key={opt.id}

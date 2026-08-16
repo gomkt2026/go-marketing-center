@@ -272,6 +272,21 @@ function isPermalink(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
 }
 
+/** facebook.com/{pageId}/posts/{postId} → Graph API 的 {pageId}_{postId} */
+function parseFacebookGraphId(url: string): string | null {
+  const posts = url.match(/facebook\.com\/(\d+)\/posts\/(\d+)/i);
+  if (posts) return `${posts[1]}_${posts[2]}`;
+  const photos = url.match(/facebook\.com\/(\d+)\/photos\/(?:[^/]+\/)?(\d+)/i);
+  if (photos) return `${photos[1]}_${photos[2]}`;
+  try {
+    const parsed = new URL(url);
+    const story = parsed.searchParams.get('story_fbid');
+    const pageId = parsed.searchParams.get('id');
+    if (story && pageId && /^\d+$/.test(story) && /^\d+$/.test(pageId)) return `${pageId}_${story}`;
+  } catch { /* 不是合法 URL */ }
+  return null;
+}
+
 async function fetchPermalinkMap(
   url: string,
   permalinkField: 'permalink' | 'permalink_url',
@@ -285,8 +300,14 @@ async function fetchPermalinkMap(
     for (const item of items) {
       if (!item.id) continue;
       const link = permalinkField === 'permalink_url' ? item.permalink_url : item.permalink;
-      if (link) map.set(permalinkLookupKey(link), item.id);
+      if (link) {
+        map.set(permalinkLookupKey(link), item.id);
+        const fromUrl = parseFacebookGraphId(link);
+        if (fromUrl) map.set(fromUrl, item.id);
+      }
       map.set(item.id, item.id);
+      const tail = item.id.includes('_') ? item.id.split('_').pop() : null;
+      if (tail) map.set(tail, item.id);
     }
     next = (res.data.paging as { next?: string } | undefined)?.next ?? null;
   }
@@ -311,14 +332,23 @@ async function resolveMediaId(job: PublishedJob, accounts: AccountBundle): Promi
     return id;
   }
   if (job.platform === 'facebook') {
+    const fromUrl = parseFacebookGraphId(raw);
+    if (fromUrl) return fromUrl;
     if (!accounts.facebook) throw new Error('尚未連接 Facebook 帳號');
     if (!accounts.permalinkIds.facebook) {
-      accounts.permalinkIds.facebook = await fetchPermalinkMap(
-        `${GRAPH_API}/${encodeURIComponent(accounts.facebook.externalId)}/posts?fields=id,permalink_url&limit=50&access_token=${encodeURIComponent(accounts.facebook.accessToken)}`,
+      const token = encodeURIComponent(accounts.facebook.accessToken);
+      const pageId = encodeURIComponent(accounts.facebook.externalId);
+      const fromPosts = await fetchPermalinkMap(
+        `${GRAPH_API}/${pageId}/published_posts?fields=id,permalink_url&limit=50&access_token=${token}`,
         'permalink_url',
       );
+      const fromFeed = await fetchPermalinkMap(
+        `${GRAPH_API}/${pageId}/posts?fields=id,permalink_url&limit=50&access_token=${token}`,
+        'permalink_url',
+      );
+      accounts.permalinkIds.facebook = new Map([...fromFeed, ...fromPosts]);
     }
-    const id = accounts.permalinkIds.facebook.get(key);
+    const id = accounts.permalinkIds.facebook.get(key) ?? accounts.permalinkIds.facebook.get(raw);
     if (!id) throw new Error(`找不到對應的 Facebook 貼文 ID(${key})`);
     return id;
   }

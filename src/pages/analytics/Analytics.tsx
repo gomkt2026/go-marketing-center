@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -125,12 +125,46 @@ export function Analytics() {
   const [message, setMessage] = useState<string | null>(null);
   const [editingJob, setEditingJob] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const autoSyncRef = useRef(false);
+
+  async function syncUntilDone() {
+    let synced = 0;
+    let failed = 0;
+    let remaining = 0;
+    let lastError = '';
+    for (let i = 0; i < 12; i++) {
+      const res = await api.syncAnalytics(slug!);
+      synced += res.synced;
+      failed += res.failed;
+      remaining = res.remaining;
+      const err = res.results.find((r) => !r.ok)?.error;
+      if (err) lastError = err;
+      if (res.remaining <= 0) break;
+      if (res.synced === 0) break;
+    }
+    if (!synced && !failed) return '近 28 天沒有可同步的已發布貼文(需有平台貼文 ID)';
+    const failNote = failed ? `;失敗 ${failed} 篇${lastError ? `:${lastError}` : ',可改手動補登'}` : '';
+    const more = remaining > 0 ? `;還有 ${remaining} 篇未回收` : '';
+    return `已自動同步 ${synced} 篇${failNote}${more}`;
+  }
 
   const posts = useMemo(() => {
     const list = data?.posts ?? [];
     if (platform === 'all') return list;
     return list.filter((p) => p.job.platform === platform);
   }, [data, platform]);
+
+  useEffect(() => {
+    if (!slug || !data || autoSyncRef.current) return;
+    if (data.syncedCount >= data.publishedCount) return;
+    autoSyncRef.current = true;
+    setBusy('sync');
+    setMessage('正在自動同步尚未回收的成效,不用一直按…');
+    void syncUntilDone()
+      .then((text) => { setMessage(text); reload(); })
+      .catch((e) => setMessage(e instanceof Error ? e.message : '自動同步失敗'))
+      .finally(() => setBusy(null));
+  }, [slug, data]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (loading) return <LoadingState />;
@@ -156,21 +190,13 @@ export function Analytics() {
     <div>
       <PageHeader
         title={`${brand.name} 成效分析`}
-        subtitle="看已發布貼文的真實互動,核准 AI 建議後回寫學習庫,讓下次生成更貼近受眾"
+        subtitle="排程每 3 小時自動回收成效;進頁也會一次補齊尚未回收的貼文,不用一直按同步"
         actions={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button
               variant="secondary"
               disabled={busy !== null}
-              onClick={() => run('sync', async () => {
-                const res = await api.syncAnalytics(slug!);
-                if (!res.attempted) return '近 28 天沒有可同步的已發布貼文(需有平台貼文 ID)';
-                const failNote = res.failed
-                  ? `;失敗 ${res.failed} 篇${res.results.find((r) => !r.ok)?.error ? `:${res.results.find((r) => !r.ok)?.error}` : ',可改手動補登'}`
-                  : '';
-                const more = res.remaining > 0 ? `;還有 ${res.remaining} 篇未回收,請再按一次同步` : '';
-                return `已同步 ${res.synced}/${res.attempted} 篇${failNote}${more}`;
-              })}
+              onClick={() => run('sync', syncUntilDone)}
             >
               {busy === 'sync' ? '同步中…' : '同步成效'}
             </Button>

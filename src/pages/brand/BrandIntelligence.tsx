@@ -250,7 +250,17 @@ export function BrandIntelligence() {
     setConvertingUrl(busyKey);
     setPressMessage(null);
     try {
-      const { coverage, parseNotes: notes } = await api.convertPressCoverage(slug, body);
+      let result: { coverage: PressCoverage; parseNotes?: string[]; alreadyExists?: boolean };
+      try {
+        result = await api.convertPressCoverage(slug, body);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '';
+        if (!/press_coverages.*does not exist/i.test(msg)) throw e;
+        setPressMessage('資料表尚未建立，正在自動補上…');
+        await api.migratePress();
+        result = await api.convertPressCoverage(slug, body);
+      }
+      const { coverage, parseNotes: notes, alreadyExists } = result;
       setCoverages((prev) => [coverage, ...prev.filter((c) => c.id !== coverage.id)]);
       if (source) {
         setDiscovered((prev) => prev.map((item) => (
@@ -261,7 +271,9 @@ export function BrandIntelligence() {
         setParseNotes([]);
       }
       if (notes?.length) setParseNotes(notes);
-      setPressMessage('已轉換並存入行銷中心，之後生成文案可引用');
+      setPressMessage(alreadyExists
+        ? '此連結已在行銷中心，已帶出既有報導'
+        : '已轉換並存入行銷中心，之後生成文案可引用');
     } catch (e) {
       setPressMessage(e instanceof Error ? e.message : '轉換失敗');
     } finally {

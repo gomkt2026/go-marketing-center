@@ -3,9 +3,11 @@ import type { Env } from '../../../../_shared/env';
 import { requireAuth } from '../../../../_shared/auth';
 import { getBrandBySlug } from '../../../../_shared/queries';
 import { json, error } from '../../../../_shared/response';
+import { getSql } from '../../../../_shared/db';
 import { logActivity } from '../../../../_shared/activity';
-import { insertPressCoverage, slugifyStoryKey } from '../../../../_shared/press';
+import { insertPressCoverage, slugifyStoryKey, toPressCoverage } from '../../../../_shared/press';
 import { parsePressUrl } from '../../../../_shared/press-parse';
+import { applyPressMigration, isMissingPressRelation } from '../../../../_shared/press-migrate';
 
 // POST /api/brands/:slug/press-coverages/convert
 // 把解析結果或原文連結轉換寫入 press_coverages。不存第三方全文。
@@ -65,20 +67,32 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   const status = body.status === 'inbox' || body.status === 'syndicated' ? body.status : 'published';
 
+  const save = async () => insertPressCoverage(context.env, {
+    brandId: brand.id,
+    storyKey: storyKey || slugifyStoryKey(`${slug}-${headline}`),
+    outlet,
+    headline,
+    articleUrl: url || null,
+    publishedOn: publishedOn || null,
+    status,
+    discoverySource: 'manual',
+    summary: summary || null,
+    keyQuotes,
+    claimableFacts,
+  });
+
   try {
-    const coverage = await insertPressCoverage(context.env, {
-      brandId: brand.id,
-      storyKey: storyKey || slugifyStoryKey(`${slug}-${headline}`),
-      outlet,
-      headline,
-      articleUrl: url || null,
-      publishedOn: publishedOn || null,
-      status,
-      discoverySource: 'manual',
-      summary: summary || null,
-      keyQuotes,
-      claimableFacts,
-    });
+    let coverage;
+    try {
+      coverage = await save();
+    } catch (e) {
+      if (isMissingPressRelation(e)) {
+        await applyPressMigration(context.env);
+        coverage = await save();
+      } else {
+        throw e;
+      }
+    }
     await logActivity(context.env, {
       brandId: brand.id,
       actorType: 'user',
@@ -91,7 +105,34 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return json({ coverage, parseNotes }, 201);
   } catch (e) {
     const msg = e instanceof Error ? e.message : '轉換失敗';
-    if (msg.includes('idx_press_coverages_url')) return error('這個原文連結已經存在', 409);
+    if (msg.includes('idx_press_coverages_url') && url) {
+      const sql = getSql(context.env);
+      const rows = await sql`
+        SELECT * FROM press_coverages
+        WHERE brand_id = ${brand.id}::uuid AND article_url = ${url}
+        LIMIT 1
+      `;
+      if (rows[0]) {
+        const existing = toPressCoverage(rows[0] as Record<string, unknown>);
+        const updated = await sql`
+          UPDATE press_coverages SET
+            outlet = ${outlet},
+            headline = ${headline},
+            published_on = ${publishedOn || existing.publishedOn},
+            summary = ${summary || existing.summary},
+            key_quotes = ${JSON.stringify(keyQuotes.length ? keyQuotes : existing.keyQuotes)},
+            claimable_facts = ${JSON.stringify(claimableFacts.length ? claimableFacts : existing.claimableFacts)}
+          WHERE id = ${existing.id}::uuid
+          RETURNING *
+        `;
+        return json({
+          coverage: toPressCoverage(updated[0] as Record<string, unknown>),
+          parseNotes,
+          alreadyExists: true,
+        });
+      }
+      return error('這個原文連結已經存在', 409);
+    }
     return error(msg, 500);
   }
 };

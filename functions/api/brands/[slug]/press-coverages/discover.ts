@@ -4,6 +4,7 @@ import { requireAuth } from '../../../../_shared/auth';
 import { getBrandBySlug } from '../../../../_shared/queries';
 import { json, error } from '../../../../_shared/response';
 import { discoverPressMentions } from '../../../../_shared/press-parse';
+import { applyPressMigration, isMissingPressRelation } from '../../../../_shared/press-migrate';
 
 // POST /api/brands/:slug/press-coverages/discover
 // 從 Google News + 台灣媒體 RSS 撈品牌名相關報導，只回傳候選清單，不自動入庫。
@@ -16,12 +17,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!brand) return error('Brand not found', 404);
 
   try {
-    const items = await discoverPressMentions(context.env, {
-      id: brand.id,
-      name: brand.name,
-      slug: brand.slug,
-    });
-    return json({ items });
+    const brandRef = { id: brand.id, name: brand.name, slug: brand.slug };
+    try {
+      return json({ items: await discoverPressMentions(context.env, brandRef) });
+    } catch (e) {
+      if (!isMissingPressRelation(e)) throw e;
+      await applyPressMigration(context.env);
+      return json({ items: await discoverPressMentions(context.env, brandRef) });
+    }
   } catch (e) {
     return error(e instanceof Error ? e.message : '撈取失敗', 500);
   }

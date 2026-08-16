@@ -105,10 +105,15 @@ export const api = {
     url?: string; outlet?: string; headline?: string; articleUrl?: string; publishedOn?: string;
     summary?: string; keyQuotes?: string[]; claimableFacts?: string[]; storyKey?: string; status?: string;
   }) =>
-    request<{ coverage: import('@/types').PressCoverage; parseNotes?: string[] }>(
+    request<{ coverage: import('@/types').PressCoverage; parseNotes?: string[]; alreadyExists?: boolean }>(
       `/api/brands/${slug}/press-coverages/convert`,
       { method: 'POST', body: JSON.stringify(body) },
     ),
+
+  migratePress: () =>
+    request<{ ok: boolean; steps: string[] }>('/api/admin/migrate-press', {
+      method: 'POST', body: JSON.stringify({}),
+    }),
 
   updatePressCoverage: (slug: string, id: string, body: Record<string, unknown>) =>
     request<{ coverage: import('@/types').PressCoverage }>(`/api/brands/${slug}/press-coverages/${id}`, {

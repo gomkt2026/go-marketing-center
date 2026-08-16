@@ -1292,7 +1292,7 @@ async function publishDueJobs(env: Env): Promise<void> {
 
       await sql`
         UPDATE publishing_jobs SET status = 'published', published_at = now(),
-          external_post_id = ${published.permalink ?? published.postId}
+          external_post_id = ${published.postId}
         WHERE id = ${row.job_id}::uuid
       `;
       await sql`UPDATE contents SET status = 'published', updated_at = now() WHERE id = ${row.content_id}::uuid`;

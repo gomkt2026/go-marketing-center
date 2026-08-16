@@ -78,7 +78,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const jobRows = await sql`
     INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, published_at, published_by, external_post_id)
     VALUES (${contentId}::uuid, ${version.id}::uuid, ${platform}, 'published',
-            now(), ${auth.id}::uuid, ${published.permalink ?? published.postId})
+            now(), ${auth.id}::uuid, ${published.postId})
     RETURNING id
   `;
   const jobId = (jobRows[0] as { id: string }).id;

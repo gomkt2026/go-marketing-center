@@ -42,6 +42,11 @@ interface AccountBundle {
   threads: Awaited<ReturnType<typeof getThreadsAccount>>;
   facebook: Awaited<ReturnType<typeof getMetaAccount>>;
   instagram: Awaited<ReturnType<typeof getMetaAccount>>;
+  permalinkIds: {
+    threads?: Map<string, string>;
+    facebook?: Map<string, string>;
+    instagram?: Map<string, string>;
+  };
 }
 
 interface PublishedJob {
@@ -249,29 +254,137 @@ async function fetchXInsights(env: Env, collaborationId: string, tweetId: string
   };
 }
 
+/** 發布時曾把 permalink 存進 external_post_id;Insights 必須用平台媒體 ID */
+function permalinkLookupKey(value: string): string {
+  const raw = value.trim();
+  try {
+    const url = new URL(raw.startsWith('http') ? raw : `https://dummy/${raw}`);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const idx = parts.findIndex((p) => p === 'post' || p === 'p' || p === 'reel' || p === 'reels');
+    if (idx >= 0 && parts[idx + 1]) return parts[idx + 1].replace(/\/+$/, '');
+    return url.href.replace(/\/+$/, '').toLowerCase();
+  } catch {
+    return raw.replace(/\/+$/, '');
+  }
+}
+
+function isPermalink(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
+}
+
+async function fetchPermalinkMap(
+  url: string,
+  permalinkField: 'permalink' | 'permalink_url',
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  let next: string | null = url;
+  for (let page = 0; page < 3 && next; page++) {
+    const res = await fetchJson(next);
+    if (!res.ok) break;
+    const items = (res.data.data as { id?: string; permalink?: string; permalink_url?: string }[]) ?? [];
+    for (const item of items) {
+      if (!item.id) continue;
+      const link = permalinkField === 'permalink_url' ? item.permalink_url : item.permalink;
+      if (link) map.set(permalinkLookupKey(link), item.id);
+      map.set(item.id, item.id);
+    }
+    next = (res.data.paging as { next?: string } | undefined)?.next ?? null;
+  }
+  return map;
+}
+
+async function resolveMediaId(job: PublishedJob, accounts: AccountBundle): Promise<string> {
+  const raw = job.externalPostId.trim();
+  if (!isPermalink(raw)) return raw;
+
+  const key = permalinkLookupKey(raw);
+  if (job.platform === 'threads') {
+    if (!accounts.threads) throw new Error('尚未連接 Threads 帳號');
+    if (!accounts.permalinkIds.threads) {
+      accounts.permalinkIds.threads = await fetchPermalinkMap(
+        `${THREADS_API}/${encodeURIComponent(accounts.threads.threadsUserId)}/threads?fields=id,permalink&limit=50&access_token=${encodeURIComponent(accounts.threads.accessToken)}`,
+        'permalink',
+      );
+    }
+    const id = accounts.permalinkIds.threads.get(key);
+    if (!id) throw new Error(`找不到對應的 Threads 媒體 ID(${key})`);
+    return id;
+  }
+  if (job.platform === 'facebook') {
+    if (!accounts.facebook) throw new Error('尚未連接 Facebook 帳號');
+    if (!accounts.permalinkIds.facebook) {
+      accounts.permalinkIds.facebook = await fetchPermalinkMap(
+        `${GRAPH_API}/${encodeURIComponent(accounts.facebook.externalId)}/posts?fields=id,permalink_url&limit=50&access_token=${encodeURIComponent(accounts.facebook.accessToken)}`,
+        'permalink_url',
+      );
+    }
+    const id = accounts.permalinkIds.facebook.get(key);
+    if (!id) throw new Error(`找不到對應的 Facebook 貼文 ID(${key})`);
+    return id;
+  }
+  if (job.platform === 'instagram') {
+    if (!accounts.instagram) throw new Error('尚未連接 Instagram 帳號');
+    if (!accounts.permalinkIds.instagram) {
+      accounts.permalinkIds.instagram = await fetchPermalinkMap(
+        `${GRAPH_API}/${encodeURIComponent(accounts.instagram.externalId)}/media?fields=id,permalink&limit=50&access_token=${encodeURIComponent(accounts.instagram.accessToken)}`,
+        'permalink',
+      );
+    }
+    const id = accounts.permalinkIds.instagram.get(key);
+    if (!id) throw new Error(`找不到對應的 Instagram 媒體 ID(${key})`);
+    return id;
+  }
+  if (job.platform === 'x') {
+    const status = raw.match(/status\/(\d+)/);
+    if (status?.[1]) return status[1];
+  }
+  throw new Error(`external_post_id 是網址,無法解析成平台 ID:${raw.slice(0, 80)}`);
+}
+
+async function persistResolvedId(env: Env, jobId: string, mediaId: string, previous: string): Promise<void> {
+  if (!isPermalink(previous) || isPermalink(mediaId)) return;
+  const sql = getSql(env);
+  try {
+    await sql`
+      UPDATE publishing_jobs
+      SET external_post_id = ${mediaId}
+      WHERE id = ${jobId}::uuid AND external_post_id LIKE 'http%'
+    `;
+  } catch (e) {
+    console.error('[insights] 回寫媒體 ID 失敗', e);
+  }
+}
+
 export async function fetchJobInsights(
   env: Env,
   job: PublishedJob,
   accounts?: AccountBundle,
 ): Promise<NormalizedMetrics> {
+  const bundle = accounts ?? await loadAccounts(env, job.brandId);
+  const mediaId = await resolveMediaId(job, bundle);
+  if (mediaId !== job.externalPostId) {
+    await persistResolvedId(env, job.id, mediaId, job.externalPostId);
+    job.externalPostId = mediaId;
+  }
+
   if (job.platform === 'threads') {
-    const account = accounts?.threads ?? await getThreadsAccount(env, job.brandId);
+    const account = bundle.threads;
     if (!account) throw new Error('尚未連接 Threads 帳號');
-    return fetchThreadsInsights(account, job.externalPostId);
+    return fetchThreadsInsights(account, mediaId);
   }
   if (job.platform === 'facebook') {
-    const account = accounts?.facebook ?? await getMetaAccount(env, job.brandId, 'facebook');
+    const account = bundle.facebook;
     if (!account) throw new Error('尚未連接 Facebook 帳號');
-    return fetchFacebookInsights(account, job.externalPostId);
+    return fetchFacebookInsights(account, mediaId);
   }
   if (job.platform === 'instagram') {
-    const account = accounts?.instagram ?? await getMetaAccount(env, job.brandId, 'instagram');
+    const account = bundle.instagram;
     if (!account) throw new Error('尚未連接 Instagram 帳號');
-    return fetchInstagramInsights(account, job.externalPostId);
+    return fetchInstagramInsights(account, mediaId);
   }
   if (job.platform === 'x') {
     if (!job.collaborationId) throw new Error('X 貼文缺少 collaboration_id');
-    return fetchXInsights(env, job.collaborationId, job.externalPostId);
+    return fetchXInsights(env, job.collaborationId, mediaId);
   }
   throw new Error(`平台 ${job.platform} 尚不支援成效回收`);
 }
@@ -282,7 +395,7 @@ async function loadAccounts(env: Env, brandId: string): Promise<AccountBundle> {
     getMetaAccount(env, brandId, 'facebook'),
     getMetaAccount(env, brandId, 'instagram'),
   ]);
-  return { threads, facebook, instagram };
+  return { threads, facebook, instagram, permalinkIds: {} };
 }
 
 export async function upsertPerformanceReport(env: Env, jobId: string, metrics: NormalizedMetrics): Promise<void> {

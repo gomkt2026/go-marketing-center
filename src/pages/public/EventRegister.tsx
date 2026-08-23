@@ -39,6 +39,14 @@ export function EventRegister() {
   const { event, sessions, referrers, brand } = data;
   const accent = brandAccent(brand);
   const isFixer = brand?.slug === 'fixercowork';
+  const edmItems = (event.edmImages?.length
+    ? event.edmImages.map((item) => ({ src: item.url, label: item.label }))
+    : isFixer
+      ? [
+          { src: '/events/fixercowork-edm-meeting.png', label: '商業交流會議' },
+          { src: '/events/fixercowork-edm-alliance.png', label: '21克拉工程聯盟' },
+        ]
+      : []);
   const inputStyle = isFixer
     ? { ...publicInputStyle, border: `1px solid ${FIXER_NAVY}33`, background: '#FFFCF9' }
     : publicInputStyle;
@@ -105,14 +113,11 @@ export function EventRegister() {
         </div>
       </div>
 
-      {isFixer && (
+      {edmItems.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: FIXER_NAVY, marginBottom: 8 }}>活動 EDM（點圖放大）</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: isFixer ? FIXER_NAVY : undefined, marginBottom: 8 }}>活動 EDM（點圖放大）</div>
           <div className="grid-2" style={{ gap: 10 }}>
-            {[
-              { src: '/events/fixercowork-edm-meeting.png', label: '商業交流會議' },
-              { src: '/events/fixercowork-edm-alliance.png', label: '21克拉工程聯盟' },
-            ].map((item) => (
+            {edmItems.map((item) => (
               <button
                 key={item.src}
                 type="button"

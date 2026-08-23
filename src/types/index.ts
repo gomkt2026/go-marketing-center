@@ -645,6 +645,12 @@ export interface EventFormField {
   options?: string[];
 }
 
+export interface EventEdmImage {
+  id: string;
+  label: string;
+  url: string;
+}
+
 export interface EventRecord {
   id: string;
   brandId: string;
@@ -660,6 +666,7 @@ export interface EventRecord {
   price?: number | null;
   priceLabel?: string | null;
   lineAddFriendUrl?: string | null;
+  edmImages?: EventEdmImage[];
   createdAt: string;
   updatedAt: string;
   registrationCount?: number;

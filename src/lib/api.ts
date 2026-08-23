@@ -519,6 +519,23 @@ export const api = {
       body: JSON.stringify(body ?? {}),
     }),
 
+  uploadEventEdm: async (eventId: string, params: { file: File; label?: string; replaceId?: string }) => {
+    const form = new FormData();
+    form.append('file', params.file);
+    if (params.label) form.append('label', params.label);
+    if (params.replaceId) form.append('replaceId', params.replaceId);
+    const res = await fetch(`/api/events/${eventId}/edms`, { method: 'POST', credentials: 'include', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    return data as { event: import('@/types').EventRecord };
+  },
+
+  updateEventEdms: (eventId: string, edmImages: import('@/types').EventEdmImage[]) =>
+    request<{ event: import('@/types').EventRecord }>(`/api/events/${eventId}/edms`, {
+      method: 'PUT',
+      body: JSON.stringify({ edmImages }),
+    }),
+
   updateRegistration: (eventId: string, registrationId: string, body: Partial<{
     status: import('@/types').EventRegistrationStatus;
     name: string; phone: string; sessionId: string | null;
@@ -726,7 +743,7 @@ export const api = {
 export const publicApi = {
   event: (slug: string) =>
     request<{
-      event: Pick<import('@/types').EventRecord, 'id' | 'slug' | 'title' | 'description' | 'location' | 'eventDate' | 'status' | 'formFields' | 'priceLabel' | 'lineAddFriendUrl'>;
+      event: Pick<import('@/types').EventRecord, 'id' | 'slug' | 'title' | 'description' | 'location' | 'eventDate' | 'status' | 'formFields' | 'priceLabel' | 'lineAddFriendUrl' | 'edmImages'>;
       brand: { name: string; slug: string; logoUrl?: string | null; primaryColor?: string | null; tagline?: string | null } | null;
       sessions: import('@/types').EventSession[];
       referrers: import('@/types').EventReferrer[];

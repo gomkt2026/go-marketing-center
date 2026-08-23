@@ -707,6 +707,7 @@ CREATE TABLE events (
   status              event_status NOT NULL DEFAULT 'draft',
   staff_token         VARCHAR(64) NOT NULL,
   form_fields         JSONB NOT NULL DEFAULT '[]',   -- [{key,label,type,required,options?}]
+  edm_images          JSONB NOT NULL DEFAULT '[]',   -- [{id,label,url}] 活動專屬 EDM
   price               NUMERIC(10,2),                 -- 拆帳計算用單價
   price_label         TEXT,                          -- 顯示用文案,如 "NT$499(原價699)"
   line_add_friend_url TEXT,

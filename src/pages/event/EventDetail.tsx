@@ -10,7 +10,7 @@ import { useBrand } from '@/context/BrandContext';
 import { api, ApiError } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type {
-  EventFormField, EventReferrerCommissionType, EventRegistration, EventRecord, EventSession, EventStats, EventStatus,
+  EventEdmImage, EventFormField, EventReferrerCommissionType, EventRegistration, EventRecord, EventSession, EventStats, EventStatus,
 } from '@/types';
 import { DuplicateEventDialog } from './DuplicateEventDialog';
 
@@ -116,12 +116,6 @@ export function EventDetail() {
                 狀態是「{statusLabel[event.status]}」時，公開頁會顯示活動不存在。請改成「開放報名」並儲存。
               </div>
             )}
-            {brand.slug === 'fixercowork' && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                <a href="/events/fixercowork-edm-meeting.png" target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#F26522' }}>商業交流會議 EDM</a>
-                <a href="/events/fixercowork-edm-alliance.png" target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#1B2B47' }}>21克拉工程聯盟 EDM</a>
-              </div>
-            )}
           </div>
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>工作人員報到連結(授權碼)</div>
@@ -131,6 +125,7 @@ export function EventDetail() {
             </div>
           </div>
         </div>
+        <EdmManager event={event} onChanged={reloadAll} />
       </Card>
 
       <div style={{ marginBottom: 16 }}>
@@ -179,6 +174,128 @@ export function EventDetail() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 活動 EDM
+// ----------------------------------------------------------------------------
+function EdmManager({ event, onChanged }: { event: EventRecord; onChanged: () => void }) {
+  const images = event.edmImages ?? [];
+  const [label, setLabel] = useState('商業交流會議');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  async function upload(file: File, replaceId?: string, nextLabel?: string) {
+    setError('');
+    setBusyId(replaceId ?? 'new');
+    try {
+      await api.uploadEventEdm(event.id, {
+        file,
+        label: nextLabel || label,
+        replaceId,
+      });
+      onChanged();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : '上傳失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function remove(item: EventEdmImage) {
+    if (!window.confirm(`確定刪除「${item.label}」？報名頁會一併拿掉這張圖。`)) return;
+    setError('');
+    setBusyId(item.id);
+    try {
+      await api.updateEventEdms(event.id, images.filter((x) => x.id !== item.id));
+      onChanged();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : '刪除失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function saveLabel(item: EventEdmImage, nextLabel: string) {
+    const trimmed = nextLabel.trim();
+    if (!trimmed || trimmed === item.label) return;
+    setBusyId(item.id);
+    try {
+      await api.updateEventEdms(event.id, images.map((x) => (x.id === item.id ? { ...x, label: trimmed } : x)));
+      onChanged();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : '更新失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>活動 EDM（報名頁會顯示這些圖，可上傳或取代）</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+        {images.map((item) => (
+          <div key={item.id} style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg-soft)' }}>
+            <a href={item.url} target="_blank" rel="noreferrer">
+              <img src={item.url} alt={item.label} style={{ width: '100%', aspectRatio: '3 / 4', objectFit: 'cover', display: 'block' }} />
+            </a>
+            <div style={{ padding: 8, display: 'grid', gap: 6 }}>
+              <input
+                defaultValue={item.label}
+                style={{ ...inputStyle, fontSize: 12 }}
+                disabled={busyId === item.id}
+                onBlur={(e) => void saveLabel(item, e.target.value)}
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <label style={{ flex: 1 }}>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    hidden
+                    disabled={busyId != null}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (file) void upload(file, item.id, item.label);
+                    }}
+                  />
+                  <Button variant="secondary" disabled={busyId != null} style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
+                    {busyId === item.id ? '處理中…' : '取代'}
+                  </Button>
+                </label>
+                <Button variant="danger" disabled={busyId != null} onClick={() => void remove(item)} style={{ fontSize: 12 }}>
+                  刪除
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 12 }}>
+        <input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          style={{ ...inputStyle, maxWidth: 200 }}
+          placeholder="EDM 名稱"
+        />
+        <label>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            hidden
+            disabled={busyId != null}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) void upload(file);
+            }}
+          />
+          <Button variant="primary" disabled={busyId != null}>{busyId === 'new' ? '上傳中…' : '新增 EDM'}</Button>
+        </label>
+      </div>
+      {error && <p style={{ color: '#B85454', fontSize: 12, marginTop: 8 }}>{error}</p>}
     </div>
   );
 }

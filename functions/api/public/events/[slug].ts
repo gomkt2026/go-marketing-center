@@ -40,6 +40,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       formFields: event.formFields,
       priceLabel: event.priceLabel,
       lineAddFriendUrl: event.lineAddFriendUrl,
+      edmImages: event.edmImages,
     },
     brand: brand ? {
       name: brand.name,

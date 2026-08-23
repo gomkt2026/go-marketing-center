@@ -175,6 +175,25 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       steps.push('seed:senraku-demo-event(already exists, skipped)');
     }
 
+    await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS edm_images JSONB NOT NULL DEFAULT '[]'`;
+    steps.push('column:events.edm_images');
+
+    await sql`
+      UPDATE events
+      SET edm_images = ${JSON.stringify([{
+        id: 'meeting-0903',
+        label: '商業交流會議',
+        url: '/events/fixercowork-edm-0903.jpg',
+      }])}::jsonb
+      WHERE COALESCE(jsonb_array_length(edm_images), 0) = 0
+        AND (
+          slug = ${'商業交流會議-高雄-09-03-ba1035'}
+          OR title ILIKE ${'%9/03%'}
+          OR title ILIKE ${'%09/03%'}
+        )
+    `;
+    steps.push('seed:kaohsiung-0903-edm');
+
     return json({ ok: true, steps });
   } catch (e) {
     return error(e instanceof Error ? `${e.message} (after steps: ${steps.join(', ')})` : 'Migration failed', 500);

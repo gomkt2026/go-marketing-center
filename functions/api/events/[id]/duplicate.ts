@@ -43,11 +43,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const inserted = await sql`
       INSERT INTO events (
         brand_id, slug, title, description, location, event_date, status,
-        staff_token, form_fields, price, price_label, line_add_friend_url, created_by
+        staff_token, form_fields, edm_images, price, price_label, line_add_friend_url, created_by
       ) VALUES (
         ${source.brandId}::uuid, ${eventSlug}, ${title}, ${source.description},
         ${location ?? null}, ${eventDate ?? null}, ${status}::event_status,
         ${staffToken}, ${JSON.stringify(source.formFields)}::jsonb,
+        ${JSON.stringify(source.edmImages ?? [])}::jsonb,
         ${source.price}, ${source.priceLabel}, ${source.lineAddFriendUrl}, ${auth.id}::uuid
       )
       RETURNING *

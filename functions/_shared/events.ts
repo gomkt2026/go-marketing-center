@@ -17,9 +17,16 @@ export interface DbEvent {
   price: number | null;
   priceLabel: string | null;
   lineAddFriendUrl: string | null;
+  edmImages: EventEdmImage[];
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface EventEdmImage {
+  id: string;
+  label: string;
+  url: string;
 }
 
 export interface FormFieldDef {
@@ -30,11 +37,59 @@ export interface FormFieldDef {
   options?: string[];
 }
 
+function parseEdmImages(raw: unknown): EventEdmImage[] {
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const rec = item as Record<string, unknown>;
+      const url = typeof rec.url === 'string' ? rec.url.trim() : '';
+      if (!url) return [];
+      return [{
+        id: typeof rec.id === 'string' && rec.id ? rec.id : url,
+        label: typeof rec.label === 'string' && rec.label.trim() ? rec.label.trim() : '活動 EDM',
+        url,
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
 export function mapEvent(row: Record<string, unknown>): DbEvent {
   const e = rowToCamel<DbEvent>(row);
   const raw = row.form_fields ?? (row as { formFields?: unknown }).formFields ?? e.formFields;
   const parsed = typeof raw === 'string' ? JSON.parse(raw) as FormFieldDef[] : raw;
-  return { ...e, formFields: Array.isArray(parsed) ? parsed : [] };
+  const rawEdm = row.edm_images ?? (row as { edmImages?: unknown }).edmImages;
+  return {
+    ...e,
+    formFields: Array.isArray(parsed) ? parsed : [],
+    edmImages: parseEdmImages(rawEdm),
+  };
+}
+
+let edmColumnReady = false;
+
+export async function ensureEventEdmColumn(env: Env): Promise<void> {
+  if (edmColumnReady) return;
+  const sql = getSql(env);
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS edm_images JSONB NOT NULL DEFAULT '[]'`;
+  await sql`
+    UPDATE events
+    SET edm_images = ${JSON.stringify([{
+      id: 'meeting-0903',
+      label: '商業交流會議',
+      url: '/events/fixercowork-edm-0903.jpg',
+    }])}::jsonb
+    WHERE COALESCE(jsonb_array_length(edm_images), 0) = 0
+      AND (
+        slug = ${'商業交流會議-高雄-09-03-ba1035'}
+        OR title ILIKE ${'%9/03%'}
+        OR title ILIKE ${'%09/03%'}
+      )
+  `;
+  edmColumnReady = true;
 }
 
 export function buildEventSlug(title: string, suffix: string): string {
@@ -107,6 +162,7 @@ export function formatBizSessionLabel(iso: string, endLabel = '16:30'): string {
 }
 
 export async function getEventById(env: Env, id: string): Promise<DbEvent | null> {
+  await ensureEventEdmColumn(env);
   const sql = getSql(env);
   const rows = await sql`SELECT * FROM events WHERE id = ${id}::uuid LIMIT 1`;
   if (!rows.length) return null;
@@ -114,6 +170,7 @@ export async function getEventById(env: Env, id: string): Promise<DbEvent | null
 }
 
 export async function getEventBySlug(env: Env, slug: string, request?: Request): Promise<DbEvent | null> {
+  await ensureEventEdmColumn(env);
   const sql = getSql(env);
   for (const candidate of eventSlugCandidates(slug, request)) {
     const rows = await sql`SELECT * FROM events WHERE slug = ${candidate} LIMIT 1`;

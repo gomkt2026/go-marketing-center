@@ -507,6 +507,24 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  duplicateEvent: (id: string, body?: {
+    title?: string; location?: string; eventDate?: string;
+    status?: import('@/types').EventStatus;
+  }) =>
+    request<{ event: import('@/types').EventRecord }>(`/api/events/${id}/duplicate`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
+
+  updateRegistration: (eventId: string, registrationId: string, body: Partial<{
+    status: import('@/types').EventRegistrationStatus;
+    name: string; phone: string; sessionId: string | null;
+  }>) =>
+    request<{ registration: import('@/types').EventRegistration }>(
+      `/api/events/${eventId}/registrations/${registrationId}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
   eventReferrers: (eventId: string) =>
     request<{ referrers: import('@/types').EventReferrer[] }>(`/api/events/${eventId}/referrers`),
 

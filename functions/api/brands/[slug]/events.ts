@@ -7,6 +7,7 @@ import { rowsToCamel } from '../../../_shared/case';
 import { json, error } from '../../../_shared/response';
 import { generateToken } from '../../../_shared/token';
 import { logActivity } from '../../../_shared/activity';
+import { buildEventSlug } from '../../../_shared/events';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -50,12 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   if (!body.title?.trim()) return error('title is required', 400);
 
-  const baseSlug = body.title.trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'event';
-  const slugSuffix = generateToken(3);
-  const eventSlug = `${baseSlug}-${slugSuffix}`;
+  const eventSlug = buildEventSlug(body.title, generateToken(3));
   const staffToken = generateToken(24);
 
   const sql = getSql(context.env);

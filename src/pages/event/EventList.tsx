@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
-import type { EventStatus } from '@/types';
+import type { EventRecord, EventStatus } from '@/types';
+import { DuplicateEventDialog } from './DuplicateEventDialog';
 
 const statusTone: Record<EventStatus, BadgeTone> = {
   draft: 'default', open: 'primary', closed: 'accent', completed: 'secondary',
@@ -26,6 +27,7 @@ export function EventList() {
     [slug],
   );
   const [creating, setCreating] = useState(false);
+  const [copyFrom, setCopyFrom] = useState<EventRecord | null>(null);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (loading) return <LoadingState />;
@@ -38,6 +40,8 @@ export function EventList() {
     try {
       const { event } = await api.createEvent(slug, { title: title.trim() });
       navigate(`/${slug}/events/${event.id}`);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '建立活動失敗');
     } finally {
       setCreating(false);
     }
@@ -47,31 +51,43 @@ export function EventList() {
     <div>
       <PageHeader
         title={`${brand.name} 活動報名與報到`}
-        subtitle="建立實體活動,產生報名連結與報到授權碼,追蹤名額、報到率與推薦人拆帳"
+        subtitle="建立或複製活動,產生報名連結與報到授權碼,追蹤名額、報到率與推薦人拆帳"
         actions={<Button variant="primary" disabled={creating} onClick={() => void createEvent()}>+ 建立活動</Button>}
       />
       <div style={{ display: 'grid', gap: 14 }}>
         {data.events.map((e) => (
-          <Link key={e.id} to={`/${slug}/events/${e.id}`} style={{ textDecoration: 'none' }}>
-            <Card hoverable>
-              <div className="card-row">
-                <div>
-                  <strong style={{ fontSize: 16 }}>{e.title}</strong>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
-                    {e.eventDate && new Date(e.eventDate).toLocaleString('zh-TW')}
-                    {e.location && ` · ${e.location}`}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                    已報名 {e.registrationCount ?? 0} 人 · 已報到 {e.checkedInCount ?? 0} 人
-                  </div>
+          <Card key={e.id} hoverable>
+            <div className="card-row">
+              <Link to={`/${slug}/events/${e.id}`} style={{ textDecoration: 'none', color: 'inherit', flex: 1, minWidth: 0 }}>
+                <strong style={{ fontSize: 16 }}>{e.title}</strong>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
+                  {e.eventDate && new Date(e.eventDate).toLocaleString('zh-TW')}
+                  {e.location && ` · ${e.location}`}
                 </div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                  已報名 {e.registrationCount ?? 0} 人 · 已報到 {e.checkedInCount ?? 0} 人
+                </div>
+              </Link>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                 <Badge tone={statusTone[e.status]}>{statusLabel[e.status]}</Badge>
+                <Button variant="ghost" onClick={() => setCopyFrom(e)}>複製</Button>
               </div>
-            </Card>
-          </Link>
+            </div>
+          </Card>
         ))}
         {data.events.length === 0 && <Card><p>尚無活動,點擊右上角建立第一個活動報名頁</p></Card>}
       </div>
+      {copyFrom && slug && (
+        <DuplicateEventDialog
+          event={copyFrom}
+          brandSlug={slug}
+          onClose={() => setCopyFrom(null)}
+          onDuplicated={(created) => {
+            setCopyFrom(null);
+            navigate(`/${slug}/events/${created.id}`);
+          }}
+        />
+      )}
     </div>
   );
 }

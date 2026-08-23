@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/Button';
 import { Tabs } from '@/components/ui/Tabs';
 import { StatCard } from '@/components/ui/StatCard';
 import { useBrand } from '@/context/BrandContext';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type {
   EventFormField, EventReferrerCommissionType, EventRegistration, EventRecord, EventSession, EventStats, EventStatus,
 } from '@/types';
+import { DuplicateEventDialog } from './DuplicateEventDialog';
 
 const statusTone: Record<EventStatus, BadgeTone> = {
   draft: 'default', open: 'primary', closed: 'accent', completed: 'secondary',
@@ -37,14 +38,16 @@ export function EventDetail() {
   const { brand: slug, id } = useParams();
   const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
+  const navigate = useNavigate();
   const [tab, setTab] = useState('settings');
+  const [copyOpen, setCopyOpen] = useState(false);
 
   const detailQuery = useAsyncData(() => (id ? api.eventDetail(id) : Promise.reject(new Error('no id'))), [id]);
   const registrationsQuery = useAsyncData(() => (id ? api.eventRegistrations(id) : Promise.reject(new Error('no id'))), [id]);
   const statsQuery = useAsyncData(() => (id ? api.eventStats(id) : Promise.reject(new Error('no id'))), [id]);
 
   if (!brand || !id) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
-  if (detailQuery.loading) return <LoadingState />;
+  if (detailQuery.loading && !detailQuery.data) return <LoadingState />;
   if (detailQuery.error || !detailQuery.data) {
     return <ErrorState message={detailQuery.error ?? '載入失敗'} onRetry={detailQuery.reload} />;
   }
@@ -73,7 +76,12 @@ export function EventDetail() {
       <PageHeader
         title={event.title}
         subtitle={`${brand.name} · 活動報名與報到`}
-        actions={<Badge tone={statusTone[event.status]}>{statusLabel[event.status]}</Badge>}
+        actions={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Button variant="secondary" onClick={() => setCopyOpen(true)}>複製活動</Button>
+            <Badge tone={statusTone[event.status]}>{statusLabel[event.status]}</Badge>
+          </div>
+        }
       />
 
       <Card style={{ marginBottom: 16 }}>
@@ -84,7 +92,7 @@ export function EventDetail() {
               <input readOnly value={registerUrl} style={inputStyle} />
               <Button variant="ghost" onClick={() => void copy(registerUrl, '報名連結')}>複製</Button>
             </div>
-            {event.slug === 'fixercowork-biz-exchange-0828' && (
+            {brand.slug === 'fixercowork' && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                 <a href="/events/fixercowork-edm-meeting.png" target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#F26522' }}>商業交流會議 EDM</a>
                 <a href="/events/fixercowork-edm-alliance.png" target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#1B2B47' }}>21克拉工程聯盟 EDM</a>
@@ -136,6 +144,17 @@ export function EventDetail() {
           eventId={id}
         />
       )}
+      {copyOpen && slug && (
+        <DuplicateEventDialog
+          event={event}
+          brandSlug={slug}
+          onClose={() => setCopyOpen(false)}
+          onDuplicated={(created) => {
+            setCopyOpen(false);
+            navigate(`/${slug}/events/${created.id}`);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -155,9 +174,26 @@ function SettingsTab({ event, onSaved }: { event: EventRecord; onSaved: () => vo
     lineAddFriendUrl: event.lineAddFriendUrl ?? '',
   });
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setForm({
+      title: event.title,
+      description: event.description ?? '',
+      location: event.location ?? '',
+      eventDate: toDatetimeLocal(event.eventDate),
+      status: event.status,
+      price: event.price != null ? String(event.price) : '',
+      priceLabel: event.priceLabel ?? '',
+      lineAddFriendUrl: event.lineAddFriendUrl ?? '',
+    });
+  }, [event.id, event.updatedAt]);
 
   async function save() {
     setSaving(true);
+    setError('');
+    setMessage('');
     try {
       await api.updateEvent(event.id, {
         title: form.title,
@@ -169,7 +205,10 @@ function SettingsTab({ event, onSaved }: { event: EventRecord; onSaved: () => vo
         priceLabel: form.priceLabel,
         lineAddFriendUrl: form.lineAddFriendUrl,
       });
+      setMessage('已儲存設定');
       onSaved();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : '儲存失敗');
     } finally {
       setSaving(false);
     }
@@ -211,6 +250,8 @@ function SettingsTab({ event, onSaved }: { event: EventRecord; onSaved: () => vo
         <label style={labelStyle}><span>官方 LINE 加好友連結</span>
           <input style={inputStyle} value={form.lineAddFriendUrl} onChange={(e) => setForm((f) => ({ ...f, lineAddFriendUrl: e.target.value }))} placeholder="https://line.me/R/ti/p/@xxxx" />
         </label>
+        {error && <p style={{ color: '#B85454', fontSize: 13 }}>{error}</p>}
+        {message && <p style={{ color: 'var(--color-primary-dark)', fontSize: 13 }}>{message}</p>}
         <div>
           <Button variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '儲存中…' : '儲存設定'}</Button>
         </div>
@@ -234,8 +275,18 @@ function SessionsFormTab({
   const [sessionDrafts, setSessionDrafts] = useState<SessionDraft[]>(
     sessions.map((s) => ({ id: s.id, label: s.label, startsAt: toDatetimeLocal(s.startsAt), capacity: s.capacity != null ? String(s.capacity) : '' })),
   );
-  const [fields, setFields] = useState<EventFormField[]>(event.formFields);
+  const [fields, setFields] = useState<EventFormField[]>(event.formFields ?? []);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setSessionDrafts(sessions.map((s) => ({
+      id: s.id, label: s.label, startsAt: toDatetimeLocal(s.startsAt),
+      capacity: s.capacity != null ? String(s.capacity) : '',
+    })));
+    setFields(event.formFields ?? []);
+  }, [event.id, event.updatedAt]);
 
   function addSession() {
     setSessionDrafts((prev) => [...prev, { label: '', startsAt: '', capacity: '' }]);
@@ -252,6 +303,8 @@ function SessionsFormTab({
 
   async function save() {
     setSaving(true);
+    setError('');
+    setMessage('');
     try {
       await api.updateEvent(event.id, {
         sessions: sessionDrafts.filter((s) => s.label.trim()).map((s, i) => ({
@@ -263,7 +316,10 @@ function SessionsFormTab({
         })),
         formFields: fields.filter((f) => f.label.trim()),
       });
+      setMessage('已儲存場次與表單');
       onSaved();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : '儲存失敗');
     } finally {
       setSaving(false);
     }
@@ -320,6 +376,8 @@ function SessionsFormTab({
         </div>
       </Card>
 
+      {error && <p style={{ color: '#B85454', fontSize: 13 }}>{error}</p>}
+      {message && <p style={{ color: 'var(--color-primary-dark)', fontSize: 13 }}>{message}</p>}
       <div><Button variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '儲存中…' : '儲存場次與表單'}</Button></div>
     </div>
   );
@@ -441,6 +499,18 @@ function RegistrationsTab({
     setList(await onSearch(query));
   }
 
+  async function toggleCancel(id: string, status: EventRegistration['status']) {
+    const next = status === 'cancelled' ? 'registered' : 'cancelled';
+    if (next === 'cancelled' && !window.confirm('確定要取消這筆報名?')) return;
+    try {
+      await api.updateRegistration(eventId, id, { status: next });
+      onChanged();
+      setList(await onSearch(query));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '更新報名失敗');
+    }
+  }
+
   const rows = query ? list : registrations;
 
   return (
@@ -474,6 +544,7 @@ function RegistrationsTab({
                 <th style={{ padding: '8px 6px' }}>推薦人</th>
                 <th style={{ padding: '8px 6px' }}>狀態</th>
                 <th style={{ padding: '8px 6px' }}>報到</th>
+                <th style={{ padding: '8px 6px' }}>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -491,6 +562,14 @@ function RegistrationsTab({
                   <td style={{ padding: '8px 6px' }}>
                     <Button variant={r.checkedInAt ? 'ghost' : 'primary'} onClick={() => void toggleCheckin(r.id, !!r.checkedInAt)}>
                       {r.checkedInAt ? '✓ 已報到(點擊取消)' : '報到'}
+                    </Button>
+                  </td>
+                  <td style={{ padding: '8px 6px' }}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => void toggleCancel(r.id, r.status)}
+                    >
+                      {r.status === 'cancelled' ? '恢復報名' : '取消報名'}
                     </Button>
                   </td>
                 </tr>

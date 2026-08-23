@@ -39,6 +39,8 @@ flowchart LR
 |---|---|---|
 | GET/POST | `/api/brands/:slug/events` | 活動列表 / 建立活動 |
 | GET/PUT | `/api/events/:id` | 活動詳情(含場次+推薦人) / 更新設定(含場次、自訂表單) |
+| POST | `/api/events/:id/duplicate` | 複製活動(表單/場次/推薦人,不含報名名單) |
+| PUT | `/api/events/:id/registrations/:rid` | 更新或取消報名 |
 | GET/POST | `/api/events/:id/referrers` | 推薦人列表 / 新增 |
 | PUT/DELETE | `/api/events/:id/referrers/:referrerId` | 更新(含停用) / 刪除推薦人 |
 | GET | `/api/events/:id/registrations?search=` | 報名名單(可搜尋姓名/手機) |

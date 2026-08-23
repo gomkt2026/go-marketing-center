@@ -32,7 +32,38 @@ export interface FormFieldDef {
 
 export function mapEvent(row: Record<string, unknown>): DbEvent {
   const e = rowToCamel<DbEvent>(row);
-  return { ...e, formFields: (row.form_fields as FormFieldDef[]) ?? [] };
+  const raw = row.form_fields ?? (row as { formFields?: unknown }).formFields ?? e.formFields;
+  const parsed = typeof raw === 'string' ? JSON.parse(raw) as FormFieldDef[] : raw;
+  return { ...e, formFields: Array.isArray(parsed) ? parsed : [] };
+}
+
+export function buildEventSlug(title: string, suffix: string): string {
+  const base = title.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'event';
+  return `${base}-${suffix}`;
+}
+
+const WEEKDAY_ZH: Record<string, string> = {
+  Sun: '日', Mon: '一', Tue: '二', Wed: '三', Thu: '四', Fri: '五', Sat: '六',
+};
+
+export function formatBizSessionLabel(iso: string, endLabel = '16:30'): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Taipei',
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  const weekday = WEEKDAY_ZH[get('weekday')] ?? get('weekday');
+  return `${get('month')}/${get('day')}（${weekday}）${get('hour')}:${get('minute')} 入場 · ${endLabel} 結束`;
 }
 
 export async function getEventById(env: Env, id: string): Promise<DbEvent | null> {

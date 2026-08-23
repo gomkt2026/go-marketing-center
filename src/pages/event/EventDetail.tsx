@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -181,11 +181,19 @@ export function EventDetail() {
 // ----------------------------------------------------------------------------
 // 活動 EDM
 // ----------------------------------------------------------------------------
+const FIXER_PRESET_EDMS: EventEdmImage[] = [
+  { id: 'preset-meeting', label: '商業交流會議', url: '/events/fixercowork-edm-meeting.png' },
+  { id: 'preset-alliance', label: '21克拉工程聯盟', url: '/events/fixercowork-edm-alliance.png' },
+];
+
 function EdmManager({ event, onChanged }: { event: EventRecord; onChanged: () => void }) {
   const images = event.edmImages ?? [];
-  const [label, setLabel] = useState('商業交流會議');
+  const [label, setLabel] = useState('21克拉工程聯盟');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const addInputRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replaceIdRef = useRef<string | null>(null);
 
   async function upload(file: File, replaceId?: string, nextLabel?: string) {
     setError('');
@@ -204,26 +212,11 @@ function EdmManager({ event, onChanged }: { event: EventRecord; onChanged: () =>
     }
   }
 
-  async function remove(item: EventEdmImage) {
-    if (!window.confirm(`確定刪除「${item.label}」？報名頁會一併拿掉這張圖。`)) return;
+  async function persist(next: EventEdmImage[]) {
     setError('');
-    setBusyId(item.id);
+    setBusyId('save');
     try {
-      await api.updateEventEdms(event.id, images.filter((x) => x.id !== item.id));
-      onChanged();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : '刪除失敗');
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function saveLabel(item: EventEdmImage, nextLabel: string) {
-    const trimmed = nextLabel.trim();
-    if (!trimmed || trimmed === item.label) return;
-    setBusyId(item.id);
-    try {
-      await api.updateEventEdms(event.id, images.map((x) => (x.id === item.id ? { ...x, label: trimmed } : x)));
+      await api.updateEventEdms(event.id, next);
       onChanged();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : '更新失敗');
@@ -232,9 +225,30 @@ function EdmManager({ event, onChanged }: { event: EventRecord; onChanged: () =>
     }
   }
 
+  async function remove(item: EventEdmImage) {
+    if (!window.confirm(`確定刪除「${item.label}」？報名頁會一併拿掉這張圖。`)) return;
+    await persist(images.filter((x) => x.id !== item.id));
+  }
+
+  async function saveLabel(item: EventEdmImage, nextLabel: string) {
+    const trimmed = nextLabel.trim();
+    if (!trimmed || trimmed === item.label) return;
+    await persist(images.map((x) => (x.id === item.id ? { ...x, label: trimmed } : x)));
+  }
+
+  async function addPreset(preset: EventEdmImage) {
+    if (images.some((x) => x.url === preset.url || x.label === preset.label)) {
+      setError(`「${preset.label}」已經在這個活動裡`);
+      return;
+    }
+    await persist([...images, { ...preset, id: `${preset.id}-${Date.now()}` }]);
+  }
+
   return (
     <div style={{ marginTop: 18 }}>
-      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>活動 EDM（報名頁會顯示這些圖，可上傳或取代）</div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+        活動 EDM（報名頁可同時顯示多張，點「新增 EDM」選檔，或直接加入預設海報）
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
         {images.map((item) => (
           <div key={item.id} style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg-soft)' }}>
@@ -245,27 +259,23 @@ function EdmManager({ event, onChanged }: { event: EventRecord; onChanged: () =>
               <input
                 defaultValue={item.label}
                 style={{ ...inputStyle, fontSize: 12 }}
-                disabled={busyId === item.id}
+                disabled={busyId != null}
                 onBlur={(e) => void saveLabel(item, e.target.value)}
               />
               <div style={{ display: 'flex', gap: 6 }}>
-                <label style={{ flex: 1 }}>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    hidden
-                    disabled={busyId != null}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = '';
-                      if (file) void upload(file, item.id, item.label);
-                    }}
-                  />
-                  <Button variant="secondary" disabled={busyId != null} style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
-                    {busyId === item.id ? '處理中…' : '取代'}
-                  </Button>
-                </label>
-                <Button variant="danger" disabled={busyId != null} onClick={() => void remove(item)} style={{ fontSize: 12 }}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={busyId != null}
+                  style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
+                  onClick={() => {
+                    replaceIdRef.current = item.id;
+                    replaceInputRef.current?.click();
+                  }}
+                >
+                  {busyId === item.id ? '處理中…' : '取代'}
+                </Button>
+                <Button type="button" variant="danger" disabled={busyId != null} onClick={() => void remove(item)} style={{ fontSize: 12 }}>
                   刪除
                 </Button>
               </div>
@@ -273,27 +283,46 @@ function EdmManager({ event, onChanged }: { event: EventRecord; onChanged: () =>
           </div>
         ))}
       </div>
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          const replaceId = replaceIdRef.current;
+          const current = images.find((x) => x.id === replaceId);
+          e.target.value = '';
+          replaceIdRef.current = null;
+          if (file && replaceId) void upload(file, replaceId, current?.label);
+        }}
+      />
+      <input
+        ref={addInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void upload(file);
+        }}
+      />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 12 }}>
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           style={{ ...inputStyle, maxWidth: 200 }}
-          placeholder="EDM 名稱"
+          placeholder="新 EDM 名稱"
         />
-        <label>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            hidden
-            disabled={busyId != null}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = '';
-              if (file) void upload(file);
-            }}
-          />
-          <Button variant="primary" disabled={busyId != null}>{busyId === 'new' ? '上傳中…' : '新增 EDM'}</Button>
-        </label>
+        <Button type="button" variant="primary" disabled={busyId != null} onClick={() => addInputRef.current?.click()}>
+          {busyId === 'new' ? '上傳中…' : '新增 EDM'}
+        </Button>
+        {FIXER_PRESET_EDMS.filter((preset) => !images.some((x) => x.url === preset.url || x.label === preset.label)).map((preset) => (
+          <Button key={preset.id} type="button" variant="secondary" disabled={busyId != null} onClick={() => void addPreset(preset)}>
+            加入「{preset.label}」
+          </Button>
+        ))}
       </div>
       {error && <p style={{ color: '#B85454', fontSize: 12, marginTop: 8 }}>{error}</p>}
     </div>

@@ -75,14 +75,35 @@ export async function ensureEventEdmColumn(env: Env): Promise<void> {
   if (edmColumnReady) return;
   const sql = getSql(env);
   await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS edm_images JSONB NOT NULL DEFAULT '[]'`;
+  const meetingEdm = {
+    id: 'meeting-0903',
+    label: '商業交流會議',
+    url: '/events/fixercowork-edm-0903.jpg',
+  };
+  const allianceEdm = {
+    id: 'alliance-default',
+    label: '21克拉工程聯盟',
+    url: '/events/fixercowork-edm-alliance.png',
+  };
   await sql`
     UPDATE events
-    SET edm_images = ${JSON.stringify([{
-      id: 'meeting-0903',
-      label: '商業交流會議',
-      url: '/events/fixercowork-edm-0903.jpg',
-    }])}::jsonb
+    SET edm_images = ${JSON.stringify([meetingEdm, allianceEdm])}::jsonb
     WHERE COALESCE(jsonb_array_length(edm_images), 0) = 0
+      AND (
+        slug = ${'商業交流會議-高雄-09-03-ba1035'}
+        OR title ILIKE ${'%9/03%'}
+        OR title ILIKE ${'%09/03%'}
+      )
+  `;
+  await sql`
+    UPDATE events
+    SET edm_images = edm_images || ${JSON.stringify([allianceEdm])}::jsonb
+    WHERE COALESCE(jsonb_array_length(edm_images), 0) > 0
+      AND NOT EXISTS (
+        SELECT 1 FROM jsonb_array_elements(edm_images) item
+        WHERE item->>'url' LIKE ${'%fixercowork-edm-alliance%'}
+           OR item->>'label' LIKE ${'%21克拉%'}
+      )
       AND (
         slug = ${'商業交流會議-高雄-09-03-ba1035'}
         OR title ILIKE ${'%9/03%'}

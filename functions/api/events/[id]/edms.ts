@@ -91,14 +91,24 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
   const kept = new Set<string>();
   for (const item of body.edmImages) {
     const existing = byId.get(item.id);
-    if (!existing) continue;
-    kept.add(existing.id);
+    if (existing) {
+      kept.add(existing.id);
+      next.push({
+        id: existing.id,
+        url: existing.url,
+        label: item.label?.trim() || existing.label,
+      });
+      continue;
+    }
+    const url = item.url?.trim();
+    if (!url || !/^(\/|https?:\/\/)/i.test(url)) continue;
     next.push({
-      id: existing.id,
-      url: existing.url,
-      label: item.label?.trim() || existing.label,
+      id: item.id?.trim() || crypto.randomUUID(),
+      label: item.label?.trim() || '活動 EDM',
+      url,
     });
   }
+  if (next.length > MAX_EDMS) return error(`每個活動最多 ${MAX_EDMS} 張 EDM`, 400);
   for (const old of event.edmImages) {
     if (!kept.has(old.id)) await deleteStoredEdm(context.env, old.url);
   }

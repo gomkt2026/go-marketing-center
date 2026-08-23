@@ -57,6 +57,7 @@ export const ACTION_LABELS: Record<string, string> = {
   'event.created': '建立活動',
   'event.updated': '更新活動設定',
   'event.duplicated': '複製活動',
+  'event.deleted': '刪除活動',
   'event.registration.created': '活動報名',
   'event.registration.updated': '更新報名',
   'event.registration.cancelled': '取消報名',

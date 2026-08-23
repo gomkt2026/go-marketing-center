@@ -38,7 +38,7 @@ flowchart LR
 | 方法 | 路徑 | 說明 |
 |---|---|---|
 | GET/POST | `/api/brands/:slug/events` | 活動列表 / 建立活動 |
-| GET/PUT | `/api/events/:id` | 活動詳情(含場次+推薦人) / 更新設定(含場次、自訂表單) |
+| GET/PUT/DELETE | `/api/events/:id` | 活動詳情 / 更新設定 / 刪除活動(含場次、推薦人、報名) |
 | POST | `/api/events/:id/duplicate` | 複製活動(表單/場次/推薦人,不含報名名單) |
 | PUT | `/api/events/:id/registrations/:rid` | 更新或取消報名 |
 | GET/POST | `/api/events/:id/referrers` | 推薦人列表 / 新增 |

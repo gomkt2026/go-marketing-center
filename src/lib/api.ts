@@ -496,6 +496,9 @@ export const api = {
       referrers: import('@/types').EventReferrer[];
     }>(`/api/events/${id}`),
 
+  deleteEvent: (id: string) =>
+    request<{ ok: boolean }>(`/api/events/${id}`, { method: 'DELETE' }),
+
   updateEvent: (id: string, body: Partial<{
     title: string; description: string; location: string; eventDate: string;
     status: import('@/types').EventStatus; formFields: import('@/types').EventFormField[];

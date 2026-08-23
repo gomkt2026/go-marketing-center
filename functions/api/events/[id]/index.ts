@@ -150,3 +150,43 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     return error(message, 500);
   }
 };
+
+export const onRequestDelete: PagesFunction<Env> = async (context) => {
+  const auth = await requireAuth(context.request, context.env);
+  if (auth instanceof Response) return auth;
+
+  const id = context.params.id as string;
+  const before = await getEventById(context.env, id);
+  if (!before) return error('Event not found', 404);
+
+  const sql = getSql(context.env);
+  const countRows = await sql`
+    SELECT COUNT(*)::int AS cnt
+    FROM event_registrations
+    WHERE event_id = ${id}::uuid AND status = 'registered'
+  `;
+  const registrationCount = (countRows[0] as { cnt: number } | undefined)?.cnt ?? 0;
+
+  try {
+    await sql`DELETE FROM events WHERE id = ${id}::uuid`;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '刪除活動失敗';
+    return error(message, 500);
+  }
+
+  try {
+    await logActivity(context.env, {
+      brandId: before.brandId,
+      actorType: 'user',
+      actorUserId: auth.id,
+      action: 'event.deleted',
+      entityType: 'event',
+      entityId: id,
+      beforeState: { ...before, registrationCount },
+    });
+  } catch {
+    // 稽核寫入失敗不阻擋刪除
+  }
+
+  return json({ ok: true });
+};

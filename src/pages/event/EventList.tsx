@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useBrand } from '@/context/BrandContext';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { EventRecord, EventStatus } from '@/types';
 import { DuplicateEventDialog } from './DuplicateEventDialog';
@@ -28,6 +28,7 @@ export function EventList() {
   );
   const [creating, setCreating] = useState(false);
   const [copyFrom, setCopyFrom] = useState<EventRecord | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (loading) return <LoadingState />;
@@ -44,6 +45,21 @@ export function EventList() {
       window.alert(e instanceof Error ? e.message : '建立活動失敗');
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function removeEvent(e: EventRecord) {
+    const count = e.registrationCount ?? 0;
+    const extra = count > 0 ? `\n此活動已有 ${count} 筆報名，刪除後名單也會一併移除。` : '';
+    if (!window.confirm(`確定要刪除「${e.title}」？${extra}\n此操作無法復原。`)) return;
+    setDeletingId(e.id);
+    try {
+      await api.deleteEvent(e.id);
+      reload();
+    } catch (err) {
+      window.alert(err instanceof ApiError ? err.message : err instanceof Error ? err.message : '刪除失敗');
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -70,7 +86,12 @@ export function EventList() {
               </Link>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                 <Badge tone={statusTone[e.status]}>{statusLabel[e.status]}</Badge>
-                <Button variant="ghost" onClick={() => setCopyFrom(e)}>複製</Button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Button variant="ghost" onClick={() => setCopyFrom(e)}>複製</Button>
+                  <Button variant="danger" disabled={deletingId === e.id} onClick={() => void removeEvent(e)}>
+                    {deletingId === e.id ? '刪除中…' : '刪除'}
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>

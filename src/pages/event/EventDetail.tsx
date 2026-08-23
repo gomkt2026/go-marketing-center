@@ -41,6 +41,7 @@ export function EventDetail() {
   const navigate = useNavigate();
   const [tab, setTab] = useState('settings');
   const [copyOpen, setCopyOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const detailQuery = useAsyncData(() => (id ? api.eventDetail(id) : Promise.reject(new Error('no id'))), [id]);
   const registrationsQuery = useAsyncData(() => (id ? api.eventRegistrations(id) : Promise.reject(new Error('no id'))), [id]);
@@ -62,6 +63,20 @@ export function EventDetail() {
     statsQuery.reload();
   }
 
+  async function removeEvent() {
+    const count = (registrationsQuery.data?.registrations ?? []).filter((r) => r.status !== 'cancelled').length;
+    const extra = count > 0 ? `\n此活動已有 ${count} 筆有效報名，刪除後名單也會一併移除。` : '';
+    if (!window.confirm(`確定要刪除「${event.title}」？${extra}\n此操作無法復原。`)) return;
+    setDeleting(true);
+    try {
+      await api.deleteEvent(event.id);
+      navigate(`/${slug}/events`);
+    } catch (e) {
+      window.alert(e instanceof ApiError ? e.message : e instanceof Error ? e.message : '刪除失敗');
+      setDeleting(false);
+    }
+  }
+
   async function copy(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
@@ -77,8 +92,11 @@ export function EventDetail() {
         title={event.title}
         subtitle={`${brand.name} · 活動報名與報到`}
         actions={
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Button variant="secondary" onClick={() => setCopyOpen(true)}>複製活動</Button>
+            <Button variant="danger" disabled={deleting} onClick={() => void removeEvent()}>
+              {deleting ? '刪除中…' : '刪除活動'}
+            </Button>
             <Badge tone={statusTone[event.status]}>{statusLabel[event.status]}</Badge>
           </div>
         }

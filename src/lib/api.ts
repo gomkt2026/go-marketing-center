@@ -730,20 +730,20 @@ export const publicApi = {
       brand: { name: string; slug: string; logoUrl?: string | null; primaryColor?: string | null; tagline?: string | null } | null;
       sessions: import('@/types').EventSession[];
       referrers: import('@/types').EventReferrer[];
-    }>(`/api/public/events/${slug}`),
+    }>(`/api/public/events/${encodeURIComponent(slug)}`),
 
   register: (slug: string, body: {
     name: string; phone: string; email?: string; lineId?: string;
     sessionId?: string; referrerId?: string; referrerName?: string;
     customAnswers?: Record<string, unknown>;
   }) =>
-    request<{ registration: import('@/types').EventRegistration }>(`/api/public/events/${slug}/register`, {
+    request<{ registration: import('@/types').EventRegistration }>(`/api/public/events/${encodeURIComponent(slug)}/register`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
 
   lookupByPhone: (slug: string, phone: string) =>
-    request<{ registrations: import('@/types').EventRegistration[] }>(`/api/public/events/${slug}/lookup`, {
+    request<{ registrations: import('@/types').EventRegistration[] }>(`/api/public/events/${encodeURIComponent(slug)}/lookup`, {
       method: 'POST',
       body: JSON.stringify({ phone }),
     }),

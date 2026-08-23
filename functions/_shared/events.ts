@@ -45,6 +45,46 @@ export function buildEventSlug(title: string, suffix: string): string {
   return `${base}-${suffix}`;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function decodePathSegment(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
+/** Cloudflare Pages 對中文動態路由常把 param 留在 percent-encoding，要還原後才能對到 slug。 */
+export function eventSlugCandidates(param: string, request?: Request): string[] {
+  const found = new Set<string>();
+  const push = (value?: string) => {
+    if (!value) return;
+    const once = decodePathSegment(value);
+    found.add(value.trim());
+    found.add(once);
+    if (once !== value) {
+      try {
+        found.add(decodeURIComponent(once));
+      } catch {
+        // already decoded
+      }
+    }
+  };
+  push(param);
+  if (request) {
+    try {
+      const path = new URL(request.url).pathname;
+      const match = path.match(/\/events\/([^/]+)/);
+      if (match?.[1]) push(match[1]);
+    } catch {
+      // ignore malformed URL
+    }
+  }
+  return [...found].filter(Boolean);
+}
+
 const WEEKDAY_ZH: Record<string, string> = {
   Sun: '日', Mon: '一', Tue: '二', Wed: '三', Thu: '四', Fri: '五', Sat: '六',
 };
@@ -73,11 +113,17 @@ export async function getEventById(env: Env, id: string): Promise<DbEvent | null
   return mapEvent(rows[0] as Record<string, unknown>);
 }
 
-export async function getEventBySlug(env: Env, slug: string): Promise<DbEvent | null> {
+export async function getEventBySlug(env: Env, slug: string, request?: Request): Promise<DbEvent | null> {
   const sql = getSql(env);
-  const rows = await sql`SELECT * FROM events WHERE slug = ${slug} LIMIT 1`;
-  if (!rows.length) return null;
-  return mapEvent(rows[0] as Record<string, unknown>);
+  for (const candidate of eventSlugCandidates(slug, request)) {
+    const rows = await sql`SELECT * FROM events WHERE slug = ${candidate} LIMIT 1`;
+    if (rows.length) return mapEvent(rows[0] as Record<string, unknown>);
+    if (UUID_RE.test(candidate)) {
+      const byId = await getEventById(env, candidate);
+      if (byId) return byId;
+    }
+  }
+  return null;
 }
 
 export async function getEventSessions(env: Env, eventId: string) {

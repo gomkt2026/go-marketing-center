@@ -109,7 +109,13 @@ export function EventDetail() {
             <div className="copy-row">
               <input readOnly value={registerUrl} style={inputStyle} />
               <Button variant="ghost" onClick={() => void copy(registerUrl, '報名連結')}>複製</Button>
+              <a href={registerUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>開啟</a>
             </div>
+            {event.status !== 'open' && (
+              <div style={{ marginTop: 8, fontSize: 12, color: '#B85454', fontWeight: 700 }}>
+                狀態是「{statusLabel[event.status]}」時，公開頁會顯示活動不存在。請改成「開放報名」並儲存。
+              </div>
+            )}
             {brand.slug === 'fixercowork' && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                 <a href="/events/fixercowork-edm-meeting.png" target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#F26522' }}>商業交流會議 EDM</a>

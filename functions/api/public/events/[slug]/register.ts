@@ -20,7 +20,7 @@ interface RegisterBody {
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const slug = context.params.slug as string;
-  const event = await getEventBySlug(context.env, slug);
+  const event = await getEventBySlug(context.env, slug, context.request);
   if (!event) return error('活動不存在', 404);
   if (event.status !== 'open') return error('此活動目前未開放報名', 400);
 

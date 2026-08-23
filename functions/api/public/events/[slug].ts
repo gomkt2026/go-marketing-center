@@ -7,7 +7,7 @@ import { mapBrand } from '../../../_shared/queries';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const slug = context.params.slug as string;
-  const event = await getEventBySlug(context.env, slug);
+  const event = await getEventBySlug(context.env, slug, context.request);
   if (!event || event.status === 'draft') return error('活動不存在或尚未開放', 404);
 
   const [sessions, referrers, registeredCounts] = await Promise.all([

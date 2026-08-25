@@ -181,7 +181,9 @@ export async function generatePlatformPost(
     : await pickAudience(env, brandCtx.brandId, brandCtx.slug, lane);
 
   let reusedAsset: BrandAssetPick | null = null;
-  if (!params.skipAssetLookup && platform !== 'threads') {
+  // IG Feed 只接受約 4:5–1.91:1;素材庫截圖多半是橫式系統畫面,Meta 會直接拒收。
+  // Threads 本來就不走素材庫。FB 對長寬比較寬鬆,仍可沿用真實截圖。
+  if (!params.skipAssetLookup && platform === 'facebook') {
     try {
       reusedAsset = await pickBrandAsset(env, brandCtx.brandId, lane === 'b2b');
     } catch (e) {

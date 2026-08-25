@@ -18,6 +18,12 @@ export interface BrandVoice {
   threadsCraft?: string;
   /** Threads 貼文字數硬上限(超過會要求模型縮短重寫一次) */
   threadsMaxChars?: number;
+  /** Instagram 品牌專屬規則(附加在平台指引之後) */
+  instagramCraft?: string;
+  /** Instagram 貼文字數硬上限(超過會要求模型縮短重寫一次) */
+  instagramMaxChars?: number;
+  /** 顧客會在 IG 搜尋欄打的詞,用來幫帳號打標籤、對準搜尋意圖 */
+  igSearchQueries?: string[];
   /** 配圖風格方向(附加到圖片生成 prompt;C 端插畫或品牌紀實參考) */
   imageStyle?: string;
   /** B 端寫實攝影參考(門市/後台/工地操作感);沒有就退回 imageStyle */
@@ -58,6 +64,17 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '3. 內文用具體數字拆解給讀者看:租金、報酬率、修繕費、屋齡,算給他看;點破「看不見的成本」(管線、防水、壁癌、稅)比看得見的裝潢更吃錢。' +
       '4. 一到兩句就換段,大量留白,手機閱讀的節奏;可用重複句式營造節奏感。' +
       '5. 結尾收在一句沉澱的行業洞察(例如「租得快的房子,都是在還沒刊登前就決定的」),不要收在促銷。',
+    instagramCraft:
+      'Homigo IG 專屬規則:' +
+      '1. 80-180 字,絕對不超過 220 字。前 125 字(摺疊前)必須是完整一句痛點 hook,讀者不用展開也知道這篇在講什麼。' +
+      '2. 圖文一體:圖上主標與文案第一句同義,禁止圖寫痛點、文案開頭卻在暖場。' +
+      '3. 搜尋導向:本篇只對準「一個」房東/代管會搜的問題,把該搜尋詞自然寫進第一句與 hashtag。' +
+      '4. 只服務一個對象,不要同時講房客吐槽與房東報稅。' +
+      '5. Hashtag 8-12 個:1 品牌 + 2-3 利基搜尋詞 + 其餘發現用。禁止無關標、禁止重複堆疊。' +
+      '6. 視覺必須看得出是 Homigo(米白底、深藍資訊、黃強調)。寧可穩、不要為了爆款換成不像自己的風格。' +
+      '7. 禁止標題黨、禁止「留言才告訴你」、禁止假裝限時優惠——會傷害推薦資格。',
+    instagramMaxChars: 220,
+    igSearchQueries: ['包租代管', '房東報修', '收租對帳', '租屋合約管理', '代管系統'],
     imageStyle:
       'Documentary photography of Taiwanese apartments and old-house living: street arcades, terrazzo stairwells, ' +
       'wooden window frames with soft daylight, rooftop water towers against the city skyline; ' +
@@ -78,6 +95,16 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '4. 講「工程鏈」的因果,讓外行人看懂內行邏輯:拆除沒處理好→水電只能遷就→泥作想辦法補→門窗木作櫥櫃全部跟著收;前面犯的錯,都是後面的人在付代價。' +
       '5. 一到兩句就換段,大量留白;可用重複句式(「他會知道…他會知道…」)營造節奏。' +
       '6. 結尾收在一句行業洞察(例如「最敢答應你的人,往往最危險」),不要收在促銷。',
+    instagramCraft:
+      'TaskGo IG 專屬規則:' +
+      '1. 80-180 字,絕對不超過 220 字。前 125 字必須是完整一句工地痛點 hook(例如白板排班、LINE 考古、月底才知賠)。' +
+      '2. 圖上主標與文案第一句同義;少字多圖,重點放在圖上的 4-10 字語錄。' +
+      '3. 搜尋導向:對準工程行老闆/工班頭會搜的一個詞(派工、現場回報、工班管理、工程行系統),寫進第一句與 hashtag。' +
+      '4. Hashtag 8-12 個,混用大流量(#做工的人 #工地日常)與利基(#派工 #工程行 #現場回報)。' +
+      '5. 視覺維持工地語錄卡或現場紀實,橘色只做強調;不要電商廣告感、不要歐美工地棚拍。' +
+      '6. 禁止標題黨與互動勒索,主題不要飄到跟工班無關的生活文。',
+    instagramMaxChars: 220,
+    igSearchQueries: ['派工系統', '工班管理', '工程行', '現場回報', '工地打卡'],
     imageStyle:
       'Documentary photography of Taiwanese old houses and renovation sites: weathered facades with exposed red brick, ' +
       'peeling plaster walls, terrazzo floors, iron window grilles, tiled roofs, craftsmen at work on site; ' +
@@ -108,6 +135,16 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '4. 說話對象是所有有送洗需求的人:上班族、媽媽、包租代管業者、飯店、民宿、醫院…用他們的日常場景開頭(例如「床單換季一次 30 套」「加班到十點洗衣店早關了」)。' +
       '5. 禁止一篇塞多個賣點、禁止連續反問句、禁止「簡直是懶人福音」這種廣告腔;像朋友隨手發的一則短文,結尾最多留一個輕鬆的問題。',
     threadsMaxChars: 150,
+    instagramCraft:
+      'Washgo IG 專屬規則:' +
+      '1. 80-180 字,絕對不超過 220 字。前 125 字必須是完整一句業者痛點 hook(手寫單、對不攏、衣服洗到哪沒人知)。' +
+      '2. 圖上主標與文案第一句同義。第一張圖是大字報式痛點,不是吉卜力卡通、不是笑臉洗衣機。' +
+      '3. 搜尋導向:對準洗衣店主會搜的一個詞(洗衣店系統、送洗履歷、門市調撥、洗衣店數位轉型)。' +
+      '4. Hashtag 8-12 個:品牌 + 利基搜尋詞 + 發現用。不要塞 #換季 #羽絨被 這種 C 端生活標到 B 端圖文。' +
+      '5. 色票深藍/品牌藍/金橘,看起來像同一家帳號連發,不要每篇換一套風格。' +
+      '6. 禁止標題黨與互動勒索。',
+    instagramMaxChars: 220,
+    igSearchQueries: ['洗衣店系統', '送洗履歷', '門市調撥', '洗衣店數位轉型'],
     imageStyle:
       'Studio Ghibli-inspired hand-drawn animation style: soft watercolor textures, warm pastel palette, gentle golden lighting; ' +
       'a cozy whimsical Taiwanese self-service laundry scene with an adorable tech twist — round friendly washing machines with cute glowing faces, ' +
@@ -129,31 +166,44 @@ export function defaultAudienceLane(platform: 'facebook' | 'instagram' | 'thread
   return platform === 'threads' ? 'b2c' : 'b2b';
 }
 
+/** 三品牌共用主 CTA:一律導向匠管,不要導各品牌 LINE / 官網註冊 */
+export const SHARED_BRAND_CTA =
+  '想來信詢問：Service@inforcraft.com.tw，或來電 0972-395-117';
+export const SHARED_BRAND_CTA_RULE =
+  '主 CTA 一律導向匠管:Email Service@inforcraft.com.tw、電話 0972-395-117。' +
+  '禁止導向各品牌 LINE(@washgo、@933pdush)、官網註冊、hello@washgo.com.tw、加 LINE 免費開始、免費試用 14 天。' +
+  `cta 欄位請寫「${SHARED_BRAND_CTA}」。`;
+
 const B2B_LANE_INSTRUCTIONS: Record<string, string> = {
   washgo:
     '【本篇受眾車道:B 端】只寫給洗衣業者(店主/連鎖/想加盟者),不要寫成媽媽加班或上班族送洗故事。' +
     '你現在是懂洗衣連鎖營運的夥伴,不是櫃檯店員跟消費者聊天。' +
     '用店裡手寫單、電話對單、多門市調撥、司機派車、客源老化的具體場景。語氣專業 7、親切 3。' +
-    'CTA 只准官網 https://washgo.com.tw 或 hello@washgo.com.tw,禁止導向 @washgo LINE 下單。' +
+    SHARED_BRAND_CTA_RULE +
     '禁止「可愛洗衣機」「懶人福音」「加班到十點的媽媽」。' +
     '可提 Go 生態系(Homigo 布巾案源、三平台同一條資訊流),但只能引用下方 Collaboration Brief 已有的事實;沒有 Brief 就不要提其他品牌。',
   homigo:
     '【本篇受眾車道:B 端】只寫給自管房東或包租代管業者,不是房客吐槽文。' +
     '場景放在收租對帳、報修指揮中心、合約續約、多物件人力。' +
-    '先同理房東/代管的混亂,再談整理回同一個地方。不要寫成租客權益文。',
+    '先同理房東/代管的混亂,再談整理回同一個地方。不要寫成租客權益文。' +
+    SHARED_BRAND_CTA_RULE,
   taskgo:
     '【本篇受眾車道:B 端】只寫給工程行老闆、工班頭或工地主任。' +
     '場景放在派工排程、成本、LINE 現場回報、月底才知賠錢。' +
-    '用後台/系統畫面感說話,少寫純工地風景抒情。立場站在做工的人這邊。',
+    '用後台/系統畫面感說話,少寫純工地風景抒情。立場站在做工的人這邊。' +
+    SHARED_BRAND_CTA_RULE,
 };
 
 const B2C_LANE_INSTRUCTIONS: Record<string, string> = {
   washgo:
-    '【本篇受眾車道:C 端】說話對象是有送洗需求的人(上班族、媽媽、租屋族)。維持親切口語,一篇只講一件事。',
+    '【本篇受眾車道:C 端】說話對象是有送洗需求的人(上班族、媽媽、租屋族)。維持親切口語,一篇只講一件事。' +
+    SHARED_BRAND_CTA_RULE,
   homigo:
-    '【本篇受眾車道:C 端】可以從房客或租屋日常切入,但不要假裝 Homigo 只做 C 端生活品牌。',
+    '【本篇受眾車道:C 端】可以從房客或租屋日常切入,但不要假裝 Homigo 只做 C 端生活品牌。' +
+    SHARED_BRAND_CTA_RULE,
   taskgo:
-    '【本篇受眾車道:C 端】若要寫現場師傅日常,仍要讓人感覺這是工班在用的工具,不是消費生活帳號。',
+    '【本篇受眾車道:C 端】若要寫現場師傅日常,仍要讓人感覺這是工班在用的工具,不是消費生活帳號。' +
+    SHARED_BRAND_CTA_RULE,
 };
 
 const FALLBACK_AUDIENCES: Record<string, Record<AudienceLane, AudiencePick>> = {
@@ -217,7 +267,7 @@ export async function pickAudience(env: Env, brandId: string, slug: string, lane
   return fallback;
 }
 
-/** B 端沒素材時,設計圖/寫實輪替;C 端 Threads(Washgo)維持可愛插畫 */
+/** B 端沒素材時,設計圖/寫實輪替;C 端 Threads(Washgo)維持可愛插畫。IG 加重 design,讓圖上主標當第一句 hook。 */
 export function pickImageStyle(params: {
   platform: 'facebook' | 'instagram' | 'threads';
   lane: AudienceLane;
@@ -227,10 +277,23 @@ export function pickImageStyle(params: {
   if (params.brandSlug === 'washgo' && params.platform === 'threads' && params.lane === 'b2c') {
     return 'illustration';
   }
-  const pool: ImageStyleId[] = params.lane === 'b2b' ? ['photo', 'design'] : ['photo', 'design', 'illustration'];
-  const filtered = pool.filter((s) => !(params.recentStyles ?? []).includes(s));
-  const candidates = filtered.length ? filtered : pool;
-  return candidates[Math.floor(Math.random() * candidates.length)];
+  const weights: Record<ImageStyleId, number> = params.platform === 'instagram'
+    ? (params.lane === 'b2b' ? { photo: 1, design: 3, illustration: 0 } : { photo: 1, design: 2, illustration: 1 })
+    : (params.lane === 'b2b' ? { photo: 1, design: 1, illustration: 0 } : { photo: 1, design: 1, illustration: 1 });
+  const recent = new Set(params.recentStyles ?? []);
+  let pool = (Object.entries(weights) as [ImageStyleId, number][])
+    .filter(([, w]) => w > 0)
+    .filter(([style]) => !recent.has(style));
+  if (!pool.length) {
+    pool = (Object.entries(weights) as [ImageStyleId, number][]).filter(([, w]) => w > 0);
+  }
+  const total = pool.reduce((sum, [, w]) => sum + w, 0);
+  let roll = Math.random() * total;
+  for (const [style, w] of pool) {
+    roll -= w;
+    if (roll <= 0) return style;
+  }
+  return pool[pool.length - 1][0];
 }
 
 // ============================================================================
@@ -243,10 +306,17 @@ export const PLATFORM_GUIDELINES: Record<string, string> = {
     '嚴格限制 1000 字以內。開頭第一句要讓人想往下讀,結尾自然帶出品牌,不要硬置入。' +
     '排版節奏:一到兩句就換行成段,段落之間留白,像在手機上讀一篇好讀的長文;不要擠成大塊文字。' +
     'Hashtag 最多 3 個放文末。',
+  // IG 規則對齊「起號 / 搜尋打標籤 / 第一句 hook / 帳號辨識 > 單篇爆款 / 推薦資格」
   instagram:
-    'Instagram 貼文:有趣、視覺先行,文案是圖片的延伸。結合近期時事哏,前 125 字要抓住重點(之後會被折疊)。' +
-    '語氣輕鬆,可用 emoji 但別堆疊。Hashtag 5-10 個放文末。' +
-    '同時你要為這篇貼文設計一張讓人覺得有趣、想停下來看的圖,提供圖片描述。',
+    'Instagram 貼文:視覺先行,文案是圖片的延伸,不是 Facebook 長文縮短版。' +
+    'IG 操盤鐵則(必遵守):' +
+    '1. 第一句決定推薦——前 125 字(摺疊前)必須是完整痛點 hook;只改第一句就能決定停滑或滑走。禁止暖場。' +
+    '2. 顧客搜尋——把這篇當成「顧客在 IG 搜尋欄打的一個問題」的答案。主題、圖上主標、hashtag 都圍繞同一個問題,幫演算法幫這個帳號打標籤。' +
+    '3. 帳號辨識 > 單篇爆款——視覺要看得出是這個品牌(色票、構圖、主標語氣一致)。寧可穩,不要為了爆款換成不像自己的風格;影片火了人沒火等於白做。' +
+    '4. 收藏優先——讓人想截圖/收藏的一句話或對比,比堆 emoji 重要。' +
+    '5. 推薦資格——不洗 hashtag、不標題黨、不誤導對比、不互動勒索(禁止「留言才告訴你」)。內容必須跟帳號主題一致。' +
+    '6. 80-200 字,語氣輕鬆但具體,可用少量 emoji。Hashtag 8-12 個放文末。' +
+    '7. 同時為這篇設計一張 4:5 直式、讓人停下來的圖;圖上主標與文案第一句同義。',
   threads:
     'Threads 貼文:用很年輕世代的語氣(像大學生/新鮮人發文的節奏),口語、有記憶點,500 字以內。' +
     'Threads 演算法要點(必遵守):' +
@@ -269,7 +339,8 @@ export const ANTI_AI_RULES =
   '6. 絕對不捏造數據、優惠、法規;不確定的就不寫。' +
   '7. 只用台灣用語,出現中國用語就重寫:影片(不是視頻)、品質(不是質量)、網路(不是網絡)、資訊(不是信息)、馬鈴薯(不是土豆)。' +
   '8. 內容要長在台灣的生活場景裡:超商、騎樓、捷運、機車、夜市、梅雨、颱風假、報稅季…讓台灣讀者一看就覺得「這就是我的日常」。' +
-  '9. 沒有「已驗證媒體報導」清單時,禁止寫「媒體報導」「登上 XX」「全台媒體」。有清單也只能引用列出的出處與事實,不可發明媒體名或把轉載算成多次專訪。';
+  '9. 沒有「已驗證媒體報導」清單時,禁止寫「媒體報導」「登上 XX」「全台媒體」。有清單也只能引用列出的出處與事實,不可發明媒體名或把轉載算成多次專訪。' +
+  '10. Homigo / TaskGo / Washgo 主 CTA 一律寫匠管聯絡:Service@inforcraft.com.tw、電話 0972-395-117。禁止寫各品牌 LINE、官網註冊、hello@washgo、加 LINE 免費開始。';
 
 // ============================================================================
 // 品牌知識組裝:從 DB 撈品牌設定組成 system prompt
@@ -340,6 +411,7 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     learnings ? `過往經營累積的操盤心得(寫文時參考,不可改品牌定位):\n${learnings}` : '',
     publishedCoveragePrompt(coverages),
     '',
+    SHARED_BRAND_CTA_RULE,
     ANTI_AI_RULES,
   ].filter(Boolean).join('\n');
 
@@ -411,7 +483,7 @@ export interface EngagementPrediction {
 /** 指示文案 AI 為 Homigo IG 圖撰寫設計描述(不是純照片描述) */
 export const HOMIGO_IG_IMAGE_PROMPT_SPEC =
   '"imagePrompt": "必填:這張圖是 Homigo 的 4:5 直式「社群設計圖」(不是純照片)。請用繁體中文描述三個元素:' +
-  '1) 主標文字:從貼文提煉一句 4-10 字、有情緒、會直接印在圖上的痛點短句(例如「講不清楚」「根本管不動」「房子越多,越焦慮」「大家都在自保」);' +
+  '1) 主標文字:從貼文第一句提煉一句 4-10 字、有情緒、會直接印在圖上的痛點短句,必須與文案第一句同義(例如「講不清楚」「根本管不動」「房子越多,越焦慮」「大家都在自保」);' +
   '2) 情境畫面:台灣年輕房東或房客的真實疲憊場景(LINE 訊息爆炸、合約找不到、報修沒人理、電費算不清),自然表情、不要商業假笑;' +
   '3) Homigo 解法元素:一個簡潔白底的手機畫面(合約管理/繳租紀錄/報修紀錄/電表管理擇一),低調出現在畫面下方"';
 
@@ -437,13 +509,13 @@ export const HOMIGO_TEXT_MARK_RULE =
 export const BRAND_DESIGN_IMAGE_STYLE: Record<string, string> = {
   homigo: HOMIGO_IG_IMAGE_STYLE,
   washgo: [
-    '【設計規格】方形或 4:5 直式社群設計圖。深藍(#1D4F8C)為主色,品牌藍(#3A8DDE)做層次,金橘(#FFB84D)只做重點強調。',
+    '【設計規格】4:5 直式社群設計圖(IG Feed)。深藍(#1D4F8C)為主色,品牌藍(#3A8DDE)做層次,金橘(#FFB84D)只做重點強調。',
     '大面積留白,文字不可貼邊。第一眼是一句 4-10 字繁中痛點主標(例如「手寫單對不攏」「衣服洗到哪沒人知」);第二眼是洗衣店後場或櫃檯情境;第三眼才是簡潔的系統畫面卡。',
     '【手機UI】白底、一個 2-4 字功能標題(如「送洗履歷」「門市調撥」),其餘用灰色線條示意,禁止小號文字與數字(小字會變亂碼)。',
     '【文字防呆】圖上所有文字必須是正確台灣繁體中文,整張不超過 5 個文字元素。不要吉卜力卡通、不要笑臉洗衣機。',
   ].join('\n'),
   taskgo: [
-    '【設計規格】方形或 4:5 直式社群設計圖。深灰底或米白底,橘色(#ED9121)只做重點強調。',
+    '【設計規格】4:5 直式社群設計圖(IG Feed)。深灰底或米白底,橘色(#ED9121)只做重點強調。',
     '第一眼是一句 4-10 字繁中痛點主標(例如「今天做到哪」「月底才知賠」);第二眼是工地或後台情境;第三眼才是派工/回報系統畫面卡。',
     '【手機UI】白底、一個 2-4 字功能標題(如「派工佇列」「現場回報」),其餘用灰色線條示意,禁止小號文字與數字。',
     '【文字防呆】圖上所有文字必須是正確台灣繁體中文,整張不超過 5 個文字元素。不要電商廣告感。',
@@ -458,8 +530,8 @@ export const WASHGO_THREADS_IMAGE_PROMPT_SPEC =
   '讓人滑到會停下來按讚的可愛程度,不含文字"';
 
 const DESIGN_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:這張圖是「社群設計圖」(不是純照片)。請用繁體中文描述三個元素:' +
-  '1) 主標文字:從貼文提煉一句 4-10 字、有情緒、會直接印在圖上的痛點短句;' +
+  '"imagePrompt": "必填:這張圖是 4:5 直式「社群設計圖」(不是純照片)。請用繁體中文描述三個元素:' +
+  '1) 主標文字:從貼文第一句提煉一句 4-10 字、有情緒、會直接印在圖上的痛點短句(必須與文案第一句同義,這是停滑 hook);' +
   '2) 情境畫面:業者真實會遇到的疲憊或忙亂場景,自然表情、不要商業假笑;' +
   '3) 解法元素:一個簡潔白底的系統畫面(只顯示一個 2-4 字功能標題)"';
 
@@ -473,7 +545,10 @@ const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = 
     '場景要在台灣(騎樓、公寓、工地、巷口、洗衣店…)、自然光,' +
     '要溫暖、貼近人心、有故事感,photorealistic 質感,避免棚拍廣告感、塑膠感與科技感構圖,不含文字"',
   instagram:
-    '"imagePrompt": "必填:給圖片生成模型的英文描述。畫面要以「台灣人」為主角(東亞臉孔、自然的身形與台灣日常穿著,有表情、有動作、有生活感的真實場景,例如師傅擦汗大笑、店員幫客人摺衣服),場景要有台灣感(騎樓、巷口、公寓、夜市…),溫暖手繪插畫或自然攝影感,避免冷冰冰的物件圖或科技感構圖,不含文字"',
+    '"imagePrompt": "必填:給圖片生成模型的英文描述,4:5 直式構圖。' +
+    '畫面必須有一個一眼看懂的停滑主體(一個人的真實情緒、或一個台灣日常空間的關鍵細節),回答這篇顧客搜尋問題。' +
+    '主角是台灣人(東亞臉孔、自然身形與日常穿著)或台灣空間本身;自然光、淺景深、有生活感。' +
+    '禁止冷冰冰物件圖、科技感構圖、歐美模特兒、棚拍廣告感。不含文字"',
   threads:
     '"imagePrompt": "選填,預設【不要】提供這個欄位(Threads 以純文字為主,大多數貼文不需要圖)。' +
     '只有當你判斷「這篇配一張圖會明顯更吸睛、更容易被按讚轉發」(例如畫面感很強的場景、視覺哏)才提供:' +
@@ -491,7 +566,7 @@ function resolveImagePromptSpec(params: {
   const slug = params.brandSlug;
   const style = params.imageStyle;
   if (style === 'design' || (slug === 'homigo' && params.platform === 'instagram' && !style)) {
-    return DESIGN_IMAGE_PROMPT_SPEC;
+    return slug === 'homigo' ? HOMIGO_IG_IMAGE_PROMPT_SPEC : DESIGN_IMAGE_PROMPT_SPEC;
   }
   if (slug === 'washgo' && params.platform === 'threads' && (params.lane ?? 'b2c') === 'b2c') {
     return WASHGO_THREADS_IMAGE_PROMPT_SPEC;
@@ -517,13 +592,18 @@ export function buildPostUserPrompt(params: {
   const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
   const guideline = params.platform === 'threads' && voice?.threadsCraft
     ? `${PLATFORM_GUIDELINES.threads}\n${voice.threadsCraft}`
-    : PLATFORM_GUIDELINES[params.platform];
+    : params.platform === 'instagram' && voice?.instagramCraft
+      ? `${PLATFORM_GUIDELINES.instagram}\n${voice.instagramCraft}`
+      : PLATFORM_GUIDELINES[params.platform];
   const lane = params.audienceLane;
   const laneBlock = lane && params.brandSlug
     ? [
         audienceLaneInstruction(params.brandSlug, lane),
         params.audienceName ? `本篇主受眾:${params.audienceName}。整篇只對這一個對象說話,不要同時討好 B 端與 C 端。` : '',
       ].filter(Boolean).join('\n')
+    : '';
+  const searchBlock = params.platform === 'instagram' && voice?.igSearchQueries?.length
+    ? `本篇要能被顧客在 IG 搜尋欄找到。只選下面「一個」搜尋意圖寫進第一句與 hashtag:${voice.igSearchQueries.join('、')}。`
     : '';
   const imageSpec = resolveImagePromptSpec({
     platform: params.platform, brandSlug: params.brandSlug,
@@ -536,6 +616,7 @@ export function buildPostUserPrompt(params: {
     '',
     guideline,
     laneBlock,
+    searchBlock,
     params.extraInstruction ?? '',
     params.skipImagePrompt ? '配圖已指定為品牌上傳的真實截圖或實拍,不要提供 imagePrompt。' : '',
     '',
@@ -565,7 +646,9 @@ export function buildImageInspiredPostPrompt(params: {
   const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
   const guideline = params.platform === 'threads' && voice?.threadsCraft
     ? `${PLATFORM_GUIDELINES.threads}\n${voice.threadsCraft}`
-    : PLATFORM_GUIDELINES[params.platform];
+    : params.platform === 'instagram' && voice?.instagramCraft
+      ? `${PLATFORM_GUIDELINES.instagram}\n${voice.instagramCraft}`
+      : PLATFORM_GUIDELINES[params.platform];
   const categoryLabel = params.imageCategory ? IMAGE_CATEGORY_LABEL[params.imageCategory] ?? '素材照片' : '素材照片';
   const lane = params.audienceLane ?? defaultAudienceLane(params.platform);
   const laneBlock = params.brandSlug
@@ -574,6 +657,9 @@ export function buildImageInspiredPostPrompt(params: {
         params.audienceName ? `本篇主受眾:${params.audienceName}。` : '',
       ].filter(Boolean).join('\n')
     : '';
+  const searchBlock = params.platform === 'instagram' && voice?.igSearchQueries?.length
+    ? `文案第一句要對準顧客會搜的一個詞:${voice.igSearchQueries.join('、')}。`
+    : '';
   return [
     `這是品牌上傳的一張${categoryLabel}${params.caption ? `,說明:${params.caption}` : ''}。`,
     `請仔細看這張圖,挑一個畫面裡真的有的細節或情境當鉤子,寫一篇 ${params.platform} 貼文。`,
@@ -581,6 +667,7 @@ export function buildImageInspiredPostPrompt(params: {
     '',
     guideline,
     laneBlock,
+    searchBlock,
     '',
     '回傳 JSON 物件:',
     '{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"}',
@@ -884,13 +971,24 @@ export function buildEcosystemXUserPrompt(params: { angle: EcosystemXAngle; coll
 }
 
 export function buildEngagementEvalPrompt(params: { platform: string; body: string }): string {
+  const igExtra = params.platform === 'instagram'
+    ? [
+        'Instagram 加權評估(這四項低分就要扣):',
+        '- 前 125 字是否自成一句痛點 hook(不用展開也看得懂)',
+        '- 有沒有對準一個顧客搜尋問題(幫帳號打標籤)',
+        '- 值不值得收藏/截圖(saves 比 likes 更能推推薦)',
+        '- 讀完會不會只記得這篇、記不住是哪個品牌(影片火了人沒火=低分)',
+        '- 有無傷害推薦資格:洗標、標題黨、互動勒索、主題飄掉',
+      ].join('\n')
+    : '';
   return [
-    `你是台灣社群操盤手,請評估以下 ${params.platform} 貼文的互動潛力(按讚/留言/轉發)。`,
+    `你是台灣社群操盤手,請評估以下 ${params.platform} 貼文的互動潛力(按讚/留言/轉發${params.platform === 'instagram' ? '/收藏' : ''})。`,
     '從受眾共鳴、開頭吸引力、平台演算法友善度、轉發動機四個面向評估。',
+    igExtra,
     '',
     '貼文內容:',
     params.body,
     '',
     '回傳 JSON 物件:{"score": 0到100的數字, "analysis": "一段評估說明", "suggestions": ["具體改進建議"]}',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }

@@ -873,7 +873,9 @@ async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
           brandCtx, platform,
           topic: theme.theme,
           topicSummary: theme.summary,
-          extraInstruction: `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。主受眾:${audience.name}。`,
+          extraInstruction: platform === 'instagram'
+            ? `切入角度:${theme.angle}。這是今天的每日主題貼文。IG:第一句=顧客搜得到的痛點,圖上主標與第一句同義,整篇只打一個標籤主題。主受眾:${audience.name}。`
+            : `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。主受眾:${audience.name}。`,
           audienceLane: 'b2b',
           audienceName: audience.name,
         });
@@ -970,7 +972,7 @@ const ECOSYSTEM_ANGLES: Record<string, EcosystemAngle[]> = {
       platform: 'facebook',
       instruction: '這篇寫給洗衣店主/連鎖業者:加入 Washgo 平台後,可以接到 Homigo 包租代管的床單布巾案源,' +
         '訂單、調撥、司機都在同一套系統。用業者會懂的場景開頭,不要寫成房客或媽媽送洗文。' +
-        'CTA 只准官網或 hello@washgo.com.tw。',
+        'CTA 一律導向匠管 Service@inforcraft.com.tw 或電話 0972-395-117。',
     },
     {
       platform: 'threads',

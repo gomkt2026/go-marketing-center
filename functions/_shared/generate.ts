@@ -7,7 +7,7 @@ import {
   OFFTOPIC_SYSTEM_PROMPT, buildOfftopicUserPrompt,
   buildImageInspiredPostPrompt,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
-  defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction,
+  defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
   type GeneratedXPost, type EcosystemXAngle,
   type AudienceLane, type ImageStyleId,
@@ -20,6 +20,14 @@ import { X_TWEET_MAX_CHARS } from './x';
 export type SocialPlatform = 'facebook' | 'instagram' | 'threads';
 
 export const SUPPORTED_PLATFORMS: SocialPlatform[] = ['facebook', 'instagram', 'threads'];
+
+/** IG 最多 12、FB 最多 3;Threads 只去 # 不硬切(品牌規則各自處理) */
+function clampHashtags(tags: string[] | undefined, platform: SocialPlatform): string[] {
+  const cleaned = (tags ?? []).map((h) => h.replace(/^#/, '').trim()).filter(Boolean);
+  if (platform === 'instagram') return cleaned.slice(0, 12);
+  if (platform === 'facebook') return cleaned.slice(0, 3);
+  return cleaned;
+}
 
 /** 讀取品牌官方 logo(R2 brand-assets/{slug}/logo.png);沒有就回 null */
 async function getBrandLogo(env: Env, brandSlug: string): Promise<Uint8Array | null> {
@@ -212,11 +220,14 @@ export async function generatePlatformPost(
 
   // 修正模型偶發輸出的字面 \n(否則會原樣出現在貼文上)
   post.body = normalizeMultilineText(post.body);
+  post.hashtags = clampHashtags(post.hashtags, platform);
+  post.cta = SHARED_BRAND_CTA;
 
-  // 字數硬限制:FB 1000 字;Threads 依品牌設定(如 Washgo 150 字短文策略)。超過就要求縮短一次
-  const brandThreadsMax = getBrandVoice(brandCtx.slug).threadsMaxChars;
+  // 字數硬限制:FB 1000 字;IG 依品牌(預設 220);Threads 依品牌設定(如 Washgo 150 字短文策略)
+  const brandVoice = getBrandVoice(brandCtx.slug);
   const hardLimit = platform === 'facebook' ? 1000
-    : platform === 'threads' && brandThreadsMax ? brandThreadsMax
+    : platform === 'instagram' ? (brandVoice.instagramMaxChars ?? 220)
+    : platform === 'threads' && brandVoice.threadsMaxChars ? brandVoice.threadsMaxChars
     : null;
   if (hardLimit && post.body.length > hardLimit) {
     post = await chatCompleteJson<GeneratedPost>(env, {
@@ -229,7 +240,10 @@ export async function generatePlatformPost(
       temperature: 0.5,
     });
     post.body = normalizeMultilineText(post.body);
+    post.hashtags = clampHashtags(post.hashtags, platform);
   }
+  post.cta = SHARED_BRAND_CTA;
+  post.hashtags = clampHashtags(post.hashtags, platform);
 
   const prediction = await chatCompleteJson<EngagementPrediction>(env, {
     messages: [
@@ -283,7 +297,8 @@ export async function generatePlatformPost(
         : isIllustration
           ? `${post.imagePrompt}. ${voice.imageStyle ?? 'Warm hand-drawn illustration style.'} Any people shown are Taiwanese, authentic Taiwan daily-life setting. No text. No watermark. No logo.`
           : `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${photoRef ? ` Style reference: ${photoRef}` : ''} No text. No watermark. No logo.`;
-      const size = isDesign && !isFb ? '1024x1536' as const : isFb ? '1536x1024' as const : '1024x1024' as const;
+      const isIg = platform === 'instagram';
+      const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : isDesign ? '1024x1536' as const : '1024x1024' as const;
       const quality = isDesign ? 'high' as const : 'medium' as const;
       let bytes = await generateImage(env, { prompt, size, quality });
       if (logo) {
@@ -392,10 +407,13 @@ export async function generatePostFromImage(
   });
   post.body = normalizeMultilineText(post.body);
   post.imagePrompt = undefined;
+  post.hashtags = clampHashtags(post.hashtags, platform);
+  post.cta = SHARED_BRAND_CTA;
 
-  const brandThreadsMax = getBrandVoice(brandCtx.slug).threadsMaxChars;
+  const brandVoice = getBrandVoice(brandCtx.slug);
   const hardLimit = platform === 'facebook' ? 1000
-    : platform === 'threads' && brandThreadsMax ? brandThreadsMax
+    : platform === 'instagram' ? (brandVoice.instagramMaxChars ?? 220)
+    : platform === 'threads' && brandVoice.threadsMaxChars ? brandVoice.threadsMaxChars
     : null;
   if (hardLimit && post.body.length > hardLimit) {
     post = await chatCompleteJson<GeneratedPost>(env, {
@@ -409,7 +427,10 @@ export async function generatePostFromImage(
     });
     post.body = normalizeMultilineText(post.body);
     post.imagePrompt = undefined;
+    post.hashtags = clampHashtags(post.hashtags, platform);
   }
+  post.cta = SHARED_BRAND_CTA;
+  post.hashtags = clampHashtags(post.hashtags, platform);
 
   const prediction = await chatCompleteJson<EngagementPrediction>(env, {
     messages: [

@@ -91,12 +91,13 @@ function daysFromNow(n: number): string {
 
 export const brandChannels: BrandChannel[] = [
   { id: 'ch-1', brandId: 'b-homigo', platform: 'facebook', toneOfVoice: '完整敘事、專業可信', lengthGuideline: '長文', formatGuideline: '痛點 → 解法 → CTA,搭配輪播圖卡', hashtagCountMin: 2, hashtagCountMax: 3 },
-  { id: 'ch-2', brandId: 'b-homigo', platform: 'instagram', toneOfVoice: '視覺優先、生活感', lengthGuideline: '短文', formatGuideline: '4:5 輪播(1080x1350)、限動、Reels 腳本', hashtagCountMin: 8, hashtagCountMax: 15 },
+  { id: 'ch-2', brandId: 'b-homigo', platform: 'instagram', toneOfVoice: '視覺優先、生活感', lengthGuideline: '80-180字,前125字完整hook', formatGuideline: '4:5 痛點主標+搜尋打標籤,第一張強hook', hashtagCountMin: 8, hashtagCountMax: 12 },
   { id: 'ch-3', brandId: 'b-homigo', platform: 'threads', toneOfVoice: '口語、短、敢聊時事', lengthGuideline: '1-3 段', formatGuideline: '可蹭租屋話題、開放留言互動', hashtagCountMin: 3, hashtagCountMax: 5 },
   { id: 'ch-4', brandId: 'b-taskgo', platform: 'threads', toneOfVoice: '台味短文、工地共鳴梗,可用台語詞', lengthGuideline: '前3行決定生死', formatGuideline: '結尾必留互動問句', hashtagCountMin: 3, hashtagCountMax: 5 },
   { id: 'ch-5', brandId: 'b-taskgo', platform: 'facebook', toneOfVoice: '誠懇前輩分享、故事完整有頭有尾', lengthGuideline: '300-800字', formatGuideline: '首兩行破題,搭配1-4張對比圖', hashtagCountMin: 2, hashtagCountMax: 3 },
+  { id: 'ch-5b', brandId: 'b-taskgo', platform: 'instagram', toneOfVoice: '視覺優先、工地語錄卡', lengthGuideline: '80-180字,前125字完整hook', formatGuideline: '4:5 痛點主標+現場情境,第一張強hook', hashtagCountMin: 8, hashtagCountMax: 12 },
   { id: 'ch-6', brandId: 'b-washgo', platform: 'threads', toneOfVoice: '口語、貼近生活、像朋友抱怨', lengthGuideline: '1-3句', formatGuideline: '先共鳴再置入,品牌名可放留言區', hashtagCountMin: 0, hashtagCountMax: 2 },
-  { id: 'ch-7', brandId: 'b-washgo', platform: 'instagram', toneOfVoice: '視覺優先短hook', lengthGuideline: '100-200字', formatGuideline: '第一張強hook,輪播教學', hashtagCountMin: 8, hashtagCountMax: 15 },
+  { id: 'ch-7', brandId: 'b-washgo', platform: 'instagram', toneOfVoice: '視覺優先短hook', lengthGuideline: '80-180字,前125字完整hook', formatGuideline: '4:5 痛點主標+搜尋打標籤,第一張強hook', hashtagCountMin: 8, hashtagCountMax: 12 },
 ];
 
 export const brandKeywords: BrandKeyword[] = [
@@ -104,21 +105,27 @@ export const brandKeywords: BrandKeyword[] = [
   { id: 'kw-2', brandId: 'b-homigo', category: 'hashtag', value: '#包租代管' },
   { id: 'kw-3', brandId: 'b-homigo', category: 'hashtag', value: '#租屋族' },
   { id: 'kw-4', brandId: 'b-homigo', category: 'hashtag', value: '#報修' },
-  { id: 'kw-5', brandId: 'b-homigo', category: 'cta', value: '加 LINE 免費開始' },
+  { id: 'kw-4b', brandId: 'b-homigo', category: 'hashtag', value: '#收租對帳' },
+  { id: 'kw-4c', brandId: 'b-homigo', category: 'hashtag', value: '#代管系統' },
+  { id: 'kw-5', brandId: 'b-homigo', category: 'cta', value: '想來信詢問：Service@inforcraft.com.tw，或來電 0972-395-117' },
   { id: 'kw-6', brandId: 'b-homigo', category: 'cta', value: '左滑看更多' },
   { id: 'kw-7', brandId: 'b-homigo', category: 'key_message', value: '不是管理房子,而是讓房子自己運作。' },
   { id: 'kw-8', brandId: 'b-homigo', category: 'key_message', value: '每天只需要看一眼。' },
   { id: 'kw-9', brandId: 'b-taskgo', category: 'hashtag', value: '#做工的人' },
   { id: 'kw-10', brandId: 'b-taskgo', category: 'hashtag', value: '#工地日常' },
   { id: 'kw-11', brandId: 'b-taskgo', category: 'hashtag', value: '#派工' },
-  { id: 'kw-12', brandId: 'b-taskgo', category: 'cta', value: '免費試用 14 天,先用再說。' },
+  { id: 'kw-11b', brandId: 'b-taskgo', category: 'hashtag', value: '#現場回報' },
+  { id: 'kw-11c', brandId: 'b-taskgo', category: 'hashtag', value: '#工班管理' },
+  { id: 'kw-12', brandId: 'b-taskgo', category: 'cta', value: '想來信詢問：Service@inforcraft.com.tw，或來電 0972-395-117' },
   { id: 'kw-13', brandId: 'b-taskgo', category: 'cta', value: '傳給你那個還在用白板排班的頭仔。' },
   { id: 'kw-14', brandId: 'b-taskgo', category: 'key_message', value: '工地人不是不懂科技,是以前的科技不懂工地。' },
   { id: 'kw-15', brandId: 'b-washgo', category: 'hashtag', value: '#Washgo' },
   { id: 'kw-16', brandId: 'b-washgo', category: 'hashtag', value: '#衣物送洗' },
   { id: 'kw-17', brandId: 'b-washgo', category: 'hashtag', value: '#到府收送' },
   { id: 'kw-18', brandId: 'b-washgo', category: 'hashtag', value: '#GoCoin' },
-  { id: 'kw-19', brandId: 'b-washgo', category: 'cta', value: '加入 @washgo 領取 100 GoCoin' },
+  { id: 'kw-18b', brandId: 'b-washgo', category: 'hashtag', value: '#洗衣店系統' },
+  { id: 'kw-18c', brandId: 'b-washgo', category: 'hashtag', value: '#送洗履歷' },
+  { id: 'kw-19', brandId: 'b-washgo', category: 'cta', value: '想來信詢問：Service@inforcraft.com.tw，或來電 0972-395-117' },
   { id: 'kw-20', brandId: 'b-washgo', category: 'key_message', value: '洗滌產業的智慧管理平台' },
 ];
 

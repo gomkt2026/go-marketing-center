@@ -1440,7 +1440,7 @@ export default {
 
   // 手動觸發除錯用:GET /?task=collect|drafts|threads|offtopic|replies|themes|ecosystem|ecosystem-x|publish|cleanup|podcast|refresh-tokens|refresh-x-tokens|insights|learn(需帶 secret)
   // threads/offtopic/themes 可帶 &slotAt=ISO時間 指定要排定發布的時段(預設現在,方便測試)
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const task = url.searchParams.get('task');
     const secret = url.searchParams.get('secret');
@@ -1448,32 +1448,31 @@ export default {
       return new Response('Unauthorized', { status: 401 });
     }
     const slotAt = new Date(url.searchParams.get('slotAt') ?? Date.now());
-    if (task === 'collect') await collectSignals(env);
-    else if (task === 'press') await collectPressMentions(env);
-    else if (task === 'drafts') await generateSignalDrafts(env);
-    else if (task === 'threads') await generateThreadsSlot(env, slotAt);
-    else if (task === 'offtopic') await generateThreadsOfftopicSlot(env, slotAt);
-    else if (task === 'replies') await threadsReplyRound(env);
-    else if (task === 'themes') await generateDailyTheme(env, slotAt);
-    else if (task === 'ecosystem') await generateEcosystemCrossPromo(env, slotAt);
-    else if (task === 'ecosystem-x') await generateEcosystemXPostSlot(env, slotAt);
-    else if (task === 'publish') await publishDueJobs(env);
-    else if (task === 'cleanup') await cleanupOldMedia(env);
-    else if (task === 'refresh-tokens') await refreshThreadsTokens(env);
-    else if (task === 'refresh-x-tokens') await refreshXTokens(env);
-    else if (task === 'insights') {
-      const result = await syncPerformanceInsights(env);
-      return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
+    const run = async (): Promise<unknown> => {
+      if (task === 'collect') return collectSignals(env);
+      if (task === 'press') return collectPressMentions(env);
+      if (task === 'drafts') return generateSignalDrafts(env);
+      if (task === 'threads') return generateThreadsSlot(env, slotAt);
+      if (task === 'offtopic') return generateThreadsOfftopicSlot(env, slotAt);
+      if (task === 'replies') return threadsReplyRound(env);
+      if (task === 'themes') return generateDailyTheme(env, slotAt);
+      if (task === 'ecosystem') return generateEcosystemCrossPromo(env, slotAt);
+      if (task === 'ecosystem-x') return generateEcosystemXPostSlot(env, slotAt);
+      if (task === 'publish') return publishDueJobs(env);
+      if (task === 'cleanup') return cleanupOldMedia(env);
+      if (task === 'refresh-tokens') return refreshThreadsTokens(env);
+      if (task === 'refresh-x-tokens') return refreshXTokens(env);
+      if (task === 'insights') return syncPerformanceInsights(env);
+      if (task === 'learn') return analyzeAllBrandPerformance(env);
+      if (task === 'podcast') return createPodcastEpisode(env);
+      return null;
+    };
+    const known = ['collect', 'press', 'drafts', 'threads', 'offtopic', 'replies', 'themes', 'ecosystem', 'ecosystem-x', 'publish', 'cleanup', 'podcast', 'refresh-tokens', 'refresh-x-tokens', 'insights', 'learn'];
+    if (!task || !known.includes(task)) {
+      return new Response(`task 必須為 ${known.join(' / ')}`, { status: 400 });
     }
-    else if (task === 'learn') {
-      const result = await analyzeAllBrandPerformance(env);
-      return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
-    }
-    else if (task === 'podcast') {
-      const result = await createPodcastEpisode(env);
-      return new Response(JSON.stringify({ ok: true, task, result }), { headers: { 'Content-Type': 'application/json' } });
-    }
-    else return new Response('task 必須為 collect / press / drafts / threads / offtopic / replies / themes / ecosystem / ecosystem-x / publish / cleanup / podcast / refresh-tokens / refresh-x-tokens / insights / learn', { status: 400 });
-    return new Response(JSON.stringify({ ok: true, task }), { headers: { 'Content-Type': 'application/json' } });
+    // 產圖/發文可能超過 HTTP 30 秒,改背景跑,避免手動觸發被切斷
+    ctx.waitUntil(run().catch((e) => console.error(`[manual] ${task} 失敗`, e)));
+    return new Response(JSON.stringify({ ok: true, task, accepted: true }), { headers: { 'Content-Type': 'application/json' } });
   },
 };

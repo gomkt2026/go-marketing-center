@@ -52,12 +52,12 @@ export const brandDocuments: BrandDocument[] = [
 ];
 
 export const brandAudiences: BrandAudience[] = [
-  { id: 'aud-1', brandId: 'b-homigo', name: '自管房東(1~10間)', painPoints: ['收租、報修、續約全靠自己記'], appealAngle: '每天只看一眼的自動化' },
-  { id: 'aud-2', brandId: 'b-homigo', name: '包租代管業者', painPoints: ['多物件多房東,人力吃緊'], appealAngle: '三視角管理、指揮中心、規模化' },
-  { id: 'aud-3', brandId: 'b-homigo', name: '房客(20~40歲租屋族)', painPoints: ['報修沒下文', '押金爭議', '信用無累積'], appealAngle: '透明進度、HomiScore 信用資產' },
-  { id: 'aud-4', brandId: 'b-washgo', name: '忙碌上班族/雙薪家庭', painPoints: ['沒時間洗', '沒時間拿'], appealAngle: '到府收送、LINE 下單、時間還給自己' },
-  { id: 'aud-5', brandId: 'b-washgo', name: '精緻衣物擁有者', painPoints: ['西裝、大衣、禮服、名牌怕洗壞'], appealAngle: '專業品管、電子簽名、AI 洗護' },
-  { id: 'aud-6', brandId: 'b-washgo', name: '傳統洗衣店主(B2B)', painPoints: ['手寫單、電話聯絡、客源老化'], appealAngle: '數位轉型零門檻、年輕客群從 LINE 進來' },
+  { id: 'aud-1', brandId: 'b-homigo', name: '自管房東(1~10間)', painPoints: ['收租、報修、續約全靠自己記'], appealAngle: '每天只看一眼的自動化', lane: 'b2b' },
+  { id: 'aud-2', brandId: 'b-homigo', name: '包租代管業者', painPoints: ['多物件多房東,人力吃緊'], appealAngle: '三視角管理、指揮中心、規模化', lane: 'b2b' },
+  { id: 'aud-3', brandId: 'b-homigo', name: '房客(20~40歲租屋族)', painPoints: ['報修沒下文', '押金爭議', '信用無累積'], appealAngle: '透明進度、HomiScore 信用資產', lane: 'b2c' },
+  { id: 'aud-4', brandId: 'b-washgo', name: '忙碌上班族/雙薪家庭', painPoints: ['沒時間洗', '沒時間拿'], appealAngle: '到府收送、LINE 下單、時間還給自己', lane: 'b2c' },
+  { id: 'aud-5', brandId: 'b-washgo', name: '精緻衣物擁有者', painPoints: ['西裝、大衣、禮服、名牌怕洗壞'], appealAngle: '專業品管、電子簽名、AI 洗護', lane: 'b2c' },
+  { id: 'aud-6', brandId: 'b-washgo', name: '傳統洗衣店主(B2B)', painPoints: ['手寫單、電話聯絡、客源老化'], appealAngle: '數位轉型零門檻、年輕客群從 LINE 進來', lane: 'b2b' },
 ];
 
 export const brandPersonas: BrandPersona[] = [

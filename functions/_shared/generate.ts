@@ -3,14 +3,16 @@ import { getSql } from './db';
 import { chatCompleteJson, generateImage } from './openai';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
-  HOMIGO_IG_IMAGE_STYLE, HOMIGO_TEXT_MARK_RULE,
+  HOMIGO_TEXT_MARK_RULE, BRAND_DESIGN_IMAGE_STYLE,
   OFFTOPIC_SYSTEM_PROMPT, buildOfftopicUserPrompt,
-  buildImageInspiredThreadsPrompt,
+  buildImageInspiredPostPrompt,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
+  defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
   type GeneratedXPost, type EcosystemXAngle,
+  type AudienceLane, type ImageStyleId,
 } from './prompts';
-import { buildMediaKey, putMedia } from './media';
+import { buildMediaKey, putMedia, toPublicMediaUrl } from './media';
 import { compositeLogo } from './watermark';
 import { normalizeMultilineText } from './text';
 import { X_TWEET_MAX_CHARS } from './x';
@@ -36,6 +38,92 @@ export interface GenerationResult {
   prediction: EngagementPrediction;
   imageUrl: string | null;
   imageError: string | null;
+  audienceLane?: AudienceLane;
+  audienceName?: string | null;
+  imageSource?: 'asset' | 'generated' | null;
+  imageStyle?: ImageStyleId | null;
+  assetId?: string | null;
+}
+
+export interface BrandAssetPick {
+  id: string;
+  fileUrl: string;
+  caption: string | null;
+  imageCategory: string | null;
+}
+
+function toAssetPick(env: Env, row: { id: string; file_url: string | null; caption: string | null; image_category: string | null }): BrandAssetPick | null {
+  const fileUrl = toPublicMediaUrl(env, row.file_url);
+  if (!fileUrl) return null;
+  return { id: row.id, fileUrl, caption: row.caption, imageCategory: row.image_category };
+}
+
+export async function pickBrandAsset(env: Env, brandId: string, preferScreenshot = false): Promise<BrandAssetPick | null> {
+  const sql = getSql(env);
+  if (preferScreenshot) {
+    const shots = await sql`
+      SELECT id, file_url, caption, image_category FROM brand_assets
+      WHERE brand_id = ${brandId}::uuid AND asset_type = 'image' AND image_category = 'system_screenshot'
+      ORDER BY used_in_threads_count ASC, last_used_at ASC NULLS FIRST
+      LIMIT 1
+    `;
+    if (shots.length) return toAssetPick(env, shots[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null });
+  }
+  const rows = await sql`
+    SELECT id, file_url, caption, image_category FROM brand_assets
+    WHERE brand_id = ${brandId}::uuid AND asset_type = 'image'
+    ORDER BY
+      CASE image_category
+        WHEN 'system_screenshot' THEN 0
+        WHEN 'real_photo' THEN 1
+        WHEN 'scene' THEN 2
+        WHEN 'people' THEN 3
+        ELSE 4
+      END,
+      used_in_threads_count ASC, last_used_at ASC NULLS FIRST
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  return toAssetPick(env, rows[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null });
+}
+
+export async function pickBrandScreenshot(env: Env, brandSlug: string): Promise<BrandAssetPick | null> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT a.id, a.file_url, a.caption, a.image_category
+    FROM brand_assets a
+    JOIN brands b ON b.id = a.brand_id
+    WHERE b.slug = ${brandSlug} AND a.asset_type = 'image' AND a.image_category = 'system_screenshot'
+    ORDER BY a.used_in_threads_count ASC, a.last_used_at ASC NULLS FIRST
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  const row = rows[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null };
+  const fileUrl = toPublicMediaUrl(env, row.file_url);
+  if (!fileUrl) return null;
+  return { id: row.id, fileUrl, caption: row.caption, imageCategory: row.image_category };
+}
+
+export async function markAssetUsed(env: Env, assetId: string): Promise<void> {
+  const sql = getSql(env);
+  await sql`
+    UPDATE brand_assets SET used_in_threads_count = used_in_threads_count + 1, last_used_at = now()
+    WHERE id = ${assetId}::uuid
+  `;
+}
+
+async function recentImageStyles(env: Env, brandId: string): Promise<ImageStyleId[]> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT generation_prompt_meta->>'imageStyle' AS style FROM contents
+    WHERE brand_id = ${brandId}::uuid
+      AND generation_prompt_meta->>'imageSource' = 'generated'
+      AND generation_prompt_meta->>'imageStyle' IS NOT NULL
+    ORDER BY created_at DESC LIMIT 2
+  `;
+  return (rows as { style: string | null }[])
+    .map((r) => r.style)
+    .filter((s): s is ImageStyleId => s === 'photo' || s === 'design' || s === 'illustration');
 }
 
 /** Threads 配圖每品牌每日上限(控制成本;以台灣時區的一天計) */
@@ -72,17 +160,49 @@ export async function generatePlatformPost(
      * 附加在 system prompt 之後,不寫回 brandCtx.systemPrompt,維持品牌知識邊界(Principle 2)。
      */
     collaborationContext?: string | null;
+    audienceLane?: AudienceLane;
+    audienceName?: string;
+    /** 不查素材庫、一律走 AI 生圖(測試或明確要求時) */
+    skipAssetLookup?: boolean;
   },
 ): Promise<GenerationResult> {
   const { brandCtx, platform } = params;
+  const lane = params.audienceLane ?? defaultAudienceLane(platform);
+  const audience = params.audienceName
+    ? { name: params.audienceName, lane, painPoints: [], appealAngle: null }
+    : await pickAudience(env, brandCtx.brandId, brandCtx.slug, lane);
+
+  let reusedAsset: BrandAssetPick | null = null;
+  if (!params.skipAssetLookup && platform !== 'threads') {
+    try {
+      reusedAsset = await pickBrandAsset(env, brandCtx.brandId, lane === 'b2b');
+    } catch (e) {
+      console.error('[generate] 素材庫查詢失敗,改走生圖', e);
+    }
+  }
+
+  const recentStyles = reusedAsset ? [] : await recentImageStyles(env, brandCtx.brandId).catch(() => [] as ImageStyleId[]);
+  const imageStyle = reusedAsset ? null : pickImageStyle({
+    platform, lane, brandSlug: brandCtx.slug, recentStyles,
+  });
 
   const userPrompt = buildPostUserPrompt({
     platform, topic: params.topic, topicSummary: params.topicSummary,
-    extraInstruction: params.extraInstruction, brandSlug: brandCtx.slug,
+    extraInstruction: [
+      params.extraInstruction ?? '',
+      reusedAsset
+        ? `本篇配圖已指定為品牌上傳的「${reusedAsset.imageCategory ?? '素材'}」${reusedAsset.caption ? `:${reusedAsset.caption}` : ''}。文案要對得上這張真實畫面,不要另外要 imagePrompt。`
+        : '',
+    ].filter(Boolean).join('\n'),
+    brandSlug: brandCtx.slug,
+    audienceLane: lane,
+    audienceName: audience.name,
+    imageStyle: imageStyle ?? undefined,
+    skipImagePrompt: !!reusedAsset,
   });
   const systemPrompt = params.collaborationContext
-    ? `${brandCtx.systemPrompt}\n\n${params.collaborationContext}`
-    : brandCtx.systemPrompt;
+    ? `${brandCtx.systemPrompt}\n\n${audienceLaneInstruction(brandCtx.slug, lane)}\n\n${params.collaborationContext}`
+    : `${brandCtx.systemPrompt}\n\n${audienceLaneInstruction(brandCtx.slug, lane)}`;
   let post = await chatCompleteJson<GeneratedPost>(env, {
     messages: [
       { role: 'system', content: systemPrompt },
@@ -119,11 +239,17 @@ export async function generatePlatformPost(
     temperature: 0.3,
   });
 
+  if (reusedAsset) {
+    post.imagePrompt = undefined;
+    return {
+      post, prediction, imageUrl: reusedAsset.fileUrl, imageError: null,
+      audienceLane: lane, audienceName: audience.name,
+      imageSource: 'asset', imageStyle: null, assetId: reusedAsset.id,
+    };
+  }
+
   // FB / IG 貼文生成配圖;Threads 由 AI 判斷選填 imagePrompt 才產圖(每品牌每日上限控成本)
-  // FB 走寫實攝影(橫式 1536x1024);IG 方形;Homigo IG 走 4:5 直式設計圖(防呆規範)
-  // imageRendering = 'illustration' 的品牌(如 Washgo)全部走插畫風,不套 photorealistic
-  // 品牌 logo 已上傳 R2(brand-assets/{slug}/logo.png)時,生成後由程式把「真 logo」合成到角落
-  // (不再叫模型畫 logo:模型合成常把 logo 畫太大或裁出畫面外)
+  // 風格依 imageStyle 輪替:photo / design / illustration。Washgo 不再全平台鎖插畫。
   let imageUrl: string | null = null;
   let imageError: string | null = null;
   let wantsImage = !!post.imagePrompt;
@@ -136,36 +262,33 @@ export async function generatePlatformPost(
         console.log(`[generate] ${brandCtx.slug} Threads 今日配圖已達上限 ${cap},改純文字`);
       }
     } catch {
-      wantsImage = false; // 計數失敗就保守不產圖
+      wantsImage = false;
     }
   }
   if (wantsImage && post.imagePrompt) {
     try {
       const isFb = platform === 'facebook';
-      const isHomigoIg = platform === 'instagram' && brandCtx.slug === 'homigo';
+      const style = imageStyle ?? 'photo';
+      const isDesign = style === 'design';
+      const isIllustration = style === 'illustration';
       const logo = await getBrandLogo(env, brandCtx.slug);
-      // 台灣人臉孔身形與在地場景;FB 加寫實攝影質感;品牌可自帶紀實風格方向(如老屋紀實)
       const twPeople = 'any people shown are Taiwanese with East Asian facial features and natural everyday body types, authentic Taiwan daily-life setting';
       const voice = getBrandVoice(brandCtx.slug);
-      const brandStyle = voice.imageStyle;
-      const isIllustration = voice.imageRendering === 'illustration';
-      const prompt = isHomigoIg
-        ? `${post.imagePrompt}\n\n${HOMIGO_IG_IMAGE_STYLE}\n${logo
-            ? '【品牌標】不要在圖上畫任何 logo 或品牌字樣;畫面左下角留乾淨,官方 logo 會在生成後由系統合成上去。'
-            : HOMIGO_TEXT_MARK_RULE}`
+      const photoRef = (lane === 'b2b' && voice.imageStyleB2b) ? voice.imageStyleB2b : voice.imageStyle;
+      const designSpec = BRAND_DESIGN_IMAGE_STYLE[brandCtx.slug] ?? BRAND_DESIGN_IMAGE_STYLE.homigo;
+      const prompt = isDesign
+        ? `${post.imagePrompt}\n\n${designSpec}\n${logo
+            ? '【品牌標】不要在圖上畫任何 logo 或品牌字樣;畫面角落留乾淨,官方 logo 會在生成後由系統合成上去。'
+            : brandCtx.slug === 'homigo' ? HOMIGO_TEXT_MARK_RULE : ''}`
         : isIllustration
-          ? `${post.imagePrompt}. ${brandStyle ?? 'Warm hand-drawn illustration style.'} Any people shown are Taiwanese, authentic Taiwan daily-life setting. No text. No watermark. No logo.`
-          : isFb
-            ? `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text. No watermark. No logo.`
-            : `${post.imagePrompt}. Warm and relatable, ${twPeople}.${brandStyle ? ` Style reference: ${brandStyle}` : ''} No text. No watermark. No logo.`;
-      const size = isHomigoIg ? '1024x1536' as const : isFb ? '1536x1024' as const : '1024x1024' as const;
-      // Homigo 設計圖要在圖上渲染繁中文字,用 high 品質防錯字
-      const quality = isHomigoIg ? 'high' as const : 'medium' as const;
+          ? `${post.imagePrompt}. ${voice.imageStyle ?? 'Warm hand-drawn illustration style.'} Any people shown are Taiwanese, authentic Taiwan daily-life setting. No text. No watermark. No logo.`
+          : `${post.imagePrompt}. Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.${photoRef ? ` Style reference: ${photoRef}` : ''} No text. No watermark. No logo.`;
+      const size = isDesign && !isFb ? '1024x1536' as const : isFb ? '1536x1024' as const : '1024x1024' as const;
+      const quality = isDesign ? 'high' as const : 'medium' as const;
       let bytes = await generateImage(env, { prompt, size, quality });
       if (logo) {
         try {
-          // Homigo IG 設計圖的 logo 放左下(footer);其他一律右下角
-          bytes = compositeLogo(bytes, logo, { position: isHomigoIg ? 'bottom-left' : 'bottom-right' });
+          bytes = compositeLogo(bytes, logo, { position: isDesign && brandCtx.slug === 'homigo' ? 'bottom-left' : 'bottom-right' });
         } catch (e) {
           console.error('[generate] logo 合成失敗,改用無 logo 原圖', e);
         }
@@ -177,7 +300,11 @@ export async function generatePlatformPost(
     }
   }
 
-  return { post, prediction, imageUrl, imageError };
+  return {
+    post, prediction, imageUrl, imageError,
+    audienceLane: lane, audienceName: audience.name,
+    imageSource: imageUrl ? 'generated' : null, imageStyle, assetId: null,
+  };
 }
 
 /**
@@ -228,22 +355,30 @@ export async function generateOfftopicPost(
 }
 
 /**
- * Threads 圖片靈感貼文:用品牌智慧素材庫上傳的一張圖(系統畫面/實拍照片…)當話題,讓 AI 看圖寫貼文。
- * 不重新呼叫圖片生成 API,配圖直接沿用原本上傳的那張圖(省成本,也更真實)。
+ * 看圖寫貼文:用品牌智慧素材庫上傳的一張圖當話題,配圖沿用原圖。
+ * FB/IG 預設 B 端,Threads 預設 C 端。
  */
-export async function generateThreadsFromImage(
+export async function generatePostFromImage(
   env: Env,
   params: {
     brandCtx: BrandContext;
+    platform: SocialPlatform;
     imageUrl: string;
     caption?: string;
     imageCategory?: string;
+    audienceLane?: AudienceLane;
+    audienceName?: string;
+    assetId?: string;
   },
 ): Promise<GenerationResult> {
-  const { brandCtx, imageUrl } = params;
-  const userPrompt = buildImageInspiredThreadsPrompt({
-    platform: 'threads', caption: params.caption, imageCategory: params.imageCategory, brandSlug: brandCtx.slug,
+  const { brandCtx, imageUrl, platform } = params;
+  const lane = params.audienceLane ?? defaultAudienceLane(platform);
+  const audienceName = params.audienceName ?? (await pickAudience(env, brandCtx.brandId, brandCtx.slug, lane)).name;
+  const userPrompt = buildImageInspiredPostPrompt({
+    platform, caption: params.caption, imageCategory: params.imageCategory,
+    brandSlug: brandCtx.slug, audienceLane: lane, audienceName,
   });
+  const systemPrompt = `${brandCtx.systemPrompt}\n\n${audienceLaneInstruction(brandCtx.slug, lane)}`;
   const visionUserMessage = {
     role: 'user' as const,
     content: [
@@ -253,19 +388,22 @@ export async function generateThreadsFromImage(
   };
 
   let post = await chatCompleteJson<GeneratedPost>(env, {
-    messages: [{ role: 'system', content: brandCtx.systemPrompt }, visionUserMessage],
+    messages: [{ role: 'system', content: systemPrompt }, visionUserMessage],
   });
   post.body = normalizeMultilineText(post.body);
-  post.imagePrompt = undefined; // 配圖沿用原圖,不需要另外的圖片生成 prompt
+  post.imagePrompt = undefined;
 
   const brandThreadsMax = getBrandVoice(brandCtx.slug).threadsMaxChars;
-  if (brandThreadsMax && post.body.length > brandThreadsMax) {
+  const hardLimit = platform === 'facebook' ? 1000
+    : platform === 'threads' && brandThreadsMax ? brandThreadsMax
+    : null;
+  if (hardLimit && post.body.length > hardLimit) {
     post = await chatCompleteJson<GeneratedPost>(env, {
       messages: [
-        { role: 'system', content: brandCtx.systemPrompt },
+        { role: 'system', content: systemPrompt },
         visionUserMessage,
         { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${brandThreadsMax} 字上限。請只保留一個核心重點,縮短到 ${brandThreadsMax} 字以內,回傳同格式 JSON。` },
+        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${hardLimit} 字上限。請只保留一個核心重點,縮短到 ${hardLimit} 字以內,回傳同格式 JSON。` },
       ],
       temperature: 0.5,
     });
@@ -276,12 +414,30 @@ export async function generateThreadsFromImage(
   const prediction = await chatCompleteJson<EngagementPrediction>(env, {
     messages: [
       { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
-      { role: 'user', content: buildEngagementEvalPrompt({ platform: 'threads', body: post.body }) },
+      { role: 'user', content: buildEngagementEvalPrompt({ platform, body: post.body }) },
     ],
     temperature: 0.3,
   });
 
-  return { post, prediction, imageUrl, imageError: null };
+  return {
+    post, prediction, imageUrl, imageError: null,
+    audienceLane: lane, audienceName, imageSource: 'asset', imageStyle: null,
+    assetId: params.assetId ?? null,
+  };
+}
+
+/** Threads 看圖寫文(相容舊呼叫) */
+export async function generateThreadsFromImage(
+  env: Env,
+  params: {
+    brandCtx: BrandContext;
+    imageUrl: string;
+    caption?: string;
+    imageCategory?: string;
+    assetId?: string;
+  },
+): Promise<GenerationResult> {
+  return generatePostFromImage(env, { ...params, platform: 'threads' });
 }
 
 export interface SavedContent {
@@ -320,7 +476,14 @@ export async function saveGeneratedContent(
       ${params.generatedByAgentId ?? null},
       ${Math.max(0, Math.min(100, result.prediction.score))},
       ${result.prediction.analysis + (result.prediction.suggestions.length ? `\n改進建議:\n- ${result.prediction.suggestions.join('\n- ')}` : '')},
-      ${JSON.stringify(params.promptMeta ?? {})},
+      ${JSON.stringify({
+        ...params.promptMeta,
+        audienceLane: params.promptMeta?.audienceLane ?? result.audienceLane,
+        audienceName: params.promptMeta?.audienceName ?? result.audienceName,
+        imageSource: params.promptMeta?.imageSource ?? result.imageSource,
+        imageStyle: params.promptMeta?.imageStyle ?? result.imageStyle,
+        assetId: params.promptMeta?.assetId ?? result.assetId,
+      })},
       ${params.sourceMarketSignalId ?? null}
     ) RETURNING id
   `;
@@ -338,8 +501,17 @@ export async function saveGeneratedContent(
     await sql`
       INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
       VALUES (${versionId}::uuid, 'image', ${result.imageUrl},
-              ${JSON.stringify(params.imageAssetMeta ?? { imagePrompt: result.post.imagePrompt ?? '', generated: true })})
+              ${JSON.stringify(params.imageAssetMeta ?? {
+                imagePrompt: result.post.imagePrompt ?? '',
+                generated: result.imageSource !== 'asset',
+                sourceAssetId: result.assetId ?? undefined,
+              })})
     `;
+  }
+
+  const usedAssetId = (params.promptMeta?.assetId as string | undefined) ?? result.assetId;
+  if (usedAssetId) {
+    await markAssetUsed(env, usedAssetId);
   }
 
   return { contentId, versionId };
@@ -357,6 +529,8 @@ export interface EcosystemXGenerationResult {
   angleLabel: string;
   imageUrl: string | null;
   imageError: string | null;
+  imageSource?: 'asset' | 'generated' | null;
+  assetId?: string | null;
 }
 
 /**
@@ -364,9 +538,15 @@ export interface EcosystemXGenerationResult {
  * 同時依模型回傳的 imagePrompt + 固定的 ECOSYSTEM_X_IMAGE_STYLE 產一張科技感 hero image
  * (16:9,配合 X 卡片顯示比例),配圖失敗不影響文字貼文,只記錄 imageError。
  */
+export const SPOTLIGHT_SLUG: Record<string, string> = {
+  brand_spotlight_taskgo: 'taskgo',
+  brand_spotlight_homigo: 'homigo',
+  brand_spotlight_washgo: 'washgo',
+};
+
 export async function generateEcosystemXPost(
   env: Env,
-  params: { angle: EcosystemXAngle; collaborationContext: string },
+  params: { angle: EcosystemXAngle; collaborationContext: string; screenshotUrl?: string | null; screenshotAssetId?: string | null },
 ): Promise<EcosystemXGenerationResult> {
   const userPrompt = buildEcosystemXUserPrompt({ angle: params.angle, collaborationContext: params.collaborationContext });
   const messages = [
@@ -394,20 +574,28 @@ export async function generateEcosystemXPost(
 
   let imageUrl: string | null = null;
   let imageError: string | null = null;
-  try {
-    const scene = post.imagePrompt?.trim() || 'Three glowing data streams merging into a single pulsing core node.';
-    const bytes = await generateImage(env, {
-      prompt: `${scene} ${ECOSYSTEM_X_IMAGE_STYLE}`,
-      size: '1536x1024',
-      quality: 'medium',
-    });
-    const key = buildMediaKey('go-ecosystem', 'jpg');
-    imageUrl = await putMedia(env, key, bytes, 'image/jpeg');
-  } catch (e) {
-    imageError = e instanceof Error ? e.message : '配圖生成失敗';
+  if (params.screenshotUrl) {
+    imageUrl = params.screenshotUrl;
+  } else {
+    try {
+      const scene = post.imagePrompt?.trim() || 'Three glowing data streams merging into a single pulsing core node.';
+      const bytes = await generateImage(env, {
+        prompt: `${scene} ${ECOSYSTEM_X_IMAGE_STYLE}`,
+        size: '1536x1024',
+        quality: 'medium',
+      });
+      const key = buildMediaKey('go-ecosystem', 'jpg');
+      imageUrl = await putMedia(env, key, bytes, 'image/jpeg');
+    } catch (e) {
+      imageError = e instanceof Error ? e.message : '配圖生成失敗';
+    }
   }
 
-  return { post, angleId: params.angle.id, angleLabel: params.angle.label, imageUrl, imageError };
+  return {
+    post, angleId: params.angle.id, angleLabel: params.angle.label, imageUrl, imageError,
+    imageSource: params.screenshotUrl ? 'asset' : (imageUrl ? 'generated' : null),
+    assetId: params.screenshotAssetId ?? null,
+  };
 }
 
 export interface SavedEcosystemContent {
@@ -440,7 +628,10 @@ export async function saveEcosystemXContent(
       NULL, ${params.collaborationId}::uuid, 'article', 'x',
       ${`[Go Ecosystem X] ${result.angleLabel}`}, ${params.status ?? 'pending_review'},
       ${params.generatedByAgentId ?? null},
-      ${JSON.stringify({ source: 'ecosystem_x', angleId: result.angleId, format: result.post.format })}
+      ${JSON.stringify({
+        source: 'ecosystem_x', angleId: result.angleId, format: result.post.format,
+        audienceLane: 'b2b', imageSource: result.imageSource, assetId: result.assetId,
+      })}
     ) RETURNING id
   `;
   const contentId = (contentRows[0] as { id: string }).id;
@@ -456,8 +647,17 @@ export async function saveEcosystemXContent(
     await sql`
       INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
       VALUES (${versionId}::uuid, 'image', ${result.imageUrl},
-              ${JSON.stringify({ imagePrompt: result.post.imagePrompt ?? '', generated: true, source: 'ecosystem_x' })})
+              ${JSON.stringify({
+                imagePrompt: result.post.imagePrompt ?? '',
+                generated: result.imageSource !== 'asset',
+                source: 'ecosystem_x',
+                sourceAssetId: result.assetId ?? undefined,
+              })})
     `;
+  }
+
+  if (result.assetId) {
+    await markAssetUsed(env, result.assetId);
   }
 
   return { contentId, versionId };

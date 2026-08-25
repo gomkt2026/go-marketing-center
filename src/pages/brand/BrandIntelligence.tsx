@@ -163,13 +163,13 @@ export function BrandIntelligence() {
     setAssets((prev) => prev.filter((a) => a.id !== id));
   }
 
-  async function generateFromAsset(id: string) {
+  async function generateFromAsset(id: string, platform: 'facebook' | 'instagram' | 'threads') {
     if (!slug) return;
-    setGeneratingAssetId(id);
+    setGeneratingAssetId(`${id}:${platform}`);
     setAssetError(null);
     setGeneratedContentId(null);
     try {
-      const { contentId } = await api.generatePostFromAsset(slug, id);
+      const { contentId } = await api.generatePostFromAsset(slug, id, platform);
       setGeneratedContentId(contentId);
       setAssets((prev) => prev.map((a) => (a.id === id
         ? { ...a, usedInThreadsCount: a.usedInThreadsCount + 1, lastUsedAt: new Date().toISOString() }
@@ -465,7 +465,11 @@ export function BrandIntelligence() {
                 <div className="grid-2" style={{ gap: 12 }}>
                   {audiences.map((a) => (
                     <div key={a.id} style={cardBoxStyle}>
-                      <strong style={{ fontSize: 14 }}>{a.name}</strong>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <strong style={{ fontSize: 14 }}>{a.name}</strong>
+                        {a.lane === 'b2b' && <Badge tone="primary">B 端</Badge>}
+                        {a.lane === 'b2c' && <Badge tone="default">C 端</Badge>}
+                      </div>
                       <div style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0' }}>痛點:{a.painPoints.join('、')}</div>
                       <div style={{ fontSize: 12 }}>訴求角度:{a.appealAngle}</div>
                     </div>
@@ -735,7 +739,7 @@ export function BrandIntelligence() {
               {tab === 'library' && (
                 <div style={{ display: 'grid', gap: 24 }}>
                   <div>
-                    <Field label="圖片素材庫(系統畫面截圖/實拍照片,可作為 Threads 圖片靈感貼文的話題來源)">
+                    <Field label="圖片素材庫(系統畫面截圖/實拍照片,FB／IG／Threads 都可直接當配圖)">
                       <div />
                     </Field>
                     <div style={{ ...cardBoxStyle, marginTop: 8 }}>
@@ -767,7 +771,7 @@ export function BrandIntelligence() {
                       {assetError && <p style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 8 }}>{assetError}</p>}
                       {generatedContentId && (
                         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
-                          已生成貼文草稿,請至內容審閱頁查看(content id: {generatedContentId})。
+                          已生成貼文草稿(FB／IG 預設 B 端、Threads 預設 C 端),請至內容審閱頁查看(content id: {generatedContentId})。
                         </p>
                       )}
                     </div>
@@ -789,13 +793,21 @@ export function BrandIntelligence() {
                             <div style={{ fontSize: 12.5, marginBottom: 8, wordBreak: 'break-word' }}>{a.caption}</div>
                           )}
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <Button
-                              variant="primary" style={{ padding: '4px 10px', fontSize: 12 }}
-                              disabled={generatingAssetId === a.id}
-                              onClick={() => void generateFromAsset(a.id)}
-                            >
-                              {generatingAssetId === a.id ? '生成中…' : '用這張圖生成貼文'}
-                            </Button>
+                            {(['facebook', 'instagram', 'threads'] as const).map((p) => {
+                              const busy = generatingAssetId === `${a.id}:${p}`;
+                              const label = p === 'facebook' ? 'FB' : p === 'instagram' ? 'IG' : 'Threads';
+                              return (
+                                <Button
+                                  key={p}
+                                  variant={p === 'threads' ? 'primary' : 'secondary'}
+                                  style={{ padding: '4px 10px', fontSize: 12 }}
+                                  disabled={!!generatingAssetId}
+                                  onClick={() => void generateFromAsset(a.id, p)}
+                                >
+                                  {busy ? '生成中…' : `用這張圖生成 ${label}`}
+                                </Button>
+                              );
+                            })}
                             <Button
                               variant="danger" style={{ padding: '4px 10px', fontSize: 12 }}
                               onClick={() => void deleteAsset(a.id)}

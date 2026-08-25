@@ -59,6 +59,7 @@ export interface BrandAudience {
   name: string;
   painPoints: string[];
   appealAngle: string;
+  lane?: 'b2b' | 'b2c' | null;
 }
 
 export interface BrandPersona {
@@ -70,6 +71,7 @@ export interface BrandPersona {
   profile?: string;
   painPoints: string[];
   appealAngle: string;
+  lane?: 'b2b' | 'b2c' | null;
 }
 
 export type PublishingPlatform =
@@ -528,6 +530,8 @@ export interface ScheduleItem {
   contentStatus?: ContentStatus;
   genSource?: string | null;
   genCategory?: string | null;
+  audienceLane?: 'b2b' | 'b2c' | null;
+  audienceName?: string | null;
   body?: string | null;
   hashtags?: string[] | null;
   imageUrl?: string | null;

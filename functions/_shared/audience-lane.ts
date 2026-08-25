@@ -1,0 +1,71 @@
+import type { Env } from './env';
+import { getSql } from './db';
+
+let applied: Promise<void> | null = null;
+
+function isMissingLaneColumn(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /column ["']?lane["']? does not exist/i.test(msg);
+}
+
+/** 套用 017 受眾車道欄位。可重複執行;同 isolate 只跑一次。 */
+export async function ensureAudienceLane(env: Env): Promise<void> {
+  if (applied) return applied;
+  applied = (async () => {
+    const sql = getSql(env);
+    await sql`ALTER TABLE brand_audiences ADD COLUMN IF NOT EXISTS lane TEXT`;
+    await sql`ALTER TABLE brand_personas ADD COLUMN IF NOT EXISTS lane TEXT`;
+    await sql`DO $$ BEGIN
+      ALTER TABLE brand_audiences
+        ADD CONSTRAINT brand_audiences_lane_check
+        CHECK (lane IS NULL OR lane IN ('b2b', 'b2c'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`;
+    await sql`DO $$ BEGIN
+      ALTER TABLE brand_personas
+        ADD CONSTRAINT brand_personas_lane_check
+        CHECK (lane IS NULL OR lane IN ('b2b', 'b2c'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`;
+
+    await sql`
+      UPDATE brand_audiences SET lane = 'b2b'
+      WHERE lane IS NULL AND (
+        name ILIKE '%房東%' OR name ILIKE '%代管%' OR name ILIKE '%業者%'
+        OR name ILIKE '%店主%' OR name ILIKE '%B2B%' OR name ILIKE '%加盟%'
+        OR name ILIKE '%連鎖%'
+      )`;
+    await sql`
+      UPDATE brand_audiences SET lane = 'b2c'
+      WHERE lane IS NULL AND (
+        name ILIKE '%房客%' OR name ILIKE '%上班族%' OR name ILIKE '%家庭%'
+        OR name ILIKE '%衣物擁有%' OR name ILIKE '%學生%' OR name ILIKE '%爸媽%'
+      )`;
+    await sql`
+      UPDATE brand_personas p SET lane = 'b2b'
+      FROM brands b
+      WHERE p.brand_id = b.id AND p.lane IS NULL AND b.slug = 'taskgo'`;
+    await sql`
+      UPDATE brand_personas SET lane = 'b2b'
+      WHERE lane IS NULL AND (
+        name ILIKE '%老闆%' OR name ILIKE '%主任%' OR name ILIKE '%經理%'
+        OR name ILIKE '%房東%' OR name ILIKE '%物管%' OR name ILIKE '%師傅%'
+      )`;
+    await sql`
+      INSERT INTO brand_audiences (brand_id, brand_version_id, name, pain_points, appeal_angle, sort_order, lane)
+      SELECT p.brand_id, p.brand_version_id, p.name, p.pain_points, p.appeal_angle, p.sort_order, COALESCE(p.lane, 'b2b')
+      FROM brand_personas p
+      JOIN brands b ON b.id = p.brand_id
+      WHERE b.slug = 'taskgo'
+        AND NOT EXISTS (
+          SELECT 1 FROM brand_audiences a
+          WHERE a.brand_id = p.brand_id AND a.name = p.name
+        )`;
+  })();
+  try {
+    await applied;
+  } catch (e) {
+    applied = null;
+    throw e;
+  }
+}
+
+export { isMissingLaneColumn };

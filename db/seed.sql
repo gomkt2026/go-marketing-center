@@ -187,29 +187,33 @@ BEGIN
   -- ==========================================================================
   -- Brand Audiences / Personas
   -- ==========================================================================
-  INSERT INTO brand_audiences (brand_id, brand_version_id, name, pain_points, appeal_angle, sort_order) VALUES
-    (b_homigo, v_homigo_1, '自管房東(1~10間)', '["收租、報修、續約全靠自己記"]', '每天只看一眼的自動化', 1),
-    (b_homigo, v_homigo_1, '包租代管業者', '["多物件多房東,人力吃緊"]', '三視角管理、指揮中心、規模化', 2),
-    (b_homigo, v_homigo_1, '房客(20~40歲租屋族)', '["報修沒下文", "押金爭議", "信用無累積"]', '透明進度、HomiScore 信用資產', 3),
-    (b_washgo, v_washgo_1, '忙碌上班族/雙薪家庭', '["沒時間洗", "沒時間拿"]', '到府收送、LINE 下單、時間還給自己', 1),
-    (b_washgo, v_washgo_1, '精緻衣物擁有者', '["西裝、大衣、禮服、名牌怕洗壞"]', '專業品管、電子簽名、AI 洗護', 2),
-    (b_washgo, v_washgo_1, '傳統洗衣店主(B2B)', '["手寫單、電話聯絡、客源老化"]', '數位轉型零門檻、年輕客群從 LINE 進來', 3);
+  INSERT INTO brand_audiences (brand_id, brand_version_id, name, pain_points, appeal_angle, sort_order, lane) VALUES
+    (b_homigo, v_homigo_1, '自管房東(1~10間)', '["收租、報修、續約全靠自己記"]', '每天只看一眼的自動化', 1, 'b2b'),
+    (b_homigo, v_homigo_1, '包租代管業者', '["多物件多房東,人力吃緊"]', '三視角管理、指揮中心、規模化', 2, 'b2b'),
+    (b_homigo, v_homigo_1, '房客(20~40歲租屋族)', '["報修沒下文", "押金爭議", "信用無累積"]', '透明進度、HomiScore 信用資產', 3, 'b2c'),
+    (b_washgo, v_washgo_1, '忙碌上班族/雙薪家庭', '["沒時間洗", "沒時間拿"]', '到府收送、LINE 下單、時間還給自己', 1, 'b2c'),
+    (b_washgo, v_washgo_1, '精緻衣物擁有者', '["西裝、大衣、禮服、名牌怕洗壞"]', '專業品管、電子簽名、AI 洗護', 2, 'b2c'),
+    (b_washgo, v_washgo_1, '傳統洗衣店主(B2B)', '["手寫單、電話聯絡、客源老化"]', '數位轉型零門檻、年輕客群從 LINE 進來', 3, 'b2b'),
+    (b_taskgo, v_taskgo_1, '工程行老闆 / 工班頭(OWNER)', '["每天下午的今天做到哪奪命連環call", "排班燒腦", "月底才知道案子賠錢"]', '省時間、看得到錢、掌控感', 1, 'b2b'),
+    (b_taskgo, v_taskgo_1, '工地主任 / 專案經理(PM)', '["口頭交代大家都忘", "缺失追不完", "照片文件散在群組"]', '留紀錄、追改善、進度自動彙整', 2, 'b2b'),
+    (b_taskgo, v_taskgo_1, '現場師傅 / 工班成員', '["怕麻煩、怕學新東西", "請款單寫了沒下文"]', '不用裝APP、會傳早安圖就會用', 3, 'b2b'),
+    (b_taskgo, v_taskgo_1, '房東 / 物管(Homigo 受眾)', '["租客報修電話接不完", "找不到可靠廠商"]', '報修線上填單、案件自動派給TaskGo廠商', 5, 'b2b');
 
-  INSERT INTO brand_personas (brand_id, brand_version_id, code, name, age_range, profile, pain_points, appeal_angle, sort_order) VALUES
+  INSERT INTO brand_personas (brand_id, brand_version_id, code, name, age_range, profile, pain_points, appeal_angle, sort_order, lane) VALUES
     (b_taskgo, v_taskgo_1, 'P1', '工程行老闆 / 工班頭(OWNER)', '30-55',
       '同時管 3-10 個工地,手機不離身,LINE 群組幾十個',
       '["每天下午的今天做到哪奪命連環call", "排班燒腦", "月底才知道案子賠錢"]',
-      '省時間、看得到錢、掌控感', 1),
+      '省時間、看得到錢、掌控感', 1, 'b2b'),
     (b_taskgo, v_taskgo_1, 'P2', '工地主任 / 專案經理(PM)', NULL, NULL,
       '["口頭交代大家都忘", "缺失追不完", "照片文件散在群組"]',
-      '留紀錄、追改善、進度自動彙整', 2),
+      '留紀錄、追改善、進度自動彙整', 2, 'b2b'),
     (b_taskgo, v_taskgo_1, 'P3', '現場師傅 / 工班成員', '50-60',
       '含老師傅,「阮嘸會用APP啦」但LINE玩得很溜',
       '["怕麻煩、怕學新東西", "請款單寫了沒下文"]',
-      '不用裝APP、會傳早安圖就會用', 3),
+      '不用裝APP、會傳早安圖就會用', 3, 'b2b'),
     (b_taskgo, v_taskgo_1, 'P5', '房東 / 物管(Homigo 受眾)', NULL, NULL,
       '["租客報修電話接不完", "找不到可靠廠商"]',
-      '報修線上填單、案件自動派給TaskGo廠商', 5);
+      '報修線上填單、案件自動派給TaskGo廠商', 5, 'b2b');
 
   -- ==========================================================================
   -- Brand Rules(事實邊界 / 禁止事項 / 核准數據)

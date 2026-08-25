@@ -234,6 +234,7 @@ CREATE TABLE brand_audiences (
   name              TEXT NOT NULL,
   pain_points       JSONB NOT NULL DEFAULT '[]',     -- string[]
   appeal_angle      TEXT,
+  lane              TEXT CHECK (lane IS NULL OR lane IN ('b2b', 'b2c')),
   sort_order        INTEGER NOT NULL DEFAULT 0,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -254,6 +255,7 @@ CREATE TABLE brand_personas (
   profile           TEXT,
   pain_points       JSONB NOT NULL DEFAULT '[]',
   appeal_angle      TEXT,
+  lane              TEXT CHECK (lane IS NULL OR lane IN ('b2b', 'b2c')),
   sort_order        INTEGER NOT NULL DEFAULT 0,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()

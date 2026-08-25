@@ -54,7 +54,7 @@ export const api = {
       pressReleases: import('@/types').PressRelease[];
     }>(`/api/brands/${slug}/intelligence`),
 
-  // -- 品牌智慧圖片素材庫(系統畫面截圖/實拍照片,可當 Threads 圖片靈感貼文的話題來源) --------
+  // -- 品牌智慧圖片素材庫(系統畫面截圖/實拍照片,FB/IG/Threads 都可直接當配圖) --------
   brandAssets: (slug: string) =>
     request<{ assets: import('@/types').BrandAsset[] }>(`/api/brands/${slug}/assets`),
 
@@ -72,8 +72,11 @@ export const api = {
   deleteBrandAsset: (slug: string, assetId: string) =>
     request<{ ok: boolean }>(`/api/brands/${slug}/assets/${assetId}`, { method: 'DELETE' }),
 
-  generatePostFromAsset: (slug: string, assetId: string) =>
-    request<{ contentId: string }>(`/api/brands/${slug}/assets/${assetId}/generate-post`, { method: 'POST' }),
+  generatePostFromAsset: (slug: string, assetId: string, platform?: 'facebook' | 'instagram' | 'threads') =>
+    request<{ contentId: string; platform: string }>(`/api/brands/${slug}/assets/${assetId}/generate-post`, {
+      method: 'POST',
+      body: JSON.stringify({ platform: platform ?? 'threads' }),
+    }),
 
   brandWorkspace: (slug: string) =>
     request<{

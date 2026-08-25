@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { loadPublishedPrimaryCoverages, publishedCoveragePrompt } from './press';
+import { ensureAudienceLane, isMissingLaneColumn } from './audience-lane';
 
 // ============================================================================
 // 品牌第一線角色視角:讓 AI 用「行業最前端人員」的思維寫貼文,而不是 AI 腔
@@ -17,10 +18,27 @@ export interface BrandVoice {
   threadsCraft?: string;
   /** Threads 貼文字數硬上限(超過會要求模型縮短重寫一次) */
   threadsMaxChars?: number;
-  /** 配圖風格方向(附加到圖片生成 prompt) */
+  /** 配圖風格方向(附加到圖片生成 prompt;C 端插畫或品牌紀實參考) */
   imageStyle?: string;
-  /** 圖片呈現方式:photo 走寫實攝影(預設);illustration 走插畫風(不套 photorealistic) */
+  /** B 端寫實攝影參考(門市/後台/工地操作感);沒有就退回 imageStyle */
+  imageStyleB2b?: string;
+  /** 業者每天會煩的事,給 FB/IG B 端主題挑選用 */
+  operatorConcerns?: string;
+  /**
+   * Threads C 端預設呈現方式。不再鎖全平台:
+   * illustration 只在 Threads C 端或明確選 illustration 風格時使用。
+   */
   imageRendering?: 'photo' | 'illustration';
+}
+
+export type AudienceLane = 'b2b' | 'b2c';
+export type ImageStyleId = 'photo' | 'design' | 'illustration';
+
+export interface AudiencePick {
+  name: string;
+  lane: AudienceLane;
+  painPoints: unknown;
+  appealAngle: string | null;
 }
 
 const BRAND_VOICES: Record<string, BrandVoice> = {
@@ -32,6 +50,7 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '品牌定位:Homigo 不是收租工具,而是在整理「租屋關係、租屋紀錄、租屋信任、租屋流程」;' +
       '品牌核心句:「把原本散落的事情,重新整理回同一個地方。」寫文時的立場永遠是先同理租屋的混亂,再談整理。',
     dailyConcerns: '租屋補助、租金行情、惡房東/惡房客糾紛、修繕責任、租約公證、包租代管節稅、社宅政策',
+    operatorConcerns: '多物件收租對帳、報修指揮中心、合約續約、代管人力吃緊、房客報修沒下文被倒灌、銀行對帳',
     contentCraft:
       '寫深度文時遵守這個範式(高互動房產帳號的寫法):' +
       '1. 開頭用一個數字或反直覺句當鉤子,例如「90%的房東,都低估了老屋出租前要花的錢」,禁止暖場鋪陳。' +
@@ -50,6 +69,7 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '請不到人;師傅在意薪水日結、工地安全、被業主嫌東嫌西。' +
       '你講話直接、江湖味、帶點工地幽默,句子短,不文謅謅。',
     dailyConcerns: '裝修行情、料價漲跌、缺工、工安、業主溝通、驗收糾紛、老屋翻新、廚衛改造',
+    operatorConcerns: '派工排程、下午奪命連環 call、月底才知案子賠錢、LINE 群組考古、請款單沒下文、現場回報散落',
     contentCraft:
       '寫深度文時遵守這個範式(高互動裝修帳號的寫法):' +
       '1. 標題可用專欄式:「工班管理學|一組不好的工班,真的可以毀掉一整個案子」「老屋預算學|是不是少一個 0?」。' +
@@ -71,6 +91,12 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
     dailyConcerns:
       '換季送洗、汙漬急救、名牌衣物保養、羽絨被清洗、梅雨天曬不乾、洗衣標籤看不懂、' +
       '包租代管與民宿的床單布巾送洗、飯店與醫院的大量制服清洗、上班族與媽媽的送洗時間困擾',
+    operatorConcerns:
+      '手寫單據對不攏、多門市調撥、司機派遣與運費、客源老化、價目管理、品管掃碼、LINE 會員經營、平台導流',
+    imageStyleB2b:
+      'Documentary photography of Taiwanese laundry-shop operations: garment racks, folding tables, receipt counters, ' +
+      'delivery scooters at the alley, staff scanning tags; muted warm tones, quiet workplace dignity. ' +
+      'The workspace or a clean system screen can be the subject; people are optional.',
     threadsCraft:
       'Washgo 的 Threads 專屬規則(與通用規則衝突時,以這裡為準):' +
       '1. 字數嚴格控制在 60-120 字,絕對不超過 150 字。2-4 個短段落、一句一行的節奏,讀者滑到 10 秒內就能讀完;寧短勿長。' +
@@ -96,6 +122,115 @@ export function getBrandVoice(slug: string): BrandVoice {
     frontlinePersona: '你是這個品牌的第一線從業人員,用客戶每天真正關心的話題與口吻寫文。',
     dailyConcerns: '',
   };
+}
+
+/** FB/IG 預設 B 端,Threads 預設 C 端(平台分工衝觸及) */
+export function defaultAudienceLane(platform: 'facebook' | 'instagram' | 'threads' | 'x'): AudienceLane {
+  return platform === 'threads' ? 'b2c' : 'b2b';
+}
+
+const B2B_LANE_INSTRUCTIONS: Record<string, string> = {
+  washgo:
+    '【本篇受眾車道:B 端】只寫給洗衣業者(店主/連鎖/想加盟者),不要寫成媽媽加班或上班族送洗故事。' +
+    '你現在是懂洗衣連鎖營運的夥伴,不是櫃檯店員跟消費者聊天。' +
+    '用店裡手寫單、電話對單、多門市調撥、司機派車、客源老化的具體場景。語氣專業 7、親切 3。' +
+    'CTA 只准官網 https://washgo.com.tw 或 hello@washgo.com.tw,禁止導向 @washgo LINE 下單。' +
+    '禁止「可愛洗衣機」「懶人福音」「加班到十點的媽媽」。' +
+    '可提 Go 生態系(Homigo 布巾案源、三平台同一條資訊流),但只能引用下方 Collaboration Brief 已有的事實;沒有 Brief 就不要提其他品牌。',
+  homigo:
+    '【本篇受眾車道:B 端】只寫給自管房東或包租代管業者,不是房客吐槽文。' +
+    '場景放在收租對帳、報修指揮中心、合約續約、多物件人力。' +
+    '先同理房東/代管的混亂,再談整理回同一個地方。不要寫成租客權益文。',
+  taskgo:
+    '【本篇受眾車道:B 端】只寫給工程行老闆、工班頭或工地主任。' +
+    '場景放在派工排程、成本、LINE 現場回報、月底才知賠錢。' +
+    '用後台/系統畫面感說話,少寫純工地風景抒情。立場站在做工的人這邊。',
+};
+
+const B2C_LANE_INSTRUCTIONS: Record<string, string> = {
+  washgo:
+    '【本篇受眾車道:C 端】說話對象是有送洗需求的人(上班族、媽媽、租屋族)。維持親切口語,一篇只講一件事。',
+  homigo:
+    '【本篇受眾車道:C 端】可以從房客或租屋日常切入,但不要假裝 Homigo 只做 C 端生活品牌。',
+  taskgo:
+    '【本篇受眾車道:C 端】若要寫現場師傅日常,仍要讓人感覺這是工班在用的工具,不是消費生活帳號。',
+};
+
+const FALLBACK_AUDIENCES: Record<string, Record<AudienceLane, AudiencePick>> = {
+  washgo: {
+    b2b: { name: '傳統洗衣店主(B2B)', lane: 'b2b', painPoints: ['手寫單、電話聯絡、客源老化'], appealAngle: '數位轉型零門檻、年輕客群從 LINE 進來' },
+    b2c: { name: '忙碌上班族/雙薪家庭', lane: 'b2c', painPoints: ['沒時間洗', '沒時間拿'], appealAngle: '到府收送、LINE 下單、時間還給自己' },
+  },
+  homigo: {
+    b2b: { name: '自管房東(1~10間)', lane: 'b2b', painPoints: ['收租、報修、續約全靠自己記'], appealAngle: '每天只看一眼的自動化' },
+    b2c: { name: '房客(20~40歲租屋族)', lane: 'b2c', painPoints: ['報修沒下文', '押金爭議'], appealAngle: '透明進度、HomiScore 信用資產' },
+  },
+  taskgo: {
+    b2b: { name: '工程行老闆 / 工班頭', lane: 'b2b', painPoints: ['排班燒腦', '月底才知道案子賠錢'], appealAngle: '省時間、看得到錢、掌控感' },
+    b2c: { name: '現場師傅 / 工班成員', lane: 'b2c', painPoints: ['怕學新東西', '請款單沒下文'], appealAngle: '不用裝 APP、會傳早安圖就會用' },
+  },
+};
+
+export function audienceLaneInstruction(slug: string, lane: AudienceLane): string {
+  const table = lane === 'b2b' ? B2B_LANE_INSTRUCTIONS : B2C_LANE_INSTRUCTIONS;
+  return table[slug] ?? (lane === 'b2b'
+    ? '【本篇受眾車道:B 端】只寫給會付錢買系統的業者,不要寫成一般消費者生活文。'
+    : '【本篇受眾車道:C 端】寫給會使用這個服務的個人,口語、有生活場景。');
+}
+
+export async function pickAudience(env: Env, brandId: string, slug: string, lane: AudienceLane): Promise<AudiencePick> {
+  const fallback = FALLBACK_AUDIENCES[slug]?.[lane] ?? {
+    name: lane === 'b2b' ? '業者' : '使用者',
+    lane,
+    painPoints: [],
+    appealAngle: null,
+  };
+  try {
+    await ensureAudienceLane(env);
+  } catch (e) {
+    console.error('[audience] ensureAudienceLane 失敗,改用 fallback', e);
+    return fallback;
+  }
+  const sql = getSql(env);
+  try {
+    const audienceRows = await sql`
+      SELECT name, lane, pain_points, appeal_angle FROM brand_audiences
+      WHERE brand_id = ${brandId}::uuid AND lane = ${lane}
+      ORDER BY random() LIMIT 1
+    `;
+    if (audienceRows.length) {
+      const row = audienceRows[0] as { name: string; lane: AudienceLane; pain_points: unknown; appeal_angle: string | null };
+      return { name: row.name, lane, painPoints: row.pain_points, appealAngle: row.appeal_angle };
+    }
+    const personaRows = await sql`
+      SELECT name, lane, pain_points, appeal_angle FROM brand_personas
+      WHERE brand_id = ${brandId}::uuid AND lane = ${lane}
+      ORDER BY random() LIMIT 1
+    `;
+    if (personaRows.length) {
+      const row = personaRows[0] as { name: string; lane: AudienceLane; pain_points: unknown; appeal_angle: string | null };
+      return { name: row.name, lane, painPoints: row.pain_points, appealAngle: row.appeal_angle };
+    }
+  } catch (e) {
+    if (!isMissingLaneColumn(e)) console.error('[audience] pickAudience 查詢失敗', e);
+  }
+  return fallback;
+}
+
+/** B 端沒素材時,設計圖/寫實輪替;C 端 Threads(Washgo)維持可愛插畫 */
+export function pickImageStyle(params: {
+  platform: 'facebook' | 'instagram' | 'threads';
+  lane: AudienceLane;
+  brandSlug: string;
+  recentStyles?: ImageStyleId[];
+}): ImageStyleId {
+  if (params.brandSlug === 'washgo' && params.platform === 'threads' && params.lane === 'b2c') {
+    return 'illustration';
+  }
+  const pool: ImageStyleId[] = params.lane === 'b2b' ? ['photo', 'design'] : ['photo', 'design', 'illustration'];
+  const filtered = pool.filter((s) => !(params.recentStyles ?? []).includes(s));
+  const candidates = filtered.length ? filtered : pool;
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 // ============================================================================
@@ -298,12 +433,35 @@ export const HOMIGO_IG_IMAGE_STYLE = [
 export const HOMIGO_TEXT_MARK_RULE =
   '【品牌標】畫面左下角或 footer 放小小的深藍色「Homigo」文字標,乾淨、不可過大、不可貼底。';
 
-/** Washgo Threads 專用:每篇必配一張可愛插畫衝曝光(短文 + 可愛圖是流量策略核心) */
+/** 各品牌 B 端「社群設計圖」規格(痛點主標 + 系統 UI 卡);Homigo 沿用既有 IG 規範 */
+export const BRAND_DESIGN_IMAGE_STYLE: Record<string, string> = {
+  homigo: HOMIGO_IG_IMAGE_STYLE,
+  washgo: [
+    '【設計規格】方形或 4:5 直式社群設計圖。深藍(#1D4F8C)為主色,品牌藍(#3A8DDE)做層次,金橘(#FFB84D)只做重點強調。',
+    '大面積留白,文字不可貼邊。第一眼是一句 4-10 字繁中痛點主標(例如「手寫單對不攏」「衣服洗到哪沒人知」);第二眼是洗衣店後場或櫃檯情境;第三眼才是簡潔的系統畫面卡。',
+    '【手機UI】白底、一個 2-4 字功能標題(如「送洗履歷」「門市調撥」),其餘用灰色線條示意,禁止小號文字與數字(小字會變亂碼)。',
+    '【文字防呆】圖上所有文字必須是正確台灣繁體中文,整張不超過 5 個文字元素。不要吉卜力卡通、不要笑臉洗衣機。',
+  ].join('\n'),
+  taskgo: [
+    '【設計規格】方形或 4:5 直式社群設計圖。深灰底或米白底,橘色(#ED9121)只做重點強調。',
+    '第一眼是一句 4-10 字繁中痛點主標(例如「今天做到哪」「月底才知賠」);第二眼是工地或後台情境;第三眼才是派工/回報系統畫面卡。',
+    '【手機UI】白底、一個 2-4 字功能標題(如「派工佇列」「現場回報」),其餘用灰色線條示意,禁止小號文字與數字。',
+    '【文字防呆】圖上所有文字必須是正確台灣繁體中文,整張不超過 5 個文字元素。不要電商廣告感。',
+  ].join('\n'),
+};
+
+/** Washgo Threads 專用:每篇必配一張可愛插畫衝曝光(短文 + 可愛圖是流量策略核心;只用於 Threads C 端) */
 export const WASHGO_THREADS_IMAGE_PROMPT_SPEC =
   '"imagePrompt": "必填:Washgo 的 Threads 每篇都要配一張「可愛系插畫」來增加曝光。' +
   '給圖片生成模型的英文描述:畫出這篇貼文主題的療癒場景,構圖要簡單、主體只有一個、一眼看懂' +
   '(例如圓滾滾有笑臉的洗衣機、蓬鬆的羽絨被、疊得整齊的毛巾山、幫忙摺衣服的小幫手角色),' +
   '讓人滑到會停下來按讚的可愛程度,不含文字"';
+
+const DESIGN_IMAGE_PROMPT_SPEC =
+  '"imagePrompt": "必填:這張圖是「社群設計圖」(不是純照片)。請用繁體中文描述三個元素:' +
+  '1) 主標文字:從貼文提煉一句 4-10 字、有情緒、會直接印在圖上的痛點短句;' +
+  '2) 情境畫面:業者真實會遇到的疲憊或忙亂場景,自然表情、不要商業假笑;' +
+  '3) 解法元素:一個簡潔白底的系統畫面(只顯示一個 2-4 字功能標題)"';
 
 /** 各平台配圖描述的要求:FB 走寫實攝影、IG 走溫暖插畫/自然攝影,Threads 預設純文字、AI 判斷有圖更好才選填 */
 const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = {
@@ -322,29 +480,64 @@ const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = 
     '給圖片生成模型的英文描述,描繪一個溫暖可愛、有台灣生活感的場景,不含文字"',
 };
 
+function resolveImagePromptSpec(params: {
+  platform: 'facebook' | 'instagram' | 'threads';
+  brandSlug?: string;
+  imageStyle?: ImageStyleId;
+  skipImagePrompt?: boolean;
+  lane?: AudienceLane;
+}): string {
+  if (params.skipImagePrompt) return '';
+  const slug = params.brandSlug;
+  const style = params.imageStyle;
+  if (style === 'design' || (slug === 'homigo' && params.platform === 'instagram' && !style)) {
+    return DESIGN_IMAGE_PROMPT_SPEC;
+  }
+  if (slug === 'washgo' && params.platform === 'threads' && (params.lane ?? 'b2c') === 'b2c') {
+    return WASHGO_THREADS_IMAGE_PROMPT_SPEC;
+  }
+  if (style === 'illustration') {
+    return '"imagePrompt": "必填:給圖片生成模型的英文描述,走溫暖手繪插畫,主體單一、一眼看懂,不含文字"';
+  }
+  if (style === 'photo') return IMAGE_PROMPT_SPEC.facebook;
+  return IMAGE_PROMPT_SPEC[params.platform];
+}
+
 export function buildPostUserPrompt(params: {
   platform: 'facebook' | 'instagram' | 'threads';
   topic: string;
   topicSummary?: string;
   extraInstruction?: string;
   brandSlug?: string;
+  audienceLane?: AudienceLane;
+  audienceName?: string;
+  imageStyle?: ImageStyleId;
+  skipImagePrompt?: boolean;
 }): string {
   const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
   const guideline = params.platform === 'threads' && voice?.threadsCraft
     ? `${PLATFORM_GUIDELINES.threads}\n${voice.threadsCraft}`
     : PLATFORM_GUIDELINES[params.platform];
-  const imageSpec = params.brandSlug === 'homigo' && params.platform === 'instagram'
-    ? HOMIGO_IG_IMAGE_PROMPT_SPEC
-    : params.brandSlug === 'washgo' && params.platform === 'threads'
-      ? WASHGO_THREADS_IMAGE_PROMPT_SPEC
-      : IMAGE_PROMPT_SPEC[params.platform];
+  const lane = params.audienceLane;
+  const laneBlock = lane && params.brandSlug
+    ? [
+        audienceLaneInstruction(params.brandSlug, lane),
+        params.audienceName ? `本篇主受眾:${params.audienceName}。整篇只對這一個對象說話,不要同時討好 B 端與 C 端。` : '',
+      ].filter(Boolean).join('\n')
+    : '';
+  const imageSpec = resolveImagePromptSpec({
+    platform: params.platform, brandSlug: params.brandSlug,
+    imageStyle: params.imageStyle, skipImagePrompt: params.skipImagePrompt, lane,
+  });
   return [
     `請針對以下主題,為 ${params.platform} 平台寫一篇貼文。`,
     `主題:${params.topic}`,
     params.topicSummary ? `主題背景:${params.topicSummary}` : '',
     '',
     guideline,
+    laneBlock,
     params.extraInstruction ?? '',
+    params.skipImagePrompt ? '配圖已指定為品牌上傳的真實截圖或實拍,不要提供 imagePrompt。' : '',
     '',
     '回傳 JSON 物件,格式:',
     `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${imageSpec ? `, ${imageSpec}` : ''}}`,
@@ -360,26 +553,48 @@ const IMAGE_CATEGORY_LABEL: Record<string, string> = {
   other: '其他素材',
 };
 
-/** image_inspired 類型專用:給模型看圖寫 Threads 貼文的文字指示(需搭配 image_url content part 一起送) */
+/** 看圖寫貼文的文字指示(需搭配 image_url content part 一起送);FB/IG/Threads 共用 */
+export function buildImageInspiredPostPrompt(params: {
+  platform: 'facebook' | 'instagram' | 'threads';
+  caption?: string;
+  imageCategory?: string;
+  brandSlug?: string;
+  audienceLane?: AudienceLane;
+  audienceName?: string;
+}): string {
+  const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
+  const guideline = params.platform === 'threads' && voice?.threadsCraft
+    ? `${PLATFORM_GUIDELINES.threads}\n${voice.threadsCraft}`
+    : PLATFORM_GUIDELINES[params.platform];
+  const categoryLabel = params.imageCategory ? IMAGE_CATEGORY_LABEL[params.imageCategory] ?? '素材照片' : '素材照片';
+  const lane = params.audienceLane ?? defaultAudienceLane(params.platform);
+  const laneBlock = params.brandSlug
+    ? [
+        audienceLaneInstruction(params.brandSlug, lane),
+        params.audienceName ? `本篇主受眾:${params.audienceName}。` : '',
+      ].filter(Boolean).join('\n')
+    : '';
+  return [
+    `這是品牌上傳的一張${categoryLabel}${params.caption ? `,說明:${params.caption}` : ''}。`,
+    `請仔細看這張圖,挑一個畫面裡真的有的細節或情境當鉤子,寫一篇 ${params.platform} 貼文。`,
+    '不要憑空描述圖片裡沒有的東西,也不要寫成單純的圖片說明文;要像有人真的看到/用到這個畫面後,寫下的一則真實感想或分享。',
+    '',
+    guideline,
+    laneBlock,
+    '',
+    '回傳 JSON 物件:',
+    '{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"}',
+  ].filter(Boolean).join('\n');
+}
+
+/** @deprecated 改用 buildImageInspiredPostPrompt */
 export function buildImageInspiredThreadsPrompt(params: {
   platform: 'threads';
   caption?: string;
   imageCategory?: string;
   brandSlug?: string;
 }): string {
-  const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
-  const guideline = voice?.threadsCraft ? `${PLATFORM_GUIDELINES.threads}\n${voice.threadsCraft}` : PLATFORM_GUIDELINES.threads;
-  const categoryLabel = params.imageCategory ? IMAGE_CATEGORY_LABEL[params.imageCategory] ?? '素材照片' : '素材照片';
-  return [
-    `這是品牌上傳的一張${categoryLabel}${params.caption ? `,說明:${params.caption}` : ''}。`,
-    '請仔細看這張圖,挑一個畫面裡真的有的細節或情境當鉤子,寫一篇 Threads 貼文。',
-    '不要憑空描述圖片裡沒有的東西,也不要寫成單純的圖片說明文;要像有人真的看到/用到這個畫面後,寫下的一則真實感想或分享。',
-    '',
-    guideline,
-    '',
-    '回傳 JSON 物件:',
-    '{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"}',
-  ].join('\n');
+  return buildImageInspiredPostPrompt(params);
 }
 
 // ============================================================================

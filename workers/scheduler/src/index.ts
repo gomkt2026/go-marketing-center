@@ -6,11 +6,13 @@ import {
   buildBrandContext, getBrandVoice, ANTI_AI_RULES,
   THREADS_HOURLY_CATEGORIES, pickThreadsHourlyCategory, type ThreadsHourlyCategoryId,
   buildCollaborationContext, findEcosystemCollaborationId, pickEcosystemXAngle,
+  pickAudience, audienceLaneInstruction,
 } from '../../../functions/_shared/prompts';
 import {
   generatePlatformPost, generateOfftopicPost, generateThreadsFromImage,
   saveGeneratedContent, findBrandAgent, type SocialPlatform,
   generateEcosystemXPost, saveEcosystemXContent, findEcosystemAgent,
+  pickBrandScreenshot, SPOTLIGHT_SLUG,
 } from '../../../functions/_shared/generate';
 import { getThreadsAccount, publishThreadsPost, searchThreadsPosts, type ThreadsSearchPost } from '../../../functions/_shared/threads';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage } from '../../../functions/_shared/meta';
@@ -314,7 +316,7 @@ async function generateSignalDrafts(env: Env): Promise<void> {
         sourceMarketSignalId: signal.id,
         generatedByAgentId: agentId,
         status: 'draft',
-        promptMeta: { source: 'auto_signal', signalId: signal.id },
+        promptMeta: { source: 'auto_signal', signalId: signal.id, audienceLane: result.audienceLane, audienceName: result.audienceName },
       });
       await logActivity(env, {
         brandId: signal.brand_id,
@@ -424,6 +426,7 @@ async function generateThreadsSlot(env: Env, slotAt: Date): Promise<void> {
           imageUrl: publicImageUrl,
           caption: candidateImage.caption ?? undefined,
           imageCategory: candidateImage.image_category ?? undefined,
+          assetId: candidateImage.id,
         });
       } else {
         const trendsBlock = [
@@ -438,6 +441,7 @@ async function generateThreadsSlot(env: Env, slotAt: Date): Promise<void> {
           platform: 'threads',
           topic,
           extraInstruction: category.instruction.replace('{{TRENDS}}', trendsBlock),
+          audienceLane: 'b2c',
         });
       }
 
@@ -452,19 +456,15 @@ async function generateThreadsSlot(env: Env, slotAt: Date): Promise<void> {
         status: willAutoPublish ? 'scheduled' : 'pending_review',
         promptMeta: {
           source: 'threads_hourly', category: category.id, trends: trends.map((t) => t.title), socialTopics,
-          slotAt: slotAt.toISOString(), assetId: category.id === 'image_inspired' && candidateImage ? candidateImage.id : undefined,
+          slotAt: slotAt.toISOString(),
+          audienceLane: 'b2c',
+          audienceName: result.audienceName,
+          assetId: category.id === 'image_inspired' && candidateImage ? candidateImage.id : undefined,
         },
         imageAssetMeta: category.id === 'image_inspired' && candidateImage
           ? { sourceAssetId: candidateImage.id, generated: false, reused: true }
           : undefined,
       });
-
-      if (candidateImage && category.id === 'image_inspired') {
-        await sql`
-          UPDATE brand_assets SET used_in_threads_count = used_in_threads_count + 1, last_used_at = now()
-          WHERE id = ${candidateImage.id}::uuid
-        `;
-      }
 
       if (willAutoPublish) {
         await sql`
@@ -535,7 +535,7 @@ async function generateThreadsOfftopicSlot(env: Env, slotAt: Date): Promise<void
         result,
         generatedByAgentId: agentId,
         status: willAutoPublish ? 'scheduled' : 'pending_review',
-        promptMeta: { source: 'threads_offtopic', slotAt: slotAt.toISOString() },
+        promptMeta: { source: 'threads_offtopic', slotAt: slotAt.toISOString(), audienceLane: 'b2c' },
       });
 
       if (willAutoPublish) {
@@ -841,18 +841,21 @@ async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
       .map((s, i) => `${i + 1}. ${s.title}${s.summary ? ` — ${s.summary}` : ''}`)
       .join('\n');
     const usedThemes = (usedThemeRows as { theme: string | null }[]).map((r) => r.theme).filter(Boolean);
+    const audience = await pickAudience(env, brand.id, brand.slug, 'b2b');
 
     const theme = await chatCompleteJson<{ theme: string; angle: string; summary: string }>(env, {
       temperature: 0.6,
       messages: [
-        { role: 'system', content: `你是品牌「${brand.name}」的內容企劃。${voice.frontlinePersona}` },
+        { role: 'system', content: `你是品牌「${brand.name}」的內容企劃。今天的 FB/IG 圖文只寫給業者/SaaS 買家,不是一般消費者。${audienceLaneInstruction(brand.slug, 'b2b')}` },
         {
           role: 'user',
           content: [
             '請從以下近期情報歸納出「一個」今天最值得做 FB+IG 圖文的主題。',
-            signalText || '(目前沒有新情報,請從行業日常議題自選一個)',
+            '這篇是寫給業者的:手寫單、派工、對帳、多門市、客源、系統操作。不要出換季、媽媽加班、羽絨被這類 C 端生活題。',
+            `主受眾:${audience.name}。痛點:${JSON.stringify(audience.painPoints)}。訴求:${audience.appealAngle ?? ''}`,
+            signalText || '(目前沒有新情報,請從業者日常痛點自選一個)',
             usedThemes.length ? `今天已做過的主題(不要重複):${usedThemes.join('、')}` : '',
-            `這個行業的日常話題:${voice.dailyConcerns}`,
+            `業者每天在煩的事:${voice.operatorConcerns ?? voice.dailyConcerns}`,
             '',
             '回傳 JSON:{"theme":"主題標題","angle":"切入角度一句話","summary":"主題背景說明(100字內)"}',
           ].filter(Boolean).join('\n'),
@@ -870,7 +873,9 @@ async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
           brandCtx, platform,
           topic: theme.theme,
           topicSummary: theme.summary,
-          extraInstruction: `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。`,
+          extraInstruction: `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。主受眾:${audience.name}。`,
+          audienceLane: 'b2b',
+          audienceName: audience.name,
         });
 
         // 帳號開啟排程自動發布 → 生成後存 scheduled 排程,由 publishDueJobs 在 slotAt 到時真正發布;否則存待審核
@@ -882,7 +887,10 @@ async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
           brandCtx, platform, result,
           generatedByAgentId: agentId,
           status: willAutoPublish ? 'scheduled' : 'pending_review',
-          promptMeta: { source: DAILY_THEME_SOURCE, theme: theme.theme, themeKey, slotAt: slotAt.toISOString() },
+          promptMeta: {
+            source: DAILY_THEME_SOURCE, theme: theme.theme, themeKey, slotAt: slotAt.toISOString(),
+            audienceLane: 'b2b', audienceName: audience.name,
+          },
         });
 
         if (willAutoPublish) {
@@ -959,6 +967,12 @@ const ECOSYSTEM_ANGLES: Record<string, EcosystemAngle[]> = {
   ],
   washgo: [
     {
+      platform: 'facebook',
+      instruction: '這篇寫給洗衣店主/連鎖業者:加入 Washgo 平台後,可以接到 Homigo 包租代管的床單布巾案源,' +
+        '訂單、調撥、司機都在同一套系統。用業者會懂的場景開頭,不要寫成房客或媽媽送洗文。' +
+        'CTA 只准官網或 hello@washgo.com.tw。',
+    },
+    {
       platform: 'threads',
       instruction: '這篇提一下:透過 Homigo 管理房子的租屋族,也可以用 Washgo 到府收送洗衣服務,' +
         '或者 GoCoin 跨品牌點數可以在 Washgo 折抵。用短文、輕鬆口吻帶出,60-120 字內。',
@@ -1005,12 +1019,14 @@ async function generateEcosystemCrossPromo(env: Env, slotAt: Date): Promise<void
     const brandCtx = await buildBrandContext(env, brand.id);
     const agentId = await findBrandAgent(env, brand.id);
 
+    const ecoLane = angle.platform === 'threads' ? 'b2c' as const : 'b2b' as const;
     const result = await generatePlatformPost(env, {
       brandCtx,
       platform: angle.platform,
       topic: 'Go 生態系跨品牌導流內容',
       extraInstruction: angle.instruction,
       collaborationContext,
+      audienceLane: ecoLane,
     });
 
     const account = angle.platform === 'threads'
@@ -1022,7 +1038,10 @@ async function generateEcosystemCrossPromo(env: Env, slotAt: Date): Promise<void
       brandCtx, platform: angle.platform, result,
       generatedByAgentId: agentId,
       status: willAutoPublish ? 'scheduled' : 'pending_review',
-      promptMeta: { source: ECOSYSTEM_CROSS_PROMO_SOURCE, collaborationId: collabId, slotAt: slotAt.toISOString() },
+      promptMeta: {
+        source: ECOSYSTEM_CROSS_PROMO_SOURCE, collaborationId: collabId, slotAt: slotAt.toISOString(),
+        audienceLane: ecoLane, audienceName: result.audienceName,
+      },
     });
 
     if (willAutoPublish) {
@@ -1083,7 +1102,13 @@ async function generateEcosystemXPostSlot(env: Env, slotAt: Date): Promise<void>
     const angle = pickEcosystemXAngle(recentAngleIds);
 
     const agentId = await findEcosystemAgent(env);
-    const result = await generateEcosystemXPost(env, { angle, collaborationContext });
+    const spotlightSlug = SPOTLIGHT_SLUG[angle.id];
+    const screenshot = spotlightSlug ? await pickBrandScreenshot(env, spotlightSlug).catch(() => null) : null;
+    const result = await generateEcosystemXPost(env, {
+      angle, collaborationContext,
+      screenshotUrl: screenshot?.fileUrl,
+      screenshotAssetId: screenshot?.id,
+    });
 
     const account = await getXAccount(env, collabId);
     const willAutoPublish = !!account?.autoPublish;

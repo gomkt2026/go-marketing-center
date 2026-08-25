@@ -189,6 +189,8 @@ export function Schedule() {
                         {item.genCategory && (
                           <Badge tone="accent">{genCategoryLabel[item.genCategory] ?? item.genCategory}</Badge>
                         )}
+                        {item.audienceLane === 'b2b' && <Badge tone="primary">B 端</Badge>}
+                        {item.audienceLane === 'b2c' && <Badge tone="default">C 端</Badge>}
                       </div>
                       <p
                         style={{
@@ -217,6 +219,7 @@ export function Schedule() {
                             </div>
                           )}
                           <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', display: 'grid', gap: 2, marginBottom: 6 }}>
+                            {item.audienceName && <span>主受眾:{item.audienceName}</span>}
                             {item.scheduledAt && <span>排定發布:{formatFullTime(item.scheduledAt)}</span>}
                             {item.publishedAt && <span>實際發布:{formatFullTime(item.publishedAt)}</span>}
                             <span>建立時間:{formatFullTime(item.createdAt)}</span>

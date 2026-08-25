@@ -21,6 +21,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const content = contentRows[0] as {
     id: string; brand_id: string; title: string | null; target_platform: string | null;
     source_market_signal_id: string | null;
+    generation_prompt_meta?: { audienceLane?: 'b2b' | 'b2c'; audienceName?: string };
   };
 
   const platform = (content.target_platform ?? 'facebook') as SocialPlatform;
@@ -56,6 +57,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   const result = await generatePlatformPost(context.env, {
     brandCtx, platform, topic, topicSummary, extraInstruction,
+    audienceLane: content.generation_prompt_meta?.audienceLane,
+    audienceName: content.generation_prompt_meta?.audienceName,
   });
 
   const nextVersion = (latest?.version_number ?? 0) + 1;

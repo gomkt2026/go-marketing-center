@@ -1,7 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { getThreadsAccount } from './threads';
-import { getMetaAccount } from './meta';
+import { getMetaAccount, resolvePageToken, type MetaAccount } from './meta';
 import { getXAccount, refreshXToken } from './x';
 
 const THREADS_API = 'https://graph.threads.net/v1.0';
@@ -140,10 +140,11 @@ async function fetchThreadsInsights(account: { accessToken: string }, postId: st
   };
 }
 
-async function fetchFacebookInsights(account: { accessToken: string }, postId: string): Promise<NormalizedMetrics> {
+async function fetchFacebookInsights(account: MetaAccount, postId: string): Promise<NormalizedMetrics> {
+  const pageToken = await resolvePageToken(account);
   const params = new URLSearchParams({
     metric: 'post_impressions,post_clicks,post_engaged_users',
-    access_token: account.accessToken,
+    access_token: pageToken,
   });
   const insights = await fetchJson(`${GRAPH_API}/${encodeURIComponent(postId)}/insights?${params}`);
   const mapped = insights.ok
@@ -152,11 +153,17 @@ async function fetchFacebookInsights(account: { accessToken: string }, postId: s
 
   const fields = new URLSearchParams({
     fields: 'shares,comments.summary(true),reactions.summary(true)',
-    access_token: account.accessToken,
+    access_token: pageToken,
   });
   const post = await fetchJson(`${GRAPH_API}/${encodeURIComponent(postId)}?${fields}`);
   if (!insights.ok && !post.ok) {
-    throw new Error(`Facebook 成效回收失敗 (${insights.status}): ${JSON.stringify(insights.data).slice(0, 220)}`);
+    const raw = JSON.stringify(insights.data);
+    const needPageToken = raw.includes('2069032') || raw.includes('不支援用戶存取權杖');
+    throw new Error(
+      needPageToken
+        ? 'Facebook 新版粉專必須用粉絲專頁權杖回收成效。請到設定重新貼上 Page Access Token(不要用個人 User Token)。'
+        : `Facebook 成效回收失敗 (${insights.status}): ${raw.slice(0, 220)}`,
+    );
   }
 
   const shares = Number((post.data.shares as { count?: number } | undefined)?.count ?? 0);
@@ -336,7 +343,8 @@ async function resolveMediaId(job: PublishedJob, accounts: AccountBundle): Promi
     if (fromUrl) return fromUrl;
     if (!accounts.facebook) throw new Error('尚未連接 Facebook 帳號');
     if (!accounts.permalinkIds.facebook) {
-      const token = encodeURIComponent(accounts.facebook.accessToken);
+      const pageToken = await resolvePageToken(accounts.facebook);
+      const token = encodeURIComponent(pageToken);
       const pageId = encodeURIComponent(accounts.facebook.externalId);
       const fromPosts = await fetchPermalinkMap(
         `${GRAPH_API}/${pageId}/published_posts?fields=id,permalink_url&limit=50&access_token=${token}`,

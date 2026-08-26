@@ -874,8 +874,8 @@ async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
           topic: theme.theme,
           topicSummary: theme.summary,
           extraInstruction: platform === 'instagram'
-            ? `切入角度:${theme.angle}。這是今天的每日主題貼文。IG:第一句=顧客搜得到的痛點,圖上主標與第一句同義,整篇只打一個標籤主題。主受眾:${audience.name}。`
-            : `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。主受眾:${audience.name}。`,
+            ? `切入角度:${theme.angle}。這是今天的每日主題貼文。IG:第一句=顧客搜得到的痛點,整篇只打一個標籤主題。配圖優先真實系統畫面或簡報風畫面卡,不要 AI 煩惱店員海報。文案結尾要有明確匠管 CTA。主受眾:${audience.name}。`
+            : `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。配圖優先系統畫面。主受眾:${audience.name}。`,
           audienceLane: 'b2b',
           audienceName: audience.name,
         });

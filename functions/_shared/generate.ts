@@ -8,12 +8,14 @@ import {
   buildImageInspiredPostPrompt,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
   defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
+  SEO_TOPIC_BANK, brandSeoFacts,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
   type GeneratedXPost, type EcosystemXAngle,
   type AudienceLane, type ImageStyleId,
 } from './prompts';
-import { buildMediaKey, putMedia, toPublicMediaUrl } from './media';
+import { buildMediaKey, getMediaBytes, mediaUrlToKey, putMedia, toPublicMediaUrl } from './media';
 import { compositeLogo } from './watermark';
+import { frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
 import { X_TWEET_MAX_CHARS } from './x';
 
@@ -76,6 +78,8 @@ export async function pickBrandAsset(env: Env, brandId: string, preferScreenshot
       LIMIT 1
     `;
     if (shots.length) return toAssetPick(env, shots[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null });
+    // B 端不要退回吉卜力/生活插畫素材庫,沒有系統畫面就走簡報風生圖
+    return null;
   }
   const rows = await sql`
     SELECT id, file_url, caption, image_category FROM brand_assets
@@ -110,6 +114,22 @@ export async function pickBrandScreenshot(env: Env, brandSlug: string): Promise<
   const fileUrl = toPublicMediaUrl(env, row.file_url);
   if (!fileUrl) return null;
   return { id: row.id, fileUrl, caption: row.caption, imageCategory: row.image_category };
+}
+
+/** 從素材庫網址取出 bytes,包成 IG 4:5 JPEG 後寫回 R2;失敗回 null 讓呼叫端沿用原圖 */
+async function frameAssetForInstagram(env: Env, brandSlug: string, fileUrl: string): Promise<string | null> {
+  const key = mediaUrlToKey(fileUrl);
+  if (!key) return null;
+  try {
+    const bytes = await getMediaBytes(env, key);
+    if (!bytes) return null;
+    const framed = frameScreenshotForIg(bytes, brandSlug);
+    const outKey = buildMediaKey(brandSlug, 'jpg');
+    return await putMedia(env, outKey, framed, 'image/jpeg');
+  } catch (e) {
+    console.error('[generate] IG 系統畫面框失敗,沿用原圖', e);
+    return null;
+  }
 }
 
 export async function markAssetUsed(env: Env, assetId: string): Promise<void> {
@@ -181,9 +201,9 @@ export async function generatePlatformPost(
     : await pickAudience(env, brandCtx.brandId, brandCtx.slug, lane);
 
   let reusedAsset: BrandAssetPick | null = null;
-  // IG Feed 只接受約 4:5–1.91:1;素材庫截圖多半是橫式系統畫面,Meta 會直接拒收。
-  // Threads 本來就不走素材庫。FB 對長寬比較寬鬆,仍可沿用真實截圖。
-  if (!params.skipAssetLookup && platform === 'facebook') {
+  // B 端 FB/IG 優先真實系統畫面。IG 橫式截圖會先包成 4:5 JPEG,不再為了比例改走 AI 人物海報。
+  // Threads 本來就不走素材庫。
+  if (!params.skipAssetLookup && (platform === 'facebook' || platform === 'instagram')) {
     try {
       reusedAsset = await pickBrandAsset(env, brandCtx.brandId, lane === 'b2b');
     } catch (e) {
@@ -257,8 +277,11 @@ export async function generatePlatformPost(
 
   if (reusedAsset) {
     post.imagePrompt = undefined;
+    const imageUrl = platform === 'instagram'
+      ? await frameAssetForInstagram(env, brandCtx.slug, reusedAsset.fileUrl) ?? reusedAsset.fileUrl
+      : reusedAsset.fileUrl;
     return {
-      post, prediction, imageUrl: reusedAsset.fileUrl, imageError: null,
+      post, prediction, imageUrl, imageError: null,
       audienceLane: lane, audienceName: audience.name,
       imageSource: 'asset', imageStyle: null, assetId: reusedAsset.id,
     };
@@ -442,8 +465,12 @@ export async function generatePostFromImage(
     temperature: 0.3,
   });
 
+  const framedUrl = platform === 'instagram'
+    ? await frameAssetForInstagram(env, brandCtx.slug, imageUrl) ?? imageUrl
+    : imageUrl;
+
   return {
-    post, prediction, imageUrl, imageError: null,
+    post, prediction, imageUrl: framedUrl, imageError: null,
     audienceLane: lane, audienceName, imageSource: 'asset', imageStyle: null,
     assetId: params.assetId ?? null,
   };
@@ -701,7 +728,7 @@ export interface SeoArticleResult {
   };
 }
 
-/** 從已核准報導或定稿新聞稿改寫 SEO 長文;不可整段複製原文 */
+/** 從主題、簡報事實、已核准報導或定稿新聞稿寫 SEO 長文;不可整段複製原文 */
 export async function generateSeoArticle(
   env: Env,
   params: {
@@ -711,6 +738,7 @@ export async function generateSeoArticle(
     extraInstruction?: string;
   },
 ): Promise<SeoArticleResult> {
+  const pitchFacts = brandSeoFacts(params.brandCtx.slug);
   const article = await chatCompleteJson<SeoArticleResult>(env, {
     messages: [
       {
@@ -720,9 +748,13 @@ export async function generateSeoArticle(
           '',
           '你現在要寫一篇給官網/部落格的原創 SEO 長文,不是社群貼文。',
           '必須改寫,不可整段複製媒體原文或新聞稿。引用媒體時只帶出處 + 一句事實 + 原文 URL。',
-          '不可發明媒體名稱、專訪、轉載數量或未經驗證的數據。',
-          '繁體中文,800 到 1500 字,用 H2 小標分段,語氣像台灣產業觀察而不是新聞稿複讀。',
-        ].join('\n'),
+          '不可發明媒體名稱、專訪、轉載數量、客戶數、營收或未經驗證的數據。',
+          '簡報或後台示意數字(例如每日 1,250 單)是畫面示範,不得當成真實業績。',
+          '繁體中文,800 到 1500 字,用 H2 小標分段,語氣像台灣產業顧問在跟店主講話,不是新聞稿複讀、不是廣告口號堆疊。',
+          '禁用「邁向數位化的未來就是現在」「告別繁瑣」「輕鬆數位化」這類空心句。',
+          `結尾 CTA 必須是:${SHARED_BRAND_CTA}`,
+          pitchFacts ? `\n【可引用的產品/簡報事實(不可再發明)】\n${pitchFacts}` : '',
+        ].filter(Boolean).join('\n'),
       },
       {
         role: 'user',
@@ -739,6 +771,7 @@ export async function generateSeoArticle(
     maxTokens: 3500,
   });
   article.body = normalizeMultilineText(article.body);
+  article.cta = SHARED_BRAND_CTA;
   article.seoMeta = {
     title: article.seoMeta?.title || article.title,
     description: article.seoMeta?.description || article.body.slice(0, 140),
@@ -747,6 +780,14 @@ export async function generateSeoArticle(
     canonicalHint: article.seoMeta?.canonicalHint || '',
   };
   return article;
+}
+
+export function pickSeoTopic(slug: string, usedTitles: string[] = []): { topic: string; angle: string } {
+  const bank = SEO_TOPIC_BANK[slug] ?? SEO_TOPIC_BANK.washgo;
+  const used = new Set(usedTitles.map((t) => t.replace(/\s+/g, '')));
+  const unused = bank.filter((item) => !used.has(item.topic.replace(/\s+/g, '')));
+  const pool = unused.length ? unused : bank;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 export async function saveSeoArticle(

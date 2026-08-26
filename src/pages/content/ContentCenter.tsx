@@ -63,6 +63,9 @@ export function ContentCenter() {
   const [regenError, setRegenError] = useState<string | null>(null);
   const [publishMessage, setPublishMessage] = useState<string | null>(null);
   const [apiPublishing, setApiPublishing] = useState(false);
+  const [seoTopics, setSeoTopics] = useState<{ topic: string; angle: string }[]>([]);
+  const [seoGenerating, setSeoGenerating] = useState(false);
+  const [seoError, setSeoError] = useState<string | null>(null);
 
   const { data, loading, error, reload } = useAsyncData(
     () => slug ? api.contents(slug) : Promise.reject(new Error('no slug')),
@@ -82,6 +85,17 @@ export function ContentCenter() {
     }
     return () => { cancelled = true; };
   }, [data?.contents]);
+
+  useEffect(() => {
+    if (!slug) return;
+    let cancelled = false;
+    api.seoTopics(slug).then((res) => {
+      if (!cancelled) setSeoTopics(res.topics ?? []);
+    }).catch(() => {
+      if (!cancelled) setSeoTopics([]);
+    });
+    return () => { cancelled = true; };
+  }, [slug]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (loading) return <LoadingState />;
@@ -142,6 +156,24 @@ export function ContentCenter() {
     }
   }
 
+  async function generateSeo(topic?: string) {
+    if (!slug || seoGenerating) return;
+    setSeoGenerating(true);
+    setSeoError(null);
+    try {
+      const res = await api.generateSeoFromTopic(slug, topic ? { topic } : undefined);
+      setPublishMessage(`已生成 SEO 長文「${res.title}」,請審閱`);
+      setPlatform('seo');
+      setTab('pending_review');
+      setSelectedId(res.contentId);
+      reload();
+    } catch (e) {
+      setSeoError(e instanceof Error ? e.message : 'SEO 長文生成失敗');
+    } finally {
+      setSeoGenerating(false);
+    }
+  }
+
   async function regenerate() {
     if (!selected || regenerating) return;
     const instruction = window.prompt('要給 AI 的修改方向?(可留空直接換角度重寫)') ?? undefined;
@@ -159,7 +191,15 @@ export function ContentCenter() {
 
   return (
     <div>
-      <PageHeader title={`${brand.name} 內容中心`} subtitle="所有內容必須人工審閱:批准、修改、退回、重新生成、延期、否決" />
+      <PageHeader
+        title={`${brand.name} 內容中心`}
+        subtitle="所有內容必須人工審閱:批准、修改、退回、重新生成、延期、否決"
+        actions={
+          <Button variant="primary" disabled={seoGenerating} onClick={() => void generateSeo()}>
+            {seoGenerating ? '⏳ 產生 SEO 長文中...' : '產生 SEO 長文'}
+          </Button>
+        }
+      />
 
       <Card style={{ padding: 0, marginBottom: 16 }}>
         <div style={{ padding: '4px 16px 0' }}>
@@ -216,7 +256,30 @@ export function ContentCenter() {
               </div>
             </button>
           ))}
-          {filtered.length === 0 && <p style={{ fontSize: 13 }}>此分類目前沒有內容</p>}
+          {filtered.length === 0 && (
+            <div>
+              <p style={{ fontSize: 13 }}>此分類目前沒有內容</p>
+              {platform === 'seo' && seoTopics.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>從簡報/搜尋詞產一篇:</p>
+                  {seoTopics.map((t) => (
+                    <button
+                      key={t.topic}
+                      disabled={seoGenerating}
+                      onClick={() => void generateSeo(t.topic)}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left', marginBottom: 6,
+                        border: '1px solid var(--color-border)', borderRadius: 8, padding: 8,
+                        background: 'var(--color-bg)', cursor: 'pointer', fontSize: 12.5,
+                      }}
+                    >
+                      {t.topic}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <AnimatePresence mode="wait">
@@ -343,8 +406,8 @@ export function ContentCenter() {
                   </div>
                 )}
 
-                {regenError && (
-                  <p style={{ fontSize: 12.5, color: '#B85454', marginBottom: 10 }}>{regenError}</p>
+                {(regenError || seoError) && (
+                  <p style={{ fontSize: 12.5, color: '#B85454', marginBottom: 10 }}>{regenError ?? seoError}</p>
                 )}
 
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
@@ -360,7 +423,15 @@ export function ContentCenter() {
               </Card>
             </motion.div>
           ) : (
-            <Card><p>此分類目前沒有內容可審閱</p></Card>
+            <Card>
+              <p>此分類目前沒有內容可審閱</p>
+              {platform === 'seo' && (
+                <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 8 }}>
+                  可按上方「產生 SEO 長文」,依簡報與搜尋詞寫一篇給業者看的官網長文,不必先有媒體報導。
+                </p>
+              )}
+              {seoError && <p style={{ fontSize: 12.5, color: '#B85454', marginTop: 8 }}>{seoError}</p>}
+            </Card>
           )}
         </AnimatePresence>
       </div>

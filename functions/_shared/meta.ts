@@ -78,7 +78,7 @@ export function composePostMessage(body: string, hashtags: string[] | null | und
  * 後台儲存的常是 System User / User token(IG 發文可用,但 FB 粉專發文必須用 Page token),
  * 這裡統一向 Graph API 換取;若儲存的已是 Page token,此呼叫會原樣回傳同一把,結果不變。
  */
-async function resolvePageToken(account: MetaAccount): Promise<string> {
+export async function resolvePageToken(account: MetaAccount): Promise<string> {
   try {
     const res = await fetch(
       `${GRAPH_API}/${encodeURIComponent(account.externalId)}?fields=access_token&access_token=${encodeURIComponent(account.accessToken)}`,

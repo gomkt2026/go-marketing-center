@@ -89,8 +89,9 @@ export async function ensureAudienceLane(env: Env): Promise<void> {
       UPDATE brand_channels c
       SET length_guideline = '80-180字,前125字完整hook',
           format_guideline = CASE b.slug
-            WHEN 'taskgo' THEN '4:5 痛點主標+現場情境,第一張強hook'
-            ELSE '4:5 痛點主標+搜尋打標籤,第一張強hook'
+            WHEN 'washgo' THEN '4:5 系統畫面或簡報風畫面卡,禁止 AI 店員海報與吉卜力'
+            WHEN 'taskgo' THEN '4:5 派工/回報系統畫面或工地語錄卡,第一張強hook'
+            ELSE '4:5 系統畫面或痛點主標+搜尋打標籤,第一張強hook'
           END,
           hashtag_count_min = 8,
           hashtag_count_max = 12

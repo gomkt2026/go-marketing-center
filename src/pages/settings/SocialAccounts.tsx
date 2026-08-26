@@ -10,7 +10,7 @@ import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { SocialAccount, SocialAccountStatus } from '@/types';
 
 const PLATFORMS: { id: 'facebook' | 'instagram' | 'threads'; label: string; hint: string }[] = [
-  { id: 'facebook', label: 'Facebook 粉絲專頁', hint: '需要粉專 Page ID 與 Page Access Token。自動發文需粉專發文權限;成效回收另需 pages_read_engagement' },
+  { id: 'facebook', label: 'Facebook 粉絲專頁', hint: '必須存粉絲專頁權杖(Page Access Token),不要存個人 User Token。新版粉專體驗用 User Token 回收成效會出現 OAuth 190 / 2069032。自動發文需粉專發文權限;成效回收另需 pages_read_engagement' },
   { id: 'instagram', label: 'Instagram 商業帳號', hint: '需要 IG 商業帳號 ID(與 FB 粉專綁定)與相同的 Page Token。成效回收另需 instagram_manage_insights' },
   { id: 'threads', label: 'Threads', hint: '需要 Threads App 的 access token(threads_basic / threads_content_publish;自動回覆需 threads_keyword_search 與 threads_manage_replies;成效回收需 threads_manage_insights)' },
 ];

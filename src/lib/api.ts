@@ -181,6 +181,15 @@ export const api = {
   contents: (slug: string) =>
     request<{ contents: import('@/types').Content[] }>(`/api/brands/${slug}/contents`),
 
+  seoTopics: (slug: string) =>
+    request<{ topics: { topic: string; angle: string }[] }>(`/api/brands/${slug}/seo-articles`),
+
+  generateSeoFromTopic: (slug: string, body?: { topic?: string; instruction?: string }) =>
+    request<{ contentId: string; title: string; topic: string }>(`/api/brands/${slug}/seo-articles`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
+
   reviewContent: (contentId: string, body: { action: string; comment?: string; contentVersionId?: string }) =>
     request<{ ok: boolean; status: string }>(`/api/contents/${contentId}/review`, {
       method: 'POST',

@@ -6,7 +6,7 @@ import { getBrandBySlug } from '../../../../_shared/queries';
 import { json, error } from '../../../../_shared/response';
 import { mediaUrlToKey } from '../../../../_shared/media';
 import { logActivity } from '../../../../_shared/activity';
-import { isCollateralType } from '../../../../_shared/documents';
+import { isCollateralDocument } from '../../../../_shared/documents';
 
 export const onRequestDelete: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -19,13 +19,15 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
 
   const sql = getSql(context.env);
   const rows = await sql`
-    SELECT id, file_url, source_type, title FROM brand_documents
+    SELECT id, file_url, source_type, title, file_name FROM brand_documents
     WHERE id = ${id}::uuid AND brand_id = ${brand.id}::uuid
     LIMIT 1
   `;
   if (!rows.length) return error('找不到這份文件', 404);
-  const doc = rows[0] as { id: string; file_url: string | null; source_type: string; title: string };
-  if (!isCollateralType(doc.source_type)) {
+  const doc = rows[0] as {
+    id: string; file_url: string | null; source_type: string; title: string; file_name: string | null;
+  };
+  if (!isCollateralDocument({ sourceType: doc.source_type, fileName: doc.file_name })) {
     return error('種子品牌手冊請走知識條目,不能從這裡刪', 400);
   }
 

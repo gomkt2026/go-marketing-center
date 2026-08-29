@@ -123,6 +123,9 @@ export const api = {
       method: 'POST', body: JSON.stringify({}),
     }),
 
+  listBrandDocuments: (slug: string) =>
+    request<{ documents: import('@/types').BrandDocument[] }>(`/api/brands/${slug}/documents`),
+
   uploadBrandDocument: async (slug: string, params: {
     file: File; sourceType: 'dm' | 'presentation'; title?: string; notes?: string;
   }) => {

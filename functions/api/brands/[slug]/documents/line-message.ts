@@ -5,7 +5,7 @@ import { getSql } from '../../../../_shared/db';
 import { getBrandBySlug } from '../../../../_shared/queries';
 import { json, error } from '../../../../_shared/response';
 import { composeCustomerLineMessage } from '../../../../_shared/brand-profile';
-import { isCollateralType, toBrandDocument } from '../../../../_shared/documents';
+import { isCollateralDocument, toBrandDocument } from '../../../../_shared/documents';
 
 // POST /api/brands/:slug/documents/line-message
 // 產出給客戶的 LINE 訊息:選定的 EDM／簡報 + 官網 + 聯絡方式
@@ -25,10 +25,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const sql = getSql(context.env);
   const rows = await sql`
     SELECT * FROM brand_documents
-    WHERE brand_id = ${brand.id}::uuid AND source_type IN ('dm', 'presentation')
+    WHERE brand_id = ${brand.id}::uuid
+      AND (
+        source_type IN ('dm', 'presentation')
+        OR (source_type IN ('pdf', 'image') AND file_name IS NOT NULL)
+      )
     ORDER BY created_at DESC
   `;
-  const all = (rows as Record<string, unknown>[]).map(toBrandDocument).filter((d) => isCollateralType(d.sourceType));
+  const all = (rows as Record<string, unknown>[]).map(toBrandDocument).filter(isCollateralDocument);
   const wanted = (body.documentIds ?? []).filter(Boolean);
   const docs = wanted.length ? all.filter((d) => wanted.includes(d.id)) : all;
   if (!docs.length && !brand.websiteUrl) {

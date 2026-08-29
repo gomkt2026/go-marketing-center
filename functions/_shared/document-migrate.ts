@@ -12,8 +12,12 @@ export async function applyDocumentCollateralMigration(env: Env): Promise<string
   const sql = getSql(env);
   const steps: string[] = [];
 
-  await sql`ALTER TYPE document_source_type ADD VALUE IF NOT EXISTS 'dm'`;
-  steps.push('enum:document_source_type.dm');
+  try {
+    await sql`ALTER TYPE document_source_type ADD VALUE IF NOT EXISTS 'dm'`;
+    steps.push('enum:document_source_type.dm');
+  } catch (e) {
+    steps.push(`enum:skipped:${e instanceof Error ? e.message : 'failed'}`);
+  }
 
   await sql`ALTER TABLE brand_documents ADD COLUMN IF NOT EXISTS key_points JSONB NOT NULL DEFAULT '[]'`;
   await sql`ALTER TABLE brand_documents ADD COLUMN IF NOT EXISTS extract_status TEXT NOT NULL DEFAULT 'pending'`;

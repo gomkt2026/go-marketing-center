@@ -147,8 +147,13 @@ export function BrandIntelligence() {
   const channels = intel.channels as BrandChannel[];
   const visuals = intel.visuals as BrandVisual[];
   const keywords = intel.keywords as BrandKeyword[];
-  const seedDocuments = documents.filter((d) => d.sourceType !== 'dm' && d.sourceType !== 'presentation');
-  const collaterals = documents.filter((d) => d.sourceType === 'dm' || d.sourceType === 'presentation');
+  const isCollateralDoc = (d: BrandDocument) => (
+    d.sourceType === 'dm' || d.sourceType === 'presentation'
+    || ((d.sourceType === 'pdf' || d.sourceType === 'image') && !!d.fileName)
+  );
+  const collateralKindText = (d: BrandDocument) => (d.sourceType === 'presentation' ? '簡報' : 'EDM');
+  const seedDocuments = documents.filter((d) => !isCollateralDoc(d));
+  const collaterals = documents.filter(isCollateralDoc);
   const pillars = (intel.examples as BrandExample[]).filter((e) => e.category === 'content_pillar');
   const hotTopics = (intel.examples as BrandExample[]).filter((e) => e.category === 'hot_topic_bank');
 
@@ -447,7 +452,27 @@ export function BrandIntelligence() {
       setDocFile(null);
       setDocTitle('');
       setDocNotes('');
-      setDocMessage('已上傳並抽出賣點,之後排程與手動生成都會參考這份內容');
+      if (result.document.extractStatus === 'ready') {
+        setDocMessage('已上傳並抽出賣點,之後排程與手動生成都會參考這份內容');
+      } else {
+        setDocMessage('已存檔,正在背景抽出賣點。大份簡報大約半分鐘,完成後即可生成貼文。');
+        void (async () => {
+          for (let i = 0; i < 16; i++) {
+            await new Promise((r) => setTimeout(r, 2500));
+            try {
+              const next = await api.listBrandDocuments(slug);
+              setDocuments(next.documents);
+              const row = next.documents.find((d) => d.id === result.document.id);
+              if (row && row.extractStatus !== 'pending') {
+                setDocMessage(row.extractStatus === 'ready'
+                  ? '已抽出賣點,之後排程與手動生成都會參考這份內容'
+                  : (row.rawContent || '已存檔,但文字抽出失敗。可補說明後再產出 LINE 訊息。'));
+                return;
+              }
+            } catch { /* 輪詢失敗就等使用者自己重整 */ }
+          }
+        })();
+      }
     } catch (e) {
       setDocMessage(e instanceof Error ? e.message : '上傳失敗');
     } finally {
@@ -940,7 +965,7 @@ export function BrandIntelligence() {
                       style={inputStyle}
                     />
                     <Button variant="primary" style={{ justifySelf: 'start' }} disabled={!docFile || docUploading} onClick={() => void uploadCollateral()}>
-                      {docUploading ? '上傳並抽取中…' : '+ 上傳並抽出賣點'}
+                      {docUploading ? '上傳中…' : '+ 上傳並抽出賣點'}
                     </Button>
                     <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
                       EDM 建議 JPG／PNG；簡報請上傳 PDF、PPT 或 PPTX。舊版 PPT／掃描檔若抽不出字,仍會存檔,可補說明後產出 LINE 訊息。單檔 40MB 以內。
@@ -955,8 +980,8 @@ export function BrandIntelligence() {
                             <input type="checkbox" checked={selectedDocIds.includes(d.id)} onChange={() => toggleDoc(d.id)} />
                             附在 LINE
                           </label>
-                          <Badge tone={d.sourceType === 'dm' ? 'primary' : 'secondary'}>
-                            {d.sourceType === 'dm' ? 'EDM' : '簡報'}
+                          <Badge tone={d.sourceType === 'presentation' ? 'secondary' : 'primary'}>
+                            {collateralKindText(d)}
                           </Badge>
                           <Badge tone={d.extractStatus === 'ready' ? 'primary' : d.extractStatus === 'failed' ? 'danger' : 'accent'}>
                             {d.extractStatus === 'ready' ? '已抽出賣點' : d.extractStatus === 'failed' ? '抽取失敗' : '處理中'}

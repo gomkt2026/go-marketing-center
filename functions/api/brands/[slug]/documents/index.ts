@@ -8,7 +8,8 @@ import { buildBrandDocumentKey, putMedia } from '../../../../_shared/media';
 import { logActivity } from '../../../../_shared/activity';
 import { applyDocumentCollateralMigration, isMissingDocumentCollateral } from '../../../../_shared/document-migrate';
 import {
-  extractCollateralContent, isCollateralType, toBrandDocument, type CollateralSourceType,
+  finalizeCollateralExtract, isCollateralType, persistCollateralSourceType,
+  toBrandDocument, type CollateralSourceType,
 } from '../../../../_shared/documents';
 
 const MAX_FILE_SIZE = 40 * 1024 * 1024;
@@ -64,10 +65,17 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
 // POST /api/brands/:slug/documents
 // multipart: file、title(選填)、sourceType=dm|presentation、notes(選填)
+// 先存 R2 + 列,再 waitUntil 抽賣點,避免大 PDF 在回應用前就把 Worker 撐到 500
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
   if (!context.env.MEDIA) return error('R2 bucket MEDIA 尚未綁定', 500);
+
+  try {
+    await applyDocumentCollateralMigration(context.env);
+  } catch (e) {
+    console.error('[documents] migrate', e instanceof Error ? e.message : e);
+  }
 
   const slug = context.params.slug as string;
   const brand = await getBrandBySlug(context.env, slug);
@@ -96,7 +104,16 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const ext = ALLOWED[mimeType] ?? extFromName(upload.name);
   if (!ext) return error('請上傳 JPG／PNG／WebP、PDF、PPT 或 PPTX', 400);
 
-  const bytes = new Uint8Array(await upload.arrayBuffer());
+  const storedSourceType = persistCollateralSourceType(sourceType, ext);
+  const pendingSummary = notes || '已存檔,正在抽出賣點。';
+
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await upload.arrayBuffer());
+  } catch (e) {
+    return error(e instanceof Error ? e.message : '讀取檔案失敗', 400);
+  }
+
   const storedType = ALLOWED[mimeType]
     ? mimeType
     : ext === 'pdf' ? 'application/pdf'
@@ -104,53 +121,53 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         : ext === 'ppt' ? 'application/vnd.ms-powerpoint'
           : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
-  let extractStatus: 'ready' | 'failed' = 'ready';
-  let extracted = { summary: notes || '', keyPoints: [] as string[] };
   try {
-    extracted = await extractCollateralContent(context.env, {
-      bytes, mimeType: storedType, fileName: upload.name || `檔案.${ext}`, kind: sourceType, notes,
-    });
-  } catch {
-    extractStatus = 'failed';
-    if (!extracted.summary) {
-      extracted.summary = notes || '已存檔,文字尚待抽出。舊版 PPT 或掃描檔可補說明後再產出 LINE 訊息。';
+    const key = buildBrandDocumentKey(brand.slug, ext);
+    const fileUrl = await putMedia(context.env, key, bytes, storedType);
+    const title = titleRaw || upload.name.replace(/\.[^.]+$/, '') || (sourceType === 'dm' ? '品牌 DM' : '品牌簡報');
+
+    const sql = getSql(context.env);
+    const insert = async () => sql`
+      INSERT INTO brand_documents (
+        brand_id, source_type, title, file_url, raw_content, key_points,
+        extract_status, file_name, mime_type, uploaded_by
+      ) VALUES (
+        ${brand.id}::uuid, ${storedSourceType}, ${title}, ${fileUrl}, ${pendingSummary},
+        '[]'::jsonb, 'pending', ${upload.name || null}, ${storedType}, ${auth.id}::uuid
+      ) RETURNING *
+    `;
+
+    let rows;
+    try {
+      rows = await insert();
+    } catch (e) {
+      if (!isMissingDocumentCollateral(e)) throw e;
+      await applyDocumentCollateralMigration(context.env);
+      rows = await insert();
     }
-  }
 
-  const key = buildBrandDocumentKey(brand.slug, ext);
-  const fileUrl = await putMedia(context.env, key, bytes, storedType);
-  const title = titleRaw || upload.name.replace(/\.[^.]+$/, '') || (sourceType === 'dm' ? '品牌 DM' : '品牌簡報');
+    const document = toBrandDocument(rows[0] as Record<string, unknown>);
+    await logActivity(context.env, {
+      brandId: brand.id,
+      actorType: 'user',
+      actorUserId: auth.id,
+      action: 'brand_document.uploaded',
+      entityType: 'brand_document',
+      entityId: document.id,
+      afterState: { sourceType: storedSourceType, title },
+    });
 
-  const sql = getSql(context.env);
-  const insert = async () => sql`
-    INSERT INTO brand_documents (
-      brand_id, source_type, title, file_url, raw_content, key_points,
-      extract_status, file_name, mime_type, uploaded_by
-    ) VALUES (
-      ${brand.id}::uuid, ${sourceType}, ${title}, ${fileUrl}, ${extracted.summary},
-      ${JSON.stringify(extracted.keyPoints)}::jsonb, ${extractStatus}, ${upload.name || null}, ${storedType}, ${auth.id}::uuid
-    ) RETURNING *
-  `;
+    const extractBytes = ext === 'pdf' ? bytes.slice(0, 2 * 1024 * 1024) : bytes;
+    context.waitUntil(finalizeCollateralExtract(context.env, document.id, {
+      bytes: extractBytes, mimeType: storedType, fileName: upload.name || `檔案.${ext}`, kind: sourceType, notes,
+    }).catch((e) => {
+      console.error('[documents] extract', e instanceof Error ? e.message : e);
+    }));
 
-  let rows;
-  try {
-    rows = await insert();
+    return json({ document }, 201);
   } catch (e) {
-    if (!isMissingDocumentCollateral(e)) throw e;
-    await applyDocumentCollateralMigration(context.env);
-    rows = await insert();
+    const msg = e instanceof Error ? e.message : '上傳失敗';
+    console.error('[documents] upload', msg);
+    return error(msg, 500);
   }
-
-  const document = toBrandDocument(rows[0] as Record<string, unknown>);
-  await logActivity(context.env, {
-    brandId: brand.id,
-    actorType: 'user',
-    actorUserId: auth.id,
-    action: 'brand_document.uploaded',
-    entityType: 'brand_document',
-    entityId: document.id,
-    afterState: { sourceType, title },
-  });
-
-  return json({ document }, 201);
 };

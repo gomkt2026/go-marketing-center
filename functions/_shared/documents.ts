@@ -43,8 +43,22 @@ export function isCollateralType(value: string): value is CollateralSourceType {
   return (COLLATERAL_SOURCE_TYPES as readonly string[]).includes(value);
 }
 
+/** 上傳列用既有 enum,避免 Neon 交易裡用不到剛 ADD 的 dm */
+export function persistCollateralSourceType(kind: CollateralSourceType, ext: string): string {
+  if (kind === 'presentation' || ext === 'ppt' || ext === 'pptx') return 'presentation';
+  if (ext === 'pdf') return 'pdf';
+  return 'image';
+}
+
+export function isCollateralDocument(doc: { sourceType: string; fileName?: string | null }): boolean {
+  if (doc.sourceType === 'dm' || doc.sourceType === 'presentation') return true;
+  return (doc.sourceType === 'pdf' || doc.sourceType === 'image') && !!doc.fileName;
+}
+
 export function collateralKindLabel(sourceType: string): string {
-  return sourceType === 'dm' ? 'EDM' : sourceType === 'presentation' ? '簡報' : sourceType;
+  if (sourceType === 'presentation') return '簡報';
+  if (sourceType === 'dm' || sourceType === 'pdf' || sourceType === 'image') return 'EDM';
+  return sourceType;
 }
 
 export function documentTopicSummary(doc: BrandDocumentRow): string {
@@ -76,7 +90,10 @@ export async function loadBrandCollaterals(env: Env, brandId: string, limit = 8)
     const rows = await sql`
       SELECT * FROM brand_documents
       WHERE brand_id = ${brandId}::uuid
-        AND source_type IN ('dm', 'presentation')
+        AND (
+          source_type IN ('dm', 'presentation')
+          OR (source_type IN ('pdf', 'image') AND file_name IS NOT NULL)
+        )
         AND extract_status = 'ready'
       ORDER BY created_at DESC
       LIMIT ${limit}
@@ -138,13 +155,17 @@ async function extractFromMessages(
   return normalizeExtract(extracted);
 }
 
-/** 從 PDF bytes 抽出可見字串(適合文字型 PDF;掃描檔會很少) */
+const PDF_SCAN_BYTES = 2 * 1024 * 1024;
+const PDF_MAX_CHUNKS = 400;
+
+/** 從 PDF bytes 抽出可見字串(只掃前 2MB,避免大檔把 Worker 撐爆) */
 export function extractPdfText(bytes: Uint8Array): string {
-  const latin = new TextDecoder('latin-1').decode(bytes);
+  const slice = bytes.byteLength > PDF_SCAN_BYTES ? bytes.subarray(0, PDF_SCAN_BYTES) : bytes;
+  const latin = new TextDecoder('latin-1').decode(slice);
   const chunks: string[] = [];
   const literal = /\((?:\\.|[^\\)]){2,200}\)/g;
   let match: RegExpExecArray | null;
-  while ((match = literal.exec(latin))) {
+  while (chunks.length < PDF_MAX_CHUNKS && (match = literal.exec(latin))) {
     const inner = match[0].slice(1, -1)
       .replace(/\\n/g, '\n')
       .replace(/\\r/g, '')
@@ -156,7 +177,7 @@ export function extractPdfText(bytes: Uint8Array): string {
     if (/[\u4e00-\u9fffA-Za-z0-9]/.test(inner)) chunks.push(inner);
   }
   const hex = /<([0-9A-Fa-f \t]{8,})>/g;
-  while ((match = hex.exec(latin))) {
+  while (chunks.length < PDF_MAX_CHUNKS && (match = hex.exec(latin))) {
     const hexStr = match[1].replace(/\s/g, '');
     if (hexStr.length % 4 !== 0) continue;
     try {
@@ -250,4 +271,31 @@ export async function extractCollateralContent(
   }
 
   return extractFromMessages(env, `${ask}\n\n檔案抽出的文字:\n${extractedText}`);
+}
+
+export async function finalizeCollateralExtract(
+  env: Env,
+  documentId: string,
+  params: { bytes: Uint8Array; mimeType: string; fileName: string; kind: CollateralSourceType; notes?: string },
+): Promise<void> {
+  const sql = getSql(env);
+  try {
+    const extracted = await extractCollateralContent(env, params);
+    await sql`
+      UPDATE brand_documents
+      SET raw_content = ${extracted.summary},
+          key_points = ${JSON.stringify(extracted.keyPoints)}::jsonb,
+          extract_status = 'ready'
+      WHERE id = ${documentId}::uuid
+    `;
+  } catch (e) {
+    const fallback = params.notes?.trim()
+      || (e instanceof Error ? e.message : '已存檔,文字尚待抽出。舊版 PPT 或掃描檔可補說明後再產出 LINE 訊息。');
+    await sql`
+      UPDATE brand_documents
+      SET raw_content = ${fallback.slice(0, 600)},
+          extract_status = 'failed'
+      WHERE id = ${documentId}::uuid
+    `.catch(() => undefined);
+  }
 }

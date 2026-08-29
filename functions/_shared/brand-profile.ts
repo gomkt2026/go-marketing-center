@@ -72,8 +72,8 @@ export function composeLineMessageTemplate(params: {
   blocks.push(`您好，這邊先把 ${params.brandName} 的資料整理給您參考。`);
   if (params.tagline) blocks.push(params.tagline);
 
-  const edms = params.docs.filter((d) => d.sourceType === 'dm');
   const decks = params.docs.filter((d) => d.sourceType === 'presentation');
+  const edms = params.docs.filter((d) => d.sourceType !== 'presentation');
 
   const writeDocs = (title: string, items: BrandDocumentRow[]) => {
     if (!items.length) return;

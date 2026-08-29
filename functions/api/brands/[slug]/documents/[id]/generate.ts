@@ -12,7 +12,7 @@ import {
   SUPPORTED_PLATFORMS, type SocialPlatform,
 } from '../../../../../_shared/generate';
 import {
-  documentTopicSummary, isCollateralType, toBrandDocument,
+  collateralKindLabel, documentTopicSummary, isCollateralDocument, toBrandDocument,
 } from '../../../../../_shared/documents';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -36,13 +36,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   `;
   if (!rows.length) return error('找不到這份文件', 404);
   const doc = toBrandDocument(rows[0] as Record<string, unknown>);
-  if (!isCollateralType(doc.sourceType)) return error('只有 DM／簡報能生成社群貼文', 400);
+  if (!isCollateralDocument(doc)) return error('只有 DM／簡報能生成社群貼文', 400);
   if (doc.extractStatus !== 'ready') return error('這份檔案還沒抽出可用賣點', 400);
 
   const brandCtx = await buildBrandContext(context.env, brand.id);
   const agentId = await findBrandAgent(context.env, brand.id);
   const topicSummary = documentTopicSummary(doc);
-  const kind = doc.sourceType === 'dm' ? 'DM' : '簡報';
+  const kind = collateralKindLabel(doc.sourceType);
   const extra = [
     `這篇要根據品牌官方${kind}《${doc.title}》來寫,只能用已抽出的賣點與摘要,不可發明優惠、價格或截止日。`,
     '語氣像第一線人員轉述手上的宣傳物,不要寫成「請見附件 DM」。',

@@ -1,12 +1,12 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
-import type { Env } from '../../../../../_shared/env';
-import { requireAuth } from '../../../../../_shared/auth';
-import { getSql } from '../../../../../_shared/db';
-import { getBrandBySlug } from '../../../../../_shared/queries';
-import { json, error } from '../../../../../_shared/response';
-import { mediaUrlToKey } from '../../../../../_shared/media';
-import { logActivity } from '../../../../../_shared/activity';
-import { isCollateralType } from '../../../../../_shared/documents';
+import type { Env } from '../../../../_shared/env';
+import { requireAuth } from '../../../../_shared/auth';
+import { getSql } from '../../../../_shared/db';
+import { getBrandBySlug } from '../../../../_shared/queries';
+import { json, error } from '../../../../_shared/response';
+import { mediaUrlToKey } from '../../../../_shared/media';
+import { logActivity } from '../../../../_shared/activity';
+import { isCollateralType } from '../../../../_shared/documents';
 
 export const onRequestDelete: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);

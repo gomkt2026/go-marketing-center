@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { rowsToCamel, rowToCamel } from './case';
+import { applyBrandWebsiteMigration, isMissingWebsiteColumn } from './brand-profile';
 
 export interface DbBrand {
   id: string;
@@ -9,6 +10,8 @@ export interface DbBrand {
   tagline: string | null;
   primaryColor: string | null;
   logoUrl: string | null;
+  websiteUrl: string | null;
+  websiteNote: string | null;
   currentVersionId: string | null;
   versionNumber?: number | null;
 }
@@ -19,21 +22,32 @@ export function mapBrand(row: Record<string, unknown>): DbBrand & { logoInitial:
     ...b,
     tagline: b.tagline ?? '',
     primaryColor: b.primaryColor ?? '#888',
+    websiteUrl: b.websiteUrl ?? null,
+    websiteNote: b.websiteNote ?? null,
     logoInitial: b.name.charAt(0).toUpperCase(),
   };
 }
 
-export async function getAllBrands(env: Env) {
+async function selectActiveBrands(env: Env) {
   const sql = getSql(env);
-  const rows = await sql`
-    SELECT b.id, b.slug, b.name, b.tagline, b.primary_color, b.logo_url, b.current_version_id,
-           v.version_number
+  return sql`
+    SELECT b.id, b.slug, b.name, b.tagline, b.primary_color, b.logo_url,
+           b.website_url, b.website_note, b.current_version_id, v.version_number
     FROM brands b
     LEFT JOIN brand_versions v ON v.id = b.current_version_id
     WHERE b.is_active = true
     ORDER BY b.name
   `;
-  return (rows as Record<string, unknown>[]).map(mapBrand);
+}
+
+export async function getAllBrands(env: Env) {
+  try {
+    return ((await selectActiveBrands(env)) as Record<string, unknown>[]).map(mapBrand);
+  } catch (e) {
+    if (!isMissingWebsiteColumn(e)) throw e;
+    await applyBrandWebsiteMigration(env);
+    return ((await selectActiveBrands(env)) as Record<string, unknown>[]).map(mapBrand);
+  }
 }
 
 export async function getBrandsForUser(env: Env, user: { role: string; brandIds: string[] }) {
@@ -45,10 +59,18 @@ export async function getBrandsForUser(env: Env, user: { role: string; brandIds:
 
 export async function getBrandBySlug(env: Env, slug: string) {
   const sql = getSql(env);
-  const rows = await sql`
-    SELECT id, slug, name, tagline, primary_color, logo_url, current_version_id
+  const run = () => sql`
+    SELECT id, slug, name, tagline, primary_color, logo_url, website_url, website_note, current_version_id
     FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1
   `;
+  let rows;
+  try {
+    rows = await run();
+  } catch (e) {
+    if (!isMissingWebsiteColumn(e)) throw e;
+    await applyBrandWebsiteMigration(env);
+    rows = await run();
+  }
   if (!rows.length) return null;
   return mapBrand(rows[0] as Record<string, unknown>);
 }

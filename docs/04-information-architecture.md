@@ -80,7 +80,7 @@
 |---|---|---|
 | `/` | Dashboard | 全域 |
 | `/:brand/workspace` | Brand Workspace 總覽 | 品牌 |
-| `/:brand/intelligence` | Brand Intelligence(知識庫 + 版本歷史) | 品牌 |
+| `/:brand/intelligence` | Brand Intelligence(知識庫 + EDM／簡報 + 客戶 LINE 資訊包) | 品牌 |
 | `/:brand/market` | Market Intelligence | 品牌 |
 | `/meetings` | AI 會議室列表 | 全域(可篩品牌) |
 | `/meetings/:id` | 會議詳情 | — |

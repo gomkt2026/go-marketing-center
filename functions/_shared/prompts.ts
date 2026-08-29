@@ -1,6 +1,8 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { loadPublishedPrimaryCoverages, publishedCoveragePrompt } from './press';
+import { loadBrandCollaterals, collateralPrompt } from './documents';
+import { officialWebsitePrompt, loadBrandWebsite } from './brand-profile';
 import { ensureAudienceLane, isMissingLaneColumn } from './audience-lane';
 
 // ============================================================================
@@ -343,6 +345,7 @@ export const ANTI_AI_RULES =
   '7. 只用台灣用語,出現中國用語就重寫:影片(不是視頻)、品質(不是質量)、網路(不是網絡)、資訊(不是信息)、馬鈴薯(不是土豆)。' +
   '8. 內容要長在台灣的生活場景裡:超商、騎樓、捷運、機車、夜市、梅雨、颱風假、報稅季…讓台灣讀者一看就覺得「這就是我的日常」。' +
   '9. 沒有「已驗證媒體報導」清單時,禁止寫「媒體報導」「登上 XX」「全台媒體」。有清單也只能引用列出的出處與事實,不可發明媒體名或把轉載算成多次專訪。' +
+  '9b. 有「品牌官方 EDM／簡報」清單時,優先用裡面的賣點、活動與 CTA 來寫社群;沒列出的優惠、價格、截止日不准發明。' +
   '10. Homigo / TaskGo / Washgo 主 CTA 一律寫匠管聯絡:Service@inforcraft.com.tw、電話 0972-395-117。禁止寫各品牌 LINE、官網註冊、hello@washgo、加 LINE 免費開始。';
 
 // ============================================================================
@@ -366,7 +369,7 @@ function formatApprovedLearning(row: { insight: string; supporting_data: unknown
 
 export async function buildBrandContext(env: Env, brandId: string): Promise<BrandContext> {
   const sql = getSql(env);
-  const [brandRows, personaRows, ruleRows, channelRows, keywordRows, learningRows, coverages] = await Promise.all([
+  const [brandRows, personaRows, ruleRows, channelRows, keywordRows, learningRows, coverages, collaterals, website] = await Promise.all([
     sql`SELECT id, slug, name, tagline FROM brands WHERE id = ${brandId}::uuid LIMIT 1`,
     sql`SELECT name, age_range, profile, pain_points, appeal_angle FROM brand_personas WHERE brand_id = ${brandId}::uuid ORDER BY sort_order LIMIT 6`,
     sql`SELECT rule_type, statement, condition_note FROM brand_rules WHERE brand_id = ${brandId}::uuid ORDER BY sort_order LIMIT 30`,
@@ -374,6 +377,8 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     sql`SELECT category, value FROM brand_keywords WHERE brand_id = ${brandId}::uuid LIMIT 40`,
     sql`SELECT insight, supporting_data FROM learning_records WHERE brand_id = ${brandId}::uuid AND status = 'approved' ORDER BY created_at DESC LIMIT 8`,
     loadPublishedPrimaryCoverages(env, brandId, 4),
+    loadBrandCollaterals(env, brandId, 8),
+    loadBrandWebsite(env, brandId),
   ]);
   if (!brandRows.length) throw new Error('Brand not found');
 
@@ -413,6 +418,8 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     keywords ? `品牌關鍵字/CTA 庫(自然使用,不要硬塞):${keywords}` : '',
     learnings ? `過往經營累積的操盤心得(寫文時參考,不可改品牌定位):\n${learnings}` : '',
     publishedCoveragePrompt(coverages),
+    collateralPrompt(collaterals),
+    officialWebsitePrompt(website.websiteUrl, website.websiteNote),
     '',
     SHARED_BRAND_CTA_RULE,
     ANTI_AI_RULES,
@@ -646,6 +653,7 @@ export function buildImageInspiredPostPrompt(params: {
   brandSlug?: string;
   audienceLane?: AudienceLane;
   audienceName?: string;
+  extraInstruction?: string;
 }): string {
   const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
   const guideline = params.platform === 'threads' && voice?.threadsCraft
@@ -672,6 +680,7 @@ export function buildImageInspiredPostPrompt(params: {
     guideline,
     laneBlock,
     searchBlock,
+    params.extraInstruction ?? '',
     '',
     '回傳 JSON 物件:',
     '{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"}',

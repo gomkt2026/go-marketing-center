@@ -60,7 +60,7 @@ CREATE TYPE brand_rule_type AS ENUM (
 CREATE TYPE document_source_type AS ENUM (
   'website', 'presentation', 'logo', 'social_post', 'product_intro',
   'past_article', 'video', 'pdf', 'image', 'brand_manual', 'faq',
-  'press_article', 'press_release', 'other'
+  'press_article', 'press_release', 'dm', 'other'
 );
 
 CREATE TYPE press_coverage_status AS ENUM ('inbox', 'published', 'syndicated', 'dismissed');
@@ -161,6 +161,8 @@ CREATE TABLE brands (
   name              TEXT NOT NULL,                   -- e.g. 'Homigo'
   tagline           TEXT,
   logo_url          TEXT,
+  website_url       TEXT,                           -- 官方網站,給客戶 LINE 資訊包引用
+  website_note      TEXT,                           -- 官網用途說明(例如產品入口、定價頁)
   primary_color     TEXT,
   is_active         BOOLEAN NOT NULL DEFAULT true,
   current_version_id UUID,          -- 指向目前已發布的 brand_versions(於下方建立後補 FK)
@@ -206,7 +208,11 @@ CREATE TABLE brand_documents (
   source_type       document_source_type NOT NULL,
   title             TEXT NOT NULL,
   file_url          TEXT,
-  raw_content       TEXT,                           -- 純文字/MD 原始內容(若適用)
+  raw_content       TEXT,                           -- 純文字/MD 原始內容,或 AI 從 DM/簡報抽出的摘要
+  key_points        JSONB NOT NULL DEFAULT '[]',    -- 可引用賣點 / 活動條件
+  extract_status    TEXT NOT NULL DEFAULT 'pending', -- pending | ready | failed
+  file_name         TEXT,
+  mime_type         TEXT,
   metadata          JSONB NOT NULL DEFAULT '{}',
   uploaded_by       UUID REFERENCES users(id),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()

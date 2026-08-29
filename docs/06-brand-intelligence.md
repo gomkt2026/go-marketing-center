@@ -16,6 +16,8 @@ Brand Knowledge 不是一份 Markdown，而是一組結構化資料，Markdown �
 | Brand Examples（敘事素材） | `brand_examples` |
 | History（里程碑） | `brand_histories` |
 | Assets（Logo / Media / Documents） | `brand_assets`, `brand_documents` |
+| EDM／簡報（活動傳單、產品簡報） | `brand_documents`(source_type = dm / presentation;抽出的賣點供社群發文與客戶 LINE 資訊包引用) |
+| 官方網站 | `brands.website_url` / `website_note` |
 | Website / FAQ | `brand_documents`(source_type = website / faq) |
 | Press Coverage（媒體報導／社會證明） | `press_coverages`（第三方露出；不存全文） |
 | Press Release（自家新聞稿） | `press_releases`（可存全文；草稿→審核→定稿） |

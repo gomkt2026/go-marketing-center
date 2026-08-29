@@ -409,6 +409,7 @@ export async function generatePostFromImage(
     audienceLane?: AudienceLane;
     audienceName?: string;
     assetId?: string;
+    extraInstruction?: string;
   },
 ): Promise<GenerationResult> {
   const { brandCtx, imageUrl, platform } = params;
@@ -417,6 +418,7 @@ export async function generatePostFromImage(
   const userPrompt = buildImageInspiredPostPrompt({
     platform, caption: params.caption, imageCategory: params.imageCategory,
     brandSlug: brandCtx.slug, audienceLane: lane, audienceName,
+    extraInstruction: params.extraInstruction,
   });
   const systemPrompt = `${brandCtx.systemPrompt}\n\n${audienceLaneInstruction(brandCtx.slug, lane)}`;
   const visionUserMessage = {

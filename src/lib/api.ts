@@ -38,6 +38,11 @@ export const api = {
   brand: (slug: string) =>
     request<{ brand: import('@/types').Brand; version: import('@/types').BrandVersion | null }>(`/api/brands/${slug}`),
 
+  updateBrand: (slug: string, body: { websiteUrl?: string | null; websiteNote?: string | null }) =>
+    request<{ brand: import('@/types').Brand }>(`/api/brands/${slug}`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+
   brandIntelligence: (slug: string) =>
     request<{
       rules: import('@/types').BrandRule[];
@@ -115,6 +120,44 @@ export const api = {
 
   migratePress: () =>
     request<{ ok: boolean; steps: string[] }>('/api/admin/migrate-press', {
+      method: 'POST', body: JSON.stringify({}),
+    }),
+
+  uploadBrandDocument: async (slug: string, params: {
+    file: File; sourceType: 'dm' | 'presentation'; title?: string; notes?: string;
+  }) => {
+    const form = new FormData();
+    form.append('file', params.file);
+    form.append('sourceType', params.sourceType);
+    if (params.title) form.append('title', params.title);
+    if (params.notes) form.append('notes', params.notes);
+    const res = await fetch(`/api/brands/${slug}/documents`, { method: 'POST', credentials: 'include', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    return data as { document: import('@/types').BrandDocument };
+  },
+
+  deleteBrandDocument: (slug: string, id: string) =>
+    request<{ ok: boolean }>(`/api/brands/${slug}/documents/${id}`, { method: 'DELETE' }),
+
+  generateFromBrandDocument: (slug: string, id: string, platforms?: Array<'facebook' | 'instagram' | 'threads'>) =>
+    request<{ created: { contentId: string; platform: string }[]; failures: { platform: string; error: string }[] }>(
+      `/api/brands/${slug}/documents/${id}/generate`,
+      { method: 'POST', body: JSON.stringify({ platforms }) },
+    ),
+
+  composeCustomerLineMessage: (slug: string, body?: { documentIds?: string[]; customerHint?: string }) =>
+    request<{
+      message: string;
+      files: { id: string; title: string; kind: string; url: string }[];
+      websiteUrl: string | null;
+      websiteNote: string | null;
+    }>(`/api/brands/${slug}/documents/line-message`, {
+      method: 'POST', body: JSON.stringify(body ?? {}),
+    }),
+
+  migrateDocuments: () =>
+    request<{ ok: boolean; steps: string[] }>('/api/admin/migrate-documents', {
       method: 'POST', body: JSON.stringify({}),
     }),
 

@@ -62,6 +62,11 @@ export function buildEventEdmKey(eventId: string, ext = 'jpg'): string {
   return `events/${eventId}/edm/${crypto.randomUUID()}.${ext}`;
 }
 
+/** 品牌 DM／簡報。放 brand-docs/ 前綴,不受 generated/ 31 天清理。 */
+export function buildBrandDocumentKey(brandSlug: string, ext: string): string {
+  return `brand-docs/${brandSlug}/${crypto.randomUUID()}.${ext.replace(/^\./, '')}`;
+}
+
 export async function putMedia(env: Env, key: string, bytes: Uint8Array, contentType = 'image/png'): Promise<string> {
   if (!env.MEDIA) {
     throw new Error('R2 bucket MEDIA 尚未綁定,請先建立 bucket 並在 wrangler.toml 設定 r2_buckets');

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode, type CSSProperties } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams, Navigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -22,6 +22,7 @@ const TABS = [
   { id: 'rules', label: '規則邊界' },
   { id: 'press', label: '媒體報導' },
   { id: 'releases', label: '新聞稿' },
+  { id: 'collateral', label: 'EDM／簡報' },
   { id: 'visual', label: '視覺' },
   { id: 'library', label: '素材庫' },
   { id: 'raw', label: '原始檢視' },
@@ -57,7 +58,9 @@ export function BrandIntelligence() {
   const { brand: slug } = useParams();
   const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
-  const [tab, setTab] = useState('core');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = TABS.some((t) => t.id === searchParams.get('tab')) ? searchParams.get('tab')! : 'core';
+  const [tab, setTab] = useState(initialTab);
   const [rules, setRules] = useState<BrandRule[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [assets, setAssets] = useState<BrandAsset[]>([]);
@@ -82,6 +85,23 @@ export function BrandIntelligence() {
   const [discovered, setDiscovered] = useState<DiscoveredPressItem[]>([]);
   const [newRelease, setNewRelease] = useState({ title: '', body: '' });
   const [editingReleaseId, setEditingReleaseId] = useState<string | null>(null);
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docTitle, setDocTitle] = useState('');
+  const [docNotes, setDocNotes] = useState('');
+  const [docKind, setDocKind] = useState<'dm' | 'presentation'>('dm');
+  const [docUploading, setDocUploading] = useState(false);
+  const [docBusyId, setDocBusyId] = useState<string | null>(null);
+  const [docMessage, setDocMessage] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<BrandDocument[]>([]);
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [websiteNote, setWebsiteNote] = useState('');
+  const [websiteSaving, setWebsiteSaving] = useState(false);
+  const [websiteMessage, setWebsiteMessage] = useState<string | null>(null);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [customerHint, setCustomerHint] = useState('');
+  const [lineMessage, setLineMessage] = useState('');
+  const [lineFiles, setLineFiles] = useState<{ title: string; kind: string; url: string }[]>([]);
+  const [lineBusy, setLineBusy] = useState(false);
 
   const brandQuery = useAsyncData(
     () => slug ? api.brand(slug) : Promise.reject(new Error('no slug')),
@@ -104,6 +124,15 @@ export function BrandIntelligence() {
   useEffect(() => {
     if (intelQuery.data?.pressReleases) setReleases(intelQuery.data.pressReleases);
   }, [intelQuery.data?.pressReleases]);
+  useEffect(() => {
+    if (intelQuery.data?.documents) setDocuments(intelQuery.data.documents);
+  }, [intelQuery.data?.documents]);
+  useEffect(() => {
+    const b = brandQuery.data?.brand;
+    if (!b) return;
+    setWebsiteUrl(b.websiteUrl ?? '');
+    setWebsiteNote(b.websiteNote ?? '');
+  }, [brandQuery.data?.brand]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (brandQuery.loading || intelQuery.loading) return <LoadingState />;
@@ -118,7 +147,8 @@ export function BrandIntelligence() {
   const channels = intel.channels as BrandChannel[];
   const visuals = intel.visuals as BrandVisual[];
   const keywords = intel.keywords as BrandKeyword[];
-  const documents = intel.documents as BrandDocument[];
+  const seedDocuments = documents.filter((d) => d.sourceType !== 'dm' && d.sourceType !== 'presentation');
+  const collaterals = documents.filter((d) => d.sourceType === 'dm' || d.sourceType === 'presentation');
   const pillars = (intel.examples as BrandExample[]).filter((e) => e.category === 'content_pillar');
   const hotTopics = (intel.examples as BrandExample[]).filter((e) => e.category === 'hot_topic_bank');
 
@@ -394,6 +424,118 @@ export function BrandIntelligence() {
     }
   }
 
+  async function uploadCollateral() {
+    if (!slug || !docFile) return;
+    setDocUploading(true);
+    setDocMessage(null);
+    try {
+      let result: { document: BrandDocument };
+      try {
+        result = await api.uploadBrandDocument(slug, {
+          file: docFile, sourceType: docKind, title: docTitle.trim() || undefined, notes: docNotes.trim() || undefined,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '';
+        if (!/key_points|extract_status|document_source_type/i.test(msg)) throw e;
+        setDocMessage('資料表尚未補齊欄位,正在自動更新…');
+        await api.migrateDocuments();
+        result = await api.uploadBrandDocument(slug, {
+          file: docFile, sourceType: docKind, title: docTitle.trim() || undefined, notes: docNotes.trim() || undefined,
+        });
+      }
+      setDocuments((prev) => [result.document, ...prev.filter((d) => d.id !== result.document.id)]);
+      setDocFile(null);
+      setDocTitle('');
+      setDocNotes('');
+      setDocMessage('已上傳並抽出賣點,之後排程與手動生成都會參考這份內容');
+    } catch (e) {
+      setDocMessage(e instanceof Error ? e.message : '上傳失敗');
+    } finally {
+      setDocUploading(false);
+    }
+  }
+
+  async function deleteCollateral(id: string) {
+    if (!slug) return;
+    setDocBusyId(id);
+    setDocMessage(null);
+    try {
+      await api.deleteBrandDocument(slug, id);
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+    } catch (e) {
+      setDocMessage(e instanceof Error ? e.message : '刪除失敗');
+    } finally {
+      setDocBusyId(null);
+    }
+  }
+
+  async function saveWebsite() {
+    if (!slug) return;
+    setWebsiteSaving(true);
+    setWebsiteMessage(null);
+    try {
+      const { brand: saved } = await api.updateBrand(slug, {
+        websiteUrl: websiteUrl.trim() || null,
+        websiteNote: websiteNote.trim() || null,
+      });
+      setWebsiteUrl(saved.websiteUrl ?? '');
+      setWebsiteNote(saved.websiteNote ?? '');
+      setWebsiteMessage('已寫入品牌資訊,給客戶的 LINE 訊息會帶上這個官網');
+    } catch (e) {
+      setWebsiteMessage(e instanceof Error ? e.message : '官網儲存失敗');
+    } finally {
+      setWebsiteSaving(false);
+    }
+  }
+
+  function toggleDoc(id: string) {
+    setSelectedDocIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function composeLinePack() {
+    if (!slug) return;
+    setLineBusy(true);
+    setDocMessage(null);
+    try {
+      const res = await api.composeCustomerLineMessage(slug, {
+        documentIds: selectedDocIds.length ? selectedDocIds : undefined,
+        customerHint: customerHint.trim() || undefined,
+      });
+      setLineMessage(res.message);
+      setLineFiles(res.files);
+      setDocMessage('已產出給客戶的 LINE 訊息,可直接複製貼上');
+    } catch (e) {
+      setDocMessage(e instanceof Error ? e.message : 'LINE 訊息產出失敗');
+    } finally {
+      setLineBusy(false);
+    }
+  }
+
+  async function copyLineMessage() {
+    if (!lineMessage) return;
+    try {
+      await navigator.clipboard.writeText(lineMessage);
+      setDocMessage('已複製到剪貼簿,可直接貼到 LINE');
+    } catch {
+      setDocMessage('瀏覽器無法自動複製,請手動選取文字');
+    }
+  }
+
+  async function generateFromCollateral(id: string) {
+    if (!slug) return;
+    setDocBusyId(id);
+    setDocMessage(null);
+    try {
+      const res = await api.generateFromBrandDocument(slug, id);
+      const fail = res.failures.length ? `, ${res.failures.length} 則失敗` : '';
+      setDocMessage(`已生成 ${res.created.length} 則社群草稿${fail},請到內容中心審閱`);
+    } catch (e) {
+      setDocMessage(e instanceof Error ? e.message : '生成失敗');
+    } finally {
+      setDocBusyId(null);
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -410,7 +552,10 @@ export function BrandIntelligence() {
 
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '4px 16px 0' }}>
-          <Tabs tabs={TABS} active={tab} onChange={setTab} />
+          <Tabs tabs={TABS} active={tab} onChange={(next) => {
+            setTab(next);
+            setSearchParams(next === 'core' ? {} : { tab: next }, { replace: true });
+          }} />
         </div>
         <div style={{ padding: 20 }}>
           <AnimatePresence mode="wait">
@@ -424,6 +569,26 @@ export function BrandIntelligence() {
               {tab === 'core' && (
                 <div style={{ display: 'grid', gap: 14 }}>
                   <Field label="一句話定位">{brand.tagline}</Field>
+                  <Field label="官方網站(給客戶 LINE 資訊包用,會寫進品牌資料)">
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <input
+                        placeholder="https:// 官方網站或產品入口"
+                        value={websiteUrl}
+                        onChange={(e) => setWebsiteUrl(e.target.value)}
+                        style={inputStyle}
+                      />
+                      <input
+                        placeholder="官網說明(選填,例如:產品介紹與方案以官網為準)"
+                        value={websiteNote}
+                        onChange={(e) => setWebsiteNote(e.target.value)}
+                        style={inputStyle}
+                      />
+                      <Button variant="secondary" style={{ justifySelf: 'start' }} disabled={websiteSaving} onClick={() => void saveWebsite()}>
+                        {websiteSaving ? '儲存中…' : '儲存官網資訊'}
+                      </Button>
+                      {websiteMessage && <p style={{ fontSize: 12, color: 'var(--color-primary-dark)', margin: 0 }}>{websiteMessage}</p>}
+                    </div>
+                  </Field>
                   <Field label="內容支柱(Content Pillars)">
                     <div style={{ display: 'grid', gap: 8 }}>
                       {pillars.map((p) => (
@@ -721,6 +886,131 @@ export function BrandIntelligence() {
                 </div>
               )}
 
+              {tab === 'collateral' && (
+                <div style={{ display: 'grid', gap: 16 }}>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0 }}>
+                    每個品牌各自上傳 EDM 與產品簡報(PDF／PPT／PPTX)。抽出的賣點會寫進品牌智慧;客戶要資料時,可產出一則包含檔案連結與官方網站的 LINE 訊息。
+                  </p>
+                  {docMessage && <p style={{ fontSize: 13, color: 'var(--color-primary-dark)' }}>{docMessage}</p>}
+                  <div style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
+                    <strong style={{ fontSize: 13 }}>產出給客戶的 LINE 訊息</strong>
+                    <input
+                      placeholder="客戶想了解什麼(選填,例如報價、導入流程、活動檔期)"
+                      value={customerHint}
+                      onChange={(e) => setCustomerHint(e.target.value)}
+                      style={inputStyle}
+                    />
+                    <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
+                      勾選下方要附上的 EDM／簡報;都不勾就帶入全部。官網請先在「品牌核心」填好。
+                    </p>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <Button variant="primary" disabled={lineBusy || (collaterals.length === 0 && !websiteUrl.trim())} onClick={() => void composeLinePack()}>
+                        {lineBusy ? '產出中…' : '產出 LINE 訊息'}
+                      </Button>
+                      <Button variant="secondary" disabled={!lineMessage} onClick={() => void copyLineMessage()}>複製訊息</Button>
+                    </div>
+                    {lineMessage && (
+                      <textarea readOnly value={lineMessage} style={{ ...inputStyle, minHeight: 220, whiteSpace: 'pre-wrap' }} />
+                    )}
+                    {lineFiles.length > 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                        附件連結:{lineFiles.map((f) => `${f.kind}《${f.title}》`).join('、')}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
+                    <strong style={{ fontSize: 13 }}>上傳 EDM 或產品簡報</strong>
+                    <div className="grid-2" style={{ gap: 8 }}>
+                      <select value={docKind} onChange={(e) => setDocKind(e.target.value as 'dm' | 'presentation')} style={inputStyle}>
+                        <option value="dm">EDM／傳單／活動海報</option>
+                        <option value="presentation">產品簡報（PDF／PPT／PPTX）</option>
+                      </select>
+                      <input placeholder="標題(選填,空白則用檔名)" value={docTitle} onChange={(e) => setDocTitle(e.target.value)} style={inputStyle} />
+                    </div>
+                    <input
+                      type="file"
+                      accept={docKind === 'dm' ? 'image/*,.pdf' : '.pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation'}
+                      onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                      style={{ fontSize: 12 }}
+                    />
+                    <input
+                      placeholder="補充說明(選填,例如檔期 8/1–8/31、只給 B 端看)"
+                      value={docNotes}
+                      onChange={(e) => setDocNotes(e.target.value)}
+                      style={inputStyle}
+                    />
+                    <Button variant="primary" style={{ justifySelf: 'start' }} disabled={!docFile || docUploading} onClick={() => void uploadCollateral()}>
+                      {docUploading ? '上傳並抽取中…' : '+ 上傳並抽出賣點'}
+                    </Button>
+                    <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
+                      EDM 建議 JPG／PNG；簡報請上傳 PDF、PPT 或 PPTX。舊版 PPT／掃描檔若抽不出字,仍會存檔,可補說明後產出 LINE 訊息。單檔 40MB 以內。
+                    </p>
+                  </div>
+                  {collaterals.map((d) => {
+                    const isImage = !!d.mimeType?.startsWith('image/') && d.fileUrl;
+                    return (
+                      <div key={d.id} style={cardBoxStyle}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginRight: 4 }}>
+                            <input type="checkbox" checked={selectedDocIds.includes(d.id)} onChange={() => toggleDoc(d.id)} />
+                            附在 LINE
+                          </label>
+                          <Badge tone={d.sourceType === 'dm' ? 'primary' : 'secondary'}>
+                            {d.sourceType === 'dm' ? 'EDM' : '簡報'}
+                          </Badge>
+                          <Badge tone={d.extractStatus === 'ready' ? 'primary' : d.extractStatus === 'failed' ? 'danger' : 'accent'}>
+                            {d.extractStatus === 'ready' ? '已抽出賣點' : d.extractStatus === 'failed' ? '抽取失敗' : '處理中'}
+                          </Badge>
+                          {d.createdAt && <Badge tone="default">{new Date(d.createdAt).toLocaleDateString('zh-TW')}</Badge>}
+                        </div>
+                        <strong style={{ fontSize: 14 }}>{d.title}</strong>
+                        {isImage && (
+                          <img
+                            src={d.fileUrl ?? ''}
+                            alt={d.title}
+                            style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 8, marginTop: 8, background: 'var(--color-bg-soft)' }}
+                          />
+                        )}
+                        {d.rawContent && (
+                          <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 8, whiteSpace: 'pre-wrap' }}>{d.rawContent}</div>
+                        )}
+                        {(d.keyPoints ?? []).length > 0 && (
+                          <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
+                            {(d.keyPoints ?? []).map((p) => <li key={p}>{p}</li>)}
+                          </ul>
+                        )}
+                        {d.fileUrl && (
+                          <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, display: 'inline-block', marginTop: 8 }}>
+                            下載原檔 →
+                          </a>
+                        )}
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                          <Button
+                            variant="secondary"
+                            style={{ padding: '4px 10px', fontSize: 12 }}
+                            disabled={docBusyId === d.id || d.extractStatus !== 'ready'}
+                            onClick={() => void generateFromCollateral(d.id)}
+                          >
+                            {docBusyId === d.id ? '生成中…' : '用這份生成社群貼文'}
+                          </Button>
+                          <Button
+                            variant="danger"
+                            style={{ padding: '4px 10px', fontSize: 12 }}
+                            disabled={docBusyId === d.id}
+                            onClick={() => void deleteCollateral(d.id)}
+                          >
+                            刪除
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {collaterals.length === 0 && (
+                    <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>這個品牌還沒有 EDM 或簡報。上傳後就能產出給客戶的 LINE 訊息,排程發文也會參考。</p>
+                  )}
+                </div>
+              )}
+
               {tab === 'visual' && (
                 <div className="grid-4" style={{ gap: 12 }}>
                   {visuals.map((v) => (
@@ -828,7 +1118,7 @@ export function BrandIntelligence() {
                       <div />
                     </Field>
                     <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
-                      {documents.map((d) => (
+                      {seedDocuments.map((d) => (
                         <div key={d.id} className="card-row" style={{ ...cardBoxStyle, alignItems: 'center', flexWrap: 'wrap' }}>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600 }}>{d.title}</div>
@@ -837,8 +1127,8 @@ export function BrandIntelligence() {
                           <Badge tone="secondary">{d.sourceType}</Badge>
                         </div>
                       ))}
-                      {documents.length === 0 && (
-                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>尚無文件資料</p>
+                      {seedDocuments.length === 0 && (
+                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>尚無文件資料。EDM／簡報請到「EDM／簡報」分頁上傳。</p>
                       )}
                     </div>
                   </div>

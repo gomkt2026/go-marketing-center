@@ -25,6 +25,8 @@ export interface Brand {
   primaryColor: string;
   logoInitial: string;
   logoUrl: string | null;
+  websiteUrl?: string | null;
+  websiteNote?: string | null;
   currentVersionId: string;
   versionNumber?: number | null;
 }
@@ -121,12 +123,20 @@ export interface BrandExample {
   weightPercent?: number;
 }
 
+export type BrandDocumentExtractStatus = 'pending' | 'ready' | 'failed';
+
 export interface BrandDocument {
   id: string;
   brandId: string;
   sourceType: string;
   title: string;
-  fileUrl: string;
+  fileUrl: string | null;
+  rawContent?: string | null;
+  keyPoints?: string[];
+  extractStatus?: BrandDocumentExtractStatus;
+  fileName?: string | null;
+  mimeType?: string | null;
+  createdAt?: string;
 }
 
 export type BrandAssetImageCategory =

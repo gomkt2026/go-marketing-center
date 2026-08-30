@@ -47,6 +47,11 @@ export interface VideoStrategy {
   brandSlug: string | null;
 }
 
+export interface EdlChunkLine {
+  order: number;
+  text: string;
+}
+
 export interface EdlSegment {
   id: string;
   sourceKey: string | null;
@@ -58,6 +63,8 @@ export interface EdlSegment {
   text: string;
   fadeInMs: number;
   fadeOutMs: number;
+  /** 同一支來源音檔裡的全部台詞,渲染時用來依字數比例對齊真實音檔 */
+  chunkLines?: EdlChunkLine[];
 }
 
 export interface EditPack {
@@ -109,7 +116,6 @@ export interface VideoJobRow {
 const CHARS_PER_SEC = 4.2;
 const TARGET_SECONDS = 30;
 const FADE_MS = 30;
-const PAD_MS = 80;
 
 /** 模型有時把 speakers 回成「阿豪、小咪」字串,統一收成字串陣列 */
 export function normalizeSpeakers(value: unknown): string[] {
@@ -512,31 +518,42 @@ function buildPodcastEdl(
   if (!picked.length) throw new Error('候選的逐字稿範圍是空的');
 
   const edl: EdlSegment[] = [];
-  let cursor = 0;
   for (const line of picked) {
     const host = hosts.find((h) => h.agentId === line.agentId || h.nickname === line.nickname);
     const seg = segments.find((s) =>
       (s.lines ?? []).some((x) => x.order === line.order) || s.label === line.segmentLabel,
     );
+    const chunkLines = (seg?.lines ?? [])
+      .map((x) => ({ order: x.order, text: x.text }))
+      .filter((x) => x.text);
+    const siblings = chunkLines.length
+      ? chunkLines
+      : [{ order: line.order, text: line.text }];
+    let startMs = 0;
+    for (const prev of siblings) {
+      if (prev.order === line.order) break;
+      startMs += estimateLineDurationMs(prev.text);
+    }
     const dur = estimateLineDurationMs(line.text);
     edl.push({
       id: `l${line.order}`,
       sourceKey: mediaUrlToKey(seg?.audio_url ?? null),
       sourceUrl: seg?.audio_url ?? null, // 寫 pack 時再轉公開 URL
-      startMs: cursor,
-      endMs: cursor + dur,
+      startMs,
+      endMs: startMs + dur,
       speaker: line.nickname,
       brandSlug: host?.brandSlug ?? null,
       text: line.text,
       fadeInMs: FADE_MS,
       fadeOutMs: FADE_MS,
+      chunkLines: siblings,
     });
-    cursor += dur + PAD_MS;
   }
 
   // 超過 32 秒就從尾端裁到約 30 秒(保留完整句)
   const maxMs = 32_000;
-  while (edl.length > 1 && (edl[edl.length - 1].endMs > maxMs)) {
+  const spanMs = (seg: EdlSegment) => Math.max(0, seg.endMs - seg.startMs);
+  while (edl.length > 1 && edl.reduce((n, seg) => n + spanMs(seg), 0) > maxMs) {
     edl.pop();
   }
   return edl;
@@ -620,17 +637,46 @@ function formatSrtTime(ms: number): string {
 }
 
 export function edlToSrt(edl: EdlSegment[]): string {
-  return edl.map((seg, i) => {
-    const text = wrapSubtitle(seg.text);
-    return `${i + 1}\n${formatSrtTime(seg.startMs)} --> ${formatSrtTime(seg.endMs)}\n${text}\n`;
-  }).join('\n');
+  let cursor = 0;
+  let index = 0;
+  const blocks: string[] = [];
+  for (const seg of edl) {
+    const phrases = splitPhrases(seg.text);
+    const totalChars = phrases.reduce((n, p) => n + p.replace(/\s+/g, '').length, 0) || 1;
+    const segDur = Math.max(300, seg.endMs - seg.startMs);
+    for (const phrase of phrases) {
+      const chars = phrase.replace(/\s+/g, '').length || 1;
+      const dur = Math.max(400, Math.round(segDur * (chars / totalChars)));
+      index += 1;
+      blocks.push(
+        `${index}\n${formatSrtTime(cursor)} --> ${formatSrtTime(cursor + dur)}\n${wrapSubtitle(phrase)}\n`,
+      );
+      cursor += dur;
+    }
+  }
+  return blocks.join('\n');
+}
+
+function splitPhrases(text: string): string[] {
+  const raw = (text || '').replace(/\s+/g, '').trim();
+  if (!raw) return [' '];
+  const parts = raw.split(/(?<=[！？。!?，,；;…])/).map((p) => p.trim()).filter(Boolean);
+  const out: string[] = [];
+  for (const part of parts) {
+    if (part.length <= 18) out.push(part);
+    else {
+      for (let i = 0; i < part.length; i += 14) out.push(part.slice(i, i + 14));
+    }
+  }
+  return out.length ? out : [raw];
 }
 
 function wrapSubtitle(text: string, max = 14): string {
   const clean = text.replace(/\s+/g, '');
-  if (clean.length <= max) return clean;
-  const mid = Math.min(max, Math.ceil(clean.length / 2));
-  return `${clean.slice(0, mid)}\n${clean.slice(mid, mid + max)}`;
+  if (!clean) return ' ';
+  const lines: string[] = [];
+  for (let i = 0; i < clean.length; i += max) lines.push(clean.slice(i, i + max));
+  return lines.join('\n');
 }
 
 export async function adjustVideoJob(

@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "sopId": "taskgo-online-repair-leak",
+  "catalogKey": "SOP-01",
+  "brandSlug": "taskgo",
+  "audience": "backoffice",
+  "title": "線上報修＋建立漏水場勘",
+  "goal": "送出漏水報修，後台建案，並把場勘連結傳給工班",
+  "sourcePath": "/Users/benchen/Desktop/線上報修加上防水場勘.mov",
+  "sourceKind": "desktop",
+  "narrator": "阿豪",
+  "voiceId": "auoHciLZJwKTwYUoRTYz",
+  "nextSopId": "taskgo-mobile-leak-survey",
+  "cues": [
+    {
+      "id": "c00",
+      "startMs": 0,
+      "endMs": 5500,
+      "step": 0,
+      "stepTotal": 8,
+      "action": "開場",
+      "target": "線上報修表單",
+      "narration": "這支給後勤。先送報修，再把場勘連結傳給工班。",
+      "subtitle": "後勤：先送報修，再傳場勘連結"
+    },
+    {
+      "id": "c01",
+      "startMs": 5500,
+      "endMs": 16000,
+      "step": 1,
+      "stepTotal": 8,
+      "action": "選案件類型",
+      "target": "漏水場勘",
+      "narration": "案件類型一定要選「漏水場勘」。選成一般修繕，場勘 SOP 帶不出來。",
+      "subtitle": "案件類型選「漏水場勘」"
+    },
+    {
+      "id": "c02",
+      "startMs": 16000,
+      "endMs": 32000,
+      "step": 2,
+      "stepTotal": 8,
+      "action": "填聯絡",
+      "target": "聯絡人",
+      "narration": "專案類型可選。委託單位、聯絡人、電話填起來。沒地址也能先送。",
+      "subtitle": "填委託單位、聯絡人、電話"
+    },
+    {
+      "id": "c03",
+      "startMs": 32000,
+      "endMs": 48000,
+      "step": 3,
+      "stepTotal": 8,
+      "action": "填地址與內容",
+      "target": "修繕內容",
+      "narration": "房東電話能填就填，對方才能看進度。地址含樓層。修繕內容必填。",
+      "subtitle": "填地址與必填「修繕內容」"
+    },
+    {
+      "id": "c04",
+      "startMs": 48000,
+      "endMs": 70000,
+      "step": 4,
+      "stepTotal": 8,
+      "action": "時間與照片",
+      "target": "送出報修",
+      "narration": "填預計施工和完工日。現場照片可先傳。最後點紫色「送出報修」。",
+      "subtitle": "填工期，再點「送出報修」"
+    },
+    {
+      "id": "c05",
+      "startMs": 70000,
+      "endMs": 88000,
+      "step": 5,
+      "stepTotal": 8,
+      "action": "進後台",
+      "target": "修繕管理",
+      "narration": "送出後到 TaskGo「修繕管理」。公開表單連結在「接單設定」。",
+      "subtitle": "後台打開「修繕管理」"
+    },
+    {
+      "id": "c06",
+      "startMs": 88000,
+      "endMs": 108000,
+      "step": 6,
+      "stepTotal": 8,
+      "action": "打開案件",
+      "target": "報價/派工工作單",
+      "narration": "打開剛進來的案件。核對聯絡資訊。漏水案不要勾「略過場勘」。",
+      "subtitle": "打開案件，不要勾「略過場勘」"
+    },
+    {
+      "id": "c07",
+      "startMs": 108000,
+      "endMs": 126000,
+      "step": 7,
+      "stepTotal": 8,
+      "action": "複製場勘連結",
+      "target": "複製",
+      "narration": "往下到「場勘地點」，狀態是「待回報」。點「複製」，把連結傳給工班。",
+      "subtitle": "「場勘地點」點「複製」傳工班"
+    },
+    {
+      "id": "c08",
+      "startMs": 126000,
+      "endMs": 141000,
+      "step": 8,
+      "stepTotal": 8,
+      "action": "預覽 SOP",
+      "target": "漏水場勘估價 SOP",
+      "narration": "工班打開就是這張「漏水場勘估價 SOP」。後勤也可先打開看要填哪些。",
+      "subtitle": "連結打開即是「漏水場勘估價 SOP」"
+    },
+    {
+      "id": "c09",
+      "startMs": 141000,
+      "endMs": 144300,
+      "step": 8,
+      "stepTotal": 8,
+      "action": "收尾",
+      "target": "場勘地點",
+      "narration": "下一步：工班用這條連結做手機場勘。",
+      "subtitle": "下一步：工班手機場勘"
+    }
+  ]
+}

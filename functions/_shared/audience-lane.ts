@@ -75,9 +75,9 @@ export async function ensureAudienceLane(env: Env): Promise<void> {
         hashtag_count_min, hashtag_count_max
       )
       SELECT b.id, b.current_version_id, 'instagram',
-             '視覺優先、工地語錄卡',
+             '視覺優先、匠管海軍藍設計圖',
              '80-180字,前125字完整hook',
-             '4:5 痛點主標+現場情境,第一張強hook',
+             '4:5 斜切深藍+工地實拍,第一張強hook',
              8, 12
       FROM brands b
       WHERE b.slug = 'taskgo'
@@ -89,9 +89,9 @@ export async function ensureAudienceLane(env: Env): Promise<void> {
       UPDATE brand_channels c
       SET length_guideline = '80-180字,前125字完整hook',
           format_guideline = CASE b.slug
-            WHEN 'washgo' THEN '4:5 系統畫面或簡報風畫面卡,禁止 AI 店員海報與吉卜力'
-            WHEN 'taskgo' THEN '4:5 派工/回報系統畫面或工地語錄卡,第一張強hook'
-            ELSE '4:5 系統畫面或痛點主標+搜尋打標籤,第一張強hook'
+            WHEN 'washgo' THEN '4:5 痛點海報+系統重點卡,不要整頁截圖直發'
+            WHEN 'taskgo' THEN '4:5 斜切深藍痛點海報+派工畫面卡,第一張強hook'
+            ELSE '4:5 痛點主標+情境+系統解法卡,第一張強hook'
           END,
           hashtag_count_min = 8,
           hashtag_count_max = 12
@@ -122,6 +122,27 @@ export async function ensureAudienceLane(env: Env): Promise<void> {
           SELECT 1 FROM brand_visuals v
           WHERE v.brand_id = b.id AND v.label = 'IG輪播尺寸'
         )`;
+    await sql`
+      INSERT INTO brand_visuals (brand_id, brand_version_id, label, value, category, sort_order)
+      SELECT b.id, b.current_version_id, v.label, v.value, v.category, v.sort_order
+      FROM brands b
+      JOIN (VALUES
+        ('主色-海軍藍', '#0B2D5C', 'color', 2),
+        ('主色-青藍', '#2BA3D6', 'color', 3),
+        ('強調-安全橘', '#ED9121', 'color', 4),
+        ('強調-黃', '#F7B500', 'color', 5),
+        ('圖文構圖', '斜切深藍banner+工地實拍+蜂巢紋+藍機器人吉祥物', 'layout', 6)
+      ) AS v(label, value, category, sort_order) ON TRUE
+      WHERE b.slug = 'taskgo'
+        AND NOT EXISTS (
+          SELECT 1 FROM brand_visuals x
+          WHERE x.brand_id = b.id AND x.label = v.label
+        )`;
+    await sql`
+      UPDATE brand_channels c
+      SET tone_of_voice = '視覺優先、匠管海軍藍設計圖'
+      FROM brands b
+      WHERE c.brand_id = b.id AND b.slug = 'taskgo' AND c.platform = 'instagram'`;
   })();
   try {
     await applied;

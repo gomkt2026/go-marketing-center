@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "sopId": "taskgo-mobile-leak-survey",
+  "catalogKey": "SOP-02",
+  "brandSlug": "taskgo",
+  "audience": "crew",
+  "title": "手機漏水場勘 SOP",
+  "goal": "工班依現場逐項回報，讓後台能帶入精準報價",
+  "sourcePath": "/Users/benchen/Downloads/手機場勘(防水).mp4",
+  "sourceKind": "mobile",
+  "narrator": "阿豪",
+  "voiceId": "auoHciLZJwKTwYUoRTYz",
+  "nextSopId": "taskgo-survey-to-quote",
+  "cues": [
+    {
+      "id": "c00",
+      "startMs": 0,
+      "endMs": 7000,
+      "step": 0,
+      "stepTotal": 7,
+      "action": "開場",
+      "target": "Taskgo_line",
+      "narration": "這支給工班。打開後勤傳來的連結，照現場把 SOP 填完。",
+      "subtitle": "工班：打開場勘連結，逐項回報"
+    },
+    {
+      "id": "c01",
+      "startMs": 7000,
+      "endMs": 18000,
+      "step": 1,
+      "stepTotal": 7,
+      "action": "核對客戶",
+      "target": "漏水場勘估價 SOP",
+      "narration": "標題是「漏水場勘估價 SOP」。先核對客戶姓名地址。有加官方 LINE 就勾。",
+      "subtitle": "核對客戶，有加 LINE 就勾"
+    },
+    {
+      "id": "c02",
+      "startMs": 18000,
+      "endMs": 30000,
+      "step": 2,
+      "stepTotal": 7,
+      "action": "填位置",
+      "target": "漏水位置",
+      "narration": "「漏水位置」要寫具體，例如客廳天花板。不要只寫漏水。",
+      "subtitle": "「漏水位置」寫具體位置"
+    },
+    {
+      "id": "c03",
+      "startMs": 30000,
+      "endMs": 42000,
+      "step": 3,
+      "stepTotal": 7,
+      "action": "選現況",
+      "target": "下雨才漏",
+      "narration": "「漏水現況」可用快捷標籤。這裡選「下雨才漏」。",
+      "subtitle": "「漏水現況」點對的標籤"
+    },
+    {
+      "id": "c04",
+      "startMs": 42000,
+      "endMs": 56000,
+      "step": 4,
+      "stepTotal": 7,
+      "action": "判斷與面積",
+      "target": "面積（坪）",
+      "narration": "初步判斷寫你看到的原因。長寬高能量就量。「面積」必填。",
+      "subtitle": "填原因，面積（坪）必填"
+    },
+    {
+      "id": "c05",
+      "startMs": 56000,
+      "endMs": 72000,
+      "step": 5,
+      "stepTotal": 7,
+      "action": "工法與金額",
+      "target": "建議工法",
+      "narration": "「建議工法」可多選。再填「初估金額」和保固。預設保固一年。",
+      "subtitle": "多選「建議工法」，填初估金額"
+    },
+    {
+      "id": "c06",
+      "startMs": 72000,
+      "endMs": 86000,
+      "step": 6,
+      "stepTotal": 7,
+      "action": "工班資料與照片",
+      "target": "工班名稱",
+      "narration": "填「工班名稱」和「工班電話」。場勘照片用拍照或相簿，建議一定傳。",
+      "subtitle": "填工班名稱電話，上傳場勘照片"
+    },
+    {
+      "id": "c07",
+      "startMs": 86000,
+      "endMs": 95000,
+      "step": 7,
+      "stepTotal": 7,
+      "action": "完成回報",
+      "target": "完成回報",
+      "narration": "最下面點紫色「完成回報」。上面客戶參考照片是唯讀，不用管。",
+      "subtitle": "最下面點「完成回報」"
+    },
+    {
+      "id": "c08",
+      "startMs": 95000,
+      "endMs": 97970,
+      "step": 7,
+      "stepTotal": 7,
+      "action": "收尾",
+      "target": "工班已完成回報",
+      "narration": "變成綠色「工班已完成回報」就對了。下一步後勤帶入報價。",
+      "subtitle": "看到「工班已完成回報」就完成"
+    }
+  ]
+}

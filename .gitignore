@@ -17,6 +17,17 @@ Thumbs.db
 # 短影音本機渲染產物(原始素材不進這裡)
 edit/
 
+# 操作 SOP 教學片產物(來源錄影不進 git)
+sop-assets/**/voice/
+sop-assets/**/preview.mp4
+sop-assets/**/final.mp4
+sop-assets/**/overlay.ass
+sop-assets/**/qa/
+
+# 從後台下載的 Podcast 片頭(本機快取)
+podcast-assets/theme-intro.mp3
+
+
 # 建置輸出
 dist/
 .output/

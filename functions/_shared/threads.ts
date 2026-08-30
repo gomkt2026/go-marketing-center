@@ -47,24 +47,193 @@ export async function getThreadsAccount(env: Env, brandId: string): Promise<Thre
     return null;
   }
 
-  // external_id 未填時,用 token 反查 Threads user id
+  // 一律用目前 token 打 /me,避免資料庫裡的 external_id 是 IG/FB 使用者 ID
+  // (POST /{錯的 id}/threads 會回 400「API access to this object is restricted」)
   let userId = row.external_id;
-  if (!userId) {
-    try {
-      const res = await fetch(`${THREADS_API}/me?fields=id&access_token=${encodeURIComponent(token)}`);
-      if (res.ok) {
-        const data = await res.json() as { id?: string };
-        userId = data.id ?? null;
+  let username = row.account_name;
+  try {
+    const res = await fetch(`${THREADS_API}/me?fields=id,username&access_token=${encodeURIComponent(token)}`);
+    if (res.ok) {
+      const data = await res.json() as { id?: string; username?: string };
+      if (data.id) {
+        userId = data.id;
+        if (data.username) username = data.username;
+        if (data.id !== row.external_id || (data.username && data.username !== row.account_name)) {
+          await sql`
+            UPDATE brand_social_accounts
+            SET external_id = ${data.id}, account_name = COALESCE(${data.username ?? null}, account_name)
+            WHERE id = ${row.id}::uuid
+          `;
+        }
       }
-    } catch { /* 保持 null */ }
-  }
+    }
+  } catch { /* 退回資料庫裡的 id */ }
   if (!userId) return null;
 
   return {
     accountId: row.id, threadsUserId: userId, accessToken: token,
     autoPublish: row.auto_publish, autoReply: row.auto_reply,
-    replyDailyCap: row.reply_daily_cap ?? 12, username: row.account_name,
+    replyDailyCap: row.reply_daily_cap ?? 12, username,
   };
+}
+
+function formatThreadsApiError(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body) as {
+      error?: { message?: string; error_user_msg?: string; code?: number };
+    };
+    const e = parsed.error;
+    if (e) {
+      const msg = e.error_user_msg || e.message || body;
+      const accessDenied = e.code === 200 || /API access blocked/i.test(msg);
+      const hint = accessDenied
+        ? ' Meta 已封鎖此 App 的 Threads 發文 API。請到 developers.facebook.com 完成開發者帳號驗證；確認發文帳號是 App 測試人員或已通過 App Review；重新授權並貼上含 threads_content_publish 的 60 天長效 token。'
+        : '';
+      return `${status}${e.code != null ? `/${e.code}` : ''}: ${msg}${hint}`;
+    }
+  } catch { /* 不是 JSON */ }
+  return `${status}: ${body.slice(0, 300)}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function isMediaNotReady(message: string): boolean {
+  return /media with id|not (?:yet )?available|not ready|media not found|in progress/i.test(message);
+}
+
+/**
+ * 等 container 變成 FINISHED 再 publish。
+ * 純文字也要等:立刻呼叫 threads_publish 會 400「The media with ID … is not available」。
+ */
+async function waitForContainerReady(
+  accessToken: string,
+  containerId: string,
+  maxMs = 25000,
+): Promise<void> {
+  await sleep(2500);
+  const started = Date.now();
+  let sawInProgress = false;
+  while (Date.now() - started < maxMs) {
+    try {
+      const res = await fetch(
+        `${THREADS_API}/${containerId}?fields=status,error_message&access_token=${encodeURIComponent(accessToken)}`,
+      );
+      if (res.ok) {
+        const data = await res.json() as { status?: string; error_message?: string };
+        if (data.status === 'FINISHED' || data.status === 'PUBLISHED') return;
+        if (data.status === 'ERROR' || data.status === 'EXPIRED') {
+          throw new Error(`Threads container ${data.status}${data.error_message ? `: ${data.error_message}` : ''}`);
+        }
+        if (data.status === 'IN_PROGRESS') sawInProgress = true;
+      } else if (!sawInProgress) {
+        // 純文字常查不到 status,等過第一段即可發布
+        return;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/container (ERROR|EXPIRED)/i.test(msg)) throw e;
+      if (!sawInProgress) return;
+    }
+    await sleep(2000);
+  }
+}
+
+async function publishContainer(accessToken: string, creationId: string): Promise<{ id: string }> {
+  const publishRes = await fetch(`${THREADS_API}/me/threads_publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ access_token: accessToken, creation_id: creationId }).toString(),
+  });
+  if (!publishRes.ok) {
+    const text = await publishRes.text().catch(() => '');
+    throw new Error(`Threads 發布失敗 (${formatThreadsApiError(publishRes.status, text)})`);
+  }
+  return await publishRes.json() as { id: string };
+}
+
+async function createAndPublish(
+  accessToken: string,
+  params: { text: string; imageUrl?: string | null; videoUrl?: string | null; replyToId?: string },
+): Promise<{ id: string }> {
+  const container = await createThreadsContainer(accessToken, params);
+  const waitMs = params.videoUrl ? 40000 : params.imageUrl ? 30000 : 20000;
+  await waitForContainerReady(accessToken, container.id, waitMs);
+  try {
+    return await publishContainer(accessToken, container.id);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!isMediaNotReady(msg)) throw e;
+    await sleep(4000);
+    await waitForContainerReady(accessToken, container.id, 12000);
+    return await publishContainer(accessToken, container.id);
+  }
+}
+
+async function createThreadsContainer(
+  accessToken: string,
+  params: { text: string; imageUrl?: string | null; videoUrl?: string | null; replyToId?: string },
+): Promise<{ id: string }> {
+  const containerParams = new URLSearchParams({
+    access_token: accessToken,
+    text: normalizeMultilineText(params.text).slice(0, 500),
+  });
+  if (params.replyToId) containerParams.set('reply_to_id', params.replyToId);
+  if (params.videoUrl) {
+    containerParams.set('media_type', 'VIDEO');
+    containerParams.set('video_url', params.videoUrl);
+  } else if (params.imageUrl) {
+    containerParams.set('media_type', 'IMAGE');
+    containerParams.set('image_url', params.imageUrl);
+  } else {
+    containerParams.set('media_type', 'TEXT');
+  }
+
+  // 走 /me,不要用可能填錯的 Threads user id
+  const createRes = await fetch(`${THREADS_API}/me/threads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: containerParams.toString(),
+  });
+  if (!createRes.ok) {
+    const text = await createRes.text().catch(() => '');
+    throw new Error(`Threads container 建立失敗 (${formatThreadsApiError(createRes.status, text)})`);
+  }
+  return await createRes.json() as { id: string };
+}
+
+export function isThreadsAccessBlocked(message: string): boolean {
+  return /API access blocked|#200\b|400\/200/i.test(message);
+}
+
+export const THREADS_ACCESS_BLOCKED_NOTE =
+  'Meta 已封鎖此 App 的 Threads 發文 API（API access blocked）。請到 developers.facebook.com 完成開發者帳號驗證；確認發文帳號是 App 測試人員或已通過 App Review；重新授權並貼上含 threads_content_publish 的 60 天長效 token，再按「測試連線」。修好前系統不會自動重試。';
+
+/** 測試讀取 + 發文權限:建立 TEXT container 但不發布(24 小時後過期) */
+export async function probeThreadsPublishAccess(token: string): Promise<{
+  ok: boolean; detail: string; userId: string | null;
+}> {
+  const meRes = await fetch(`${THREADS_API}/me?fields=id,username&access_token=${encodeURIComponent(token)}`);
+  const me = await meRes.json().catch(() => ({})) as { id?: string; username?: string; error?: { message?: string } };
+  if (!meRes.ok || !me.id) {
+    return { ok: false, detail: `Threads /me 失敗:${me.error?.message ?? meRes.statusText}`, userId: null };
+  }
+  try {
+    await createThreadsContainer(token, { text: '（系統連線測試，此則不會發布）' });
+    return {
+      ok: true,
+      detail: `讀取與發文權限都正常(@${me.username ?? me.id})。測試 container 未發布，24 小時後過期。`,
+      userId: me.id,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      detail: isThreadsAccessBlocked(msg) ? THREADS_ACCESS_BLOCKED_NOTE : msg,
+      userId: me.id,
+    };
+  }
 }
 
 export interface ThreadsPublishResult {
@@ -137,36 +306,9 @@ export async function replyToThreadsPost(
   account: ThreadsAccount,
   params: { text: string; replyToId: string },
 ): Promise<ThreadsPublishResult> {
-  const containerParams = new URLSearchParams({
-    access_token: account.accessToken,
-    media_type: 'TEXT',
-    text: normalizeMultilineText(params.text).slice(0, 500),
-    reply_to_id: params.replyToId,
+  const published = await createAndPublish(account.accessToken, {
+    text: params.text, replyToId: params.replyToId,
   });
-  const createRes = await fetch(`${THREADS_API}/${account.threadsUserId}/threads`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: containerParams.toString(),
-  });
-  if (!createRes.ok) {
-    const text = await createRes.text().catch(() => '');
-    throw new Error(`Threads 回覆 container 建立失敗 (${createRes.status}): ${text.slice(0, 300)}`);
-  }
-  const container = await createRes.json() as { id: string };
-
-  // container 建立後 Threads 端需要一點處理時間,太快發布會出現「Media not found」
-  await new Promise((r) => setTimeout(r, 3000));
-
-  const publishRes = await fetch(`${THREADS_API}/${account.threadsUserId}/threads_publish`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ access_token: account.accessToken, creation_id: container.id }).toString(),
-  });
-  if (!publishRes.ok) {
-    const text = await publishRes.text().catch(() => '');
-    throw new Error(`Threads 回覆發布失敗 (${publishRes.status}): ${text.slice(0, 300)}`);
-  }
-  const published = await publishRes.json() as { id: string };
 
   let permalink: string | null = null;
   try {
@@ -185,47 +327,21 @@ export async function publishThreadsPost(
   account: ThreadsAccount,
   params: { text: string; imageUrl?: string | null; videoUrl?: string | null },
 ): Promise<ThreadsPublishResult> {
-  // 1. 建立 media container(發布前把字面 \n 修成真換行,保險舊資料)
-  const containerParams = new URLSearchParams({
-    access_token: account.accessToken,
-    text: normalizeMultilineText(params.text).slice(0, 500), // Threads 上限 500 字
-  });
-  if (params.videoUrl) {
-    containerParams.set('media_type', 'VIDEO');
-    containerParams.set('video_url', params.videoUrl);
-  } else if (params.imageUrl) {
-    containerParams.set('media_type', 'IMAGE');
-    containerParams.set('image_url', params.imageUrl);
-  } else {
-    containerParams.set('media_type', 'TEXT');
+  let published: { id: string };
+  try {
+    published = await createAndPublish(account.accessToken, {
+      text: params.text, imageUrl: params.imageUrl, videoUrl: params.videoUrl,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const hadMedia = !!(params.imageUrl || params.videoUrl);
+    if (hadMedia && (/container 建立失敗|container ERROR|發布失敗|media with id/i.test(msg))) {
+      console.warn(`[threads] 帶媒體發布失敗,改發純文字: ${msg.slice(0, 200)}`);
+      published = await createAndPublish(account.accessToken, { text: params.text });
+    } else {
+      throw e;
+    }
   }
-
-  const createRes = await fetch(`${THREADS_API}/${account.threadsUserId}/threads`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: containerParams.toString(),
-  });
-  if (!createRes.ok) {
-    const text = await createRes.text().catch(() => '');
-    throw new Error(`Threads container 建立失敗 (${createRes.status}): ${text.slice(0, 300)}`);
-  }
-  const container = await createRes.json() as { id: string };
-
-  // 2. 帶圖/影片時官方建議稍等 container 處理完成
-  if (params.videoUrl) await new Promise((r) => setTimeout(r, 8000));
-  else if (params.imageUrl) await new Promise((r) => setTimeout(r, 5000));
-
-  // 3. 發布 container
-  const publishRes = await fetch(`${THREADS_API}/${account.threadsUserId}/threads_publish`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ access_token: account.accessToken, creation_id: container.id }).toString(),
-  });
-  if (!publishRes.ok) {
-    const text = await publishRes.text().catch(() => '');
-    throw new Error(`Threads 發布失敗 (${publishRes.status}): ${text.slice(0, 300)}`);
-  }
-  const published = await publishRes.json() as { id: string };
 
   // 4. 取 permalink(失敗不影響結果)
   let permalink: string | null = null;

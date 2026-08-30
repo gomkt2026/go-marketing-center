@@ -91,13 +91,13 @@ function daysFromNow(n: number): string {
 
 export const brandChannels: BrandChannel[] = [
   { id: 'ch-1', brandId: 'b-homigo', platform: 'facebook', toneOfVoice: '完整敘事、專業可信', lengthGuideline: '長文', formatGuideline: '痛點 → 解法 → CTA,搭配輪播圖卡', hashtagCountMin: 2, hashtagCountMax: 3 },
-  { id: 'ch-2', brandId: 'b-homigo', platform: 'instagram', toneOfVoice: '視覺優先、生活感', lengthGuideline: '80-180字,前125字完整hook', formatGuideline: '4:5 痛點主標+搜尋打標籤,第一張強hook', hashtagCountMin: 8, hashtagCountMax: 12 },
+  { id: 'ch-2', brandId: 'b-homigo', platform: 'instagram', toneOfVoice: '視覺優先、生活感', lengthGuideline: '80-180字,前125字完整hook', formatGuideline: '4:5 痛點主標+情境+系統解法卡,第一張強hook', hashtagCountMin: 8, hashtagCountMax: 12 },
   { id: 'ch-3', brandId: 'b-homigo', platform: 'threads', toneOfVoice: '口語、短、敢聊時事', lengthGuideline: '1-3 段', formatGuideline: '可蹭租屋話題、開放留言互動', hashtagCountMin: 3, hashtagCountMax: 5 },
   { id: 'ch-4', brandId: 'b-taskgo', platform: 'threads', toneOfVoice: '台味短文、工地共鳴梗,可用台語詞', lengthGuideline: '前3行決定生死', formatGuideline: '結尾必留互動問句', hashtagCountMin: 3, hashtagCountMax: 5 },
   { id: 'ch-5', brandId: 'b-taskgo', platform: 'facebook', toneOfVoice: '誠懇前輩分享、故事完整有頭有尾', lengthGuideline: '300-800字', formatGuideline: '首兩行破題,搭配1-4張對比圖', hashtagCountMin: 2, hashtagCountMax: 3 },
-  { id: 'ch-5b', brandId: 'b-taskgo', platform: 'instagram', toneOfVoice: '視覺優先、工地語錄卡', lengthGuideline: '80-180字,前125字完整hook', formatGuideline: '4:5 痛點主標+現場情境,第一張強hook', hashtagCountMin: 8, hashtagCountMax: 12 },
+  { id: 'ch-5b', brandId: 'b-taskgo', platform: 'instagram', toneOfVoice: '視覺優先、匠管海軍藍設計圖', lengthGuideline: '80-180字,前125字完整hook', formatGuideline: '4:5 斜切深藍痛點海報+派工畫面卡,第一張強hook', hashtagCountMin: 8, hashtagCountMax: 12 },
   { id: 'ch-6', brandId: 'b-washgo', platform: 'threads', toneOfVoice: '口語、貼近生活、像朋友抱怨', lengthGuideline: '1-3句', formatGuideline: '先共鳴再置入,品牌名可放留言區', hashtagCountMin: 0, hashtagCountMax: 2 },
-  { id: 'ch-7', brandId: 'b-washgo', platform: 'instagram', toneOfVoice: '視覺優先短hook', lengthGuideline: '80-180字,前125字完整hook', formatGuideline: '4:5 痛點主標+搜尋打標籤,第一張強hook', hashtagCountMin: 8, hashtagCountMax: 12 },
+  { id: 'ch-7', brandId: 'b-washgo', platform: 'instagram', toneOfVoice: '視覺優先短hook', lengthGuideline: '80-180字,前125字完整hook', formatGuideline: '4:5 痛點海報+系統重點卡,不要整頁截圖直發', hashtagCountMin: 8, hashtagCountMax: 12 },
 ];
 
 export const brandKeywords: BrandKeyword[] = [

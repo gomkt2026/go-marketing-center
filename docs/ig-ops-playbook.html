@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<title>Go 生態系 Instagram 運營操盤手冊</title>
+<style>
+@font-face {
+  font-family: "SourceHan";
+  src: url("../podcast-assets/fonts/SourceHanSansTW-Regular.otf") format("opentype");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "SourceHan";
+  src: url("../podcast-assets/fonts/SourceHanSansTW-Bold.otf") format("opentype");
+  font-weight: 700;
+}
+:root {
+  --ink: #1a1c1e;
+  --muted: #5c6570;
+  --line: #d8dde3;
+  --paper: #f7f4ee;
+  --navy: #0b2d5c;
+  --gold: #d4a017;
+  --homigo: #0b2d5c;
+  --taskgo: #c56a12;
+  --washgo: #1d4f8c;
+}
+* { box-sizing: border-box; }
+@page { size: A4; margin: 16mm 16mm 18mm; }
+html, body {
+  margin: 0; padding: 0;
+  font-family: "SourceHan", "PingFang TC", "Heiti TC", sans-serif;
+  color: var(--ink);
+  font-size: 11.2pt;
+  line-height: 1.65;
+  background: #fff;
+}
+h1, h2, h3, h4 { line-height: 1.3; margin: 0 0 10px; }
+h1 { font-size: 26pt; letter-spacing: 0.02em; }
+h2 { font-size: 16pt; color: var(--navy); border-bottom: 2px solid var(--navy); padding-bottom: 6px; margin-top: 22px; }
+h3 { font-size: 13pt; margin-top: 16px; }
+p { margin: 0 0 8px; }
+ul, ol { margin: 0 0 10px 1.2em; padding: 0; }
+li { margin-bottom: 4px; }
+.cover {
+  page-break-after: always;
+  min-height: 240mm;
+  padding: 28mm 8mm 16mm;
+  background: linear-gradient(165deg, #0b2d5c 0%, #163f73 58%, #1d4f8c 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.cover h1 { color: #fff; font-size: 30pt; margin-bottom: 14px; }
+.cover .kicker { color: var(--gold); font-weight: 700; letter-spacing: 0.18em; font-size: 11pt; margin-bottom: 18px; }
+.cover .lead { font-size: 13pt; max-width: 150mm; color: #e8eef6; }
+.meta { font-size: 10.5pt; color: #c9d4e4; }
+.brand-pills { display: flex; gap: 8px; margin-top: 22px; }
+.pill { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.28); padding: 6px 12px; border-radius: 999px; font-size: 10.5pt; }
+.section { page-break-inside: avoid; }
+.rule {
+  background: var(--paper);
+  border-left: 4px solid var(--navy);
+  padding: 10px 12px;
+  margin: 8px 0 12px;
+}
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  page-break-inside: avoid;
+}
+.card h4 { margin-bottom: 6px; }
+.homigo { border-top: 4px solid var(--homigo); }
+.taskgo { border-top: 4px solid var(--taskgo); }
+.washgo { border-top: 4px solid var(--washgo); }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 10.4pt; }
+th, td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; text-align: left; }
+th { background: #eef2f7; color: var(--navy); }
+.muted { color: var(--muted); }
+.small { font-size: 10pt; color: var(--muted); }
+.badge { display: inline-block; font-size: 9pt; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: #eef2f7; color: var(--navy); }
+.do { color: #1b6b3a; }
+.dont { color: #a12626; }
+.footer-note { margin-top: 18px; font-size: 9.5pt; color: var(--muted); }
+.check li { list-style: none; margin-left: -0.4em; }
+.check li::before { content: "☐  "; }
+.example { background: #f3f6fa; padding: 8px 10px; border-radius: 6px; font-size: 10.5pt; margin: 6px 0 10px; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div>
+    <div class="kicker">GO ECOSYSTEM · MARKETING PLAYBOOK</div>
+    <h1>Instagram 運營操盤手冊<br>Homigo × TaskGo × Washgo</h1>
+    <p class="lead">把 IG 運營片的全部重點，轉成三品牌各自可執行的帳號設定、搜尋打標籤、第一句 hook、產圖規格與日常檢查表。給行銷人員直接對照使用，並對齊現行系統已落地的規則。</p>
+    <div class="brand-pills">
+      <span class="pill">Homigo 包租代管</span>
+      <span class="pill">TaskGo 工班派工</span>
+      <span class="pill">Washgo 洗衣系統</span>
+    </div>
+  </div>
+  <div class="meta">
+    匠管 Go 行銷中心內部文件 · 2026-08-25<br>
+    適用對象：行銷操盤、內容審閱、品牌負責人<br>
+    主 CTA 一律：Service@inforcraft.com.tw／0972-395-117
+  </div>
+</section>
+
+<h2>0. 這份手冊怎麼用</h2>
+<p>來源有兩層：<strong>IG 運營教學片的操盤邏輯</strong>，以及<strong>Go 行銷中心已經寫進系統的產文／產圖規則</strong>。影片講的是「怎麼讓演算法認得這個帳號、顧客搜得到、第一眼停得下來、火的是帳號不是單篇」；系統負責每天產出符合這些規則的 FB／IG 圖文。</p>
+<ul>
+  <li><strong>第 1–6 章</strong>：三品牌共通，先把帳號與內容原則做對。</li>
+  <li><strong>第 7–9 章</strong>：Homigo／TaskGo／Washgo 各自的顧客、搜尋詞、主標、色票與範例。</li>
+  <li><strong>第 10 章</strong>：行銷每天要做、系統已自動做、禁止事項。</li>
+</ul>
+<div class="rule">平台分工（現行系統）：Facebook／Instagram 每日圖文走 <strong>B 端業者</strong>；Threads 走 C 端觸及。不要把媽媽加班、羽絨被、房客吐槽寫進 IG 每日圖文。</div>
+
+<h2>1. 影片十條鐵則（全品牌必守）</h2>
+<ol>
+  <li><strong>先看推薦資格，再談內容。</strong>進「設定 → 專業工具 → 帳戶狀態」。內容／覆蓋人數／功能／變現四項都要綠燈。被限流時，產再多圖也沒有用。</li>
+  <li><strong>必須用專業帳號。</strong>才能看控制面板、Insights、專業儀表板。個人帳號無法用數據迭代。</li>
+  <li><strong>主頁是搜尋落地頁，不是裝飾。</strong>名稱欄寫顧客會搜的詞；簡介第二條放真實案例；最後一行 CTA。</li>
+  <li><strong>顧客會搜，才發那篇。</strong>先搜產業＋顧客問題，再產圖文。主題、圖上主標、hashtag 必須打同一個問題。</li>
+  <li><strong>新號怎麼打標籤：全部圍繞他。</strong>「他」= 鎖定的顧客，不是品牌自己。連續貼文都服務同一群人，演算法才知道推薦給誰。</li>
+  <li><strong>先找 3 個顧客，不要找所有人。</strong>每篇只對準其中一個說話。</li>
+  <li><strong>只改第一句。</strong>摺疊前約 125 字必須自成一句痛點 hook。圖上 4–10 字主標與文案第一句同義。</li>
+  <li><strong>帳號辨識 &gt; 單篇爆款。</strong>影片火了人沒火，等於白做。色票、構圖、主標語氣要連發都像同一家。</li>
+  <li><strong>Stories 做信任與轉換，不是發 Feed 代替品。</strong>24 小時會消失；重要內容存精選。</li>
+  <li><strong>不傷害推薦資格。</strong>不洗 hashtag、不標題黨、不互動勒索（禁止「留言才告訴你」）、不假裝限時優惠。</li>
+</ol>
+
+<h2>2. 帳號健康：上線前先做完</h2>
+<div class="grid-2">
+  <div class="card">
+    <h4>每次發文前進去看</h4>
+    <ul class="check">
+      <li>設定 → 帳戶類型與工具：專業／創作者</li>
+      <li>專業面板／Insights：近 30 天覆蓋、互動</li>
+      <li>帳戶狀態：四項綠燈</li>
+      <li>帳戶隱私：公開</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>紅燈時立刻停</h4>
+    <ul>
+      <li>內容被移除 → 先查哪則違規，不要連發類似稿</li>
+      <li>覆蓋受限 → 48 小時內不催更、不洗標</li>
+      <li>功能被關 → 先恢復再談 Recs／Reels</li>
+    </ul>
+  </div>
+</div>
+<p class="small">系統產得出圖文，產不出「帳號沒被關」。這一步永遠是人要看的。</p>
+
+<h2>3. 主頁設定：名稱、簡介、真實案例</h2>
+<p>影片強調「然後名字欄」「第二條真實案例」「顧客搜尋」。三品牌共用結構，只換詞：</p>
+<table>
+  <tr><th>欄位</th><th>寫法</th><th>不要寫</th></tr>
+  <tr><td>名稱欄</td><td>品牌名 + 顧客會搜的行業詞</td><td>只寫英文品牌、空泛 slogan</td></tr>
+  <tr><td>第 1 行</td><td>一句定位：用 IG + 系統，把經驗變成生意／把混亂整理回同一個地方</td><td>「全台第一」「保證成交」</td></tr>
+  <tr><td>第 2 行</td><td><strong>真實案例</strong>（匿名也可：某北部 30 人物管／一間 8 門市洗衣店）</td><td>空泛「已服務無數客戶」</td></tr>
+  <tr><td>第 3 行</td><td>服務支柱，用｜隔開，最多四段</td><td>把全部功能塞進去</td></tr>
+  <tr><td>最後一行</td><td>匠管聯絡：Email／電話</td><td>各品牌 LINE、官網註冊、免費試用 14 天當主 CTA</td></tr>
+</table>
+<table>
+  <tr><th>品牌</th><th>名稱欄建議</th><th>簡介第二條（真實案例）</th><th>服務支柱</th></tr>
+  <tr><td>Homigo</td><td>Homigo｜包租代管系統</td><td>真實案例｜多物件收租對帳／報修指揮中心</td><td>收租對帳｜報修派工｜合約管理｜租屋紀錄</td></tr>
+  <tr><td>TaskGo</td><td>TaskGo｜工班派工系統</td><td>真實案例｜現場回報不再考古 LINE</td><td>派工佇列｜現場回報｜成本看得到｜不用裝 App</td></tr>
+  <tr><td>Washgo</td><td>Washgo｜洗衣店系統</td><td>真實案例｜手寫單對得攏、衣服洗到哪看得到</td><td>送洗履歷｜門市調撥｜司機派遣｜LINE 下單</td></tr>
+</table>
+<p>精選封面建議各做 5 格，風格與 Feed 一致：痛點／案例／教學／系統畫面／聯絡我們。</p>
+
+<h2>4. 搜尋打標籤與起號</h2>
+<p>影片口令：<strong>「搜行業、顧客問題」→「找到以後看什麼」→「新號怎麼打標籤」→「全部圍繞他來做」。</strong></p>
+<ol>
+  <li>打開 IG 搜尋，打該品牌的利基詞（見第 7–9 章），看前排 Recs 在講什麼、用什麼封面。</li>
+  <li>只挑「顧客真的會問」的一個問題當今天主題。掛不上熱點就寫日常，不要硬蹭。</li>
+  <li>連續 7–14 天，主題都落在同一組 3 個顧客、同一組搜尋詞。這就是打標籤。</li>
+  <li>Hashtag：<strong>8–12 個</strong>＝ 1 品牌 + 2–3 利基搜尋詞 + 其餘發現用。禁止無關標、禁止重複堆疊。</li>
+</ol>
+<div class="rule">系統已把「每篇只選一個搜尋意圖寫進第一句與 hashtag」寫進產文規則。審稿時只要檢查：第一句、圖上主標、hashtag 是不是同一個詞。</div>
+
+<h2>5. 第一句 hook 與產圖規格</h2>
+<p>影片說「就換第一句話」。在 IG，第一句話有兩個位置：<strong>文案摺疊前</strong>，以及<strong>圖上主標</strong>。</p>
+<table>
+  <tr><th>項目</th><th>規格</th></tr>
+  <tr><td>畫幅</td><td>4:5 直式（1080×1350）。系統產圖 1024×1536。禁止橫式系統截圖直接上 IG。</td></tr>
+  <tr><td>文案</td><td>80–180 字，上限 220。前 125 字自成一句痛點，不用展開也看得懂。</td></tr>
+  <tr><td>圖上主標</td><td>4–10 字繁中，與文案第一句同義。</td></tr>
+  <tr><td>閱讀順序</td><td>第一眼痛點 → 第二眼情境 → 第三眼系統畫面卡。</td></tr>
+  <tr><td>圖上文字</td><td>最多 5 個文字元素；UI 卡只留一個 2–4 字功能標題，禁止小字數字（會變亂碼）。</td></tr>
+  <tr><td>檔案</td><td>JPEG。PNG 橫式後台截圖會被 Meta 以「長寬比無效」拒收。</td></tr>
+</table>
+<div class="example"><strong>反面教材（已發生）：</strong>Washgo 某則沿用 2872×1230 系統截圖，IG API 回「提交的圖像長寬比無效」。FB 可過、IG 不行。之後 IG 一律改產 4:5，不再沿用橫式截圖。</div>
+
+<h2>6. Stories、精選、信任與轉換</h2>
+<p>Stories 24 小時會消失。影片把它定位成<strong>建立信任與轉換</strong>，不是再貼一次 Feed。</p>
+<ul>
+  <li>Feed：搜尋＋收藏＋帳號辨識（痛點主標卡）。</li>
+  <li>Stories：當天現場、回覆提問、案例進度、把人導向主頁／匠管聯絡。</li>
+  <li>精選：把會過期但值得留下來的 Stories 存進去（案例、教學、FAQ、聯絡）。</li>
+</ul>
+<p class="small">現行系統自動產的是 Feed 單圖，還不會自動產限動。Stories／精選由行銷人員操作。</p>
+
+<h2>7. Homigo 做法</h2>
+<div class="card homigo">
+  <h4>鎖定 3 個顧客（每篇只選一個）</h4>
+  <ol>
+    <li>自管房東（1–10 間）— 收租、報修、續約全靠自己記</li>
+    <li>包租代管業者 — 多物件對帳、報修指揮中心、人力吃緊</li>
+    <li>物管／社宅承辦 — 流程要留痕、不能再靠 LINE 群</li>
+  </ol>
+  <p>不要同時講房客吐槽與房東報稅。房客生活題留給 Threads。</p>
+</div>
+<table>
+  <tr><th>搜尋詞（一篇只打一個）</th><td>包租代管、房東報修、收租對帳、租屋合約管理、代管系統</td></tr>
+  <tr><th>圖上主標例</th><td>講不清楚／根本管不動／房子越多越焦慮／大家都在自保</td></tr>
+  <tr><th>色票</th><td>米白底 #F5F1EA、深藍 #0B2D5C、黃強調 #F7B500（黃只做重點）</td></tr>
+  <tr><th>產圖</th><td>4:5 社群設計圖：痛點主標 → 房東／房客疲憊情境 → 手機 UI 卡（合約管理／繳租紀錄／報修紀錄／電表管理擇一）</td></tr>
+  <tr><th>Hashtag</th><td>#Homigo + #包租代管 #收租對帳 #代管系統 + 發現用。8–12 個。</td></tr>
+  <tr><th>語氣</th><td>先同理租屋混亂，再談「整理回同一個地方」。不要寫成租客權益文。</td></tr>
+</table>
+<div class="example"><strong>合格第一句：</strong>「收租對帳還在 Excel 跟 LINE 群對來對去的話，房子越多只會越焦慮。」<br><strong>不合格：</strong>「在這個數位時代，智慧包租代管已經成為趨勢……」（暖場、沒有搜尋詞、不像 Homigo）</div>
+
+<h2>8. TaskGo 做法</h2>
+<div class="card taskgo">
+  <h4>鎖定 3 個顧客（每篇只選一個）</h4>
+  <ol>
+    <li>工程行老闆／老闆娘 — 派工、月底才知賠、請款沒下文</li>
+    <li>工班頭 — 下午奪命連環 call、白板排班、代打卡</li>
+    <li>工地主任／PM — LINE 現場回報散落、驗收單墊便當</li>
+  </ol>
+  <p>少寫純工地風景抒情。立場站在做工的人這邊。</p>
+</div>
+<table>
+  <tr><th>搜尋詞</th><td>派工系統、工班管理、工程行、現場回報、工地打卡</td></tr>
+  <tr><th>圖上主標例</th><td>今天做到哪／月底才知賠／LINE 群考古／請款已讀</td></tr>
+  <tr><th>色票</th><td>海軍藍 #0B2D5C、青藍 #2BA3D6、白；橘 #ED9121／黃 #F7B500 只做強調</td></tr>
+  <tr><th>產圖</th><td>4:5 匠管設計圖：斜切深藍 banner＋台灣工地實拍＋蜂巢紋；可放藍機器人吉祥物；第三眼才是派工／回報畫面卡</td></tr>
+  <tr><th>Hashtag</th><td>大流量 #做工的人 #工地日常 + 利基 #派工 #工程行 #現場回報 #工班管理</td></tr>
+  <tr><th>語氣</th><td>短句、江湖味、可台語詞。不要電商廣告感、不要歐美工地棚拍。</td></tr>
+</table>
+<div class="example"><strong>合格第一句：</strong>「現場回報還在 LINE 群考古三個月前的施工照，是一種修行。」<br><strong>不合格：</strong>生活文、戀愛哏、跟工班無關的熱點硬蹭。</div>
+
+<h2>9. Washgo 做法</h2>
+<div class="card washgo">
+  <h4>鎖定 3 個顧客（每篇只選一個）</h4>
+  <ol>
+    <li>傳統洗衣店主 — 手寫單、電話對單、客源老化</li>
+    <li>連鎖／多門市負責人 — 調撥、司機、價目、品管掃碼</li>
+    <li>想數位轉型的加盟者 — 要零門檻，不要再聽「下載 App」</li>
+  </ol>
+  <p>C 端換季、羽絨被、媽媽加班留給 Threads。IG 每日圖文不要出現笑臉洗衣機、吉卜力卡通。</p>
+</div>
+<table>
+  <tr><th>搜尋詞</th><td>洗衣店系統、送洗履歷、門市調撥、洗衣店數位轉型</td></tr>
+  <tr><th>圖上主標例</th><td>手寫單對不攏／衣服洗到哪沒人知／調撥調到爆</td></tr>
+  <tr><th>色票</th><td>深藍 #1D4F8C、品牌藍 #3A8DDE、金橘 #FFB84D</td></tr>
+  <tr><th>產圖</th><td>4:5 大字報痛點 + 後場／櫃檯情境 + 系統畫面卡（送洗履歷／門市調撥）</td></tr>
+  <tr><th>Hashtag</th><td>#Washgo #洗衣店系統 #送洗履歷 #門市調撥。禁止 B 端稿塞 #換季 #羽絨被</td></tr>
+  <tr><th>語氣</th><td>專業 7、親切 3。像懂連鎖營運的夥伴，不是櫃檯對消費者聊天。</td></tr>
+</table>
+<div class="example"><strong>合格第一句：</strong>「手寫單對不攏的時候，不是店員不認真，是單據本來就不該靠手抄。」<br><strong>不合格：</strong>「隨著季節變換，讓衣物來一場大清洗吧✨」（C 端、沒有業者搜尋詞、傷害帳號打標籤）</div>
+
+<h2>10. 行銷每日檢查表</h2>
+<h3>發文前 2 分鐘</h3>
+<ul class="check">
+  <li>帳戶狀態四項綠燈</li>
+  <li>這篇只打一個搜尋詞，且出現在第一句</li>
+  <li>圖是 4:5 JPEG，主標 4–10 字，與第一句同義</li>
+  <li>看得出是哪個品牌（色票／構圖），不是隨便一張爆款圖</li>
+  <li>Hashtag 8–12，沒有無關標、沒有互動勒索</li>
+  <li>CTA 是匠管 Email／電話，不是各品牌 LINE</li>
+</ul>
+<h3>系統已自動做</h3>
+<ul>
+  <li>FB／IG 預設 B 端；每日主題約台灣 19:00 檔</li>
+  <li>IG 文案套用各品牌 instagramCraft（字數、hook、搜尋詞）</li>
+  <li>IG 產 4:5 圖，不再沿用橫式系統截圖</li>
+  <li>Hashtag 硬切到 12 個以內</li>
+  <li>主 CTA 統一寫入匠管聯絡</li>
+</ul>
+<h3>系統不會做、人要補</h3>
+<ul>
+  <li>專業帳號、Insights、帳戶狀態</li>
+  <li>名稱欄／簡介／精選封面</li>
+  <li>Stories 與精選（信任與轉換）</li>
+  <li>Homigo 尚未連 IG 時，內容只會待審。TaskGo／Washgo 已接帳號且開自動發布才會真的發出</li>
+  <li>發文後 1 小時內回留言</li>
+</ul>
+
+<h2>11. 禁止事項（三品牌共用）</h2>
+<table>
+  <tr><th class="dont">不要</th><th class="do">改做</th></tr>
+  <tr><td>為了爆款換成不像自己的視覺</td><td>寧可穩，連續貼文像同一家帳號</td></tr>
+  <tr><td>一篇同時討好 B 端與 C 端</td><td>IG 對業者，Threads 對生活使用者</td></tr>
+  <tr><td>橫式後台截圖直接上 IG</td><td>4:5 設計圖；截圖只給 FB 或重裁</td></tr>
+  <tr><td>「留言才告訴你」、假限時優惠</td><td>資訊一次講完，保護推薦資格</td></tr>
+  <tr><td>發明媒體報導、市佔第一、保證成效</td><td>只寫品牌知識裡 can_claim 的事實</td></tr>
+  <tr><td>導向 @washgo、官網註冊、hello@washgo</td><td>Service@inforcraft.com.tw、0972-395-117</td></tr>
+</table>
+
+<h2>12. 一週節奏建議</h2>
+<table>
+  <tr><th></th><th>Homigo</th><th>TaskGo</th><th>Washgo</th></tr>
+  <tr><td>Feed 圖文</td><td>週 3 篇，輪流 3 個顧客</td><td>週 3 篇，輪流老闆／工班頭／主任</td><td>週 3 篇，系統已排每日 19:00</td></tr>
+  <tr><td>Reels</td><td>選做：報修流程 15–30 秒</td><td>工地實拍 + 字卡</td><td>週 1–2；開頭 3 秒抓眼球</td></tr>
+  <tr><td>Stories</td><td>案例進度、常見問題</td><td>當日工地一句話</td><td>門市現場、對單畫面</td></tr>
+  <tr><td>審稿重點</td><td>有沒有「包租代管／收租對帳」</td><td>有沒有「派工／現場回報」</td><td>有沒有「洗衣店系統」，有沒有誤塞換季</td></tr>
+</table>
+
+<p class="footer-note">文件對齊 Go 行銷中心 2026-08-29 已部署規則（TaskGo 海軍藍斜切圖文、instagramCraft、4:5 產圖、搜尋詞庫、匠管 CTA）。帳號連線與 Stories 仍由行銷人員操作。更新時請同步品牌手冊與本 PDF，避免口頭規則與系統產出口徑不一致。</p>
+
+</body>
+</html>

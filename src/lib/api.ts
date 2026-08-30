@@ -59,7 +59,7 @@ export const api = {
       pressReleases: import('@/types').PressRelease[];
     }>(`/api/brands/${slug}/intelligence`),
 
-  // -- 品牌智慧圖片素材庫(系統畫面截圖/實拍照片,FB/IG/Threads 都可直接當配圖) --------
+  // -- 品牌智慧圖片素材庫(系統截圖會做成 B 端痛點海報;實拍可直接當配圖) --------
   brandAssets: (slug: string) =>
     request<{ assets: import('@/types').BrandAsset[] }>(`/api/brands/${slug}/assets`),
 

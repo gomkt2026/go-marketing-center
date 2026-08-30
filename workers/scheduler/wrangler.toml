@@ -10,7 +10,7 @@ compatibility_date = "2024-09-23"
 # 每小時第 45 分:為一則高分情報生成三平台草稿(拆開避免超過子請求上限)
 # 每 30 分鐘統一調度(halfHourlyDispatch,生成與發布已拆開):
 #   - 整點 tick:提前 1 小時生成下個時段的內容,存成 scheduled 排程(Threads 品牌相關 00/06/12/18、
-#     Threads 生活哏文 09/21、FB+IG 每日主題 19,皆為台灣時間)→ 行程表可提早看到已排定的內容
+#     Threads 生活哏文 09/21(Washgo+TaskGo)、FB+IG 每日主題 19(已接帳號的品牌各 1 篇),皆為台灣時間)→ 行程表可提早看到已排定的內容
 #   - 每個 tick(整點+半點)都會呼叫 publishDueJobs,檢查有沒有到期的排程要真正發布
 #     (發布時間誤差在 30 分鐘內;Cloudflare 帳號 Cron Trigger 數量有上限,沒有另開更密集的 cron)
 #   - 半點 tick 另外跑 Threads 自動回覆(偶數小時);台灣凌晨 2-6 點靜默不跑回覆

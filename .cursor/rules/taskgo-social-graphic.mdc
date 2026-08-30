@@ -1,0 +1,18 @@
+---
+description: TaskGo／匠管 FB、IG 圖文必須用海軍藍斜切工地風，不要深灰橘色語錄卡
+alwaysApply: false
+---
+
+# TaskGo 社群圖文
+
+產生 TaskGo 或匠管的 FB／IG 圖、自動發文配圖、或改產圖 prompt 時：
+
+1. 先讀 `.cursor/skills/taskgo-social-graphic/SKILL.md`
+2. 主色海軍藍 `#0B2D5C` + 青藍 `#2BA3D6`；橘／黃只做強調
+3. 斜切 banner、蜂巢紋、台灣工班（安全帽、LINE、案場）
+4. 加一個台灣文化錨；圖上只寫正確繁中，文字元素 ≤ 5
+5. 可放藍色圓頭機器人吉祥物，不要畫 logo
+6. 系統截圖要做成痛點海報（情境 + 主標 + 解法卡），不要整頁後台直發
+7. 短影音阿豪卡繼續用橘，不要把兩套主色混在同一張圖
+
+程式規格：`functions/_shared/prompts.ts` → `BRAND_DESIGN_IMAGE_STYLE.taskgo`

@@ -3,7 +3,7 @@ import { PhotonImage, SamplingFilter, resize, watermark } from '@cf-wasm/photon'
 // ============================================================================
 // 把素材庫橫式系統截圖包成 IG Feed 可發的 4:5 JPEG
 //   Meta IG 只收約 4:5–1.91:1 的 JPEG;橫式 PNG 後台會直接 36003 拒收。
-//   B 端不要裁掉報表欄位,改放進品牌色簡報框。
+//   這是「系統畫面海報」生成失敗時的後備:品牌色簡報框 + 原圖,不要當主路徑。
 // ============================================================================
 
 const IG_W = 1080;
@@ -14,7 +14,7 @@ const PAD_Y = 88;
 const BRAND_BG: Record<string, [number, number, number]> = {
   washgo: [0x1d, 0x4f, 0x8c],
   homigo: [0x1a, 0x2b, 0x4a],
-  taskgo: [0x2c, 0x2c, 0x2c],
+  taskgo: [0x0b, 0x2d, 0x5c],
 };
 
 function fillCanvas(w: number, h: number, rgb: [number, number, number]): PhotonImage {

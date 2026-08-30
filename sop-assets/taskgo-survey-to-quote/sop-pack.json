@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "sopId": "taskgo-survey-to-quote",
+  "catalogKey": "SOP-03",
+  "brandSlug": "taskgo",
+  "audience": "backoffice",
+  "title": "場勘後帶入報價草稿",
+  "goal": "場勘完成後，把 SOP 轉成客戶報價草稿並準備傳送",
+  "sourcePath": "/Users/benchen/Desktop/場勘後的報價部分.mov",
+  "sourceKind": "desktop",
+  "narrator": "阿豪",
+  "voiceId": "auoHciLZJwKTwYUoRTYz",
+  "nextSopId": null,
+  "cues": [
+    {
+      "id": "c00",
+      "startMs": 0,
+      "endMs": 4500,
+      "step": 0,
+      "stepTotal": 6,
+      "action": "開場",
+      "target": "派工場勘報價",
+      "narration": "這支給後勤。場勘做完，把 SOP 轉成報價草稿。",
+      "subtitle": "後勤：場勘完成後帶入報價"
+    },
+    {
+      "id": "c01",
+      "startMs": 4500,
+      "endMs": 9000,
+      "step": 1,
+      "stepTotal": 6,
+      "action": "確認場勘完成",
+      "target": "已完成",
+      "narration": "打開案件，確認停在「派工場勘報價」。場勘地點要顯示「已完成」。",
+      "subtitle": "確認場勘狀態是「已完成」"
+    },
+    {
+      "id": "c02",
+      "startMs": 9000,
+      "endMs": 14500,
+      "step": 2,
+      "stepTotal": 6,
+      "action": "帶入草稿",
+      "target": "從場勘 SOP 帶入報價草稿",
+      "narration": "點綠色「從場勘 SOP 帶入報價草稿」。不要跟左邊匯入廠商報價搞混。",
+      "subtitle": "點「從場勘 SOP 帶入報價草稿」"
+    },
+    {
+      "id": "c03",
+      "startMs": 14500,
+      "endMs": 20000,
+      "step": 3,
+      "stepTotal": 6,
+      "action": "確定導入",
+      "target": "已從場勘 SOP 導入客戶報價單草稿",
+      "narration": "看到已導入草稿，按「確定」。客戶報價單會出現一張草稿。",
+      "subtitle": "提示出現後按「確定」"
+    },
+    {
+      "id": "c04",
+      "startMs": 20000,
+      "endMs": 38000,
+      "step": 4,
+      "stepTotal": 6,
+      "action": "核對工項",
+      "target": "工項明細",
+      "narration": "打開草稿。逐項核對名稱、數量、單位、單價。系統會自動算小計。",
+      "subtitle": "核對工項名稱、數量、單價"
+    },
+    {
+      "id": "c05",
+      "startMs": 38000,
+      "endMs": 50000,
+      "step": 5,
+      "stepTotal": 6,
+      "action": "核對總計與更新",
+      "target": "更新單據",
+      "narration": "看總計和收款期別。備註會帶入場勘初估。確認後點「更新單據」。",
+      "subtitle": "核對總計，點「更新單據」"
+    },
+    {
+      "id": "c06",
+      "startMs": 50000,
+      "endMs": 58000,
+      "step": 6,
+      "stepTotal": 6,
+      "action": "準備傳送",
+      "target": "傳送",
+      "narration": "回到案件，草稿右邊有紫色「傳送」。要給業主簽名再按。",
+      "subtitle": "要給業主簽名再按「傳送」"
+    },
+    {
+      "id": "c07",
+      "startMs": 58000,
+      "endMs": 60380,
+      "step": 6,
+      "stepTotal": 6,
+      "action": "收尾",
+      "target": "傳送",
+      "narration": "場勘完成、帶入草稿、傳送，這三步不要跳。",
+      "subtitle": "完成、帶入、傳送，三步不要跳"
+    }
+  ]
+}

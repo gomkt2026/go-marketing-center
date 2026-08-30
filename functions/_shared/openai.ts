@@ -116,21 +116,39 @@ export async function generateImage(
 
 /**
  * 帶參考圖產生圖片(images/edits 端點)。
- * 用途:把品牌 logo 原樣合成進生成圖(input_fidelity=high 保持 logo 不被重畫走樣)。
+ * 用途:品牌 logo 合成,或把真實系統截圖做成 B 端痛點海報(input_fidelity=high 保留 UI)。
  */
+function referenceImageMime(bytes: Uint8Array): { mime: string; filename: string } {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return { mime: 'image/jpeg', filename: 'reference.jpg' };
+  }
+  if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return { mime: 'image/png', filename: 'reference.png' };
+  }
+  return { mime: 'image/png', filename: 'reference.png' };
+}
+
 export async function generateImageWithReference(
   env: Env,
-  params: { prompt: string; reference: Uint8Array; size?: ImageSize; quality?: ImageQuality },
+  params: {
+    prompt: string;
+    reference: Uint8Array;
+    size?: ImageSize;
+    quality?: ImageQuality;
+    /** high=保留參考圖細節(logo/系統 UI);low=允許重構圖 */
+    inputFidelity?: 'high' | 'low';
+  },
 ): Promise<Uint8Array> {
   const apiKey = requireApiKey(env);
+  const { mime, filename } = referenceImageMime(params.reference);
   const form = new FormData();
   form.append('model', env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1');
   form.append('prompt', params.prompt);
   form.append('size', params.size ?? '1024x1024');
   form.append('quality', params.quality ?? 'medium');
   form.append('output_format', 'jpeg');
-  form.append('input_fidelity', 'high');
-  form.append('image[]', new Blob([params.reference as unknown as ArrayBuffer], { type: 'image/png' }), 'logo.png');
+  form.append('input_fidelity', params.inputFidelity ?? 'high');
+  form.append('image[]', new Blob([params.reference as unknown as ArrayBuffer], { type: mime }), filename);
   const res = await fetch(`${OPENAI_BASE}/images/edits`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}` },

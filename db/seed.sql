@@ -247,13 +247,13 @@ BEGIN
   -- ==========================================================================
   INSERT INTO brand_channels (brand_id, brand_version_id, platform, tone_of_voice, length_guideline, format_guideline, hashtag_count_min, hashtag_count_max) VALUES
     (b_homigo, v_homigo_1, 'facebook', '完整敘事、專業可信', '長文', '痛點 → 解法 → CTA,搭配輪播圖卡', 2, 3),
-    (b_homigo, v_homigo_1, 'instagram', '視覺優先、生活感', '80-180字,前125字完整hook', '4:5 痛點主標+搜尋打標籤,第一張強hook', 8, 12),
+    (b_homigo, v_homigo_1, 'instagram', '視覺優先、生活感', '80-180字,前125字完整hook', '4:5 痛點主標+情境+系統解法卡,第一張強hook', 8, 12),
     (b_homigo, v_homigo_1, 'threads', '口語、短、敢聊時事', '1-3 段', '可蹭租屋話題、開放留言互動', 3, 5),
     (b_taskgo, v_taskgo_1, 'threads', '台味短文、工地共鳴梗,可用台語詞', '前3行決定生死', '結尾必留互動問句', 3, 5),
     (b_taskgo, v_taskgo_1, 'facebook', '誠懇前輩分享、故事完整有頭有尾', '300-800字', '首兩行破題,搭配1-4張對比圖', 2, 3),
-    (b_taskgo, v_taskgo_1, 'instagram', '視覺優先、工地語錄卡', '80-180字,前125字完整hook', '4:5 痛點主標+現場情境,第一張強hook', 8, 12),
+    (b_taskgo, v_taskgo_1, 'instagram', '視覺優先、匠管海軍藍設計圖', '80-180字,前125字完整hook', '4:5 斜切深藍痛點海報+派工畫面卡,第一張強hook', 8, 12),
     (b_washgo, v_washgo_1, 'threads', '口語、貼近生活、像朋友抱怨', '1-3句', '先共鳴再置入,品牌名可放留言區', 0, 2),
-    (b_washgo, v_washgo_1, 'instagram', '視覺優先短hook', '80-180字,前125字完整hook', '4:5 痛點主標+搜尋打標籤,第一張強hook', 8, 12);
+    (b_washgo, v_washgo_1, 'instagram', '視覺優先短hook', '80-180字,前125字完整hook', '4:5 痛點海報+系統重點卡,不要整頁截圖直發', 8, 12);
 
   -- ==========================================================================
   -- Brand Keywords(Hashtag / CTA / Key Message)
@@ -285,6 +285,11 @@ BEGIN
   INSERT INTO brand_visuals (brand_id, brand_version_id, label, value, category, sort_order) VALUES
     (b_homigo, v_homigo_1, 'IG輪播尺寸', '1080x1350 (4:5)', 'layout', 1),
     (b_taskgo, v_taskgo_1, 'IG輪播尺寸', '1080x1350 (4:5)', 'layout', 1),
+    (b_taskgo, v_taskgo_1, '主色-海軍藍', '#0B2D5C', 'color', 2),
+    (b_taskgo, v_taskgo_1, '主色-青藍', '#2BA3D6', 'color', 3),
+    (b_taskgo, v_taskgo_1, '強調-安全橘', '#ED9121', 'color', 4),
+    (b_taskgo, v_taskgo_1, '強調-黃', '#F7B500', 'color', 5),
+    (b_taskgo, v_taskgo_1, '圖文構圖', '斜切深藍banner+工地實拍+蜂巢紋+藍機器人吉祥物', 'layout', 6),
     (b_washgo, v_washgo_1, 'IG輪播尺寸', '1080x1350 (4:5)', 'layout', 5),
     (b_washgo, v_washgo_1, '主色-深藍', '#1D4F8C', 'color', 1),
     (b_washgo, v_washgo_1, '主色-品牌藍', '#3A8DDE', 'color', 2),

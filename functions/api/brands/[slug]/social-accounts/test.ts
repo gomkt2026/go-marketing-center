@@ -5,6 +5,8 @@ import { getSql } from '../../../../_shared/db';
 import { getBrandBySlug } from '../../../../_shared/queries';
 import { json, error } from '../../../../_shared/response';
 import { decryptToken } from '../../../../_shared/crypto';
+import { probeThreadsPublishAccess } from '../../../../_shared/threads';
+import { probeMetaPublishAccess } from '../../../../_shared/meta';
 
 // 以已儲存的 token 測試平台連線;成功則將狀態升級為 connected
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -29,40 +31,31 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   const token = await decryptToken(context.env, account.access_token_enc);
 
-  let testUrl: string;
   if (body.platform === 'threads') {
-    testUrl = `https://graph.threads.net/v1.0/me?fields=id,username&access_token=${encodeURIComponent(token)}`;
-  } else if (body.platform === 'instagram' && account.external_id) {
-    testUrl = `https://graph.facebook.com/v21.0/${encodeURIComponent(account.external_id)}?fields=id,username&access_token=${encodeURIComponent(token)}`;
-  } else {
-    testUrl = `https://graph.facebook.com/v21.0/me?access_token=${encodeURIComponent(token)}`;
+    const probe = await probeThreadsPublishAccess(token);
+    await sql`
+      UPDATE brand_social_accounts
+      SET status = ${probe.ok ? 'connected' : 'error'},
+          connected_at = ${probe.ok ? new Date().toISOString() : null},
+          notes = ${probe.detail},
+          external_id = COALESCE(${probe.userId}, external_id)
+      WHERE id = ${account.id}::uuid
+    `;
+    return json({ ok: probe.ok, status: probe.ok ? 'connected' : 'error', detail: probe.detail });
   }
 
-  let ok = false;
-  let detail = '';
-  let fetchedId: string | null = null;
-  try {
-    const res = await fetch(testUrl);
-    const data = await res.json().catch(() => ({})) as Record<string, unknown>;
-    if (res.ok) {
-      ok = true;
-      fetchedId = typeof data.id === 'string' ? data.id : null;
-      detail = `連線成功:${JSON.stringify({ id: data.id, name: data.name ?? data.username })}`;
-    } else {
-      const err = (data as { error?: { message?: string } }).error;
-      detail = `平台回應錯誤:${err?.message ?? res.statusText}`;
-    }
-  } catch (e) {
-    detail = `連線失敗:${e instanceof Error ? e.message : '未知錯誤'}`;
+  if (body.platform === 'facebook' || body.platform === 'instagram') {
+    const probe = await probeMetaPublishAccess(token, body.platform, account.external_id);
+    await sql`
+      UPDATE brand_social_accounts
+      SET status = ${probe.ok ? 'connected' : 'error'},
+          connected_at = ${probe.ok ? new Date().toISOString() : null},
+          notes = ${probe.detail},
+          external_id = COALESCE(external_id, ${probe.fetchedId})
+      WHERE id = ${account.id}::uuid
+    `;
+    return json({ ok: probe.ok, status: probe.ok ? 'connected' : 'error', detail: probe.detail });
   }
 
-  const newStatus = ok ? 'connected' : 'error';
-  await sql`
-    UPDATE brand_social_accounts
-    SET status = ${newStatus}, connected_at = ${ok ? new Date().toISOString() : null}, notes = ${detail},
-        external_id = COALESCE(external_id, ${fetchedId})
-    WHERE id = ${account.id}::uuid
-  `;
-
-  return json({ ok, status: newStatus, detail });
+  return error('不支援的平台', 400);
 };

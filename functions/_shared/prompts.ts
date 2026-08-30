@@ -73,7 +73,7 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '3. 搜尋導向:本篇只對準「一個」房東/代管會搜的問題,把該搜尋詞自然寫進第一句與 hashtag。' +
       '4. 只服務一個對象,不要同時講房客吐槽與房東報稅。' +
       '5. Hashtag 8-12 個:1 品牌 + 2-3 利基搜尋詞 + 其餘發現用。禁止無關標、禁止重複堆疊。' +
-      '6. 視覺必須看得出是 Homigo(米白底、深藍資訊、黃強調)。寧可穩、不要為了爆款換成不像自己的風格。' +
+      '6. 視覺必須看得出是 Homigo(米白底、深藍資訊、黃強調)。寧可穩、不要為了爆款換成不像自己的風格。系統畫面做成痛點海報的解法卡,不要整頁後台直發。' +
       '7. 禁止標題黨、禁止「留言才告訴你」、禁止假裝限時優惠——會傷害推薦資格。',
     instagramMaxChars: 220,
     igSearchQueries: ['包租代管', '房東報修', '收租對帳', '租屋合約管理', '代管系統'],
@@ -103,14 +103,25 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '2. 圖上主標與文案第一句同義;少字多圖,重點放在圖上的 4-10 字語錄。' +
       '3. 搜尋導向:對準工程行老闆/工班頭會搜的一個詞(派工、現場回報、工班管理、工程行系統),寫進第一句與 hashtag。' +
       '4. Hashtag 8-12 個,混用大流量(#做工的人 #工地日常)與利基(#派工 #工程行 #現場回報)。' +
-      '5. 視覺維持工地語錄卡或現場紀實,橘色只做強調;不要電商廣告感、不要歐美工地棚拍。' +
+      '5. 視覺必須看得出是匠管 TaskGo:海軍藍/青藍/白、斜切色塊、蜂巢科技紋;橘或黃只做強調。可放藍色圓頭機器人吉祥物。要有台灣工地文化(安全帽、反光背心、LINE、案場)。系統畫面做成痛點海報的解法卡,不要整頁後台直發。不要深灰語錄卡、不要歐美棚拍、不要電商廣告感。' +
       '6. 禁止標題黨與互動勒索,主題不要飄到跟工班無關的生活文。',
     instagramMaxChars: 220,
     igSearchQueries: ['派工系統', '工班管理', '工程行', '現場回報', '工地打卡'],
     imageStyle:
-      'Documentary photography of Taiwanese old houses and renovation sites: weathered facades with exposed red brick, ' +
-      'peeling plaster walls, terrazzo floors, iron window grilles, tiled roofs, craftsmen at work on site; ' +
-      'muted nostalgic tones, quiet dignified composition like an architectural portrait. The building itself can be the subject; people are optional.',
+      'Professional Taiwan construction-tech photography: bright daylight on a real site with cranes or scaffolding, ' +
+      'Taiwanese craftsmen in white or yellow hard hats and high-vis vests using a tablet or LINE on a phone; ' +
+      'navy-cyan color grade, clean tech-utility feel. East Asian faces, natural body types. Not muted film nostalgia, not Western stock models.',
+    imageStyleB2b:
+      'B2B documentary of a Taiwan engineering crew at work: site office or mid-rise Taipei construction, ' +
+      'foreman pointing at a plan, tablet showing a simple checklist, hard hats and reflective vests, ' +
+      'bright professional light, navy-cyan grade. The workspace or a clean system screen can be the subject.',
+    threadsCraft:
+      'TaskGo 的 Threads 專屬規則(與通用規則衝突時,以這裡為準):' +
+      '1. 字數 80-180 字,絕對不超過 220 字。2-5 個短段落,一句一行,前 3 行決定停滑。' +
+      '2. 每篇只講一件工地日常:白板排班、LINE 群考古、代打卡、月底才知賠、請款已讀、業主奪命 call。可用台語詞。' +
+      '3. 熱議跟風只當開頭一句鉤子,立刻回到工班場景;掛不上就寫現場觀察,不要硬蹭。' +
+      '4. 禁止連續反問、禁止「數位轉型升級」廣告腔;結尾留一個讓工班想回的問題。',
+    threadsMaxChars: 220,
   },
   washgo: {
     frontlinePersona:
@@ -140,7 +151,7 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
     instagramCraft:
       'Washgo IG 專屬規則:' +
       '1. 80-180 字,絕對不超過 220 字。前 125 字必須是完整一句業者痛點 hook(手寫單、對不攏、衣服洗到哪沒人知)。' +
-      '2. 配圖必須是真實系統畫面(每日送洗報表、訂單列表、調撥、品管)或深藍簡報風畫面卡。禁止 AI 合成煩惱店員、禁止吉卜力卡通、禁止笑臉洗衣機。' +
+      '2. 配圖必須是 B 端痛點海報:店主真實煩惱場景 + 4-10 字主標 + Washgo 系統重點畫面卡(訂單/履歷/調撥擇一)。禁止只把整頁後台截圖置中鋪在色塊上。禁止吉卜力卡通、禁止笑臉洗衣機。' +
       '3. 文案要講畫面上看得見的事(欄位、狀態、對不攏的單),像店主在看自己後台,不要寫「邁向數位化的未來就是現在」「告別繁瑣」「輕鬆數位化」空心廣告句。' +
       '4. 搜尋導向:對準洗衣店主會搜的一個詞(洗衣店系統、送洗履歷、門市調撥、洗衣店數位轉型)。' +
       '5. Hashtag 8-12 個:品牌 + 利基搜尋詞 + 發現用。不要塞 #換季 #羽絨被 這種 C 端生活標到 B 端圖文。' +
@@ -185,7 +196,7 @@ const B2B_LANE_INSTRUCTIONS: Record<string, string> = {
     SHARED_BRAND_CTA_RULE +
     '禁止「可愛洗衣機」「懶人福音」「加班到十點的媽媽」。' +
     '禁止「邁向數位化的未來就是現在」「告別繁瑣」「輕鬆數位化」「數位轉型解決方案」這類空心廣告句。' +
-    '視覺與文案都要像業界簡報或後台畫面,不要 AI 人物海報。' +
+    '視覺要做成 B 端痛點海報:現場煩惱 + 主標 + 系統重點畫面卡,證明系統對店主真的有用。禁止只貼整頁截圖。禁止吉卜力與笑臉洗衣機。' +
     '可提 Go 生態系(Homigo 布巾案源、三平台同一條資訊流),但只能引用下方 Collaboration Brief 已有的事實;沒有 Brief 就不要提其他品牌。',
   homigo:
     '【本篇受眾車道:B 端】只寫給自管房東或包租代管業者,不是房客吐槽文。' +
@@ -282,7 +293,12 @@ export function pickImageStyle(params: {
   if (params.brandSlug === 'washgo' && params.platform === 'threads' && params.lane === 'b2c') {
     return 'illustration';
   }
-  const weights: Record<ImageStyleId, number> = params.platform === 'instagram'
+  // TaskGo FB/IG 原圖以設計圖為主(海軍藍斜切+工地實拍),寫實照只當輪替
+  const weights: Record<ImageStyleId, number> = params.brandSlug === 'taskgo' && params.platform !== 'threads'
+    ? (params.platform === 'instagram'
+      ? { photo: 1, design: 4, illustration: 0 }
+      : { photo: 1, design: 3, illustration: 0 })
+    : params.platform === 'instagram'
     ? (params.lane === 'b2b' ? { photo: 1, design: 3, illustration: 0 } : { photo: 1, design: 2, illustration: 1 })
     : (params.lane === 'b2b' ? { photo: 1, design: 1, illustration: 0 } : { photo: 1, design: 1, illustration: 1 });
   const recent = new Set(params.recentStyles ?? []);
@@ -321,7 +337,7 @@ export const PLATFORM_GUIDELINES: Record<string, string> = {
     '4. 收藏優先——讓人想截圖/收藏的一句話或對比,比堆 emoji 重要。' +
     '5. 推薦資格——不洗 hashtag、不標題黨、不誤導對比、不互動勒索(禁止「留言才告訴你」)。內容必須跟帳號主題一致。' +
     '6. 80-200 字,語氣輕鬆但具體,可用少量 emoji。Hashtag 8-12 個放文末。' +
-    '7. B 端配圖優先真實系統畫面或簡報風畫面卡;沒有截圖才用 4:5 設計圖。圖上主標與文案第一句同義。禁止 AI 合成的煩惱店員海報。',
+    '7. B 端配圖做成痛點海報:業者現場煩惱 + 4-10 字主標 + 系統重點畫面卡。有真實截圖時把截圖做成解法卡,不要整頁後台置中鋪色塊。圖上主標與文案第一句同義。',
   threads:
     'Threads 貼文:用很年輕世代的語氣(像大學生/新鮮人發文的節奏),口語、有記憶點,500 字以內。' +
     'Threads 演算法要點(必遵守):' +
@@ -503,6 +519,7 @@ export const HOMIGO_IG_IMAGE_STYLE = [
   '上下留白至少 120px、左右至少 80px,文字不可貼邊,畫面不可過滿,留白感要足夠。',
   '【閱讀順序】第一眼:大而粗、有情緒的繁體中文主標(痛點,可局部用黃色強調);第二眼:有共鳴的情境;第三眼才看到 Homigo 解法。先讓人感受到問題,不要一開始就像廣告、像在賣工具。',
   '【人物】東亞臉孔的台灣年輕人,自然表情、不要過度微笑、不要商業假笑,情緒偏真實與疲憊(房東焦慮、房客無奈)。不浮誇、不搞笑,讓人有共鳴。',
+  '【系統畫面】解法是平板或白卡上的 Homigo 重點畫面,不要把整頁後台截圖置中鋪在色塊上。' +
   '【手機UI】簡潔、白底、深藍 icon、黃色重點;像真的有人會用的租屋工具,不要金融 APP 的科技感,不要過度複雜的 UI、假 icon、無意義按鈕、奇怪數字。' +
   '手機畫面上「只能有一個」2-4 字的功能標題(如「合約管理」「繳租紀錄」),其餘內容一律用抽象的灰色線條與色塊示意,絕對不要畫任何小號文字或數字(小字一定會變成亂碼)。',
   '【文字防呆】圖上所有文字必須是「正確的台灣繁體中文」:禁止任何簡體字(壞不能寫成坏、燈不能寫成灯、約不能寫成约)、禁止錯字、禁止英文亂碼、禁止模糊文字。' +
@@ -519,17 +536,22 @@ export const HOMIGO_TEXT_MARK_RULE =
 export const BRAND_DESIGN_IMAGE_STYLE: Record<string, string> = {
   homigo: HOMIGO_IG_IMAGE_STYLE,
   washgo: [
-    '【設計規格】4:5 直式「產品簡報畫面卡」(IG Feed)。深藍(#1D4F8C)為主色,品牌藍(#3A8DDE)做層次,金橘(#FFB84D)只做重點強調。',
-    '第一眼是一句 4-10 字繁中痛點主標(例如「手寫單對不攏」「每日送洗報表」);主體必須是真實後台/報表/訂單列表的畫面卡,像投影片放進系統 UI。',
-    '禁止畫煩惱的店員、禁止手撐頭的人像、禁止吉卜力卡通、禁止笑臉洗衣機、禁止庫存照片合成。',
-    '【畫面卡】白底系統視窗,可有一個 2-4 字功能標題(如「送洗履歷」「訂單管理」),其餘用灰色線條示意欄位,禁止小號亂碼文字。',
-    '【文字防呆】圖上所有文字必須是正確台灣繁體中文,整張不超過 5 個文字元素。',
+    '【設計規格】4:5 直式 B 端痛點海報。深藍(#1D4F8C)主底,品牌藍(#3A8DDE)層次,金橘(#FFB84D)只點主標。',
+    '【閱讀順序】第一眼:4-10 字繁中痛點主標(例如「手寫單對不攏」);第二眼:台灣洗衣店主在店裡的真實煩惱(手寫單、收據堆、對不攏);第三眼:平板或白卡上的 Washgo 系統重點(訂單管理/送洗履歷/調撥擇一),證明系統解這個痛。',
+    '【人物】東亞臉、自然身形的台灣店主或櫃檯,polo 或工作服,店內衣架與摺衣台。真實疲憊可以,不要歐美模特、不要吉卜力、不要笑臉洗衣機。',
+    '【系統畫面】只放一個重點區塊,不要整頁後台置中鋪在純色底上。',
+    '【文字防呆】正確台灣繁體中文,整張不超過 5 個文字元素。不要畫 logo。',
   ].join('\n'),
   taskgo: [
-    '【設計規格】4:5 直式社群設計圖(IG Feed)。深灰底或米白底,橘色(#ED9121)只做重點強調。',
-    '第一眼是一句 4-10 字繁中痛點主標(例如「今天做到哪」「月底才知賠」);第二眼是工地或後台情境;第三眼才是派工/回報系統畫面卡。',
-    '【手機UI】白底、一個 2-4 字功能標題(如「派工佇列」「現場回報」),其餘用灰色線條示意,禁止小號文字與數字。',
-    '【文字防呆】圖上所有文字必須是正確台灣繁體中文,整張不超過 5 個文字元素。不要電商廣告感。',
+    '【設計規格】4:5 直式「匠管 TaskGo」社群設計圖。主色海軍藍(#0B2D5C)與青藍(#2BA3D6),大面積白;安全橘(#ED9121)與黃(#F7B500)只做主標強調或工安色。禁止深灰語錄卡當主視覺。',
+    '【構圖】斜切色塊/平行四邊形 banner、半透明海軍藍疊在工地實拍上、淡青蜂巢或六角科技紋。可對角分割:一邊工地/平板,一邊深藍字塊。',
+    '【閱讀順序】第一眼:大而粗的繁中主標 4-10 字(痛點或價值,局部黃字);第二眼:台灣工地或師傅用平板/LINE;第三眼才是派工/回報畫面卡。',
+    '【人物】東亞臉孔的台灣工班:白或黃安全帽、反光背心、深藍工作服;自然表情,不要歐美模特、不要棚拍假笑。可出現工地主任看圖、師傅打卡、後勤看報表。',
+    '【吉祥物】可在邊角放藍色圓頭機器人(大圓眼、短天線,可戴藍安全帽或拿鉛筆),當 AI 幫手,不要佔據主體、不要日式大眼萌。',
+    '【台灣文化】場景長在台灣:大台北案場、騎樓、塔吊、中元普渡工安、端午工地粽、開工、颱風天收工、LINE 群。用語用工班/案場/師傅/頭仔。不要歐美工地、不要簡體字。',
+    '【系統畫面】解法是平板或白卡上的派工/回報重點,不要把整頁後台截圖置中鋪在色塊上。',
+    '【手機UI】白底、一個 2-4 字功能標題(如「派工佇列」「現場回報」「成本看得到」),其餘用灰色線條示意,禁止小號亂碼。',
+    '【文字防呆】圖上所有文字必須是正確台灣繁體中文;整張不超過 5 個文字元素。不要畫 logo 或品牌英文字(官方 logo 會後製合成)。不要電商廣告感。',
   ].join('\n'),
 };
 
@@ -541,10 +563,41 @@ export const WASHGO_THREADS_IMAGE_PROMPT_SPEC =
   '讓人滑到會停下來按讚的可愛程度,不含文字"';
 
 const DESIGN_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:這張圖是 4:5 直式「產品簡報畫面卡」(不是人物海報、不是寫實店員)。請用繁體中文描述:' +
+  '"imagePrompt": "必填:這張圖是 4:5 直式 B 端痛點海報。請用繁體中文描述:' +
   '1) 主標文字:從貼文第一句提煉一句 4-10 字痛點短句,必須與文案第一句同義;' +
-  '2) 主體:真實系統後台、報表或訂單列表的畫面卡,深藍簡報底+白底視窗,像給店主看的投影片;' +
-  '3) 禁止:煩惱的人、手撐頭、吉卜力、笑臉洗衣機、庫存照片合成"';
+  '2) 情境:台灣業者在現場的真實煩惱(依品牌:洗衣店主/房東代管/工班頭);' +
+  '3) 解法:平板或白卡只露出一個系統重點功能,讓人看出系統對這個痛點真的有用;' +
+  '4) 禁止:整頁截圖鋪在純色底、吉卜力、笑臉洗衣機、簡體字、亂碼小字、自己畫 logo"';
+
+/** 有真實系統截圖時:指示文案 AI 寫出海報構圖,截圖會當參考圖做成解法卡 */
+export const B2B_SCREENSHOT_POSTER_PROMPT_SPEC =
+  '"imagePrompt": "必填:這張圖要把已提供的真實系統畫面做成 B 端痛點海報,不是把截圖原圖置中。請用繁體中文描述:' +
+  '1) 主標:從貼文第一句提煉 4-10 字痛點短句,與文案第一句同義;' +
+  '2) 情境:台灣 B 端業者在現場的真實煩惱(洗衣店主/房東代管/工班頭,依品牌);' +
+  '3) 解法:平板或白卡只露出這張系統畫面的一個重點功能;' +
+  '4) 禁止:整頁截圖鋪在純色底、吉卜力、笑臉洗衣機、簡體字、亂碼小字、自己畫 logo"';
+
+/** 帶參考截圖生海報時附加在圖片 prompt 後 */
+export const SYSTEM_SCREENSHOT_POSTER_RULE =
+  'The attached image is a REAL product screenshot. Build a B2B social poster, not a screenshot dump. ' +
+  'First glance: 4-10 character Traditional Chinese pain-point headline matching the post hook. ' +
+  'Second glance: a Taiwanese B2B operator in their real workplace showing the pain. ' +
+  'Third glance: a tablet, phone, or floating white card that shows THIS exact screenshot — crop to the key panel, keep the UI recognizable, do not invent a different software. ' +
+  'Do not place the raw full screenshot centered on a solid navy or blue field. ' +
+  'Max 5 text elements. Correct Traditional Chinese only. Do not draw a logo.';
+
+const TASKGO_DESIGN_IMAGE_PROMPT_SPEC =
+  '"imagePrompt": "必填:這張圖是匠管 TaskGo 的 4:5 直式社群設計圖(海軍藍斜切+台灣工地,不是深灰語錄卡)。請用繁體中文描述:' +
+  '1) 主標文字:從貼文第一句提煉一句 4-10 字痛點或價值短句,必須與文案第一句同義(例如「今天做到哪」「月底才知賠」「經驗變標準」);' +
+  '2) 情境:台灣工班真實場景——安全帽、反光背心、塔吊或案場、師傅用平板/LINE;可點出一個台灣文化錨(開工、端午工地粽、中元普渡工安、颱風天收工、大台北工地);' +
+  '3) 設計元素:斜切深藍 banner、青藍蜂巢紋;邊角可放藍色圓頭機器人吉祥物;平板或白卡只放一個 2-4 字功能畫面(派工佇列/現場回報),不要整頁截圖鋪底;' +
+  '4) 禁止:歐美工地棚拍、深灰純文字卡、整頁後台置中、簡體字、亂碼小字、自己畫 logo"';
+
+const TASKGO_PHOTO_IMAGE_PROMPT_SPEC =
+  '"imagePrompt": "必填:給圖片生成模型的英文描述,走「台灣工地×數位工具」專業寫實,不是懷舊底片風。' +
+  '主角是台灣工班(東亞臉孔、自然身形,白或黃安全帽、反光背心),在案場用平板或 LINE;' +
+  '場景在台灣(大台北工地、騎樓整修、工務所),明亮日光、海軍藍青藍色調。' +
+  '禁止歐美模特、棚拍廣告、黃昏懷舊、不含文字"';
 
 /** 各平台配圖描述的要求:FB 走寫實攝影、IG 走溫暖插畫/自然攝影,Threads 預設純文字、AI 判斷有圖更好才選填 */
 const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = {
@@ -571,19 +624,26 @@ function resolveImagePromptSpec(params: {
   brandSlug?: string;
   imageStyle?: ImageStyleId;
   skipImagePrompt?: boolean;
+  screenshotPoster?: boolean;
   lane?: AudienceLane;
 }): string {
   if (params.skipImagePrompt) return '';
+  if (params.screenshotPoster) return B2B_SCREENSHOT_POSTER_PROMPT_SPEC;
   const slug = params.brandSlug;
   const style = params.imageStyle;
   if (style === 'design' || (slug === 'homigo' && params.platform === 'instagram' && !style)) {
-    return slug === 'homigo' ? HOMIGO_IG_IMAGE_PROMPT_SPEC : DESIGN_IMAGE_PROMPT_SPEC;
+    if (slug === 'homigo') return HOMIGO_IG_IMAGE_PROMPT_SPEC;
+    if (slug === 'taskgo') return TASKGO_DESIGN_IMAGE_PROMPT_SPEC;
+    return DESIGN_IMAGE_PROMPT_SPEC;
   }
   if (slug === 'washgo' && params.platform === 'threads' && (params.lane ?? 'b2c') === 'b2c') {
     return WASHGO_THREADS_IMAGE_PROMPT_SPEC;
   }
   if (style === 'illustration') {
     return '"imagePrompt": "必填:給圖片生成模型的英文描述,走溫暖手繪插畫,主體單一、一眼看懂,不含文字"';
+  }
+  if (slug === 'taskgo' && (style === 'photo' || params.platform === 'facebook' || params.platform === 'instagram')) {
+    return TASKGO_PHOTO_IMAGE_PROMPT_SPEC;
   }
   if (style === 'photo') return IMAGE_PROMPT_SPEC.facebook;
   return IMAGE_PROMPT_SPEC[params.platform];
@@ -599,6 +659,7 @@ export function buildPostUserPrompt(params: {
   audienceName?: string;
   imageStyle?: ImageStyleId;
   skipImagePrompt?: boolean;
+  screenshotPoster?: boolean;
 }): string {
   const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
   const guideline = params.platform === 'threads' && voice?.threadsCraft
@@ -618,7 +679,8 @@ export function buildPostUserPrompt(params: {
     : '';
   const imageSpec = resolveImagePromptSpec({
     platform: params.platform, brandSlug: params.brandSlug,
-    imageStyle: params.imageStyle, skipImagePrompt: params.skipImagePrompt, lane,
+    imageStyle: params.imageStyle, skipImagePrompt: params.skipImagePrompt,
+    screenshotPoster: params.screenshotPoster, lane,
   });
   return [
     `請針對以下主題,為 ${params.platform} 平台寫一篇貼文。`,
@@ -629,7 +691,9 @@ export function buildPostUserPrompt(params: {
     laneBlock,
     searchBlock,
     params.extraInstruction ?? '',
-    params.skipImagePrompt ? '配圖已指定為品牌上傳的真實截圖或實拍,不要提供 imagePrompt。' : '',
+    params.screenshotPoster
+      ? '配圖會把品牌上傳的真實系統畫面做成 B 端痛點海報(現場煩惱 + 主標 + 這張畫面當解法卡),必須提供 imagePrompt。'
+      : params.skipImagePrompt ? '配圖已指定為品牌上傳的真實截圖或實拍,不要提供 imagePrompt。' : '',
     '',
     '回傳 JSON 物件,格式:',
     `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${imageSpec ? `, ${imageSpec}` : ''}}`,
@@ -672,10 +736,15 @@ export function buildImageInspiredPostPrompt(params: {
   const searchBlock = params.platform === 'instagram' && voice?.igSearchQueries?.length
     ? `文案第一句要對準顧客會搜的一個詞:${voice.igSearchQueries.join('、')}。`
     : '';
+  const screenshotPoster = params.imageCategory === 'system_screenshot'
+    && (params.platform === 'facebook' || params.platform === 'instagram');
   return [
     `這是品牌上傳的一張${categoryLabel}${params.caption ? `,說明:${params.caption}` : ''}。`,
     `請仔細看這張圖,挑一個畫面裡真的有的細節或情境當鉤子,寫一篇 ${params.platform} 貼文。`,
     '不要憑空描述圖片裡沒有的東西,也不要寫成單純的圖片說明文;要像有人真的看到/用到這個畫面後,寫下的一則真實感想或分享。',
+    screenshotPoster
+      ? '這張系統畫面會被做成 B 端痛點海報(現場煩惱 + 主標 + 畫面當解法卡),不是原圖直發。請一併提供 imagePrompt。'
+      : '',
     '',
     guideline,
     laneBlock,
@@ -683,7 +752,7 @@ export function buildImageInspiredPostPrompt(params: {
     params.extraInstruction ?? '',
     '',
     '回傳 JSON 物件:',
-    '{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"}',
+    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${screenshotPoster ? `, ${B2B_SCREENSHOT_POSTER_PROMPT_SPEC}` : ''}}`,
   ].filter(Boolean).join('\n');
 }
 
@@ -794,7 +863,7 @@ export function pickThreadsHourlyCategory(
 
 // ============================================================================
 // Threads 生活哏文(跟品牌/服務完全無關的個人碎念,拿來衝自然流量與帳號真實感)
-//   目前先限定 Washgo(見排程 Worker 的 OFFTOPIC_BRANDS),之後要擴充品牌只要加進那個陣列。
+//   目前 Washgo + TaskGo(見排程 Worker 的 OFFTOPIC_BRANDS)。
 // ============================================================================
 
 /** 生活哏文的通用人設:完全不提品牌,像帳號背後真的有一個會講幹話的人 */

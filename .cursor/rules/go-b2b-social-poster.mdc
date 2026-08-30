@@ -1,0 +1,17 @@
+---
+description: Homigo／TaskGo／Washgo 的 FB、IG 系統畫面必須做成 B 端痛點海報，不要整頁截圖直發
+globs: functions/_shared/prompts.ts,functions/_shared/generate.ts,functions/_shared/ig-frame.ts
+alwaysApply: false
+---
+
+# 三品牌 FB／IG 系統畫面海報
+
+產生 Homigo、TaskGo、Washgo 的 FB／IG 圖、自動發文配圖、或改產圖 prompt 時：
+
+1. 有系統截圖也要做成海報：現場煩惱 + 4–10 字繁中主標 + 平板／白卡只露這張畫面的一個重點
+2. 禁止把整頁後台置中鋪在海軍藍或純色底上
+3. 主標與文案第一句同義；整張文字元素 ≤ 5；正確繁中
+4. Washgo 不要吉卜力、不要笑臉洗衣機；TaskGo 維持海軍藍斜切工地風
+5. 簡報框原圖只當海報生成失敗的後備
+
+程式：`functions/_shared/prompts.ts` 的 `SYSTEM_SCREENSHOT_POSTER_RULE`、`functions/_shared/generate.ts` 的 `generateSystemScreenshotPoster`

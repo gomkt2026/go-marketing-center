@@ -53,6 +53,28 @@ export interface MetaPublishResult {
   permalink: string | null;
 }
 
+export function isMetaTokenInvalid(message: string): boolean {
+  return /Error validating access token|Session has expired|session is invalid|has been invalidated/i.test(message);
+}
+
+export const META_TOKEN_INVALID_NOTE =
+  'Facebook／Instagram 粉專權杖已失效（Error validating access token）。請到 Graph API 探索工具重新取得「粉絲專頁存取權杖」（不要用個人 User Token），延伸成長期權杖後，Facebook 與 Instagram 都貼同一把並測試連線。Threads 權杖是另一把，不受影響。';
+
+function formatGraphApiError(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body) as {
+      error?: { message?: string; error_user_msg?: string; code?: number; error_subcode?: number };
+    };
+    const e = parsed.error;
+    if (e) {
+      const msg = e.error_user_msg || e.message || body;
+      const hint = isMetaTokenInvalid(msg) ? ` ${META_TOKEN_INVALID_NOTE}` : '';
+      return `${status}${e.code != null ? `/${e.code}` : ''}: ${msg}${hint}`;
+    }
+  } catch { /* 不是 JSON */ }
+  return `${status}: ${body.slice(0, 300)}`;
+}
+
 async function graphPost(url: string, params: Record<string, string>): Promise<Record<string, unknown>> {
   const res = await fetch(url, {
     method: 'POST',
@@ -61,9 +83,48 @@ async function graphPost(url: string, params: Record<string, string>): Promise<R
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`Graph API 失敗 (${res.status}): ${text.slice(0, 300)}`);
+    throw new Error(`Graph API 失敗 (${formatGraphApiError(res.status, text)})`);
   }
   return await res.json() as Record<string, unknown>;
+}
+
+/** 確認粉專／IG 權杖還能讀到目標帳號（比只打 /me 準，User Token 過期或錯粉專會在這裡現形） */
+export async function probeMetaPublishAccess(
+  token: string,
+  platform: 'facebook' | 'instagram',
+  externalId: string | null,
+): Promise<{ ok: boolean; detail: string; fetchedId: string | null }> {
+  const id = externalId?.trim();
+  const url = platform === 'instagram' && id
+    ? `${GRAPH_API}/${encodeURIComponent(id)}?fields=id,username&access_token=${encodeURIComponent(token)}`
+    : id
+      ? `${GRAPH_API}/${encodeURIComponent(id)}?fields=id,name,access_token&access_token=${encodeURIComponent(token)}`
+      : `${GRAPH_API}/me?fields=id,name&access_token=${encodeURIComponent(token)}`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json().catch(() => ({})) as {
+      id?: string; name?: string; username?: string; error?: { message?: string };
+    };
+    if (!res.ok) {
+      const msg = data.error?.message ?? res.statusText;
+      return {
+        ok: false,
+        detail: isMetaTokenInvalid(msg) ? META_TOKEN_INVALID_NOTE : `平台回應錯誤:${msg}`,
+        fetchedId: null,
+      };
+    }
+    const label = data.name ?? data.username ?? data.id;
+    if (platform === 'facebook' && !id) {
+      return {
+        ok: false,
+        detail: `權杖有效,但沒有填粉專 Page ID。目前 /me 是「${label}」,請填 TaskGo 粉專 ID 再測一次,不要留空。`,
+        fetchedId: data.id ?? null,
+      };
+    }
+    return { ok: true, detail: `連線成功:${label}`, fetchedId: data.id ?? null };
+  } catch (e) {
+    return { ok: false, detail: `連線失敗:${e instanceof Error ? e.message : '未知錯誤'}`, fetchedId: null };
+  }
 }
 
 /** 貼文全文 = 內文 + hashtags(FB 建議少量、IG 可多) */

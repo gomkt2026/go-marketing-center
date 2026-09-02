@@ -5,7 +5,10 @@ import { getSql } from '../../../_shared/db';
 import { getBrandBySlug } from '../../../_shared/queries';
 import { rowsToCamel } from '../../../_shared/case';
 import { json, error } from '../../../_shared/response';
-import { publishReplyTarget, getReplyQuotaState, replyQuotaIssue, clampReplyHourlyCap, clampReplyDailyCap } from '../../../_shared/threads-replies';
+import {
+  publishReplyTarget, getReplyQuotaState, replyQuotaIssue, clampReplyHourlyCap, clampReplyDailyCap,
+  getLatestReplyScan, diagnoseBrandReplySearch,
+} from '../../../_shared/threads-replies';
 import { getThreadsAccount } from '../../../_shared/threads';
 import { logActivity } from '../../../_shared/activity';
 
@@ -70,6 +73,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     replyHourlyCap: clampReplyHourlyCap(acc.reply_hourly_cap),
     replyDailyCap: clampReplyDailyCap(acc.reply_daily_cap),
     autoReply: !!acc.auto_reply,
+    lastScan: await getLatestReplyScan(context.env, brand.id),
   });
 };
 
@@ -82,8 +86,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!brand) return error('Brand not found', 404);
 
   const body = await context.request.json() as { id?: string; action?: string; replyText?: string };
+  if (body.action === 'scan') {
+    const result = await diagnoseBrandReplySearch(context.env, brand.id, brand.slug);
+    return json({ ok: result.ok, status: result.ok ? 'ready' : 'blocked', detail: result.detail });
+  }
   if (!body.id || !body.action || !['approve', 'skip'].includes(body.action)) {
-    return error('需要 id 與 action(approve / skip)', 400);
+    return error('需要 id 與 action(approve / skip / scan)', 400);
   }
 
   const sql = getSql(context.env);

@@ -20,6 +20,7 @@ import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '..
 import { toPublicMediaUrl } from '../../../functions/_shared/media';
 import {
   publishReplyTarget, replyTextIssue, getReplyQuotaState, replyQuotaIssue, THREADS_REPLY_KEYWORDS,
+  recordReplyScan,
 } from '../../../functions/_shared/threads-replies';
 import { encryptToken, decryptToken } from '../../../functions/_shared/crypto';
 import { logActivity } from '../../../functions/_shared/activity';
@@ -770,7 +771,11 @@ async function threadsReplyRound(env: Env): Promise<void> {
           }
         }
         if (!found.length) {
-          console.log(`[replies] ${brand.slug} 沒有搜尋結果(檢查 token 是否有 threads_keyword_search 權限)`);
+          const detail = keywords.length
+            ? `關鍵字「${keywords.join('、')}」沒有搜到貼文。token 可能缺少 threads_keyword_search,或 App 還在開發模式。`
+            : '本輪未執行搜尋';
+          console.log(`[replies] ${brand.slug} ${detail}`);
+          await recordReplyScan(env, brand.id, detail, { keywords, total: 0 });
         }
       }
 
@@ -814,7 +819,12 @@ async function threadsReplyRound(env: Env): Promise<void> {
         .sort(replyHeatRank)
         .slice(0, REPLY_CANDIDATES_FOR_AI);
       if (!candidates.length) {
-        console.log(`[replies] ${brand.slug} 過濾後沒有可回覆的候選貼文`);
+        const ownCount = found.filter((p) => (p.username ?? '').toLowerCase() === ownUsername).length;
+        const detail = ownCount === found.length
+          ? `搜到 ${found.length} 則都是自己的帳號 @${account.username}。Meta 規定 threads_keyword_search 未過 App Review 前只能搜自己的文,自動回覆佇列會是空的。`
+          : `搜到 ${found.length} 則,過濾後沒有可回覆的公開文(太舊、已處理、作者冷卻或是回覆串)。`;
+        console.log(`[replies] ${brand.slug} ${detail}`);
+        await recordReplyScan(env, brand.id, detail, { total: found.length, ownCount, publicCount: found.length - ownCount });
         if (account.autoReply) {
           await autoPublishPendingReplies(env, {
             brandId: brand.id, brandSlug: brand.slug, account,
@@ -907,7 +917,9 @@ async function threadsReplyRound(env: Env): Promise<void> {
           ) ON CONFLICT (brand_id, target_post_id) DO NOTHING
         `;
       }
-      console.log(`[replies] ${brand.slug} 關鍵字=${keywords.join('、')} 候選=${candidates.length} 入庫=${insertedIds.length}`);
+      const scanDetail = `關鍵字「${keywords.join('、')}」候選 ${candidates.length} 則,入庫 ${insertedIds.length} 則`;
+      console.log(`[replies] ${brand.slug} ${scanDetail}`);
+      await recordReplyScan(env, brand.id, scanDetail, { keywords, candidates: candidates.length, queued: insertedIds.length });
 
       if (account.autoReply) {
         await autoPublishPendingReplies(env, {
@@ -1581,6 +1593,11 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
   }
 
   // X access token 僅 2 小時效期,每個 30 分鐘 tick 都順手檢查一次(SQL 已篩選快到期才動作)
+  // Threads 回覆輪放在發布前面,避免 publishDueJobs 逾時把回覆掃文吃掉
+  if (!(twHour >= 2 && twHour < 6) && !isTopOfHour) {
+    await threadsReplyRound(env);
+  }
+
   await refreshXTokens(env);
 
   // 近 48 小時失敗的 Threads 每次只重試 1 則,避免半點一次塞 3 則被 Meta 擋
@@ -1588,12 +1605,6 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
 
   // 發布階段:每個 tick 都檢查有沒有已經到期的排程要真正發出去(呼叫平台 API)
   await publishDueJobs(env);
-
-  // Threads 回覆輪:凌晨 2-6 點靜默;其餘每個 :30 tick 跑一次(自動回覆消化 pending)
-  if (twHour >= 2 && twHour < 6) return;
-  if (!isTopOfHour) {
-    await threadsReplyRound(env);
-  }
 }
 
 // ============================================================================

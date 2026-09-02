@@ -114,7 +114,12 @@ function TokenHowTo({ brandName }: { brandName: string }) {
             <a href="https://developers.facebook.com/docs/threads/get-started/" target="_blank" rel="noreferrer" style={linkStyle}>
               Threads 開始使用
             </a>
-            的授權視窗，權限至少 <code>threads_basic</code>、<code>threads_content_publish</code>。
+            的授權視窗。發文至少勾 <code>threads_basic</code>、<code>threads_content_publish</code>；
+            自動回覆還要勾 <code>threads_keyword_search</code>、<code>threads_manage_replies</code>。
+          </li>
+          <li>
+            自動回覆搜的是「別人的」熱門公開文。Meta 規定 <code>threads_keyword_search</code> <strong>未過 App Review 前只會搜到自己的貼文</strong>，
+            系統會略過自己的文，所以「Threads 互動」會一直是空的。要真正衝觸及，請在 App Review 送審這個權限；過審前開關開了也不會有佇列。
           </li>
           <li>
             若行程表出現 <code>API access blocked</code>：先開{' '}
@@ -125,9 +130,9 @@ function TokenHowTo({ brandName }: { brandName: string }) {
             開發模式下，Washgo 的 Threads 帳號必須加進 App 的測試人員並在手機 Threads 同意邀請。
           </li>
           <li>
-            重新走授權視窗，權限一定要勾 <code>threads_basic</code>、<code>threads_content_publish</code>，換成 60 天長效 token。
+            重新走授權視窗，權限一定要勾 <code>threads_basic</code>、<code>threads_content_publish</code>、<code>threads_keyword_search</code>、<code>threads_manage_replies</code>，換成 60 天長效 token。
           </li>
-          <li>回到本頁貼上新 token，按「測試連線」。測試現在會真的試建一篇（不發布）；通過後再勾「排程自動發布」。</li>
+          <li>回到本頁貼上新 token，按「測試連線」。測試會試建一篇（不發布）並探測關鍵字搜尋能不能看到別人的文。</li>
         </ol>
       )}
     </Card>

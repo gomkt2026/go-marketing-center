@@ -6,6 +6,7 @@ import { getBrandBySlug } from '../../../../_shared/queries';
 import { json, error } from '../../../../_shared/response';
 import { decryptToken } from '../../../../_shared/crypto';
 import { probeThreadsPublishAccess } from '../../../../_shared/threads';
+import { diagnoseBrandReplySearch } from '../../../../_shared/threads-replies';
 import { probeMetaPublishAccess } from '../../../../_shared/meta';
 
 // 以已儲存的 token 測試平台連線;成功則將狀態升級為 connected
@@ -33,15 +34,21 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   if (body.platform === 'threads') {
     const probe = await probeThreadsPublishAccess(token);
+    let searchNote = '';
+    if (probe.ok) {
+      const search = await diagnoseBrandReplySearch(context.env, brand.id, brand.slug);
+      searchNote = search.detail;
+    }
+    const detail = [probe.detail, searchNote].filter(Boolean).join(' ');
     await sql`
       UPDATE brand_social_accounts
       SET status = ${probe.ok ? 'connected' : 'error'},
           connected_at = ${probe.ok ? new Date().toISOString() : null},
-          notes = ${probe.detail},
+          notes = ${detail},
           external_id = COALESCE(${probe.userId}, external_id)
       WHERE id = ${account.id}::uuid
     `;
-    return json({ ok: probe.ok, status: probe.ok ? 'connected' : 'error', detail: probe.detail });
+    return json({ ok: probe.ok, status: probe.ok ? 'connected' : 'error', detail });
   }
 
   if (body.platform === 'facebook' || body.platform === 'instagram') {

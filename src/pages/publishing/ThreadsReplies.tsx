@@ -31,6 +31,7 @@ export function ThreadsReplies() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const { data, loading, error, reload } = useAsyncData(
@@ -41,6 +42,21 @@ export function ThreadsReplies() {
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
 
   const capReached = !!data && (data.replied1h >= data.replyHourlyCap || data.replied24h >= data.replyDailyCap);
+
+  async function scanNow() {
+    if (!slug) return;
+    setScanning(true);
+    setMessage(null);
+    try {
+      const res = await api.actThreadReply(slug, { action: 'scan' });
+      setMessage(res.detail ?? (res.ok ? '搜尋可用,下一輪會開始入庫' : '搜尋仍無法看到別人的公開文'));
+      reload();
+    } catch (e) {
+      setMessage(`掃描失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
+    } finally {
+      setScanning(false);
+    }
+  }
 
   async function act(target: ThreadsReplyTarget, action: 'approve' | 'skip', replyText?: string) {
     if (!slug) return;
@@ -83,6 +99,9 @@ export function ThreadsReplies() {
             本小時 {data.replied1h}/{data.replyHourlyCap} · 近 24 小時 {data.replied24h}/{data.replyDailyCap}
           </span>
         )}
+        <Button variant="secondary" disabled={scanning} onClick={() => void scanNow()}>
+          {scanning ? '掃描中...' : '立即掃描搜尋權限'}
+        </Button>
       </div>
 
       {data && (data.replied1h >= data.replyHourlyCap || data.replied24h >= data.replyDailyCap) && (
@@ -110,8 +129,13 @@ export function ThreadsReplies() {
             <Card>
               <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
                 {tab === 'pending'
-                  ? '目前沒有待審核的回覆。排程每小時會搜尋一輪熱門貼文;若一直沒有項目,請確認 Threads token 已具備 threads_keyword_search 權限,並在「社群帳號」完成設定。'
+                  ? '目前沒有待審核的回覆。開關開了還是空的,通常不是設定沒存到,而是 Meta 規定 threads_keyword_search 未過 App Review 前只能搜到自己的文;系統會略過自己的文,佇列就會一直是空的。請按「立即掃描搜尋權限」,或到社群帳號按「測試連線」看實際搜尋結果。'
                   : '這個分類目前沒有項目'}
+                {data.lastScan?.detail && (
+                  <p style={{ fontSize: 12.5, marginTop: 8, color: 'var(--color-text)' }}>
+                    最近一次掃描({new Date(data.lastScan.at).toLocaleString('zh-TW')}):{data.lastScan.detail}
+                  </p>
+                )}
               </p>
             </Card>
           )}

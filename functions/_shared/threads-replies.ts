@@ -1,6 +1,6 @@
 import type { Env } from './env';
 import { getSql } from './db';
-import { getThreadsAccount, replyToThreadsPost, type ThreadsAccount } from './threads';
+import { getThreadsAccount, replyToThreadsPost, diagnoseThreadsKeywordSearch, type ThreadsAccount } from './threads';
 import { logActivity } from './activity';
 
 // ============================================================================
@@ -86,6 +86,48 @@ export function replyQuotaIssue(params: {
     return `已達每日回覆上限 ${params.dailyCap} 則`;
   }
   return null;
+}
+
+export async function recordReplyScan(env: Env, brandId: string, detail: string, extra?: Record<string, unknown>): Promise<void> {
+  await logActivity(env, {
+    brandId,
+    actorType: 'ai_agent',
+    action: 'threads_reply.scan',
+    entityType: 'brand',
+    entityId: brandId,
+    afterState: { detail, ...extra },
+  });
+}
+
+export async function getLatestReplyScan(env: Env, brandId: string): Promise<{ at: string; detail: string } | null> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT created_at, after_state
+    FROM activity_logs
+    WHERE brand_id = ${brandId}::uuid AND action = 'threads_reply.scan'
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  const row = rows[0] as { created_at: string; after_state: { detail?: string } | string | null };
+  const state = typeof row.after_state === 'string'
+    ? JSON.parse(row.after_state) as { detail?: string }
+    : (row.after_state ?? {});
+  return { at: row.created_at, detail: state.detail ?? '' };
+}
+
+/** 用品牌第一個痛點關鍵字探測能不能搜到別人的公開文 */
+export async function diagnoseBrandReplySearch(env: Env, brandId: string, slug: string) {
+  const account = await getThreadsAccount(env, brandId);
+  if (!account) {
+    return { ok: false, detail: '品牌尚未連接可用的 Threads 帳號' };
+  }
+  const keyword = (THREADS_REPLY_KEYWORDS[slug] ?? [slug])[0];
+  const result = await diagnoseThreadsKeywordSearch(account, keyword);
+  await recordReplyScan(env, brandId, result.detail, {
+    keyword: result.keyword, total: result.total, ownCount: result.ownCount, publicCount: result.publicCount,
+  });
+  return result;
 }
 
 /** 程式層安全檢查:回傳 null 表示通過,否則回傳問題描述 */

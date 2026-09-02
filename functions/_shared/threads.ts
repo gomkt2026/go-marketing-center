@@ -311,6 +311,47 @@ export async function searchThreadsPosts(
   }));
 }
 
+export interface ThreadsSearchDiagnosis {
+  ok: boolean;
+  keyword: string;
+  total: number;
+  ownCount: number;
+  publicCount: number;
+  error?: string;
+  detail: string;
+}
+
+/**
+ * 診斷 keyword search 能不能搜到「別人的」公開文。
+ * App Review 未過審時官方只回自己的貼文,自動回覆佇列就會一直是空的。
+ */
+export async function diagnoseThreadsKeywordSearch(
+  account: ThreadsAccount,
+  keyword: string,
+): Promise<ThreadsSearchDiagnosis> {
+  const own = (account.username ?? '').toLowerCase();
+  try {
+    const posts = await searchThreadsPosts(account, keyword, 25);
+    const ownCount = posts.filter((p) => (p.username ?? '').toLowerCase() === own).length;
+    const publicCount = posts.length - ownCount;
+    let detail: string;
+    if (!posts.length) {
+      detail = `關鍵字「${keyword}」沒有搜到任何貼文。token 可能缺少 threads_keyword_search,或 App 還在開發模式。`;
+    } else if (publicCount === 0) {
+      detail = `關鍵字「${keyword}」搜到 ${posts.length} 則,全部是 @${account.username ?? '自己'}。Meta 規定 threads_keyword_search 未過 App Review 前只能搜自己的文,系統會略過自己的文,所以「Threads 互動」會是空的。請到開發者後台送審這個權限,過審後才能搜公開熱門文。`;
+    } else {
+      detail = `關鍵字「${keyword}」搜到 ${posts.length} 則,其中別人的公開文 ${publicCount} 則,搜尋可用。`;
+    }
+    return { ok: publicCount > 0, keyword, total: posts.length, ownCount, publicCount, detail };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false, keyword, total: 0, ownCount: 0, publicCount: 0, error,
+      detail: `關鍵字搜尋失敗:${error}。請重新授權並勾選 threads_keyword_search 與 threads_manage_replies。`,
+    };
+  }
+}
+
 // ============================================================================
 // 回覆貼文:建立 container 時帶 reply_to_id(需 threads_manage_replies 權限)
 // ============================================================================

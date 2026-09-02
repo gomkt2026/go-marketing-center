@@ -450,12 +450,13 @@ export const api = {
       replyHourlyCap: number;
       replyDailyCap: number;
       autoReply: boolean;
+      lastScan?: { at: string; detail: string } | null;
     }>(
       `/api/brands/${slug}/thread-replies?status=${status}`,
     ),
 
-  actThreadReply: (slug: string, body: { id: string; action: 'approve' | 'skip'; replyText?: string }) =>
-    request<{ ok: boolean; status: string; permalink?: string | null }>(`/api/brands/${slug}/thread-replies`, {
+  actThreadReply: (slug: string, body: { id?: string; action: 'approve' | 'skip' | 'scan'; replyText?: string }) =>
+    request<{ ok: boolean; status: string; permalink?: string | null; detail?: string }>(`/api/brands/${slug}/thread-replies`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),

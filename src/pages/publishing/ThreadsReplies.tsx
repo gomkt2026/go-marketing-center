@@ -40,6 +40,8 @@ export function ThreadsReplies() {
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
 
+  const capReached = !!data && (data.replied1h >= data.replyHourlyCap || data.replied24h >= data.replyDailyCap);
+
   async function act(target: ThreadsReplyTarget, action: 'approve' | 'skip', replyText?: string) {
     if (!slug) return;
     setBusyId(target.id);
@@ -62,7 +64,7 @@ export function ThreadsReplies() {
     <div>
       <PageHeader
         title={`${brand.name} Threads 互動引流`}
-        subtitle="系統定時搜尋 Threads 熱門公開貼文,由 AI 以品牌第一線人設生成回覆;審核通過即發布,透過高品質互動提升帳號曝光"
+        subtitle="系統每 30 分鐘搜尋熱門相關公開貼文,以品牌第一線人設生成回覆;開啟自動回覆後會在額度內直接發布,也可在此人工核准或改稿"
       />
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -77,10 +79,21 @@ export function ThreadsReplies() {
         ))}
         {data && (
           <span style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
-            近 24 小時已回覆 {data.replied24h} 則
+            {data.autoReply ? '自動回覆已開啟 · ' : '自動回覆關閉(僅人工核准) · '}
+            本小時 {data.replied1h}/{data.replyHourlyCap} · 近 24 小時 {data.replied24h}/{data.replyDailyCap}
           </span>
         )}
       </div>
+
+      {data && (data.replied1h >= data.replyHourlyCap || data.replied24h >= data.replyDailyCap) && (
+        <Card style={{ marginBottom: 12, borderLeft: '4px solid var(--color-danger, #b42318)' }}>
+          <p style={{ fontSize: 13 }}>
+            {data.replied1h >= data.replyHourlyCap
+              ? `本小時已達上限 ${data.replyHourlyCap} 則,請等下一個時段再核准或等待自動回覆。`
+              : `近 24 小時已達每日上限 ${data.replyDailyCap} 則。`}
+          </p>
+        </Card>
+      )}
 
       {message && (
         <Card style={{ marginBottom: 12, borderLeft: '4px solid var(--color-primary)' }}>
@@ -185,14 +198,14 @@ export function ThreadsReplies() {
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {isEditing ? (
                       <>
-                        <Button variant="primary" disabled={busy} onClick={() => void act(t, 'approve', editText)}>
+                        <Button variant="primary" disabled={busy || capReached} onClick={() => void act(t, 'approve', editText)}>
                           {busy ? '發布中...' : '發布修改後的回覆'}
                         </Button>
                         <Button variant="ghost" onClick={() => setEditingId(null)}>取消編輯</Button>
                       </>
                     ) : (
                       <>
-                        <Button variant="primary" disabled={busy} onClick={() => void act(t, 'approve')}>
+                        <Button variant="primary" disabled={busy || capReached} onClick={() => void act(t, 'approve')}>
                           {busy ? '發布中...' : '核准並發布'}
                         </Button>
                         <Button
@@ -215,10 +228,11 @@ export function ThreadsReplies() {
       <Card style={{ marginTop: 16, background: 'var(--color-bg-soft)' }}>
         <strong style={{ fontSize: 13 }}>運作方式與防封號機制</strong>
         <ul style={{ fontSize: 12.5, color: 'var(--color-text-muted)', lineHeight: 1.9, paddingLeft: 18, marginTop: 6 }}>
-          <li>排程每小時輪一個品牌:以行業關鍵字搜尋 Threads 熱門公開貼文,AI 只挑真正相關的(相關性 ≥ 70%)生成回覆</li>
-          <li>回覆走品牌第一線人設、不放連結、不促銷;每日上限與發布間隔可在「<Link to={`/${slug}/social`}>社群帳號</Link>」設定</li>
-          <li>開啟「自動回覆」後高分回覆會直接發布;關閉則全部進入此頁待審核</li>
-          <li>發布失敗(如被限流)會自動暫停該品牌當日後續回覆,避免觸發平台風控</li>
+          <li>每 30 分鐘掃一輪,優先處理已開自動回覆的品牌(每輪最多 2 個);關鍵字含行業痛點,AI 只挑相關性 ≥ 70% 的文</li>
+          <li>熱度訊號:官方 TOP 搜尋 + 已有人回覆 + 48 小時內新文優先(API 沒有瀏覽數)</li>
+          <li>回覆走品牌第一線人設、不放連結、不促銷;小時上限預設 5(硬頂 20)、每日上限與自動回覆開關在「<Link to={`/${slug}/social`}>社群帳號</Link>」</li>
+          <li>開啟「自動回覆」後,待審佇列會在額度內自動發布;關閉則全部等你核准</li>
+          <li>發布失敗(如被限流)會暫停該品牌 12 小時,避免觸發平台風控</li>
         </ul>
       </Card>
     </div>

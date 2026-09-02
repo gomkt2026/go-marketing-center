@@ -466,6 +466,7 @@ export interface SocialAccount {
   autoPublish?: boolean;
   autoReply?: boolean;
   replyDailyCap?: number;
+  replyHourlyCap?: number;
   connectedAt?: string | null;
   hasToken?: boolean;
   tokenMasked?: string | null;

@@ -5,7 +5,8 @@ import { getSql } from '../../../_shared/db';
 import { getBrandBySlug } from '../../../_shared/queries';
 import { rowsToCamel } from '../../../_shared/case';
 import { json, error } from '../../../_shared/response';
-import { publishReplyTarget } from '../../../_shared/threads-replies';
+import { publishReplyTarget, getReplyQuotaState, replyQuotaIssue, clampReplyHourlyCap, clampReplyDailyCap } from '../../../_shared/threads-replies';
+import { getThreadsAccount } from '../../../_shared/threads';
 import { logActivity } from '../../../_shared/activity';
 
 // ============================================================================
@@ -42,16 +43,33 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         ORDER BY created_at DESC LIMIT 100
       `;
 
-  // 近 24 小時已發布數(前台顯示今日額度)
-  const statRows = await sql`
-    SELECT count(*)::int AS replied_24h
-    FROM threads_reply_targets
-    WHERE brand_id = ${brand.id}::uuid AND status = 'replied' AND replied_at > now() - interval '24 hours'
-  `;
+  const quota = await getReplyQuotaState(context.env, brand.id);
+  let acc: { auto_reply?: boolean; reply_daily_cap?: number; reply_hourly_cap?: number } = {};
+  try {
+    const accRows = await sql`
+      SELECT auto_reply, reply_daily_cap, reply_hourly_cap
+      FROM brand_social_accounts
+      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads'
+      LIMIT 1
+    `;
+    acc = (accRows[0] ?? {}) as typeof acc;
+  } catch {
+    const accRows = await sql`
+      SELECT auto_reply, reply_daily_cap
+      FROM brand_social_accounts
+      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads'
+      LIMIT 1
+    `;
+    acc = (accRows[0] ?? {}) as typeof acc;
+  }
 
   return json({
     targets: rowsToCamel(rows as Record<string, unknown>[]),
-    replied24h: (statRows[0] as { replied_24h: number }).replied_24h,
+    replied1h: quota.replied1h,
+    replied24h: quota.replied24h,
+    replyHourlyCap: clampReplyHourlyCap(acc.reply_hourly_cap),
+    replyDailyCap: clampReplyDailyCap(acc.reply_daily_cap),
+    autoReply: !!acc.auto_reply,
   });
 };
 
@@ -95,7 +113,17 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return json({ ok: true, status: 'skipped' });
   }
 
-  // approve:立即發布(可帶編輯後文字)
+  // approve:立即發布(可帶編輯後文字);小時/日上限與自動回覆共用
+  const account = await getThreadsAccount(context.env, brand.id);
+  const quota = await getReplyQuotaState(context.env, brand.id);
+  const capIssue = replyQuotaIssue({
+    replied1h: quota.replied1h,
+    replied24h: quota.replied24h,
+    hourlyCap: account?.replyHourlyCap ?? 5,
+    dailyCap: account?.replyDailyCap ?? 12,
+  });
+  if (capIssue) return error(capIssue, 429);
+
   const result = await publishReplyTarget(context.env, {
     targetId: target.id,
     reviewedByUserId: auth.id,

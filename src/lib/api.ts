@@ -434,7 +434,7 @@ export const api = {
   saveSocialAccount: (slug: string, body: {
     platform: string; accountName?: string; externalId?: string;
     accessToken?: string; clearToken?: boolean; notes?: string; autoPublish?: boolean;
-    autoReply?: boolean; replyDailyCap?: number;
+    autoReply?: boolean; replyDailyCap?: number; replyHourlyCap?: number;
   }) =>
     request<{ account: import('@/types').SocialAccount }>(`/api/brands/${slug}/social-accounts`, {
       method: 'PUT',
@@ -443,7 +443,14 @@ export const api = {
 
   // -- Threads 熱門貼文回覆佇列 ----------------------------------------------
   threadReplies: (slug: string, status = 'pending') =>
-    request<{ targets: import('@/types').ThreadsReplyTarget[]; replied24h: number }>(
+    request<{
+      targets: import('@/types').ThreadsReplyTarget[];
+      replied1h: number;
+      replied24h: number;
+      replyHourlyCap: number;
+      replyDailyCap: number;
+      autoReply: boolean;
+    }>(
       `/api/brands/${slug}/thread-replies?status=${status}`,
     ),
 

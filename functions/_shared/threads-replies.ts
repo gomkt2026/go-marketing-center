@@ -8,6 +8,86 @@ import { logActivity } from './activity';
 //   (scheduler 自動發布與前台人工核准共用)
 // ============================================================================
 
+export const REPLY_HOURLY_CAP_DEFAULT = 5;
+export const REPLY_HOURLY_CAP_MAX = 20;
+export const REPLY_DAILY_CAP_DEFAULT = 12;
+export const REPLY_DAILY_CAP_MAX = 50;
+
+/** 搜尋用關鍵字(與新聞 filterKeywords 分開,避免把派工痛點詞灌進一般新聞篩選) */
+export const THREADS_REPLY_KEYWORDS: Record<string, string[]> = {
+  taskgo: [
+    '裝修', '裝潢', '工班', '翻新', '缺工', '工地', '建材', '室內設計', '水電', '漏水',
+    '排班', '管帳', '估價', '派工', '工班進度', '做白工',
+  ],
+  washgo: [
+    '洗衣', '乾洗', '衣物', '棉被', '羽絨', '換季', '收納', '梅雨', '潮濕', '黴',
+    '發霉', '洗羽絨衣', '床墊', '窗簾', '店家外送',
+  ],
+  homigo: [
+    '租屋', '租金', '房東', '房客', '租客', '包租', '社宅', '房市', '押金', '租約', '囤房',
+  ],
+};
+
+export function clampReplyHourlyCap(n: number | null | undefined): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return REPLY_HOURLY_CAP_DEFAULT;
+  return Math.max(1, Math.min(REPLY_HOURLY_CAP_MAX, Math.round(v)));
+}
+
+export function clampReplyDailyCap(n: number | null | undefined): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return REPLY_DAILY_CAP_DEFAULT;
+  return Math.max(1, Math.min(REPLY_DAILY_CAP_MAX, Math.round(v)));
+}
+
+export interface ReplyQuotaState {
+  replied1h: number;
+  replied24h: number;
+  lastRepliedAt: string | null;
+  failedRecent: number;
+  pendingCount: number;
+}
+
+export async function getReplyQuotaState(env: Env, brandId: string): Promise<ReplyQuotaState> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT
+      count(*) FILTER (WHERE status = 'replied' AND replied_at > now() - interval '1 hour')::int AS replied_1h,
+      count(*) FILTER (WHERE status = 'replied' AND replied_at > now() - interval '24 hours')::int AS replied_24h,
+      max(replied_at) FILTER (WHERE status = 'replied') AS last_replied_at,
+      count(*) FILTER (WHERE status = 'failed' AND updated_at > now() - interval '12 hours')::int AS failed_recent,
+      count(*) FILTER (WHERE status = 'pending')::int AS pending_count
+    FROM threads_reply_targets WHERE brand_id = ${brandId}::uuid
+  `;
+  const row = (rows[0] ?? {}) as {
+    replied_1h?: number; replied_24h?: number; last_replied_at?: string | null;
+    failed_recent?: number; pending_count?: number;
+  };
+  return {
+    replied1h: row.replied_1h ?? 0,
+    replied24h: row.replied_24h ?? 0,
+    lastRepliedAt: row.last_replied_at ?? null,
+    failedRecent: row.failed_recent ?? 0,
+    pendingCount: row.pending_count ?? 0,
+  };
+}
+
+/** 回傳 null 表示還可以發;否則是給操作者看的原因 */
+export function replyQuotaIssue(params: {
+  replied1h: number;
+  replied24h: number;
+  hourlyCap: number;
+  dailyCap: number;
+}): string | null {
+  if (params.replied1h >= params.hourlyCap) {
+    return `已達每小時回覆上限 ${params.hourlyCap} 則,請稍後再發`;
+  }
+  if (params.replied24h >= params.dailyCap) {
+    return `已達每日回覆上限 ${params.dailyCap} 則`;
+  }
+  return null;
+}
+
 /** 程式層安全檢查:回傳 null 表示通過,否則回傳問題描述 */
 export function replyTextIssue(text: string | null | undefined): string | null {
   const t = (text ?? '').trim();

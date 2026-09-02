@@ -7,6 +7,7 @@ import { rowsToCamel, rowToCamel } from '../../../_shared/case';
 import { json, error } from '../../../_shared/response';
 import { encryptToken, decryptToken, maskToken } from '../../../_shared/crypto';
 import { logActivity } from '../../../_shared/activity';
+import { clampReplyDailyCap, clampReplyHourlyCap } from '../../../_shared/threads-replies';
 
 const SUPPORTED = ['facebook', 'instagram', 'threads'];
 
@@ -64,6 +65,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     autoPublish?: boolean;  // 排程生成後直接發布(threads / facebook / instagram)
     autoReply?: boolean;    // 自動回覆熱門貼文(threads)
     replyDailyCap?: number; // 每日回覆上限
+    replyHourlyCap?: number; // 每小時回覆上限(1-20)
   };
   if (!body.platform || !SUPPORTED.includes(body.platform)) {
     return error(`platform 必須為 ${SUPPORTED.join(' / ')}`, 400);
@@ -92,15 +94,18 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
 
   // 有 token 即進入手動發布模式(connected 需通過連線測試)
   const status = tokenEnc ? 'manual' : (body.accountName?.trim() ? 'manual' : 'disconnected');
-  const prev = existing.length ? existing[0] as { auto_publish: boolean; auto_reply: boolean; reply_daily_cap: number } : null;
+  const prev = existing.length ? existing[0] as {
+    auto_publish: boolean; auto_reply: boolean; reply_daily_cap: number; reply_hourly_cap: number;
+  } : null;
   const autoPublish = (body.autoPublish ?? prev?.auto_publish ?? false) && !!tokenEnc;
   const autoReply = (body.autoReply ?? prev?.auto_reply ?? false) && !!tokenEnc;
-  const replyDailyCap = Math.max(1, Math.min(50, body.replyDailyCap ?? prev?.reply_daily_cap ?? 12));
+  const replyDailyCap = clampReplyDailyCap(body.replyDailyCap ?? prev?.reply_daily_cap);
+  const replyHourlyCap = clampReplyHourlyCap(body.replyHourlyCap ?? prev?.reply_hourly_cap);
 
   const rows = await sql`
-    INSERT INTO brand_social_accounts (brand_id, platform, account_name, external_id, access_token_enc, token_expires_at, status, notes, auto_publish, auto_reply, reply_daily_cap, connected_at)
+    INSERT INTO brand_social_accounts (brand_id, platform, account_name, external_id, access_token_enc, token_expires_at, status, notes, auto_publish, auto_reply, reply_daily_cap, reply_hourly_cap, connected_at)
     VALUES (${brand.id}::uuid, ${body.platform}, ${body.accountName ?? null}, ${body.externalId ?? null},
-            ${tokenEnc}, ${tokenExpiresAt}, ${status}, ${body.notes ?? null}, ${autoPublish}, ${autoReply}, ${replyDailyCap}, ${tokenEnc ? new Date().toISOString() : null})
+            ${tokenEnc}, ${tokenExpiresAt}, ${status}, ${body.notes ?? null}, ${autoPublish}, ${autoReply}, ${replyDailyCap}, ${replyHourlyCap}, ${tokenEnc ? new Date().toISOString() : null})
     ON CONFLICT (brand_id, platform) DO UPDATE SET
       account_name = EXCLUDED.account_name,
       external_id = EXCLUDED.external_id,
@@ -111,6 +116,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
       auto_publish = EXCLUDED.auto_publish,
       auto_reply = EXCLUDED.auto_reply,
       reply_daily_cap = EXCLUDED.reply_daily_cap,
+      reply_hourly_cap = EXCLUDED.reply_hourly_cap,
       connected_at = EXCLUDED.connected_at
     RETURNING *
   `;

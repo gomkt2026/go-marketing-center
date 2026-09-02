@@ -19,24 +19,36 @@ export interface ThreadsAccount {
   autoPublish: boolean;
   autoReply: boolean;       // 自動回覆熱門貼文開關
   replyDailyCap: number;    // 每日回覆上限
+  replyHourlyCap: number;   // 每小時回覆上限(硬頂 20)
   username: string | null;  // 自家帳號名稱(過濾自家貼文用)
 }
 
 /** 取得品牌已連接且可用的 Threads 帳號;未設定或缺 token 回傳 null */
 export async function getThreadsAccount(env: Env, brandId: string): Promise<ThreadsAccount | null> {
   const sql = getSql(env);
-  const rows = await sql`
-    SELECT id, external_id, access_token_enc, auto_publish, status, account_name,
-           auto_reply, reply_daily_cap
-    FROM brand_social_accounts
-    WHERE brand_id = ${brandId}::uuid AND platform = 'threads'
-    LIMIT 1
-  `;
+  let rows: Record<string, unknown>[];
+  try {
+    rows = await sql`
+      SELECT id, external_id, access_token_enc, auto_publish, status, account_name,
+             auto_reply, reply_daily_cap, reply_hourly_cap
+      FROM brand_social_accounts
+      WHERE brand_id = ${brandId}::uuid AND platform = 'threads'
+      LIMIT 1
+    ` as Record<string, unknown>[];
+  } catch {
+    rows = await sql`
+      SELECT id, external_id, access_token_enc, auto_publish, status, account_name,
+             auto_reply, reply_daily_cap
+      FROM brand_social_accounts
+      WHERE brand_id = ${brandId}::uuid AND platform = 'threads'
+      LIMIT 1
+    ` as Record<string, unknown>[];
+  }
   if (!rows.length) return null;
   const row = rows[0] as {
     id: string; external_id: string | null; access_token_enc: string | null;
     auto_publish: boolean; status: string; account_name: string | null;
-    auto_reply: boolean; reply_daily_cap: number;
+    auto_reply: boolean; reply_daily_cap: number; reply_hourly_cap?: number;
   };
   if (!row.access_token_enc || row.status === 'error') return null;
 
@@ -73,7 +85,9 @@ export async function getThreadsAccount(env: Env, brandId: string): Promise<Thre
   return {
     accountId: row.id, threadsUserId: userId, accessToken: token,
     autoPublish: row.auto_publish, autoReply: row.auto_reply,
-    replyDailyCap: row.reply_daily_cap ?? 12, username,
+    replyDailyCap: Math.max(1, Math.min(50, row.reply_daily_cap ?? 12)),
+    replyHourlyCap: Math.max(1, Math.min(20, row.reply_hourly_cap ?? 5)),
+    username,
   };
 }
 

@@ -42,6 +42,7 @@ interface FormState {
   autoPublish: boolean;
   autoReply: boolean;
   replyDailyCap: number;
+  replyHourlyCap: number;
 }
 
 function TokenHowTo({ brandName }: { brandName: string }) {
@@ -138,7 +139,7 @@ export function SocialAccounts() {
   const { brandBySlug, brandsLoading } = useBrand();
   const brand = slug ? brandBySlug(slug) : undefined;
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>({ accountName: '', externalId: '', accessToken: '', autoPublish: false, autoReply: false, replyDailyCap: 12 });
+  const [form, setForm] = useState<FormState>({ accountName: '', externalId: '', accessToken: '', autoPublish: false, autoReply: false, replyDailyCap: 12, replyHourlyCap: 5 });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -162,6 +163,7 @@ export function SocialAccounts() {
       autoPublish: acc?.autoPublish ?? false,
       autoReply: acc?.autoReply ?? false,
       replyDailyCap: acc?.replyDailyCap ?? 12,
+      replyHourlyCap: acc?.replyHourlyCap ?? 5,
     });
     setEditing(platform);
     setMessage(null);
@@ -180,6 +182,7 @@ export function SocialAccounts() {
         autoPublish: form.autoPublish,
         autoReply: form.autoReply,
         replyDailyCap: form.replyDailyCap,
+        replyHourlyCap: form.replyHourlyCap,
       });
       setEditing(null);
       setMessage('已儲存設定');
@@ -251,7 +254,9 @@ export function SocialAccounts() {
                         </div>
                       )}
                       {acc.autoPublish && <div>🚀 排程自動發布:已開啟</div>}
-                      {acc.autoReply && <div>💬 自動回覆熱門貼文:已開啟(每日上限 {acc.replyDailyCap ?? 12} 則)</div>}
+                      {acc.autoReply && (
+                        <div>💬 自動回覆熱門貼文:已開啟(每小時 {acc.replyHourlyCap ?? 5} 則 / 每日 {acc.replyDailyCap ?? 12} 則)</div>
+                      )}
                       {acc.notes && (
                         <div style={{ color: status === 'error' ? 'var(--color-danger, #b42318)' : 'var(--color-text-muted)', fontSize: 12 }}>
                           {acc.notes}
@@ -325,7 +330,18 @@ export function SocialAccounts() {
                           checked={form.autoReply}
                           onChange={(e) => setForm((f) => ({ ...f, autoReply: e.target.checked }))}
                         />
-                        自動回覆熱門貼文(AI 生成的高相關回覆直接發布;關閉則進入「Threads 互動」頁待審核。token 需具備 threads_keyword_search 與 threads_manage_replies 權限)
+                        自動回覆熱門貼文(每 30 分鐘掃熱門相關貼文,在小時/日上限內自動發布;關閉則全部進「Threads 互動」待審核。token 需具備 threads_keyword_search 與 threads_manage_replies)
+                      </label>
+                      <label style={{ fontSize: 12.5 }}>
+                        每小時回覆上限(建議 3-5,硬頂 20)
+                        <input
+                          style={{ ...inputStyle, maxWidth: 120 }}
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={form.replyHourlyCap}
+                          onChange={(e) => setForm((f) => ({ ...f, replyHourlyCap: Math.max(1, Math.min(20, Number(e.target.value) || 5)) }))}
+                        />
                       </label>
                       <label style={{ fontSize: 12.5 }}>
                         每日回覆上限(建議 10-15,避免被平台判定為 spam)

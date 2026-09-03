@@ -1,5 +1,6 @@
 import type { Env } from './env';
 import { getSql } from './db';
+import { WASHGO_PRESS_RELEASE } from './washgo-press-release';
 
 export function isMissingPressRelation(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -121,18 +122,36 @@ export async function applyPressMigration(env: Env): Promise<string[]> {
       SELECT 1 FROM press_coverages pc WHERE pc.brand_id = b.id AND pc.article_url = v.article_url
     )
   `;
-  await sql`
-    INSERT INTO press_releases (brand_id, title, body, status, embargo_on)
-    SELECT b.id,
-      '匠管打造生活工程管理生態系,Washgo 再補一塊拼圖',
-      '匠管今日宣布推出面向洗衣、乾洗營運的數位化平台 Washgo,以 LINE 讓洗滌業真正用得起數位化,首個落地場域為洗楽。文中僅陳述導入事實,不放洗楽執行長引言。定稿前不可宣稱已被媒體報導。',
-      'pending_review', DATE '2026-08-16'
-    FROM brands b
-    WHERE b.slug = 'washgo'
-      AND NOT EXISTS (
-        SELECT 1 FROM press_releases pr WHERE pr.brand_id = b.id AND pr.title LIKE '匠管打造生活工程管理生態系%'
-      )
-  `;
+  const washgoBrand = await sql`SELECT id FROM brands WHERE slug = 'washgo' LIMIT 1`;
+  if (washgoBrand.length) {
+    const brandId = (washgoBrand[0] as { id: string }).id;
+    const existing = await sql`
+      SELECT id FROM press_releases
+      WHERE brand_id = ${brandId}::uuid
+        AND title LIKE ${'匠管打造生活工程管理生態系%'}
+      LIMIT 1
+    `;
+    if (existing.length) {
+      await sql`
+        UPDATE press_releases SET
+          title = ${WASHGO_PRESS_RELEASE.title},
+          body = ${WASHGO_PRESS_RELEASE.body},
+          embargo_on = ${WASHGO_PRESS_RELEASE.embargoOn}
+        WHERE id = ${(existing[0] as { id: string }).id}::uuid
+      `;
+    } else {
+      await sql`
+        INSERT INTO press_releases (brand_id, title, body, status, embargo_on)
+        VALUES (
+          ${brandId}::uuid,
+          ${WASHGO_PRESS_RELEASE.title},
+          ${WASHGO_PRESS_RELEASE.body},
+          ${WASHGO_PRESS_RELEASE.status},
+          ${WASHGO_PRESS_RELEASE.embargoOn}
+        )
+      `;
+    }
+  }
   await sql`
     INSERT INTO brand_rules (brand_id, brand_version_id, rule_type, statement, condition_note, verification, sort_order)
     SELECT b.id, b.current_version_id, v.rule_type, v.statement, v.condition_note, v.verification, v.sort_order

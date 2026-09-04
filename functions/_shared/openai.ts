@@ -20,6 +20,38 @@ export class OpenAIError extends Error {
   }
 }
 
+export interface ClientFacingError {
+  status: number;
+  message: string;
+  retryable: boolean;
+}
+
+/** 把 OpenAI / 生成例外轉成前台看得懂的中文,額度不足不再偽裝成 502 */
+export function toClientError(err: unknown, action: string): ClientFacingError {
+  const raw = err instanceof Error ? err.message : String(err);
+  const status = err instanceof OpenAIError ? err.status : 502;
+  const blob = raw.toLowerCase();
+  if (status === 401 || /incorrect api key|invalid_api_key|invalid api key/.test(blob)) {
+    return { status: 401, message: `${action}失敗:OpenAI API Key 無效,請檢查 Pages Secret OPENAI_API_KEY`, retryable: false };
+  }
+  if (
+    /insufficient_quota|exceeded your (current )?quota|credit_balance_exhausted|no credits remaining|billing_not_active/.test(blob)
+  ) {
+    return {
+      status: 402,
+      message: `${action}失敗:OpenAI 額度不足(儲值金額已用完)。請到 platform.openai.com/settings/organization/billing 儲值後再試`,
+      retryable: false,
+    };
+  }
+  if (status === 429 || /rate[_ ]limit/.test(blob)) {
+    return { status: 429, message: `${action}失敗:OpenAI 請求過於頻繁,請稍後再試`, retryable: true };
+  }
+  if (/OPENAI_API_KEY 尚未設定/.test(raw)) {
+    return { status: 503, message: raw, retryable: false };
+  }
+  return { status: 502, message: `${action}失敗:${raw.slice(0, 240)}`, retryable: status >= 500 };
+}
+
 function requireApiKey(env: Env): string {
   if (!env.OPENAI_API_KEY) {
     throw new OpenAIError(500, 'OPENAI_API_KEY 尚未設定,請先執行 wrangler pages secret put OPENAI_API_KEY');

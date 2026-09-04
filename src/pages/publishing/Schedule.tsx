@@ -134,7 +134,7 @@ export function Schedule() {
     <div>
       <PageHeader
         title={`${brand.name} 行程表`}
-        subtitle="提早看到已排定要發布的內容(通常提前 1 小時生成),到了時間才真正發布,成功/失敗都會回寫在這裡"
+        subtitle="規則節奏:FB/IG 每天 19:00 各一則;Threads 00/06/12/18 跟風 + 09/21 哏文。內容通常提前 1 小時生成,漏檔會在之後的半點自動補"
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
             <NavButton onClick={() => setWeekOffset((n) => n - 1)}>‹ 上一週</NavButton>

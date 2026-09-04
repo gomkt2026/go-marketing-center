@@ -346,7 +346,8 @@ async function generateSignalDrafts(env: Env): Promise<void> {
 // ============================================================================
 const THREADS_DAILY_CAP = 4; // 每品牌每日上限(以排定時段所在的台灣時區當天計)
 const THREADS_BRANDS_PER_TICK = 3; // Homigo / TaskGo / Washgo 同一檔都產,不再互搶
-const THREADS_MIN_INTERVAL_MS = 5 * 60 * 60 * 1000; // 每品牌至少間隔 5 小時 → 配合 6 小時一檔
+const AUTO_POST_BRANDS = ['homigo', 'taskgo', 'washgo'] as const;
+const CATCHUP_GENERATIONS_PER_TICK = 1; // 每 tick 只補 1 則,避開 Workers 子請求上限(Neon 每條 SQL 都算 1 次)
 
 async function generateThreadsSlot(
   env: Env,
@@ -355,7 +356,9 @@ async function generateThreadsSlot(
 ): Promise<void> {
   const sql = getSql(env);
   const trends = await fetchGoogleTrendsTW(8);
-  if (!trends.length) return;
+  if (!trends.length) {
+    console.warn('[threads] Google Trends 為空,改走非時事類型,不略過整檔');
+  }
 
   // 會真正發文的品牌(已連 Threads + 開自動發布)優先,其餘品牌輪流補位
   // today_count 只算「品牌相關跟風文」(threads_hourly),不受生活哏文(threads_offtopic)影響
@@ -380,7 +383,8 @@ async function generateThreadsSlot(
            EXISTS(SELECT 1 FROM brand_social_accounts a
                   WHERE a.brand_id = b.id AND a.platform = 'threads'
                     AND a.status = 'connected' AND a.auto_publish) AS can_publish
-    FROM brands b WHERE b.is_active = true
+    FROM brands b
+    WHERE b.is_active = true AND b.slug IN ('homigo', 'taskgo', 'washgo')
     ORDER BY can_publish DESC, last_at ASC NULLS FIRST
     LIMIT ${opts?.slugs?.length ? 20 : THREADS_BRANDS_PER_TICK}
   `;
@@ -390,12 +394,13 @@ async function generateThreadsSlot(
   }[]).filter((b) => !opts?.slugs?.length || opts.slugs.includes(b.slug));
 
   for (const brand of selected) {
-    if (opts?.onlyMissing && await brandHasSlotJob(env, brand.id, 'threads', 'threads_hourly', slotAt)) {
-      console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} Threads 跟風檔已存在,跳過`);
+    if (await brandHasSlotContent(env, brand.id, 'threads', 'threads_hourly', slotAt)) {
+      if (opts?.onlyMissing) {
+        console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} Threads 跟風檔已存在,跳過`);
+      }
       continue;
     }
     if (brand.today_count >= THREADS_DAILY_CAP) continue;
-    if (!opts?.ignoreInterval && brand.last_at && Date.now() - new Date(brand.last_at).getTime() < THREADS_MIN_INTERVAL_MS) continue;
     try {
       const brandCtx = await buildBrandContext(env, brand.id);
       const agentId = await findBrandAgent(env, brand.id);
@@ -426,7 +431,8 @@ async function generateThreadsSlot(
       const availableCategoryIds = (candidateImage
         ? THREADS_HOURLY_CATEGORIES
         : THREADS_HOURLY_CATEGORIES.filter((c) => c.id !== 'image_inspired')
-      ).map((c) => c.id);
+      ).filter((c) => trends.length > 0 || c.id !== 'seasonal_trend')
+        .map((c) => c.id);
       const category = pickThreadsHourlyCategory(recentCategoryIds, availableCategoryIds);
 
       let result;
@@ -503,11 +509,11 @@ async function generateThreadsSlot(
 
 // ============================================================================
 // 主流程 2d:Threads 生活哏文(跟品牌/系統完全無關,衝自然流量與帳號真實感)
-//   - Washgo + TaskGo(OFFTOPIC_BRANDS),跟品牌無關的生活哏文衝帳號真實感
+//   - Homigo / Washgo / TaskGo(OFFTOPIC_BRANDS),跟品牌無關的生活哏文衝帳號真實感
 //   - 固定 2 檔:台灣 09:00 / 21:00,不佔用/不影響品牌相關貼文的 THREADS_DAILY_CAP
 //   - 完全不套用品牌語氣與知識庫,純文字、不配圖,見 functions/_shared/prompts.ts 的 OFFTOPIC_SYSTEM_PROMPT
 // ============================================================================
-const OFFTOPIC_BRANDS = ['washgo', 'taskgo'];
+const OFFTOPIC_BRANDS = ['homigo', 'washgo', 'taskgo'];
 const THREADS_OFFTOPIC_DAILY_CAP = 2;
 
 async function generateThreadsOfftopicSlot(
@@ -522,8 +528,10 @@ async function generateThreadsOfftopicSlot(
       const brandRows = await sql`SELECT id, slug, name FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1`;
       if (!brandRows.length) continue;
       const brand = brandRows[0] as { id: string; slug: string; name: string };
-      if (opts?.onlyMissing && await brandHasSlotJob(env, brand.id, 'threads', 'threads_offtopic', slotAt)) {
-        console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} Threads 生活哏文已存在,跳過`);
+      if (await brandHasSlotContent(env, brand.id, 'threads', 'threads_offtopic', slotAt)) {
+        if (opts?.onlyMissing) {
+          console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} Threads 生活哏文已存在,跳過`);
+        }
         continue;
       }
 
@@ -582,7 +590,7 @@ async function generateThreadsOfftopicSlot(
   }
 }
 
-const CATCHUP_BRANDS = ['taskgo', 'washgo'] as const;
+const CATCHUP_BRANDS = AUTO_POST_BRANDS;
 
 function taiwanDayStartUtc(now = new Date()): Date {
   const twMs = now.getTime() + 8 * 60 * 60 * 1000;
@@ -592,6 +600,29 @@ function taiwanDayStartUtc(now = new Date()): Date {
 
 function slotAtToday(hourTW: number, now = new Date()): Date {
   return new Date(taiwanDayStartUtc(now).getTime() + hourTW * 60 * 60 * 1000);
+}
+
+async function brandHasSlotContent(
+  env: Env,
+  brandId: string,
+  platform: string,
+  source: string,
+  slotAt: Date,
+  windowMin = 90,
+): Promise<boolean> {
+  const sql = getSql(env);
+  const from = new Date(slotAt.getTime() - windowMin * 60 * 1000).toISOString();
+  const to = new Date(slotAt.getTime() + windowMin * 60 * 1000).toISOString();
+  const rows = await sql`
+    SELECT c.id FROM contents c
+    WHERE c.brand_id = ${brandId}::uuid
+      AND c.target_platform = ${platform}
+      AND c.generation_prompt_meta->>'source' = ${source}
+      AND (c.generation_prompt_meta->>'slotAt')::timestamptz
+          BETWEEN ${from}::timestamptz AND ${to}::timestamptz
+    LIMIT 1
+  `;
+  return rows.length > 0;
 }
 
 async function brandHasSlotJob(
@@ -618,49 +649,136 @@ async function brandHasSlotJob(
   return rows.length > 0;
 }
 
-/** 補今天已過、且最接近現在的缺檔 Threads(一次最多 1 個跟風 + 1 個哏文,避免 Worker 逾時) */
-async function catchupMissingThreadsSlots(env: Env, slugs: string[]): Promise<void> {
-  const sql = getSql(env);
-  const now = new Date();
-  const twHour = (now.getUTCHours() + 8) % 24;
-  const brands = await sql`SELECT id, slug FROM brands WHERE slug IN ('taskgo', 'washgo') AND is_active = true`;
-  const brandRows = (brands as { id: string; slug: string }[]).filter((b) => slugs.includes(b.slug));
-
-  let hourlyDone = false;
-  let offtopicDone = false;
-  for (const hour of THREADS_POST_HOURS_TW.filter((h) => h <= twHour).reverse()) {
-    if (hourlyDone) break;
-    const slot = slotAtToday(hour, now);
-    for (const brand of brandRows) {
-      if (await brandHasSlotJob(env, brand.id, 'threads', 'threads_hourly', slot)) continue;
-      console.log(`[catchup] 補 ${brand.slug} Threads 跟風 ${hour}:00`);
-      await generateThreadsSlot(env, slot, { slugs: [brand.slug], ignoreInterval: true, onlyMissing: true });
-      hourlyDone = true;
-      break;
-    }
-  }
-  for (const hour of THREADS_OFFTOPIC_HOURS_TW.filter((h) => h <= twHour).reverse()) {
-    if (offtopicDone) break;
-    const slot = slotAtToday(hour, now);
-    for (const brand of brandRows) {
-      if (await brandHasSlotJob(env, brand.id, 'threads', 'threads_offtopic', slot)) continue;
-      console.log(`[catchup] 補 ${brand.slug} Threads 生活哏文 ${hour}:00`);
-      await generateThreadsOfftopicSlot(env, slot, { slugs: [brand.slug], onlyMissing: true });
-      offtopicDone = true;
-      break;
-    }
-  }
+function slotGenerationDue(hourTW: number, now = new Date()): boolean {
+  const slot = slotAtToday(hourTW, now);
+  return Date.now() >= slot.getTime() - GENERATION_LEAD_HOURS * 60 * 60 * 1000;
 }
 
-/** 手動補發:TaskGo / Washgo 今天已過、但還沒產出或還沒發出的自動檔 */
+/** 已生成但沒建 publishing_job 的自動檔(常見於 Worker 產完文就逾時)→ 補單 */
+async function ensureAutoPublishJobs(env: Env): Promise<number> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT c.id, c.brand_id, b.slug, c.target_platform AS platform,
+           c.generation_prompt_meta->>'slotAt' AS slot_at,
+           v.id AS version_id,
+           a.file_url AS image_url,
+           acc.status AS account_status,
+           acc.auto_publish
+    FROM contents c
+    JOIN brands b ON b.id = c.brand_id
+    JOIN content_versions v ON v.content_id = c.id
+      AND v.version_number = (SELECT max(version_number) FROM content_versions WHERE content_id = c.id)
+    JOIN brand_social_accounts acc
+      ON acc.brand_id = c.brand_id AND acc.platform = c.target_platform
+    LEFT JOIN LATERAL (
+      SELECT file_url FROM content_assets
+      WHERE content_version_id = v.id AND asset_type IN ('image', 'video') LIMIT 1
+    ) a ON true
+    WHERE b.slug IN ('homigo', 'taskgo', 'washgo')
+      AND c.target_platform IN ('facebook', 'instagram', 'threads')
+      AND c.status IN ('scheduled', 'approved')
+      AND acc.auto_publish = true
+      AND acc.status = 'connected'
+      AND c.created_at > now() - interval '2 days'
+      AND NOT EXISTS (SELECT 1 FROM publishing_jobs pj WHERE pj.content_id = c.id)
+  `;
+
+  let created = 0;
+  for (const row of rows as {
+    id: string; brand_id: string; slug: string; platform: string;
+    slot_at: string | null; version_id: string; image_url: string | null;
+  }[]) {
+    if (row.platform === 'instagram' && !row.image_url) {
+      console.log(`[catchup] ${row.slug} IG 仍無配圖,略過建單`);
+      continue;
+    }
+    const slotAt = row.slot_at ?? new Date().toISOString();
+    await sql`
+      INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
+      VALUES (${row.id}::uuid, ${row.version_id}::uuid, ${row.platform}, 'scheduled', ${slotAt}::timestamptz)
+    `;
+    await sql`UPDATE contents SET status = 'scheduled', updated_at = now() WHERE id = ${row.id}::uuid`;
+    created += 1;
+    console.log(`[catchup] ${row.slug}/${row.platform} 已補發布單`);
+  }
+  return created;
+}
+
+/** 一次查出下一則該補的 Threads 檔,避免每個品牌/時段各打一槍 SQL */
+async function findNextMissingThreadsSlot(
+  env: Env,
+  slugs: string[],
+): Promise<{ slug: string; hour: number; source: 'threads_hourly' | 'threads_offtopic'; slotAt: Date } | null> {
+  const sql = getSql(env);
+  const now = new Date();
+  const due: Array<{ hour: number; source: 'threads_hourly' | 'threads_offtopic' }> = [
+    ...THREADS_POST_HOURS_TW.filter((h) => slotGenerationDue(h, now)).map((hour) => ({ hour, source: 'threads_hourly' as const })),
+    ...THREADS_OFFTOPIC_HOURS_TW.filter((h) => slotGenerationDue(h, now)).map((hour) => ({ hour, source: 'threads_offtopic' as const })),
+  ];
+  const targetSlugs = slugs.filter((s) => (AUTO_POST_BRANDS as readonly string[]).includes(s));
+  if (!due.length || !targetSlugs.length) return null;
+
+  const rows = await sql`
+    SELECT b.slug,
+           c.generation_prompt_meta->>'source' AS source,
+           extract(hour from (c.generation_prompt_meta->>'slotAt')::timestamptz AT TIME ZONE 'Asia/Taipei')::int AS hour
+    FROM contents c
+    JOIN brands b ON b.id = c.brand_id
+    WHERE b.slug IN ('homigo', 'taskgo', 'washgo')
+      AND c.target_platform = 'threads'
+      AND c.generation_prompt_meta->>'source' IN ('threads_hourly', 'threads_offtopic')
+      AND (c.generation_prompt_meta->>'slotAt')::timestamptz
+          >= date_trunc('day', now() AT TIME ZONE 'Asia/Taipei') AT TIME ZONE 'Asia/Taipei'
+      AND (c.generation_prompt_meta->>'slotAt')::timestamptz
+          < date_trunc('day', now() AT TIME ZONE 'Asia/Taipei') AT TIME ZONE 'Asia/Taipei' + interval '1 day'
+  `;
+  const have = new Set((rows as { slug: string; source: string; hour: number }[])
+    .map((r) => `${r.slug}|${r.source}|${r.hour}`));
+
+  for (const slot of due) {
+    for (const slug of targetSlugs) {
+      if (!have.has(`${slug}|${slot.source}|${slot.hour}`)) {
+        return { slug, hour: slot.hour, source: slot.source, slotAt: slotAtToday(slot.hour, now) };
+      }
+    }
+  }
+  return null;
+}
+
+/** 補今天已到生成時間、但還沒產出的 Threads 檔(每 tick 預設 1 則) */
+async function catchupMissingThreadsSlots(env: Env, slugs: string[], limit = CATCHUP_GENERATIONS_PER_TICK): Promise<number> {
+  let generated = 0;
+  while (generated < limit) {
+    const missing = await findNextMissingThreadsSlot(env, slugs);
+    if (!missing) break;
+    if (missing.source === 'threads_hourly') {
+      console.log(`[catchup] 補 ${missing.slug} Threads 跟風 ${missing.hour}:00`);
+      await generateThreadsSlot(env, missing.slotAt, { slugs: [missing.slug], ignoreInterval: true, onlyMissing: true });
+    } else {
+      console.log(`[catchup] 補 ${missing.slug} Threads 生活哏文 ${missing.hour}:00`);
+      await generateThreadsOfftopicSlot(env, missing.slotAt, { slugs: [missing.slug], onlyMissing: true });
+    }
+    generated += 1;
+  }
+  return generated;
+}
+
+/** 手動補發:Homigo / TaskGo / Washgo 今天已過、但還沒產出或還沒發出的自動檔 */
 async function catchupTodayAutoPosts(env: Env): Promise<void> {
   const slugs = [...CATCHUP_BRANDS];
   console.log(`[catchup] 開始補齊 ${slugs.join(' / ')} 今日自動發文`);
   await recoverStuckPublishingJobs(env);
   await ensureDailyThemePublishJobs(env, slugs);
+  await ensureAutoPublishJobs(env);
   await publishDueJobs(env);
-  await fillMissingDailyThemePlatforms(env, slotAtToday(DAILY_THEME_HOUR_TW), slugs);
-  await catchupMissingThreadsSlots(env, slugs);
+  const threadsFilled = await catchupMissingThreadsSlots(env, slugs, 1);
+  if (!threadsFilled && slotGenerationDue(DAILY_THEME_HOUR_TW)) {
+    await fillMissingDailyThemePlatforms(env, slotAtToday(DAILY_THEME_HOUR_TW), slugs, {
+      maxPlatforms: 1,
+      onlyAutoPublish: true,
+    });
+  }
+  await ensureAutoPublishJobs(env);
   await publishDueJobs(env);
   console.log('[catchup] 補齊與發布輪結束');
 }
@@ -1012,7 +1130,7 @@ type DailyThemeBrand = { id: string; slug: string; name: string; theme_count: nu
 async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
   const sql = getSql(env);
   // 台灣今天已生成的主題數(以 daily_theme 內容的 themeKey 去重)
-  // 只處理已接 FB 或 IG 的品牌;沒接的(例如 Homigo)不佔用生成額度
+  // 只處理已接 FB 或 IG 的品牌(Homigo / TaskGo / Washgo 接上就進每晚 19:00 檔)
   let brands;
   try {
     brands = await sql`
@@ -1145,7 +1263,7 @@ async function ensureDailyThemePublishJobs(env: Env, slugs: string[]): Promise<v
       SELECT file_url FROM content_assets
       WHERE content_version_id = v.id AND asset_type = 'image' LIMIT 1
     ) a ON true
-    WHERE b.slug IN ('taskgo', 'washgo')
+    WHERE b.slug IN ('homigo', 'taskgo', 'washgo')
       AND c.generation_prompt_meta->>'source' = ${DAILY_THEME_SOURCE}
       AND c.created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours'
       AND NOT EXISTS (SELECT 1 FROM publishing_jobs pj WHERE pj.content_id = c.id)
@@ -1192,9 +1310,17 @@ async function ensureDailyThemePublishJobs(env: Env, slugs: string[]): Promise<v
 }
 
 /** 只補今天缺的 FB/IG 每日主題平台(已有主題的品牌沿用同一則,避免 TaskGo 有 FB 沒 IG 時被 theme_count 擋住) */
-async function fillMissingDailyThemePlatforms(env: Env, slotAt: Date, slugs: string[]): Promise<void> {
+async function fillMissingDailyThemePlatforms(
+  env: Env,
+  slotAt: Date,
+  slugs: string[],
+  opts?: { maxPlatforms?: number; onlyAutoPublish?: boolean },
+): Promise<number> {
   const sql = getSql(env);
+  let generated = 0;
+  const maxPlatforms = opts?.maxPlatforms ?? 4;
   for (const slug of slugs) {
+    if (generated >= maxPlatforms) break;
     const brandRows = await sql`SELECT id, slug, name FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1`;
     if (!brandRows.length) continue;
     const brand = brandRows[0] as DailyThemeBrand;
@@ -1214,29 +1340,48 @@ async function fillMissingDailyThemePlatforms(env: Env, slotAt: Date, slugs: str
         )
     `;
     const have = new Set((existing as { platform: string }[]).map((r) => r.platform));
-    const missing = (['facebook', 'instagram'] as const).filter((p) => !have.has(p));
+    const missing: Array<'facebook' | 'instagram'> = [];
+    for (const platform of (['facebook', 'instagram'] as const)) {
+      if (have.has(platform)) continue;
+      if (opts?.onlyAutoPublish) {
+        const account = await getMetaAccount(env, brand.id, platform);
+        if (!account?.autoPublish) {
+          console.log(`[catchup] ${slug}/${platform} 帳號未連線或未開自動發布,不補每日主題`);
+          continue;
+        }
+      }
+      missing.push(platform);
+    }
     if (!missing.length) {
-      console.log(`[catchup] ${slug} 今日 FB/IG 主題已齊`);
+      console.log(`[catchup] ${slug} 今日可自動發布的 FB/IG 主題已齊`);
       continue;
     }
 
+    const batch = missing.slice(0, maxPlatforms - generated);
     const reused = (existing as { theme: string | null; theme_key: string | null }[]).find((r) => r.theme);
     if (reused?.theme) {
-      console.log(`[catchup] ${slug} 補 ${missing.join('+')} 每日主題(沿用「${reused.theme}」)`);
-      await generateDailyThemePlatforms(env, brand, slotAt, [...missing], {
+      console.log(`[catchup] ${slug} 補 ${batch.join('+')} 每日主題(沿用「${reused.theme}」)`);
+      await generateDailyThemePlatforms(env, brand, slotAt, batch, {
         theme: reused.theme,
         angle: '',
         summary: reused.theme,
         themeKey: reused.theme_key ?? `${new Date().toISOString().slice(0, 10)}-${slug}-1`,
       });
     } else {
-      console.log(`[catchup] ${slug} 今日尚無每日主題,整組生成`);
-      await generateDailyThemeForBrand(env, brand, slotAt);
+      console.log(`[catchup] ${slug} 今日尚無每日主題,先補 ${batch.join('+')}`);
+      await generateDailyThemeForBrand(env, brand, slotAt, batch);
     }
+    generated += batch.length;
   }
+  return generated;
 }
 
-async function generateDailyThemeForBrand(env: Env, brand: DailyThemeBrand, slotAt: Date): Promise<boolean> {
+async function generateDailyThemeForBrand(
+  env: Env,
+  brand: DailyThemeBrand,
+  slotAt: Date,
+  platforms: Array<'facebook' | 'instagram'> = ['facebook', 'instagram'],
+): Promise<boolean> {
   const sql = getSql(env);
   try {
     // 近 48 小時高分情報 + 今日已用主題(避免重複)
@@ -1282,7 +1427,7 @@ async function generateDailyThemeForBrand(env: Env, brand: DailyThemeBrand, slot
     });
 
     const themeKey = `${new Date().toISOString().slice(0, 10)}-${brand.slug}-${brand.theme_count + 1}`;
-    await generateDailyThemePlatforms(env, brand, slotAt, ['facebook', 'instagram'], {
+    await generateDailyThemePlatforms(env, brand, slotAt, platforms, {
       theme: theme.theme, angle: theme.angle, summary: theme.summary, themeKey,
     });
     console.log(`[themes] ${brand.slug} 今日主題 #${brand.theme_count + 1}:${theme.theme}`);
@@ -1592,6 +1737,28 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
     }
   }
 
+  // 每個 tick 先救卡住的 job、補「有內容沒單」;半點 tick 再補漏檔,
+  // 避開整點生成搶時間(單一 tick 產圖逾時後,下一輪半點會把缺的品牌補上)
+  await recoverStuckPublishingJobs(env);
+  await ensureAutoPublishJobs(env);
+  // 18:00 整點要產 FB/IG 配圖,那一檔把補漏留給 18:30;其餘 tick 都補,避免 :00 空檔浪費
+  const heavyThemeTick = isTopOfHour && ((twHour + GENERATION_LEAD_HOURS) % 24) === DAILY_THEME_HOUR_TW;
+  if (!heavyThemeTick) {
+    try {
+      const threadsFilled = await catchupMissingThreadsSlots(env, [...AUTO_POST_BRANDS], 1);
+      if (!threadsFilled && slotGenerationDue(DAILY_THEME_HOUR_TW)) {
+        await fillMissingDailyThemePlatforms(
+          env,
+          slotAtToday(DAILY_THEME_HOUR_TW),
+          [...AUTO_POST_BRANDS],
+          { maxPlatforms: 1, onlyAutoPublish: true },
+        );
+      }
+    } catch (e) {
+      console.error('[catchup] 補檔失敗,仍繼續發布到期排程', e);
+    }
+  }
+
   // X access token 僅 2 小時效期,每個 30 分鐘 tick 都順手檢查一次(SQL 已篩選快到期才動作)
   // Threads 回覆輪放在發布前面,避免 publishDueJobs 逾時把回覆掃文吃掉
   if (!(twHour >= 2 && twHour < 6) && !isTopOfHour) {
@@ -1895,7 +2062,21 @@ export default {
     if (!task || !known.includes(task)) {
       return new Response(`task 必須為 ${known.join(' / ')}`, { status: 400 });
     }
-    // 產圖/發文可能超過 HTTP 30 秒,改背景跑,避免手動觸發被切斷
+    // catchup / 生成必須等做完:waitUntil 在 HTTP 回應後約 30 秒就會被取消,補檔會做到一半被砍
+    const awaitTasks = ['catchup', 'threads', 'offtopic', 'themes', 'publish'];
+    if (awaitTasks.includes(task)) {
+      try {
+        await run();
+        return new Response(JSON.stringify({ ok: true, task, done: true }), { headers: { 'Content-Type': 'application/json' } });
+      } catch (e) {
+        console.error(`[manual] ${task} 失敗`, e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return new Response(JSON.stringify({ ok: false, task, error: msg.slice(0, 300) }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
     ctx.waitUntil(run().catch((e) => console.error(`[manual] ${task} 失敗`, e)));
     return new Response(JSON.stringify({ ok: true, task, accepted: true }), { headers: { 'Content-Type': 'application/json' } });
   },

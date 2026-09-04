@@ -135,6 +135,12 @@ export const api = {
   deleteHelpDocument: (slug: string, id: string) =>
     request<{ ok: boolean }>(`/api/brands/${slug}/help/documents/${id}`, { method: 'DELETE' }),
 
+  seedHelpDocuments: (slug: string) =>
+    request<{ ok: boolean; upserted: string[]; created: number; updated: number; origins: string[] }>(
+      `/api/brands/${slug}/help/seed`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
+
   helpChat: (slug: string, body: { role: string; message: string; sessionId?: string; pagePath?: string }) =>
     request<import('@/types').HelpChatResult>(`/api/brands/${slug}/help/chat`, {
       method: 'POST', body: JSON.stringify(body),

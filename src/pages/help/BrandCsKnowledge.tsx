@@ -117,6 +117,19 @@ function DocsTab({ slug, roles, documents, onChanged }: {
     set(list.includes(id) ? list.filter((r) => r !== id) : [...list, id]);
   }
 
+  async function syncOfficial() {
+    setBusy(true); setMessage('');
+    try {
+      const res = await api.seedHelpDocuments(slug);
+      setMessage(`已同步 ${res.upserted.length} 份官方操作文件（新增 ${res.created}、更新 ${res.updated}），並直接發布。`);
+      onChanged();
+    } catch (e) {
+      setMessage(e instanceof ApiError ? e.message : '同步失敗');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function upload() {
     if (!file || !pickedRoles.length) return;
     setBusy(true); setMessage('');
@@ -182,6 +195,22 @@ function DocsTab({ slug, roles, documents, onChanged }: {
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
           接受 MD／TXT／PDF／Word（.docx）。抽出的是操作正文，不會進品牌行銷知識庫。發布後該角色的小幫手才能引用。
         </p>
+        {(slug === 'taskgo' || slug === 'homigo') && (
+          <div style={{ marginBottom: 12 }}>
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() => void syncOfficial()}
+            >
+              {busy ? '同步中…' : slug === 'homigo' ? '同步官方操作文件（21 份）' : '同步官方操作文件（32 份）'}
+            </Button>
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0 0' }}>
+              {slug === 'homigo'
+                ? '依檔名或標題覆蓋房東／房客／代管說明，並直接發布。來源：docs/help/homigo。'
+                : '依檔名或標題覆蓋後勤／工班／業主說明，並直接發布。來源：docs/help/taskgo。'}
+            </p>
+          </div>
+        )}
         {message && <p style={{ fontSize: 13, color: 'var(--color-primary-dark)' }}>{message}</p>}
         <div style={{ display: 'grid', gap: 8 }}>
           <input placeholder="標題（選填，空白則用檔名）" value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} />

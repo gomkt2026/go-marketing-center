@@ -125,7 +125,18 @@ SELECT b.id, o.origin
 FROM brands b
 CROSS JOIN (VALUES
   ('https://app.taskgo.com.tw'),
+  ('https://dev.taskgo.com.tw'),
+  ('http://localhost:5173'),
   ('https://liff.line.me')
 ) AS o(origin)
-WHERE b.slug IN ('homigo', 'taskgo', 'washgo')
+WHERE b.slug = 'taskgo'
+ON CONFLICT (brand_id, origin) DO NOTHING;
+
+INSERT INTO product_help_origins (brand_id, origin)
+SELECT b.id, o.origin
+FROM brands b
+CROSS JOIN (VALUES
+  ('https://liff.line.me')
+) AS o(origin)
+WHERE b.slug IN ('homigo', 'washgo')
 ON CONFLICT (brand_id, origin) DO NOTHING;

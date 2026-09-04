@@ -714,4 +714,8 @@ $washgo$,
 
 END $$;
 
+-- TaskGo / Homigo 品牌客服操作文件（依 slug upsert，可重複）
+\ir migrations/029_taskgo_help_documents.sql
+\ir migrations/030_homigo_help_documents.sql
+
 COMMIT;

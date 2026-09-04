@@ -896,6 +896,79 @@ export interface VideoJob {
 
 export type PodcastGuestStatus = 'pending' | 'cloning' | 'ready' | 'failed';
 
+export type HelpExtractStatus = 'pending' | 'ready' | 'failed';
+export type HelpPublishStatus = 'draft' | 'published' | 'archived';
+export type HelpTicketStatus = 'new' | 'contacted' | 'resolved' | 'cancelled';
+
+export interface HelpRoleOption {
+  id: string;
+  label: string;
+}
+
+export interface CsKnowledgeDocument {
+  id: string;
+  brandId: string;
+  title: string;
+  fileUrl: string | null;
+  fileName: string | null;
+  mimeType: string | null;
+  extractedText: string | null;
+  extractStatus: HelpExtractStatus;
+  publishStatus: HelpPublishStatus;
+  pagePaths: string[];
+  roles: string[];
+  createdAt: string;
+  publishedAt?: string | null;
+}
+
+export interface HelpCitation {
+  title: string;
+}
+
+export interface HelpChatResult {
+  sessionId: string;
+  answer: string;
+  answered: boolean;
+  citations: HelpCitation[];
+  suggestedFollowups: string[];
+}
+
+export interface HelpTicket {
+  id: string;
+  brandId: string;
+  sessionId: string | null;
+  role: string | null;
+  pagePath: string | null;
+  source: 'web' | 'liff' | 'admin';
+  name: string;
+  phone: string;
+  email: string | null;
+  lineId: string | null;
+  requestNote: string;
+  transcriptSnapshot: { role: string; content: string }[];
+  status: HelpTicketStatus;
+  followupNote: string | null;
+  contactedAt: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export interface HelpSettings {
+  brandId: string;
+  widgetKey: string;
+  welcomeByRole: Record<string, string>;
+  origins: string[];
+}
+
+export interface HelpSessionPreview {
+  id: string;
+  role: string;
+  pagePath: string | null;
+  source: string;
+  createdAt: string;
+  preview: string;
+}
+
 /** 訪談來賓(聲音已 Clone 到 ElevenLabs) */
 export interface PodcastGuest {
   id: string;

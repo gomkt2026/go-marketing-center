@@ -870,6 +870,104 @@ CREATE INDEX idx_activity_logs_entity ON activity_logs(entity_type, entity_id);
 CREATE INDEX idx_activity_logs_created ON activity_logs(created_at DESC);
 
 -- ============================================================================
+-- 品牌客服資料庫 / 系統問答小幫手（與 Brand Knowledge 分離）
+-- ============================================================================
+
+CREATE TABLE cs_knowledge_documents (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id          UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  title             TEXT NOT NULL,
+  file_url          TEXT,
+  file_name         TEXT,
+  mime_type         TEXT,
+  extracted_text    TEXT,
+  extract_status    TEXT NOT NULL DEFAULT 'pending',
+  publish_status    TEXT NOT NULL DEFAULT 'draft',
+  page_paths        JSONB NOT NULL DEFAULT '[]',
+  uploaded_by       UUID REFERENCES users(id),
+  published_by      UUID REFERENCES users(id),
+  published_at      TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_cs_knowledge_documents_brand ON cs_knowledge_documents(brand_id, publish_status, created_at DESC);
+CREATE TRIGGER trg_cs_knowledge_documents_updated_at BEFORE UPDATE ON cs_knowledge_documents
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE cs_knowledge_document_roles (
+  document_id UUID NOT NULL REFERENCES cs_knowledge_documents(id) ON DELETE CASCADE,
+  role        TEXT NOT NULL,
+  PRIMARY KEY (document_id, role)
+);
+
+CREATE TABLE product_help_settings (
+  brand_id         UUID PRIMARY KEY REFERENCES brands(id) ON DELETE CASCADE,
+  widget_key       TEXT NOT NULL UNIQUE,
+  welcome_by_role  JSONB NOT NULL DEFAULT '{}',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TRIGGER trg_product_help_settings_updated_at BEFORE UPDATE ON product_help_settings
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE product_help_origins (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id   UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  origin     TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (brand_id, origin)
+);
+
+CREATE TABLE product_help_sessions (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id     UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  role         TEXT NOT NULL,
+  page_path    TEXT,
+  source       TEXT NOT NULL DEFAULT 'web',
+  widget_key   TEXT,
+  client_hash  TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_product_help_sessions_brand ON product_help_sessions(brand_id, created_at DESC);
+
+CREATE TABLE product_help_messages (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id  UUID NOT NULL REFERENCES product_help_sessions(id) ON DELETE CASCADE,
+  role        TEXT NOT NULL,
+  content     TEXT NOT NULL,
+  answered    BOOLEAN,
+  citations   JSONB NOT NULL DEFAULT '[]',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_product_help_messages_session ON product_help_messages(session_id, created_at);
+
+CREATE TABLE product_help_tickets (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id             UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  session_id           UUID REFERENCES product_help_sessions(id) ON DELETE SET NULL,
+  role                 TEXT,
+  page_path            TEXT,
+  source               TEXT NOT NULL DEFAULT 'web',
+  name                 TEXT NOT NULL,
+  phone                TEXT NOT NULL,
+  email                TEXT,
+  line_id              TEXT,
+  request_note         TEXT NOT NULL,
+  transcript_snapshot  JSONB NOT NULL DEFAULT '[]',
+  status               TEXT NOT NULL DEFAULT 'new',
+  assigned_to          UUID REFERENCES users(id),
+  contacted_at         TIMESTAMPTZ,
+  resolved_at          TIMESTAMPTZ,
+  followup_note        TEXT,
+  client_hash          TEXT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_product_help_tickets_brand ON product_help_tickets(brand_id, status, created_at DESC);
+CREATE TRIGGER trg_product_help_tickets_updated_at BEFORE UPDATE ON product_help_tickets
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================================
 -- 結尾:agent_roles 種子(角色本身不含品牌別,實際 Agent 於 seed.sql 建立)
 -- ============================================================================
 

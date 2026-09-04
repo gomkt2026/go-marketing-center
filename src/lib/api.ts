@@ -20,6 +20,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+type SocialPlatform = 'facebook' | 'instagram' | 'threads';
+const SOCIAL_PLATFORMS: SocialPlatform[] = ['facebook', 'instagram', 'threads'];
+
+/** 每個平台各自打一次 API,避免單次 Worker 把 Neon / OpenAI subrequest 打爆 */
+async function generateAcrossPlatforms<C, F extends { platform: string; error: string }>(
+  platforms: string[] | undefined,
+  call: (platform: SocialPlatform) => Promise<{ created: C[]; failures: F[] }>,
+): Promise<{ created: C[]; failures: F[] }> {
+  const list = (platforms?.length ? platforms : SOCIAL_PLATFORMS)
+    .filter((p): p is SocialPlatform => (SOCIAL_PLATFORMS as string[]).includes(p));
+  const created: C[] = [];
+  const failures: F[] = [];
+  for (const platform of list) {
+    try {
+      const res = await call(platform);
+      created.push(...res.created);
+      failures.push(...res.failures);
+    } catch (e) {
+      failures.push({ platform, error: e instanceof Error ? e.message : '生成失敗' } as F);
+    }
+  }
+  if (!created.length) {
+    throw new ApiError(502, `全部平台生成失敗:${failures.map((f) => `${f.platform}: ${f.error}`).join(';')}`);
+  }
+  return { created, failures };
+}
+
 export const api = {
   health: () => request<{ ok: boolean }>('/api/health'),
 
@@ -83,6 +110,59 @@ export const api = {
       body: JSON.stringify({ platform: platform ?? 'threads' }),
     }),
 
+  helpDocuments: (slug: string) =>
+    request<{ documents: import('@/types').CsKnowledgeDocument[] }>(`/api/brands/${slug}/help/documents`),
+
+  uploadHelpDocument: async (slug: string, params: { file: File; title?: string; roles: string[]; pagePaths?: string }) => {
+    const form = new FormData();
+    form.append('file', params.file);
+    if (params.title) form.append('title', params.title);
+    form.append('roles', params.roles.join(','));
+    if (params.pagePaths) form.append('pagePaths', params.pagePaths);
+    const res = await fetch(`/api/brands/${slug}/help/documents`, { method: 'POST', credentials: 'include', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    return data as { document: import('@/types').CsKnowledgeDocument; extractError: string | null };
+  },
+
+  updateHelpDocument: (slug: string, id: string, body: {
+    title?: string; extractedText?: string; roles?: string[]; pagePaths?: string[]; publishStatus?: import('@/types').HelpPublishStatus;
+  }) =>
+    request<{ document: import('@/types').CsKnowledgeDocument }>(`/api/brands/${slug}/help/documents/${id}`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+
+  deleteHelpDocument: (slug: string, id: string) =>
+    request<{ ok: boolean }>(`/api/brands/${slug}/help/documents/${id}`, { method: 'DELETE' }),
+
+  helpChat: (slug: string, body: { role: string; message: string; sessionId?: string; pagePath?: string }) =>
+    request<import('@/types').HelpChatResult>(`/api/brands/${slug}/help/chat`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+
+  helpTickets: (slug: string, status?: string) =>
+    request<{ tickets: import('@/types').HelpTicket[]; newCount: number }>(
+      `/api/brands/${slug}/help/tickets${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+    ),
+
+  updateHelpTicket: (slug: string, id: string, body: { status?: import('@/types').HelpTicketStatus; followupNote?: string }) =>
+    request<{ ticket: import('@/types').HelpTicket }>(`/api/brands/${slug}/help/tickets/${id}`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+
+  helpSettings: (slug: string) =>
+    request<{
+      settings: import('@/types').HelpSettings;
+      roles: import('@/types').HelpRoleOption[];
+      brand: { name: string; slug: string; primaryColor: string | null };
+      sessions: import('@/types').HelpSessionPreview[];
+    }>(`/api/brands/${slug}/help/settings`),
+
+  updateHelpSettings: (slug: string, body: { welcomeByRole?: Record<string, string>; origins?: string[]; rotateKey?: boolean }) =>
+    request<{ settings: import('@/types').HelpSettings }>(`/api/brands/${slug}/help/settings`, {
+      method: 'PUT', body: JSON.stringify(body),
+    }),
+
   brandWorkspace: (slug: string) =>
     request<{
       stats: { activeCampaigns: number; pendingContents: number; marketSignals: number; learningRecords: number };
@@ -144,9 +224,11 @@ export const api = {
     request<{ ok: boolean }>(`/api/brands/${slug}/documents/${id}`, { method: 'DELETE' }),
 
   generateFromBrandDocument: (slug: string, id: string, platforms?: Array<'facebook' | 'instagram' | 'threads'>) =>
-    request<{ created: { contentId: string; platform: string }[]; failures: { platform: string; error: string }[] }>(
-      `/api/brands/${slug}/documents/${id}/generate`,
-      { method: 'POST', body: JSON.stringify({ platforms }) },
+    generateAcrossPlatforms(platforms, (platform) =>
+      request<{ created: { contentId: string; platform: string }[]; failures: { platform: string; error: string }[] }>(
+        `/api/brands/${slug}/documents/${id}/generate`,
+        { method: 'POST', body: JSON.stringify({ platforms: [platform] }) },
+      ),
     ),
 
   composeCustomerLineMessage: (slug: string, body?: { documentIds?: string[]; customerHint?: string }) =>
@@ -177,9 +259,11 @@ export const api = {
       method: 'POST', body: JSON.stringify(body ?? {}),
     }),
 
-  generateFromPressCoverage: (slug: string, id: string) =>
-    request<{ created: { contentId: string; platform: string }[]; failures: { platform: string; error: string }[] }>(
-      `/api/brands/${slug}/press-coverages/${id}/generate`, { method: 'POST', body: JSON.stringify({}) },
+  generateFromPressCoverage: (slug: string, id: string, platforms?: Array<'facebook' | 'instagram' | 'threads'>) =>
+    generateAcrossPlatforms(platforms, (platform) =>
+      request<{ created: { contentId: string; platform: string }[]; failures: { platform: string; error: string }[] }>(
+        `/api/brands/${slug}/press-coverages/${id}/generate`, { method: 'POST', body: JSON.stringify({ platforms: [platform] }) },
+      ),
     ),
 
   generateArticleFromPressCoverage: (slug: string, id: string) =>
@@ -202,9 +286,11 @@ export const api = {
       method: 'POST', body: JSON.stringify({ action, note }),
     }),
 
-  generateFromPressRelease: (slug: string, id: string) =>
-    request<{ created: { contentId: string; platform: string }[]; failures: { platform: string; error: string }[] }>(
-      `/api/brands/${slug}/press-releases/${id}/generate`, { method: 'POST', body: JSON.stringify({}) },
+  generateFromPressRelease: (slug: string, id: string, platforms?: Array<'facebook' | 'instagram' | 'threads'>) =>
+    generateAcrossPlatforms(platforms, (platform) =>
+      request<{ created: { contentId: string; platform: string }[]; failures: { platform: string; error: string }[] }>(
+        `/api/brands/${slug}/press-releases/${id}/generate`, { method: 'POST', body: JSON.stringify({ platforms: [platform] }) },
+      ),
     ),
 
   generateArticleFromPressRelease: (slug: string, id: string) =>
@@ -413,13 +499,15 @@ export const api = {
 
   // -- AI 內容生成 ----------------------------------------------------------
   generateFromSignal: (signalId: string, body?: { platforms?: string[]; instruction?: string }) =>
-    request<{
-      created: { contentId: string; platform: string; score: number; imageUrl: string | null; imageError: string | null }[];
-      failures: { platform: string; error: string }[];
-    }>(`/api/market-signals/${signalId}/generate`, {
-      method: 'POST',
-      body: JSON.stringify(body ?? {}),
-    }),
+    generateAcrossPlatforms(body?.platforms, (platform) =>
+      request<{
+        created: { contentId: string; platform: string; score: number; imageUrl: string | null; imageError: string | null }[];
+        failures: { platform: string; error: string }[];
+      }>(`/api/market-signals/${signalId}/generate`, {
+        method: 'POST',
+        body: JSON.stringify({ ...body, platforms: [platform] }),
+      }),
+    ),
 
   regenerateContent: (contentId: string, body?: { instruction?: string }) =>
     request<{ ok: boolean; versionNumber: number; predictedEngagementScore: number; imageUrl: string | null; imageError: string | null }>(

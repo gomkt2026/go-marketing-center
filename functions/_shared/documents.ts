@@ -159,7 +159,7 @@ const PDF_SCAN_BYTES = 2 * 1024 * 1024;
 const PDF_MAX_CHUNKS = 400;
 
 /** 從 PDF bytes 抽出可見字串(只掃前 2MB,避免大檔把 Worker 撐爆) */
-export function extractPdfText(bytes: Uint8Array): string {
+export function extractPdfText(bytes: Uint8Array, maxChars = 12000): string {
   const slice = bytes.byteLength > PDF_SCAN_BYTES ? bytes.subarray(0, PDF_SCAN_BYTES) : bytes;
   const latin = new TextDecoder('latin-1').decode(slice);
   const chunks: string[] = [];
@@ -187,7 +187,7 @@ export function extractPdfText(bytes: Uint8Array): string {
       if (/[\u4e00-\u9fff]/.test(decoded)) chunks.push(decoded);
     } catch { /* 略過解不開的 hex */ }
   }
-  return chunks.join('').replace(/\s+/g, ' ').trim().slice(0, 12000);
+  return chunks.join('').replace(/\s+/g, ' ').trim().slice(0, maxChars);
 }
 
 async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {

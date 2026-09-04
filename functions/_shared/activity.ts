@@ -98,4 +98,11 @@ export const ACTION_LABELS: Record<string, string> = {
   'analytics.learn_requested': '產生成效學習建議',
   'learning.approved': '核准學習洞察',
   'learning.dismissed': '駁回學習洞察',
+  'help.document.uploaded': '上傳客服文件',
+  'help.document.updated': '更新客服文件',
+  'help.document.status': '發布或下架客服文件',
+  'help.document.deleted': '刪除客服文件',
+  'help.chat.answered': '小幫手回答問題',
+  'help.ticket.created': '客戶留資請客服聯繫',
+  'help.ticket.status_changed': '更新客服工單狀態',
 };

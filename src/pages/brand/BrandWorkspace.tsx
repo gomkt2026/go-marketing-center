@@ -55,6 +55,7 @@ export function BrandWorkspace() {
           <strong style={{ display: 'block', marginBottom: 12 }}>快速前往</strong>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Link to={`/${brand.slug}/intelligence`} style={linkStyle}>品牌智慧(知識庫 + 版本歷史) →</Link>
+            <Link to={`/${brand.slug}/help`} style={linkStyle}>品牌客服資料庫（操作問答 + 留資工單） →</Link>
             <Link to={`/${brand.slug}/intelligence?tab=collateral`} style={linkStyle}>EDM／簡報與客戶 LINE 資訊包 →</Link>
             <Link to={`/${brand.slug}/market`} style={linkStyle}>市場情報 →</Link>
             <Link to={`/${brand.slug}/campaigns`} style={linkStyle}>行銷活動 →</Link>

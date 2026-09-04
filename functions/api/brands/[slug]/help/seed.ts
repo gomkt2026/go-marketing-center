@@ -1,11 +1,11 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
-import type { Env } from '../../../../../_shared/env';
-import { requireAuth } from '../../../../../_shared/auth';
-import { getBrandBySlug } from '../../../../../_shared/queries';
-import { json, error } from '../../../../../_shared/response';
-import { applyTaskgoHelpSeed } from '../../../../../_shared/taskgo-help-migrate';
-import { applyHomigoHelpSeed } from '../../../../../_shared/homigo-help-migrate';
-import { logActivity } from '../../../../../_shared/activity';
+import type { Env } from '../../../../_shared/env';
+import { requireAuth } from '../../../../_shared/auth';
+import { getBrandBySlug } from '../../../../_shared/queries';
+import { json, error } from '../../../../_shared/response';
+import { applyTaskgoHelpSeed } from '../../../../_shared/taskgo-help-migrate';
+import { applyHomigoHelpSeed } from '../../../../_shared/homigo-help-migrate';
+import { logActivity } from '../../../../_shared/activity';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);

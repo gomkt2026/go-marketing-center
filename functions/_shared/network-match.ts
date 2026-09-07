@@ -11,7 +11,7 @@ export interface VendorAsk {
   summary: string | null;
 }
 
-const ASK_HINT = /有人|認識|推薦|廠商|師傅|誰會|想做|可以問|有沒有人|求推薦|介紹一下|會做|能做|包商|施工|拍謝問|請問/;
+const ASK_HINT = /有人|認識|推薦|廠商|師傅|誰會|想做|可以問|有沒有人|求推薦|介紹一下|會做|能做|包商|施工|拍謝問|請問|我想找|找一個|水電|防水|冷氣|抓漏/;
 
 export function looksLikeVendorAsk(text: string): boolean {
   const t = text.replace(/\s+/g, '');
@@ -106,6 +106,12 @@ function scoreContact(contact: NetworkContactRecord, category: string, region: s
   } else if (cat && blob.includes(cat)) {
     score += 3;
     reasons.push(`資料提到「${category}」`);
+  } else if (cat) {
+    const tokens = category.split(/[／/\s、]+/).filter((item) => item.length >= 2);
+    if (tokens.some((token) => blob.includes(token.toLowerCase()))) {
+      score += 2;
+      reasons.push(`資料接近「${category}」`);
+    }
   }
   if (region) {
     const regionHit = contact.serviceRegions.some((r) => r.includes(region) || region.includes(r))

@@ -155,7 +155,7 @@ export async function upsertNetworkContact(
   const source = SOURCES.includes(draft.source) ? draft.source : 'manual';
   const status = draft.status && STATUSES.includes(draft.status)
     ? draft.status
-    : (source === 'event' || source === 'csv' ? 'verified' : 'pending_review');
+    : (source === 'manual' ? 'pending_review' : 'verified');
 
   let existing: Record<string, unknown> | null = null;
   if (draft.registrationId) {

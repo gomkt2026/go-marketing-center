@@ -150,9 +150,9 @@ export function BrandNetwork() {
             <br />
             {statusQuery.data.line.configured
               ? statusQuery.data.line.appliesToThisBrand
-                ? 'Channel Secret / Access Token 已設定。把 Bot 加進 FixerCo聯盟，傳名片或問廠商就會進這庫。'
+                ? 'Channel Secret / Access Token 已設定。LINE 官方帳號後台請把回應模式改成 Bot，並關閉「自動回應訊息」，否則會出現「本帳號無法個別回覆」。'
                 : `此 Bot 目前寫入 ${statusQuery.data.line.brandSlug}，不是這個品牌。`
-              : '尚未設定 LINE_NETWORK_CHANNEL_SECRET / ACCESS_TOKEN。請用 wrangler pages secret put，不要把 Token 寫進程式。'}
+              : '尚未設定 LINE_NETWORK_CHANNEL_SECRET / ACCESS_TOKEN。請在 Cloudflare Pages 環境變數補上後重新部署。'}
           </div>
         </Card>
       )}

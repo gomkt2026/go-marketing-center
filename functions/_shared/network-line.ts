@@ -4,7 +4,8 @@ import { getBrandBySlug } from './queries';
 import { DEFAULT_PUBLIC_BASE, buildNetworkCardKey, putMedia } from './media';
 import { ensureNetworkTables, upsertNetworkContact } from './network-contacts';
 import { bytesToDataUrl, draftFromOcr, ocrBusinessCard } from './network-ocr';
-import { classifyVendorAsk, formatMatchText, logNetworkMatch, looksLikeVendorAsk, searchVendors } from './network-match';
+import { classifyVendorAsk, formatMatchText, logNetworkMatch, looksLikeVendorAsk, searchVendors, type RankedContact, type VendorAsk } from './network-match';
+import type { NetworkContactRecord } from './network-contacts';
 
 const LINE_API = 'https://api.line.me/v2/bot';
 const LINE_DATA = 'https://api-data.line.me/v2/bot';
@@ -101,6 +102,100 @@ function textMsg(text: string) {
   return { type: 'text', text };
 }
 
+function firstPhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const part = raw.split(/[,，、/\s]+/).find((item) => /\d{8,}/.test(item));
+  const digits = (part ?? raw).replace(/[^\d+]/g, '');
+  if (digits.length < 8) return null;
+  return digits.startsWith('886') ? `0${digits.slice(3)}` : digits;
+}
+
+function telUri(raw: string | null | undefined): string | null {
+  const phone = firstPhone(raw);
+  return phone ? `tel:${phone}` : null;
+}
+
+function lineUri(raw: string | null | undefined): string | null {
+  const id = raw?.trim();
+  if (!id) return null;
+  if (/^https?:\/\//i.test(id)) return id;
+  if (id.startsWith('@')) return `https://line.me/R/ti/p/${encodeURIComponent(id)}`;
+  return `https://line.me/ti/p/~${encodeURIComponent(id.replace(/^~/, ''))}`;
+}
+
+function flexText(text: string, extra: Record<string, unknown> = {}) {
+  return { type: 'text', text, wrap: true, ...extra };
+}
+
+function contactBubble(contact: NetworkContactRecord) {
+  const body = [
+    flexText(contact.name || contact.company || '人脈', { weight: 'bold', size: 'lg' }),
+    contact.company && contact.company !== contact.name
+      ? flexText(contact.company, { size: 'sm', color: '#555555' })
+      : null,
+    contact.industry ? flexText(contact.industry, { size: 'xs', color: '#1A2F4B' }) : null,
+    contact.specialties.length
+      ? flexText(contact.specialties.slice(0, 4).join('、'), { size: 'xs', color: '#888888' })
+      : null,
+    contact.phone ? flexText(`電話 ${contact.phone}`, { size: 'sm' }) : null,
+    contact.lineId ? flexText(`LINE ${contact.lineId}`, { size: 'sm' }) : null,
+  ].filter(Boolean);
+
+  const buttons: Record<string, unknown>[] = [];
+  const tel = telUri(contact.phone);
+  if (tel) {
+    buttons.push({
+      type: 'button', style: 'primary', height: 'sm', color: '#1A2F4B',
+      action: { type: 'uri', label: '通話', uri: tel },
+    });
+  }
+  const line = lineUri(contact.lineId);
+  if (line) {
+    buttons.push({
+      type: 'button', style: 'primary', height: 'sm', color: '#06C755',
+      action: { type: 'uri', label: '加 LINE', uri: line },
+    });
+  }
+
+  return {
+    type: 'bubble',
+    size: 'kilo',
+    body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: body },
+    ...(buttons.length
+      ? { footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: buttons } }
+      : {}),
+  };
+}
+
+function matchMessages(ask: VendorAsk, matches: RankedContact[]): unknown[] {
+  const intro = formatMatchText(ask, matches);
+  if (!matches.length) return [textMsg(intro)];
+  return [
+    textMsg(intro),
+    {
+      type: 'flex',
+      altText: intro.slice(0, 390),
+      contents: {
+        type: 'carousel',
+        contents: matches.map((item) => contactBubble(item.contact)),
+      },
+    },
+  ];
+}
+
+async function replyOrPush(env: Env, event: LineEvent, messages: unknown[]): Promise<void> {
+  if (event.replyToken) {
+    try {
+      await replyLine(env, event.replyToken, messages);
+      return;
+    } catch {
+      // replyToken 可能已過期,改推到群組或私訊
+    }
+  }
+  const to = event.source?.groupId ?? event.source?.roomId ?? event.source?.userId;
+  if (to) await pushLine(env, to, messages);
+}
+
 export async function handleLineNetworkEvents(env: Env, body: LineWebhookBody): Promise<void> {
   const events = body.events ?? [];
   const slug = env.LINE_NETWORK_BRAND_SLUG || 'fixercowork';
@@ -131,7 +226,7 @@ async function handleOneEvent(env: Env, brandId: string, brandSlug: string, even
 
   if (event.type === 'join' && event.replyToken) {
     await replyLine(env, event.replyToken, [textMsg(
-      '我已加入群組。之後有人問廠商，或丟名片進來，我會幫忙整理進人脈庫。完整名單會盡量私訊，避免洗版。',
+      '我已加入群組。問「高雄有沒有水電／防水／冷氣」這類問題，我會用人脈庫回卡片，可直接通話或加 LINE。傳名片照片也會幫你建檔。',
     )]);
     return;
   }
@@ -177,23 +272,19 @@ async function handleOneEvent(env: Env, brandId: string, brandSlug: string, even
     const summary = [contact.name, contact.company, contact.phone, contact.specialties.slice(0, 2).join('、')]
       .filter(Boolean)
       .join(' ｜ ');
-    const msg = `已寫進人脈庫（待人工確認）：${summary}`;
-    if (userId) {
-      const pushed = await pushLine(env, userId, [textMsg(msg)]);
-      if (!pushed && !event.replyToken) {
-        // reply token 已用於「正在辨識」
-      }
-    }
+    const msg = `已寫進人脈庫：${summary}`;
+    const to = groupId ?? userId;
+    if (to) await pushLine(env, to, [textMsg(msg)]);
     return;
   }
 
   if (messageType === 'text' && text) {
     if (!looksLikeVendorAsk(text)) return;
-    if (event.replyToken) {
-      await replyLine(env, event.replyToken, [textMsg(groupId ? '收到，我先幫你找人，名單會盡量私訊。' : '收到，正在幫你找合適廠商…')]).catch(() => undefined);
-    }
     const ask = await classifyVendorAsk(env, text);
-    if (!ask.isVendorAsk) return;
+    if (!ask.isVendorAsk) {
+      await replyOrPush(env, event, [textMsg('這則我先當一般討論。若要找廠商，直接說工種和地區，例如「高雄水電有推薦嗎？」')]);
+      return;
+    }
     const matches = await searchVendors(env, brandId, ask);
     await logNetworkMatch(env, {
       brandId,
@@ -203,17 +294,7 @@ async function handleOneEvent(env: Env, brandId: string, brandSlug: string, even
       lineUserId: userId,
       lineGroupId: groupId,
     });
-    const detail = formatMatchText(ask, matches);
-    let pushed = false;
-    if (userId) pushed = await pushLine(env, userId, [textMsg(detail)]);
-    if (!pushed && groupId) {
-      const short = matches.length
-        ? `已找到 ${matches.length} 位「${ask.category ?? '相關'}」人選。請先加我好友，才能私訊完整聯絡方式。`
-        : `人脈庫暫時沒有「${ask.category ?? '這個工種'}」的現成名單，我先記下來。`;
-      if (userId) {
-        await pushLine(env, groupId, [textMsg(short)]);
-      }
-    }
+    await replyOrPush(env, event, matchMessages(ask, matches));
   }
 }
 

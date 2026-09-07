@@ -279,7 +279,7 @@ if (!noCards) {
           rawOcr: ocr.rawText,
           source: 'business_card',
           sourceRef: name,
-          status: 'pending_review',
+          status: 'verified',
           confidence: ocr.confidence,
         });
         tally[result] += 1;

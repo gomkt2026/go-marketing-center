@@ -111,7 +111,7 @@ export function draftFromOcr(
     cardImageUrl: extras.cardImageUrl ?? null,
     source,
     sourceRef: extras.sourceRef ?? null,
-    status: 'pending_review',
+    status: 'verified',
     confidence: ocr.confidence,
   };
 }

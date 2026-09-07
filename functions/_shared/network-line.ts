@@ -1,11 +1,10 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { getBrandBySlug } from './queries';
-import { DEFAULT_PUBLIC_BASE, buildNetworkCardKey, putMedia } from './media';
-import { ensureNetworkTables, upsertNetworkContact } from './network-contacts';
+import { DEFAULT_PUBLIC_BASE, buildNetworkCardKey, putMedia, toPublicMediaUrl } from './media';
+import { ensureNetworkTables, upsertNetworkContact, type NetworkContactRecord } from './network-contacts';
 import { bytesToDataUrl, draftFromOcr, ocrBusinessCard } from './network-ocr';
-import { classifyVendorAsk, formatMatchText, logNetworkMatch, looksLikeVendorAsk, searchVendors, type RankedContact, type VendorAsk } from './network-match';
-import type { NetworkContactRecord } from './network-contacts';
+import { classifyVendorAsk, contactLineUri, contactTelUri, formatMatchText, logNetworkMatch, looksLikeVendorAsk, searchVendors, type RankedContact, type VendorAsk } from './network-match';
 
 const LINE_API = 'https://api.line.me/v2/bot';
 const LINE_DATA = 'https://api-data.line.me/v2/bot';
@@ -102,64 +101,77 @@ function textMsg(text: string) {
   return { type: 'text', text };
 }
 
-function firstPhone(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const part = raw.split(/[,，、/\s]+/).find((item) => /\d{8,}/.test(item));
-  const digits = (part ?? raw).replace(/[^\d+]/g, '');
-  if (digits.length < 8) return null;
-  return digits.startsWith('886') ? `0${digits.slice(3)}` : digits;
-}
-
-function telUri(raw: string | null | undefined): string | null {
-  const phone = firstPhone(raw);
-  return phone ? `tel:${phone}` : null;
-}
-
-function lineUri(raw: string | null | undefined): string | null {
-  const id = raw?.trim();
-  if (!id) return null;
-  if (/^https?:\/\//i.test(id)) return id;
-  if (id.startsWith('@')) return `https://line.me/R/ti/p/${encodeURIComponent(id)}`;
-  return `https://line.me/ti/p/~${encodeURIComponent(id.replace(/^~/, ''))}`;
-}
-
 function flexText(text: string, extra: Record<string, unknown> = {}) {
   return { type: 'text', text, wrap: true, ...extra };
 }
 
-function contactBubble(contact: NetworkContactRecord) {
+function contactBubble(env: Env, contact: NetworkContactRecord) {
+  const tel = contactTelUri(contact.phone);
+  const line = contactLineUri(contact.lineId);
+  const imageUrl = toPublicMediaUrl(env, contact.cardImageUrl);
   const body = [
     flexText(contact.name || contact.company || '人脈', { weight: 'bold', size: 'lg' }),
     contact.company && contact.company !== contact.name
-      ? flexText(contact.company, { size: 'sm', color: '#555555' })
+      ? flexText(`🏢 ${contact.company}`, { size: 'sm', color: '#555555' })
       : null,
-    contact.industry ? flexText(contact.industry, { size: 'xs', color: '#1A2F4B' }) : null,
+    contact.industry ? flexText(`🏷️ ${contact.industry}`, { size: 'xs', color: '#1A2F4B' }) : null,
     contact.specialties.length
-      ? flexText(contact.specialties.slice(0, 4).join('、'), { size: 'xs', color: '#888888' })
+      ? flexText(`🛠️ ${contact.specialties.slice(0, 4).join('、')}`, { size: 'xs', color: '#666666' })
       : null,
-    contact.phone ? flexText(`電話 ${contact.phone}`, { size: 'sm' }) : null,
-    contact.lineId ? flexText(`LINE ${contact.lineId}`, { size: 'sm' }) : null,
+    contact.phone
+      ? flexText(`📞 ${contact.phone}`, {
+        size: 'sm',
+        color: '#1A2F4B',
+        decoration: 'underline',
+        ...(tel ? { action: { type: 'uri', uri: tel } } : {}),
+      })
+      : null,
+    contact.lineId
+      ? flexText(`💬 ${contact.lineId}`, {
+        size: 'sm',
+        color: '#06C755',
+        decoration: 'underline',
+        ...(line ? { action: { type: 'uri', uri: line } } : {}),
+      })
+      : null,
   ].filter(Boolean);
 
   const buttons: Record<string, unknown>[] = [];
-  const tel = telUri(contact.phone);
   if (tel) {
     buttons.push({
-      type: 'button', style: 'primary', height: 'sm', color: '#1A2F4B',
-      action: { type: 'uri', label: '通話', uri: tel },
+      type: 'button', style: 'primary', height: 'md', color: '#1A2F4B',
+      action: { type: 'uri', label: '📞 打電話', uri: tel },
     });
   }
-  const line = lineUri(contact.lineId);
   if (line) {
     buttons.push({
-      type: 'button', style: 'primary', height: 'sm', color: '#06C755',
-      action: { type: 'uri', label: '加 LINE', uri: line },
+      type: 'button', style: 'primary', height: 'md', color: '#06C755',
+      action: { type: 'uri', label: '💬 加 LINE', uri: line },
     });
   }
 
   return {
     type: 'bubble',
-    size: 'kilo',
+    size: 'mega',
+    ...(imageUrl
+      ? {
+        hero: {
+          type: 'image',
+          url: imageUrl,
+          size: 'full',
+          aspectRatio: '16:10',
+          aspectMode: 'cover',
+        },
+      }
+      : {
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: '#1A2F4B',
+          paddingAll: '12px',
+          contents: [flexText('📇 人脈名片', { color: '#FFFFFF', size: 'sm', weight: 'bold' })],
+        },
+      }),
     body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: body },
     ...(buttons.length
       ? { footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: buttons } }
@@ -167,7 +179,7 @@ function contactBubble(contact: NetworkContactRecord) {
   };
 }
 
-function matchMessages(ask: VendorAsk, matches: RankedContact[]): unknown[] {
+function matchMessages(env: Env, ask: VendorAsk, matches: RankedContact[]): unknown[] {
   const intro = formatMatchText(ask, matches);
   if (!matches.length) return [textMsg(intro)];
   return [
@@ -177,7 +189,7 @@ function matchMessages(ask: VendorAsk, matches: RankedContact[]): unknown[] {
       altText: intro.slice(0, 390),
       contents: {
         type: 'carousel',
-        contents: matches.map((item) => contactBubble(item.contact)),
+        contents: matches.map((item) => contactBubble(env, item.contact)),
       },
     },
   ];
@@ -294,7 +306,7 @@ async function handleOneEvent(env: Env, brandId: string, brandSlug: string, even
       lineUserId: userId,
       lineGroupId: groupId,
     });
-    await replyOrPush(env, event, matchMessages(ask, matches));
+    await replyOrPush(env, event, matchMessages(env, ask, matches));
   }
 }
 

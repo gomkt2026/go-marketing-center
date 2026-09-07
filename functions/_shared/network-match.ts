@@ -155,15 +155,38 @@ export async function logNetworkMatch(
   `;
 }
 
+export function contactLineUri(raw: string | null | undefined): string | null {
+  const id = raw?.trim();
+  if (!id) return null;
+  if (/^https?:\/\//i.test(id)) return id;
+  if (id.startsWith('@')) return `https://line.me/R/ti/p/${encodeURIComponent(id)}`;
+  return `https://line.me/ti/p/~${encodeURIComponent(id.replace(/^~/, ''))}`;
+}
+
+export function contactTelUri(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const part = raw.split(/[,，、/\s]+/).find((item) => /\d{8,}/.test(item));
+  const digits = (part ?? raw).replace(/[^\d+]/g, '');
+  if (digits.length < 8) return null;
+  const phone = digits.startsWith('886') ? `0${digits.slice(3)}` : digits;
+  return `tel:${phone}`;
+}
+
 export function formatMatchText(ask: VendorAsk, matches: RankedContact[]): string {
+  const topic = [ask.region, ask.category].filter(Boolean).join('／') || ask.summary || '你的需求';
   if (!matches.length) {
-    return `目前人脈庫裡還沒找到「${ask.category ?? '這個工種'}」${ask.region ? `／${ask.region}` : ''}的合適名單。我先記下這筆需求。`;
+    return `😅 人脈庫暫時沒找到「${topic}」的現成名單，我先記下來，之後有人加入會再對。`;
   }
-  const lines = matches.map((m, i) => {
+  const blocks = matches.map((m, i) => {
     const c = m.contact;
-    const bits = [c.company, c.specialties.slice(0, 3).join('、'), c.phone ? `Tel ${c.phone}` : '', c.lineId ? `LINE ${c.lineId}` : '']
-      .filter(Boolean);
-    return `${i + 1}. ${c.name}${bits.length ? `｜${bits.join('｜')}` : ''}`;
+    const lineLink = contactLineUri(c.lineId);
+    const phone = c.phone?.replace(/\s+/g, '') ?? '';
+    return [
+      `${['1️⃣', '2️⃣', '3️⃣'][i] ?? `${i + 1}.`} ${c.name}${c.company ? `｜${c.company}` : ''}`,
+      c.specialties.length ? `🛠️ ${c.specialties.slice(0, 3).join('、')}` : '',
+      phone ? `📞 ${phone}` : '',
+      lineLink ? `💬 ${lineLink}` : '',
+    ].filter(Boolean).join('\n');
   });
-  return `依「${ask.summary ?? ask.category ?? '你的需求'}」找到這幾位，資料供參考，請自行確認是否方便接案：\n${lines.join('\n')}`;
+  return `🔎 ${topic}，幫你找到這幾位可以問問👇\n先跟對方確認檔期與報價喔\n\n${blocks.join('\n\n')}`;
 }

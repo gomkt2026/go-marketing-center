@@ -67,6 +67,11 @@ export function buildBrandDocumentKey(brandSlug: string, ext: string): string {
   return `brand-docs/${brandSlug}/${crypto.randomUUID()}.${ext.replace(/^\./, '')}`;
 }
 
+/** 人脈名片原圖。放 network-cards/ 前綴,不受 generated/ 31 天清理。 */
+export function buildNetworkCardKey(brandSlug: string, ext = 'jpg'): string {
+  return `network-cards/${brandSlug}/${crypto.randomUUID()}.${ext.replace(/^\./, '')}`;
+}
+
 export async function putMedia(env: Env, key: string, bytes: Uint8Array, contentType = 'image/png'): Promise<string> {
   if (!env.MEDIA) {
     throw new Error('R2 bucket MEDIA 尚未綁定,請先建立 bucket 並在 wrangler.toml 設定 r2_buckets');
@@ -75,7 +80,7 @@ export async function putMedia(env: Env, key: string, bytes: Uint8Array, content
   return `/api/media/${key}`;
 }
 
-const DEFAULT_PUBLIC_BASE = 'https://go-marketing-center.pages.dev';
+export const DEFAULT_PUBLIC_BASE = 'https://go-marketing-center.pages.dev';
 
 /**
  * 把站內相對媒體路徑(/api/media/...)轉成公開絕對 URL。

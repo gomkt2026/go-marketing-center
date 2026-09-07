@@ -25,6 +25,11 @@ export interface Env {
   MEDIA?: R2Bucket;
   /** 選填:站台公開網址(組媒體絕對 URL 給 Meta API 抓圖用),預設 Pages 網域 */
   PUBLIC_BASE_URL?: string;
+  /** FIXERCOWORK 人脈 Bot(LINE Messaging API)。正式環境用 wrangler pages secret put */
+  LINE_NETWORK_CHANNEL_SECRET?: string;
+  LINE_NETWORK_CHANNEL_ACCESS_TOKEN?: string;
+  /** 此 Bot 寫入的品牌 slug,預設 fixercowork */
+  LINE_NETWORK_BRAND_SLUG?: string;
 }
 
 export function getSessionSecret(env: Env): string {

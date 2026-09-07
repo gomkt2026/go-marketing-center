@@ -981,3 +981,51 @@ export interface PodcastGuest {
   consentConfirmedAt: string;
   createdAt: string;
 }
+
+export type NetworkContactSource = 'event' | 'business_card' | 'line_chat' | 'manual' | 'csv';
+export type NetworkContactStatus = 'pending_review' | 'verified' | 'archived';
+
+export interface NetworkContact {
+  id: string;
+  brandId: string;
+  name: string;
+  nameEn: string | null;
+  company: string | null;
+  title: string | null;
+  phone: string | null;
+  phoneDigits: string | null;
+  email: string | null;
+  lineId: string | null;
+  lineUserId: string | null;
+  website: string | null;
+  address: string | null;
+  industry: string | null;
+  specialties: string[];
+  serviceRegions: string[];
+  yearsExperience: number | null;
+  acceptsDispatch: boolean | null;
+  chambers: string | null;
+  notes: string | null;
+  rawOcr: string | null;
+  cardImageUrl: string | null;
+  source: NetworkContactSource;
+  sourceRef: string | null;
+  eventId: string | null;
+  registrationId: string | null;
+  status: NetworkContactStatus;
+  confidence: number | null;
+  extra: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  eventTitle?: string | null;
+}
+
+export interface NetworkStats {
+  total: number;
+  pendingReview: number;
+  verified: number;
+  fromEvents: number;
+  fromCards: number;
+  fromLine: number;
+  acceptsDispatch: number;
+}

@@ -105,4 +105,8 @@ export const ACTION_LABELS: Record<string, string> = {
   'help.chat.answered': '小幫手回答問題',
   'help.ticket.created': '客戶留資請客服聯繫',
   'help.ticket.status_changed': '更新客服工單狀態',
+  'network.contact.created': '新增人脈',
+  'network.contact.updated': '更新人脈',
+  'network.contact.imported': '匯入人脈',
+  'network.card.ocr': '名片 OCR',
 };

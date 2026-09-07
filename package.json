@@ -14,7 +14,9 @@
     "deploy": "npm run build && wrangler pages deploy dist --project-name=go-marketing-center --branch=Ben",
     "export:podcast": "node scripts/export-podcast.mjs",
     "render:short": "python3 scripts/render-short-video.py",
-    "x:oauth": "node scripts/x-oauth-setup.mjs"
+    "x:oauth": "node scripts/x-oauth-setup.mjs",
+    "network:apply": "node scripts/apply-network.mjs",
+    "network:import": "node scripts/import-network.mjs"
   },
   "dependencies": {
     "@cf-wasm/photon": "^0.4.0",

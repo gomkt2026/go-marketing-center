@@ -897,6 +897,84 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
     return data as { job: import('@/types').VideoJob };
   },
+
+  networkContacts: (slug: string, params?: { search?: string; source?: string; status?: string; specialty?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.search) q.set('search', params.search);
+    if (params?.source) q.set('source', params.source);
+    if (params?.status) q.set('status', params.status);
+    if (params?.specialty) q.set('specialty', params.specialty);
+    const qs = q.toString();
+    return request<{
+      contacts: import('@/types').NetworkContact[];
+      stats: import('@/types').NetworkStats;
+    }>(`/api/brands/${slug}/network/contacts${qs ? `?${qs}` : ''}`);
+  },
+
+  createNetworkContact: (slug: string, body: Partial<import('@/types').NetworkContact>) =>
+    request<{ contact: import('@/types').NetworkContact; created: boolean }>(`/api/brands/${slug}/network/contacts`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateNetworkContact: (slug: string, id: string, body: Partial<import('@/types').NetworkContact>) =>
+    request<{ contact: import('@/types').NetworkContact }>(`/api/brands/${slug}/network/contacts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteNetworkContact: (slug: string, id: string) =>
+    request<{ ok: boolean }>(`/api/brands/${slug}/network/contacts/${id}`, { method: 'DELETE' }),
+
+  importNetworkEvents: (slug: string) =>
+    request<{ created: number; updated: number; skipped: number }>(`/api/brands/${slug}/network/import-events`, {
+      method: 'POST',
+    }),
+
+  importNetworkCsv: async (slug: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`/api/brands/${slug}/network/import-csv`, { method: 'POST', credentials: 'include', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    return data as { created: number; updated: number; skipped: number; total: number };
+  },
+
+  ocrNetworkCard: async (slug: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`/api/brands/${slug}/network/ocr`, { method: 'POST', credentials: 'include', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    return data as {
+      skipped: boolean;
+      reason?: string;
+      created?: boolean;
+      contact?: import('@/types').NetworkContact;
+    };
+  },
+
+  matchNetworkVendors: (slug: string, text: string) =>
+    request<{
+      ask: { isVendorAsk: boolean; category: string | null; region: string | null; summary: string | null };
+      matches: { contact: import('@/types').NetworkContact; score: number; reasons: string[] }[];
+      reply: string;
+    }>(`/api/brands/${slug}/network/match`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+
+  networkStatus: (slug: string) =>
+    request<{
+      line: {
+        configured: boolean;
+        brandSlug: string;
+        webhookPath: string;
+        webhookUrl: string;
+        botId: string;
+        appliesToThisBrand: boolean;
+      };
+    }>(`/api/brands/${slug}/network/status`),
 };
 
 // -- 活動報名(公開端,無需登入) ----------------------------------------------

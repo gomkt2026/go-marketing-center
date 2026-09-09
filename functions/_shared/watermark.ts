@@ -1,4 +1,4 @@
-import { PhotonImage, SamplingFilter, resize, watermark } from '@cf-wasm/photon';
+import { loadPhoton, type PhotonApi, type PhotonImage } from './photon-wasm';
 
 // ============================================================================
 // 品牌 logo 程式化合成(取代先前「叫圖片模型把 logo 畫進圖」的做法)
@@ -19,7 +19,7 @@ const MARGIN_RATIO = 0.025;
  * 白底消失、彩色與深色線條保留,邊緣抗鋸齒自然過渡。
  * 已有透明背景的 logo 原樣回傳。
  */
-function ensureAlpha(logo: PhotonImage): PhotonImage {
+function ensureAlpha(PhotonImage: PhotonApi['PhotonImage'], logo: PhotonImage): PhotonImage {
   const raw = logo.get_raw_pixels(); // RGBA
   let hasAlpha = false;
   for (let i = 3; i < raw.length; i += 4) {
@@ -45,16 +45,17 @@ export type LogoPosition = 'bottom-right' | 'bottom-left';
  * 把品牌 logo 合成到生成圖角落,回傳 JPEG bytes。
  * 任一步驟失敗時由呼叫端 catch,退回無 logo 的原圖。
  */
-export function compositeLogo(
+export async function compositeLogo(
   imageBytes: Uint8Array,
   logoBytes: Uint8Array,
   opts?: { position?: LogoPosition },
-): Uint8Array {
+): Promise<Uint8Array> {
+  const { PhotonImage, SamplingFilter, resize, watermark } = await loadPhoton();
   const base = PhotonImage.new_from_byteslice(imageBytes);
   let logo: PhotonImage | null = null;
   let resized: PhotonImage | null = null;
   try {
-    logo = ensureAlpha(PhotonImage.new_from_byteslice(logoBytes));
+    logo = ensureAlpha(PhotonImage, PhotonImage.new_from_byteslice(logoBytes));
 
     const baseW = base.get_width();
     const baseH = base.get_height();

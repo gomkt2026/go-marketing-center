@@ -23,6 +23,23 @@ export type SocialPlatform = 'facebook' | 'instagram' | 'threads';
 
 export const SUPPORTED_PLATFORMS: SocialPlatform[] = ['facebook', 'instagram', 'threads'];
 
+/** 三平台依序跑,避免一次 Worker 把 Neon / OpenAI subrequest 打爆 */
+export async function runPlatformJobs<T>(
+  platforms: SocialPlatform[],
+  work: (platform: SocialPlatform) => Promise<T>,
+): Promise<{ created: T[]; failures: { platform: SocialPlatform; error: string }[] }> {
+  const created: T[] = [];
+  const failures: { platform: SocialPlatform; error: string }[] = [];
+  for (const platform of platforms) {
+    try {
+      created.push(await work(platform));
+    } catch (e) {
+      failures.push({ platform, error: e instanceof Error ? e.message : '生成失敗' });
+    }
+  }
+  return { created, failures };
+}
+
 /** IG 最多 12、FB 最多 3;Threads 只去 # 不硬切(品牌規則各自處理) */
 function clampHashtags(tags: string[] | undefined, platform: SocialPlatform): string[] {
   const cleaned = (tags ?? []).map((h) => h.replace(/^#/, '').trim()).filter(Boolean);
@@ -159,7 +176,7 @@ async function generateSystemScreenshotPoster(
     });
     if (logo) {
       try {
-        bytes = compositeLogo(bytes, logo, {
+        bytes = await compositeLogo(bytes, logo, {
           position: isIg && params.brandSlug === 'homigo' ? 'bottom-left' : 'bottom-right',
         });
       } catch (e) {
@@ -181,7 +198,7 @@ async function frameAssetForInstagram(env: Env, brandSlug: string, fileUrl: stri
   try {
     const bytes = await getMediaBytes(env, key);
     if (!bytes) return null;
-    const framed = frameScreenshotForIg(bytes, brandSlug);
+    const framed = await frameScreenshotForIg(bytes, brandSlug);
     const outKey = buildMediaKey(brandSlug, 'jpg');
     return await putMedia(env, outKey, framed, 'image/jpeg');
   } catch (e) {
@@ -421,7 +438,7 @@ export async function generatePlatformPost(
       let bytes = await generateImage(env, { prompt, size, quality });
       if (logo) {
         try {
-          bytes = compositeLogo(bytes, logo, { position: isDesign && brandCtx.slug === 'homigo' ? 'bottom-left' : 'bottom-right' });
+          bytes = await compositeLogo(bytes, logo, { position: isDesign && brandCtx.slug === 'homigo' ? 'bottom-left' : 'bottom-right' });
         } catch (e) {
           console.error('[generate] logo 合成失敗,改用無 logo 原圖', e);
         }

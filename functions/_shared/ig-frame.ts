@@ -1,4 +1,4 @@
-import { PhotonImage, SamplingFilter, resize, watermark } from '@cf-wasm/photon';
+import { loadPhoton, type PhotonApi, type PhotonImage } from './photon-wasm';
 
 // ============================================================================
 // 把素材庫橫式系統截圖包成 IG Feed 可發的 4:5 JPEG
@@ -17,7 +17,12 @@ const BRAND_BG: Record<string, [number, number, number]> = {
   taskgo: [0x0b, 0x2d, 0x5c],
 };
 
-function fillCanvas(w: number, h: number, rgb: [number, number, number]): PhotonImage {
+function fillCanvas(
+  PhotonImage: PhotonApi['PhotonImage'],
+  w: number,
+  h: number,
+  rgb: [number, number, number],
+): PhotonImage {
   const pixels = new Uint8Array(w * h * 4);
   for (let i = 0; i < w * h; i++) {
     const o = i * 4;
@@ -37,7 +42,8 @@ function aspect(w: number, h: number): number {
  * 系統截圖 → IG 可用 JPEG。
  * 接近 4:5 只轉 JPEG;橫式報表則置中放進品牌色 4:5 簡報框。
  */
-export function frameScreenshotForIg(imageBytes: Uint8Array, brandSlug: string): Uint8Array {
+export async function frameScreenshotForIg(imageBytes: Uint8Array, brandSlug: string): Promise<Uint8Array> {
+  const { PhotonImage, SamplingFilter, resize, watermark } = await loadPhoton();
   const shot = PhotonImage.new_from_byteslice(imageBytes);
   let canvas: PhotonImage | null = null;
   let card: PhotonImage | null = null;
@@ -51,7 +57,7 @@ export function frameScreenshotForIg(imageBytes: Uint8Array, brandSlug: string):
     }
 
     const bg = BRAND_BG[brandSlug] ?? BRAND_BG.washgo;
-    canvas = fillCanvas(IG_W, IG_H, bg);
+    canvas = fillCanvas(PhotonImage, IG_W, IG_H, bg);
 
     const innerW = IG_W - PAD_X * 2;
     const innerH = IG_H - PAD_Y * 2;
@@ -64,7 +70,7 @@ export function frameScreenshotForIg(imageBytes: Uint8Array, brandSlug: string):
     const cardPad = 16;
     const cardW = tw + cardPad * 2;
     const cardH = th + cardPad * 2;
-    card = fillCanvas(cardW, cardH, [255, 255, 255]);
+    card = fillCanvas(PhotonImage, cardW, cardH, [255, 255, 255]);
     watermark(card, resized, BigInt(cardPad), BigInt(cardPad));
 
     const x = Math.round((IG_W - cardW) / 2);

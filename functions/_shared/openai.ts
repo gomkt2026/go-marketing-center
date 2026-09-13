@@ -136,7 +136,7 @@ export async function generateImage(
       model: env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1',
       prompt: params.prompt,
       size: params.size ?? '1024x1024',
-      // 預設 medium(快);要在圖上渲染中文字的設計圖用 high,避免錯字
+      // 預設 medium(快);海報設計圖用 high 提升畫面精緻度。中文主標改後製,不再靠模型畫字
       quality: params.quality ?? 'medium',
       // IG Graph API 的 image_url 只接受 JPEG,統一輸出 JPEG(檔案也較小)
       output_format: 'jpeg',

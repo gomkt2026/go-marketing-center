@@ -21,6 +21,7 @@
   "dependencies": {
     "@cf-wasm/photon": "^0.4.0",
     "@neondatabase/serverless": "^1.1.0",
+    "@resvg/resvg-wasm": "^2.6.2",
     "framer-motion": "^11.11.17",
     "html5-qrcode": "^2.3.8",
     "qrcode": "^1.5.4",

@@ -287,14 +287,18 @@ export function pickImageStyle(params: {
   if (params.brandSlug === 'washgo' && params.platform === 'threads' && params.lane === 'b2c') {
     return 'illustration';
   }
-  // TaskGo FB/IG 原圖以設計圖為主(海軍藍斜切+工地實拍),寫實照只當輪替
-  const weights: Record<ImageStyleId, number> = params.brandSlug === 'taskgo' && params.platform !== 'threads'
-    ? (params.platform === 'instagram'
-      ? { photo: 1, design: 4, illustration: 0 }
-      : { photo: 1, design: 3, illustration: 0 })
-    : params.platform === 'instagram'
-    ? (params.lane === 'b2b' ? { photo: 1, design: 3, illustration: 0 } : { photo: 1, design: 2, illustration: 1 })
-    : (params.lane === 'b2b' ? { photo: 1, design: 1, illustration: 0 } : { photo: 1, design: 1, illustration: 1 });
+  // TaskGo / Homigo / Washgo 的 FB、IG 以海報設計圖為主,寫實照只當輪替
+  const weights: Record<ImageStyleId, number> = params.platform === 'threads'
+    ? (params.brandSlug === 'washgo' && params.lane === 'b2c'
+      ? { photo: 0, design: 0, illustration: 1 }
+      : { photo: 1, design: 1, illustration: 1 })
+    : params.brandSlug === 'taskgo'
+      ? (params.platform === 'instagram'
+        ? { photo: 1, design: 5, illustration: 0 }
+        : { photo: 1, design: 4, illustration: 0 })
+      : params.platform === 'instagram'
+        ? { photo: 1, design: 4, illustration: 0 }
+        : { photo: 1, design: 3, illustration: 0 };
   const recent = new Set(params.recentStyles ?? []);
   let pool = (Object.entries(weights) as [ImageStyleId, number][])
     .filter(([, w]) => w > 0)
@@ -331,7 +335,7 @@ export const PLATFORM_GUIDELINES: Record<string, string> = {
     '4. 收藏優先——讓人想截圖/收藏的一句話或對比,比堆 emoji 重要。' +
     '5. 推薦資格——不洗 hashtag、不標題黨、不誤導對比、不互動勒索(禁止「留言才告訴你」)。內容必須跟帳號主題一致。' +
     '6. 80-200 字,語氣輕鬆但具體,可用少量 emoji。Hashtag 8-12 個放文末。' +
-    '7. B 端配圖做成痛點海報:業者現場煩惱 + 4-10 字主標 + 系統重點畫面卡。有真實截圖時把截圖做成解法卡,不要整頁後台置中鋪色塊。圖上主標與文案第一句同義。',
+    '7. B 端配圖做成痛點海報:業者現場煩惱 + 後製繁中主標 + 系統重點畫面卡。有真實截圖時把截圖做成解法卡,不要整頁後台置中鋪色塊。主標與文案第一句同義,由系統印上,不要叫圖片模型畫字。',
   threads:
     'Threads 貼文:用很年輕世代的語氣(像大學生/新鮮人發文的節奏),口語、有記憶點,500 字以內。' +
     'Threads 演算法要點(必遵守):' +
@@ -491,6 +495,10 @@ export interface GeneratedPost {
   hashtags: string[];
   cta: string;
   imagePrompt?: string;
+  /** 海報主標(4-10 字台灣繁中);系統用思源黑體後製印上,不要寫進 imagePrompt 叫模型去畫 */
+  posterHeadline?: string;
+  /** 主標裡要用品牌強調色的 2-6 字(如「不理？」);沒有就空 */
+  posterAccent?: string;
   /** Threads 串文 2/2:發布後自動回覆在主帖下面,用來邀請大家分享故事 */
   replyBody?: string;
 }
@@ -505,26 +513,28 @@ export interface EngagementPrediction {
 // Homigo IG/Threads 專用:4:5 直式「社群設計圖」規範(痛點主標 → 情境 → 解法)
 // ============================================================================
 
+/** 海報主標 JSON:後製印字,禁止寫進 imagePrompt 叫模型去畫 */
+export const POSTER_HEADLINE_JSON_SPEC =
+  '"posterHeadline": "必填:4-10 字台灣繁體中文痛點主標,必須與文案第一句同義,禁止簡體(例如「房東修繕不理？」「講不清楚」「手寫單對不攏」「今天做到哪」)", ' +
+  '"posterAccent": "主標裡要用品牌強調色的 2-6 字(例如「不理？」「對不攏」);沒有就空字串"';
+
 /** 指示文案 AI 為 Homigo IG 圖撰寫設計描述(不是純照片描述) */
 export const HOMIGO_IG_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:這張圖是 Homigo 的 4:5 直式「社群設計圖」(不是純照片)。請用繁體中文描述三個元素:' +
-  '1) 主標文字:從貼文第一句提煉一句 4-10 字、有情緒、會直接印在圖上的痛點短句,必須與文案第一句同義(例如「講不清楚」「根本管不動」「房子越多,越焦慮」「大家都在自保」);' +
-  '2) 情境畫面:台灣年輕房東或房客的真實疲憊場景(LINE 訊息爆炸、合約找不到、報修沒人理、電費算不清),自然表情、不要商業假笑;' +
-  '3) Homigo 解法元素:一個簡潔白底的手機畫面(合約管理/繳租紀錄/報修紀錄/電表管理擇一),低調出現在畫面下方"';
+  '"imagePrompt": "必填:這張圖是 Homigo 的直式品牌海報畫面(不是純照片、不是語錄卡)。只描述畫面,不要描述任何要印在圖上的文字:' +
+  '1) 構圖:上方 25% 完全留空(米白或極淡漸層,沒有人、沒有物件、沒有任何文字),留給後製主標;' +
+  '2) 情境:台灣年輕房東或房客的真實疲憊場景(LINE 訊息爆炸、合約找不到、報修沒人理、電費算不清),自然表情、不要商業假笑;' +
+  '3) 解法:畫面下方一個簡潔白底手機/平板卡,UI 只有抽象灰線與色塊,禁止任何文字、數字、假按鈕"';
 
 /** Homigo IG 圖片生成的固定設計規格(直接附加在圖片 prompt 後) */
 export const HOMIGO_IG_IMAGE_STYLE = [
-  '【設計規格】4:5 直式社群貼文設計圖。米白背景(#F5F1EA)大面積留白;深藍(#0B2D5C)為主要資訊色;黃色(#F7B500)只做重點強調,禁止過度花俏。',
-  '上下留白至少 120px、左右至少 80px,文字不可貼邊,畫面不可過滿,留白感要足夠。',
-  '【閱讀順序】第一眼:大而粗、有情緒的繁體中文主標(痛點,可局部用黃色強調);第二眼:有共鳴的情境;第三眼才看到 Homigo 解法。先讓人感受到問題,不要一開始就像廣告、像在賣工具。',
-  '【人物】東亞臉孔的台灣年輕人,自然表情、不要過度微笑、不要商業假笑,情緒偏真實與疲憊(房東焦慮、房客無奈)。不浮誇、不搞笑,讓人有共鳴。',
+  '【設計規格】直式品牌海報。米白背景(#F5F1EA)大面積留白;深藍(#0B2D5C)為主要資訊色;黃色(#F7B500)只做色塊強調,禁止花俏。',
+  '上下左右留白要足夠,畫面不可過滿,像一張會被印出來的社群海報。',
+  '【閱讀順序】上方留空 banner → 中間有共鳴的情境人物 → 下方才是 Homigo 解法卡。先讓人感受到問題,不要一開始就像廣告。',
+  '【人物】東亞臉孔的台灣年輕人,自然表情、不要過度微笑、不要商業假笑,情緒偏真實與疲憊(房東焦慮、房客無奈)。',
   '【系統畫面】解法是平板或白卡上的 Homigo 重點畫面,不要把整頁後台截圖置中鋪在色塊上。' +
-  '【手機UI】簡潔、白底、深藍 icon、黃色重點;像真的有人會用的租屋工具,不要金融 APP 的科技感,不要過度複雜的 UI、假 icon、無意義按鈕、奇怪數字。' +
-  '手機畫面上「只能有一個」2-4 字的功能標題(如「合約管理」「繳租紀錄」),其餘內容一律用抽象的灰色線條與色塊示意,絕對不要畫任何小號文字或數字(小字一定會變成亂碼)。',
-  '【文字防呆】圖上所有文字必須是「正確的台灣繁體中文」:禁止任何簡體字(壞不能寫成坏、燈不能寫成灯、約不能寫成约)、禁止錯字、禁止英文亂碼、禁止模糊文字。' +
-  '整張圖的文字元素不超過 5 個(主標 1 個+情境短語最多 3 個+手機 UI 標籤),每個情境短語 2-4 字,逐字確認寫對再畫。',
-  '【整體感覺】像新創品牌做的內容視覺,有觀點、有情緒、有生活感;不要像電商廣告、保險 DM、傳統房仲海報、不要過度商業化。',
-  '目標:讓人看到的反應是「這真的就是我遇到的問題」,而不是「又一個廣告」。',
+  '【手機UI】簡潔、白底、深藍色塊、黃色重點;UI 一律用抽象灰色線條與色塊示意,絕對不要畫任何文字、數字、假 icon 標籤(模型畫中文一定會變成亂碼)。',
+  '【禁止文字】圖上不要出現任何中文、英文、數字、logo、浮水印。主標由系統後製疊上正確台灣繁體中文。',
+  '【整體感覺】像新創品牌內容海報,有觀點、有情緒、有生活感;不要電商廣告、保險 DM、傳統房仲海報。',
 ].join('\n');
 
 /** Homigo 品牌標:無 logo 檔時的文字標 fallback */
@@ -535,22 +545,20 @@ export const HOMIGO_TEXT_MARK_RULE =
 export const BRAND_DESIGN_IMAGE_STYLE: Record<string, string> = {
   homigo: HOMIGO_IG_IMAGE_STYLE,
   washgo: [
-    '【設計規格】4:5 直式 B 端痛點海報。深藍(#1D4F8C)主底,品牌藍(#3A8DDE)層次,金橘(#FFB84D)只點主標。',
-    '【閱讀順序】第一眼:4-10 字繁中痛點主標(例如「手寫單對不攏」);第二眼:台灣洗衣店主在店裡的真實煩惱(手寫單、收據堆、對不攏);第三眼:平板或白卡上的 Washgo 系統重點(訂單管理/送洗履歷/調撥擇一),證明系統解這個痛。',
+    '【設計規格】直式 B 端痛點海報。深藍(#1D4F8C)主底,品牌藍(#3A8DDE)層次,金橘(#FFB84D)只做色塊強調。',
+    '【構圖】上方 25% 完全留空給後製主標(純深藍或極淡漸層,不要人物、不要任何文字)。中間是店內情境,下方才是系統卡。',
     '【人物】東亞臉、自然身形的台灣店主或櫃檯,polo 或工作服,店內衣架與摺衣台。真實疲憊可以,不要歐美模特、不要吉卜力、不要笑臉洗衣機。',
-    '【系統畫面】只放一個重點區塊,不要整頁後台置中鋪在純色底上。',
-    '【文字防呆】正確台灣繁體中文,整張不超過 5 個文字元素。不要畫 logo。',
+    '【系統畫面】只放一個重點區塊,UI 用抽象灰線與色塊,禁止任何文字數字。不要整頁後台置中鋪在純色底上。',
+    '【禁止文字】圖上不要出現任何中文、英文、數字、logo。主標由系統後製疊上正確台灣繁體中文。',
   ].join('\n'),
   taskgo: [
-    '【設計規格】4:5 直式「匠管 TaskGo」社群設計圖。主色海軍藍(#0B2D5C)與青藍(#2BA3D6),大面積白;安全橘(#ED9121)與黃(#F7B500)只做主標強調或工安色。禁止深灰語錄卡當主視覺。',
-    '【構圖】斜切色塊/平行四邊形 banner、半透明海軍藍疊在工地實拍上、淡青蜂巢或六角科技紋。可對角分割:一邊工地/平板,一邊深藍字塊。',
-    '【閱讀順序】第一眼:大而粗的繁中主標 4-10 字(痛點或價值,局部黃字);第二眼:台灣工地或師傅用平板/LINE;第三眼才是派工/回報畫面卡。',
+    '【設計規格】直式「匠管 TaskGo」品牌海報。主色海軍藍(#0B2D5C)與青藍(#2BA3D6),大面積白;安全橘(#ED9121)與黃(#F7B500)只做色塊。禁止深灰語錄卡當主視覺。',
+    '【構圖】斜切色塊/平行四邊形、半透明海軍藍疊在工地實拍上、淡青蜂巢或六角科技紋。上方 25%(直式)或左側 38%(橫式)完全留空給後製主標,不要人物、不要任何文字。',
     '【人物】東亞臉孔的台灣工班:白或黃安全帽、反光背心、深藍工作服;自然表情,不要歐美模特、不要棚拍假笑。可出現工地主任看圖、師傅打卡、後勤看報表。',
     '【吉祥物】可在邊角放藍色圓頭機器人(大圓眼、短天線,可戴藍安全帽或拿鉛筆),當 AI 幫手,不要佔據主體、不要日式大眼萌。',
-    '【台灣文化】場景長在台灣:大台北案場、騎樓、塔吊、中元普渡工安、端午工地粽、開工、颱風天收工、LINE 群。用語用工班/案場/師傅/頭仔。不要歐美工地、不要簡體字。',
-    '【系統畫面】解法是平板或白卡上的派工/回報重點,不要把整頁後台截圖置中鋪在色塊上。',
-    '【手機UI】白底、一個 2-4 字功能標題(如「派工佇列」「現場回報」「成本看得到」),其餘用灰色線條示意,禁止小號亂碼。',
-    '【文字防呆】圖上所有文字必須是正確台灣繁體中文;整張不超過 5 個文字元素。不要畫 logo 或品牌英文字(官方 logo 會後製合成)。不要電商廣告感。',
+    '【台灣文化】場景長在台灣:大台北案場、騎樓、塔吊、中元普渡工安、端午工地粽、開工、颱風天收工、LINE 群。不要歐美工地。',
+    '【系統畫面】解法是平板或白卡上的派工/回報重點,UI 用抽象灰線與色塊,禁止任何文字數字。不要整頁後台置中。',
+    '【禁止文字】圖上不要出現任何中文、英文、數字、logo 或品牌英文字(官方 logo 與主標會後製合成)。不要電商廣告感。',
   ].join('\n'),
 };
 
@@ -562,35 +570,35 @@ export const WASHGO_THREADS_IMAGE_PROMPT_SPEC =
   '讓人滑到會停下來按讚的可愛程度,不含文字"';
 
 const DESIGN_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:這張圖是 4:5 直式 B 端痛點海報。請用繁體中文描述:' +
-  '1) 主標文字:從貼文第一句提煉一句 4-10 字痛點短句,必須與文案第一句同義;' +
+  '"imagePrompt": "必填:這張圖是直式 B 端痛點海報畫面。只描述畫面,不要描述任何要印在圖上的文字:' +
+  '1) 構圖:上方 25% 完全留空給後製主標(純色或極淡漸層,沒有人、沒有物件、沒有文字);' +
   '2) 情境:台灣業者在現場的真實煩惱(依品牌:洗衣店主/房東代管/工班頭);' +
-  '3) 解法:平板或白卡只露出一個系統重點功能,讓人看出系統對這個痛點真的有用;' +
-  '4) 禁止:整頁截圖鋪在純色底、吉卜力、笑臉洗衣機、簡體字、亂碼小字、自己畫 logo"';
+  '3) 解法:平板或白卡只露出一個系統重點,UI 用抽象灰線與色塊,禁止任何文字;' +
+  '4) 禁止:整頁截圖鋪在純色底、吉卜力、笑臉洗衣機、任何中英數字、自己畫 logo"';
 
 /** 有真實系統截圖時:指示文案 AI 寫出海報構圖,截圖會當參考圖做成解法卡 */
 export const B2B_SCREENSHOT_POSTER_PROMPT_SPEC =
-  '"imagePrompt": "必填:這張圖要把已提供的真實系統畫面做成 B 端痛點海報,不是把截圖原圖置中。請用繁體中文描述:' +
-  '1) 主標:從貼文第一句提煉 4-10 字痛點短句,與文案第一句同義;' +
+  '"imagePrompt": "必填:這張圖要把已提供的真實系統畫面做成 B 端痛點海報,不是把截圖原圖置中。只描述畫面,不要描述要印在圖上的文字:' +
+  '1) 構圖:上方 25%(直式)或左側 38%(橫式)完全留空給後製主標;' +
   '2) 情境:台灣 B 端業者在現場的真實煩惱(洗衣店主/房東代管/工班頭,依品牌);' +
-  '3) 解法:平板或白卡只露出這張系統畫面的一個重點功能;' +
-  '4) 禁止:整頁截圖鋪在純色底、吉卜力、笑臉洗衣機、簡體字、亂碼小字、自己畫 logo"';
+  '3) 解法:平板或白卡只露出這張系統畫面的一個重點功能,畫面裡原有的 UI 文字保持原樣即可,不要另外發明中文標題;' +
+  '4) 禁止:整頁截圖鋪在純色底、吉卜力、笑臉洗衣機、自己畫 logo、自己畫主標大字"';
 
 /** 帶參考截圖生海報時附加在圖片 prompt 後 */
 export const SYSTEM_SCREENSHOT_POSTER_RULE =
   'The attached image is a REAL product screenshot. Build a B2B social poster, not a screenshot dump. ' +
-  'First glance: 4-10 character Traditional Chinese pain-point headline matching the post hook. ' +
+  'Leave the top 25% (portrait) or left 38% (landscape) as a clean empty brand-color banner with NO text — the headline is composited later in Traditional Chinese. ' +
   'Second glance: a Taiwanese B2B operator in their real workplace showing the pain. ' +
   'Third glance: a tablet, phone, or floating white card that shows THIS exact screenshot — crop to the key panel, keep the UI recognizable, do not invent a different software. ' +
   'Do not place the raw full screenshot centered on a solid navy or blue field. ' +
-  'Max 5 text elements. Correct Traditional Chinese only. Do not draw a logo.';
+  'Do not draw extra Chinese headlines, captions, or logos.';
 
 const TASKGO_DESIGN_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:這張圖是匠管 TaskGo 的 4:5 直式社群設計圖(海軍藍斜切+台灣工地,不是深灰語錄卡)。請用繁體中文描述:' +
-  '1) 主標文字:從貼文第一句提煉一句 4-10 字痛點或價值短句,必須與文案第一句同義(例如「今天做到哪」「月底才知賠」「經驗變標準」);' +
+  '"imagePrompt": "必填:這張圖是匠管 TaskGo 的直式品牌海報(海軍藍斜切+台灣工地,不是深灰語錄卡)。只描述畫面,不要描述任何要印在圖上的文字:' +
+  '1) 構圖:上方 25% 完全留空給後製主標;斜切深藍色塊、青藍蜂巢紋;' +
   '2) 情境:台灣工班真實場景——安全帽、反光背心、塔吊或案場、師傅用平板/LINE;可點出一個台灣文化錨(開工、端午工地粽、中元普渡工安、颱風天收工、大台北工地);' +
-  '3) 設計元素:斜切深藍 banner、青藍蜂巢紋;邊角可放藍色圓頭機器人吉祥物;平板或白卡只放一個 2-4 字功能畫面(派工佇列/現場回報),不要整頁截圖鋪底;' +
-  '4) 禁止:歐美工地棚拍、深灰純文字卡、整頁後台置中、簡體字、亂碼小字、自己畫 logo"';
+  '3) 解法:邊角可放藍色圓頭機器人吉祥物;平板或白卡只放抽象 UI 色塊,不要整頁截圖鋪底、不要任何文字;' +
+  '4) 禁止:歐美工地棚拍、深灰純文字卡、整頁後台置中、任何中英數字、自己畫 logo"';
 
 const TASKGO_PHOTO_IMAGE_PROMPT_SPEC =
   '"imagePrompt": "必填:給圖片生成模型的英文描述,走「台灣工地×數位工具」專業寫實,不是懷舊底片風。' +
@@ -681,6 +689,11 @@ export function buildPostUserPrompt(params: {
     imageStyle: params.imageStyle, skipImagePrompt: params.skipImagePrompt,
     screenshotPoster: params.screenshotPoster, lane,
   });
+  const overlayHeadline = !params.skipImagePrompt && (
+    params.screenshotPoster
+    || params.imageStyle === 'design'
+    || (params.brandSlug === 'homigo' && params.platform === 'instagram' && !params.imageStyle)
+  );
   return [
     `請針對以下主題,為 ${params.platform} 平台寫一篇貼文。`,
     `主題:${params.topic}`,
@@ -691,11 +704,12 @@ export function buildPostUserPrompt(params: {
     searchBlock,
     params.extraInstruction ?? '',
     params.screenshotPoster
-      ? '配圖會把品牌上傳的真實系統畫面做成 B 端痛點海報(現場煩惱 + 主標 + 這張畫面當解法卡),必須提供 imagePrompt。'
+      ? '配圖會把品牌上傳的真實系統畫面做成 B 端痛點海報(現場煩惱 + 後製繁中主標 + 這張畫面當解法卡),必須提供 imagePrompt 與 posterHeadline。'
       : params.skipImagePrompt ? '配圖已指定為品牌上傳的真實截圖或實拍,不要提供 imagePrompt。' : '',
+    overlayHeadline ? 'posterHeadline 必須是正確台灣繁體中文(禁止簡體)。主標會由系統印在圖上,不要把這句字寫進 imagePrompt 叫圖片模型去畫。' : '',
     '',
     '回傳 JSON 物件,格式:',
-    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${imageSpec ? `, ${imageSpec}` : ''}}`,
+    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${imageSpec ? `, ${imageSpec}` : ''}${overlayHeadline ? `, ${POSTER_HEADLINE_JSON_SPEC}` : ''}}`,
   ].filter(Boolean).join('\n');
 }
 
@@ -742,7 +756,7 @@ export function buildImageInspiredPostPrompt(params: {
     `請仔細看這張圖,挑一個畫面裡真的有的細節或情境當鉤子,寫一篇 ${params.platform} 貼文。`,
     '不要憑空描述圖片裡沒有的東西,也不要寫成單純的圖片說明文;要像有人真的看到/用到這個畫面後,寫下的一則真實感想或分享。',
     screenshotPoster
-      ? '這張系統畫面會被做成 B 端痛點海報(現場煩惱 + 主標 + 畫面當解法卡),不是原圖直發。請一併提供 imagePrompt。'
+      ? '這張系統畫面會被做成 B 端痛點海報(現場煩惱 + 後製繁中主標 + 畫面當解法卡),不是原圖直發。請一併提供 imagePrompt 與 posterHeadline。主標不要寫進 imagePrompt。'
       : '',
     '',
     guideline,
@@ -751,7 +765,7 @@ export function buildImageInspiredPostPrompt(params: {
     params.extraInstruction ?? '',
     '',
     '回傳 JSON 物件:',
-    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${screenshotPoster ? `, ${B2B_SCREENSHOT_POSTER_PROMPT_SPEC}` : ''}}`,
+    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${screenshotPoster ? `, ${B2B_SCREENSHOT_POSTER_PROMPT_SPEC}, ${POSTER_HEADLINE_JSON_SPEC}` : ''}}`,
   ].filter(Boolean).join('\n');
 }
 

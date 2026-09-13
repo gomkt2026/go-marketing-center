@@ -18,6 +18,7 @@ import { compositeLogo } from './watermark';
 import { frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
 import { X_TWEET_MAX_CHARS } from './x';
+import { burnPosterHeadline, POSTER_NO_GLYPHS_RULE } from './poster-text';
 
 export type SocialPlatform = 'facebook' | 'instagram' | 'threads';
 
@@ -145,6 +146,40 @@ async function loadAssetBytes(env: Env, fileUrl: string): Promise<Uint8Array | n
   return getMediaBytes(env, key);
 }
 
+async function finishPosterImage(
+  env: Env,
+  bytes: Uint8Array,
+  params: {
+    brandSlug: string;
+    landscape: boolean;
+    headline?: string;
+    accent?: string;
+    body: string;
+    logo: Uint8Array | null;
+    logoPosition: 'bottom-left' | 'bottom-right';
+  },
+): Promise<Uint8Array> {
+  try {
+    bytes = await burnPosterHeadline(env, bytes, {
+      brandSlug: params.brandSlug,
+      headline: params.headline,
+      accent: params.accent,
+      body: params.body,
+      landscape: params.landscape,
+    });
+  } catch (e) {
+    console.error('[generate] 海報主標後製失敗,沿用無字原圖', e);
+  }
+  if (params.logo) {
+    try {
+      bytes = await compositeLogo(bytes, params.logo, { position: params.logoPosition });
+    } catch (e) {
+      console.error('[generate] logo 合成失敗,改用無 logo 原圖', e);
+    }
+  }
+  return bytes;
+}
+
 /** 把真實系統截圖做成 B 端痛點海報;失敗回 null 讓呼叫端退回簡報框原圖 */
 async function generateSystemScreenshotPoster(
   env: Env,
@@ -152,6 +187,9 @@ async function generateSystemScreenshotPoster(
     brandSlug: string;
     platform: SocialPlatform;
     imagePrompt?: string | null;
+    posterHeadline?: string;
+    posterAccent?: string;
+    body?: string;
     screenshotUrl: string;
   },
 ): Promise<string | null> {
@@ -163,11 +201,15 @@ async function generateSystemScreenshotPoster(
     const designSpec = BRAND_DESIGN_IMAGE_STYLE[params.brandSlug] ?? BRAND_DESIGN_IMAGE_STYLE.homigo;
     const logo = await getBrandLogo(env, params.brandSlug);
     const headlineHint = params.imagePrompt?.trim()
-      || 'B2B pain-point poster with a 4-10 character Traditional Chinese headline.';
+      || 'B2B pain-point poster. Leave an empty banner for typography. No letters or glyphs.';
     const prompt = [
       headlineHint,
       designSpec,
       SYSTEM_SCREENSHOT_POSTER_RULE,
+      POSTER_NO_GLYPHS_RULE,
+      isFb
+        ? 'LANDSCAPE poster 3:2. Empty left 38% banner. Scene and device card on the right.'
+        : 'PORTRAIT poster. Empty top 25% banner.',
       logo
         ? 'Do not draw any logo or brand wordmark; leave a clean corner for the official logo composite.'
         : params.brandSlug === 'homigo' ? HOMIGO_TEXT_MARK_RULE : '',
@@ -176,15 +218,15 @@ async function generateSystemScreenshotPoster(
     let bytes = await generateImageWithReference(env, {
       prompt, reference: ref, size, quality: 'high', inputFidelity: 'high',
     });
-    if (logo) {
-      try {
-        bytes = await compositeLogo(bytes, logo, {
-          position: isIg && params.brandSlug === 'homigo' ? 'bottom-left' : 'bottom-right',
-        });
-      } catch (e) {
-        console.error('[generate] 海報 logo 合成失敗,沿用無 logo 原圖', e);
-      }
-    }
+    bytes = await finishPosterImage(env, bytes, {
+      brandSlug: params.brandSlug,
+      landscape: isFb,
+      headline: params.posterHeadline,
+      accent: params.posterAccent,
+      body: params.body ?? '',
+      logo,
+      logoPosition: isIg && params.brandSlug === 'homigo' ? 'bottom-left' : 'bottom-right',
+    });
     const key = buildMediaKey(params.brandSlug, 'jpg');
     return await putMedia(env, key, bytes, 'image/jpeg');
   } catch (e) {
@@ -342,7 +384,7 @@ export async function generatePlatformPost(
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${hardLimit} 字上限。請只保留一個核心重點,縮短到 ${hardLimit} 字以內,回傳同格式 JSON(imagePrompt 保留不變)。` },
+        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${hardLimit} 字上限。請只保留一個核心重點,縮短到 ${hardLimit} 字以內,回傳同格式 JSON(imagePrompt 與 posterHeadline 保留不變)。` },
       ],
       temperature: 0.5,
     });
@@ -365,6 +407,9 @@ export async function generatePlatformPost(
       brandSlug: brandCtx.slug,
       platform,
       imagePrompt: post.imagePrompt,
+      posterHeadline: post.posterHeadline,
+      posterAccent: post.posterAccent,
+      body: post.body,
       screenshotUrl: reusedAsset.fileUrl,
     });
     if (posterUrl) {
@@ -428,9 +473,17 @@ export async function generatePlatformPost(
         ? `Photorealistic professional construction-tech photography in Taiwan, bright daylight, navy-cyan color grade, ${twPeople}, workers in hard hats and reflective vests using a tablet or LINE on site, shallow depth of field. Not film nostalgia, not Western stock-model look.`
         : `Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.`;
       const prompt = isDesign
-        ? `${post.imagePrompt}\n\n${designSpec}\n${logo
-            ? '【品牌標】不要在圖上畫任何 logo 或品牌字樣;畫面角落留乾淨,官方 logo 會在生成後由系統合成上去。'
-            : brandCtx.slug === 'homigo' ? HOMIGO_TEXT_MARK_RULE : ''}`
+        ? [
+            post.imagePrompt,
+            designSpec,
+            POSTER_NO_GLYPHS_RULE,
+            isFb
+              ? 'LANDSCAPE poster 3:2. Empty left 38% banner. Scene and device card on the right.'
+              : 'PORTRAIT poster. Empty top 25% banner.',
+            logo
+              ? '【品牌標】不要在圖上畫任何 logo 或品牌字樣;畫面角落留乾淨,官方 logo 會在生成後由系統合成上去。'
+              : brandCtx.slug === 'homigo' ? HOMIGO_TEXT_MARK_RULE : '',
+          ].filter(Boolean).join('\n\n')
         : isIllustration
           ? `${post.imagePrompt}. ${voice.imageStyle ?? 'Warm hand-drawn illustration style.'} Any people shown are Taiwanese, authentic Taiwan daily-life setting. No text. No watermark. No logo.`
           : `${post.imagePrompt}. ${photoBase}${photoRef ? ` Style reference: ${photoRef}` : ''} No text. No watermark. No logo.`;
@@ -438,9 +491,19 @@ export async function generatePlatformPost(
       const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : isDesign ? '1024x1536' as const : '1024x1024' as const;
       const quality = isDesign ? 'high' as const : 'medium' as const;
       let bytes = await generateImage(env, { prompt, size, quality });
-      if (logo) {
+      if (isDesign) {
+        bytes = await finishPosterImage(env, bytes, {
+          brandSlug: brandCtx.slug,
+          landscape: isFb,
+          headline: post.posterHeadline,
+          accent: post.posterAccent,
+          body: post.body,
+          logo,
+          logoPosition: isDesign && brandCtx.slug === 'homigo' ? 'bottom-left' : 'bottom-right',
+        });
+      } else if (logo) {
         try {
-          bytes = await compositeLogo(bytes, logo, { position: isDesign && brandCtx.slug === 'homigo' ? 'bottom-left' : 'bottom-right' });
+          bytes = await compositeLogo(bytes, logo, { position: 'bottom-right' });
         } catch (e) {
           console.error('[generate] logo 合成失敗,改用無 logo 原圖', e);
         }
@@ -594,6 +657,9 @@ export async function generatePostFromImage(
       brandSlug: brandCtx.slug,
       platform,
       imagePrompt: post.imagePrompt,
+      posterHeadline: post.posterHeadline,
+      posterAccent: post.posterAccent,
+      body: post.body,
       screenshotUrl: imageUrl,
     });
     if (posterUrl) {
@@ -674,6 +740,8 @@ export async function saveGeneratedContent(
         imageStyle: params.promptMeta?.imageStyle ?? result.imageStyle,
         assetId: params.promptMeta?.assetId ?? result.assetId,
         replyBody: params.promptMeta?.replyBody ?? result.post.replyBody ?? undefined,
+        posterHeadline: result.post.posterHeadline ?? undefined,
+        posterAccent: result.post.posterAccent ?? undefined,
       })},
       ${params.sourceMarketSignalId ?? null}
     ) RETURNING id

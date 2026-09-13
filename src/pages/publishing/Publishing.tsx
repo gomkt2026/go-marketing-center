@@ -55,7 +55,7 @@ const genSourceLabel: Record<string, string> = {
 const PLATFORM_COLUMNS: { id: 'facebook' | 'instagram' | 'threads'; label: string; note: string }[] = [
   { id: 'facebook', label: 'Facebook', note: '每天台灣 19:00 一則業者主題;帳號需 API 已連線並開啟自動發布' },
   { id: 'instagram', label: 'Instagram', note: '與 FB 同一主題、每天 19:00 一則;必須有配圖才會自動發' },
-  { id: 'threads', label: 'Threads', note: '每天固定 6 檔(00/06/12/18 熱議跟風 + 09/21 生活哏文);漏檔會在之後的 30 分 tick 自動補' },
+  { id: 'threads', label: 'Threads', note: '每天 00/06/12/18 熱議跟風、09 生活哏文、21:00 三品牌各一篇愛情散文(自動發)' },
 ];
 
 export function Publishing() {

@@ -21,7 +21,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   const contentRows = await sql`SELECT * FROM contents WHERE id = ${contentId}::uuid LIMIT 1`;
   if (!contentRows.length) return error('找不到內容', 404);
-  const content = contentRows[0] as { brand_id: string; target_platform: string | null; status: string; title: string };
+  const content = contentRows[0] as {
+    brand_id: string; target_platform: string | null; status: string; title: string;
+    generation_prompt_meta: { replyBody?: string } | null;
+  };
 
   const platform = content.target_platform;
   if (platform !== 'threads' && platform !== 'facebook' && platform !== 'instagram') {
@@ -54,7 +57,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (platform === 'threads') {
       const account = await getThreadsAccount(context.env, content.brand_id);
       if (!account) return error('品牌尚未連接 Threads 帳號(社群帳號頁需填入有效 token)', 400);
-      published = await publishThreadsPost(account, { text: version.body, imageUrl, videoUrl });
+      published = await publishThreadsPost(account, {
+        text: version.body,
+        imageUrl,
+        videoUrl,
+        replyText: content.generation_prompt_meta?.replyBody,
+      });
     } else {
       const account = await getMetaAccount(context.env, content.brand_id, platform);
       if (!account) return error(`品牌尚未連接 ${PLATFORM_LABELS[platform]} 帳號(社群帳號頁需填入平台 ID 與有效 token)`, 400);

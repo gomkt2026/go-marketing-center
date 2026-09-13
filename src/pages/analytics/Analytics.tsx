@@ -21,6 +21,9 @@ const genSourceLabel: Record<string, string> = {
   daily_theme: '每日主題', auto_signal: '情報自動', market_signal: '市場情報',
   meeting_plan: '會議計畫',
 };
+const genCategoryLabel: Record<string, string> = {
+  love_story: '生活散文', love_view: '生活散文', emotion: '感情/人際',
+};
 
 const platformLabel: Record<string, string> = {
   threads: 'Threads', facebook: 'Facebook', instagram: 'Instagram', x: 'X',
@@ -170,7 +173,7 @@ export function Analytics() {
   if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
 
-  const { totals, publishedCount, syncedCount, suggestions } = data;
+  const { totals, totalsAll, publishedCount, syncedCount, suggestions } = data;
   const platforms = Array.from(new Set((data.posts ?? []).map((p) => p.job.platform)));
 
   async function run(label: string, fn: () => Promise<string>) {
@@ -222,17 +225,22 @@ export function Analytics() {
       )}
 
       <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 12 }}>
-        已發布 {publishedCount} 篇 · 已回收 {syncedCount} 篇
+        已發布 {publishedCount} 篇 · 已回收 {syncedCount} 篇 · 上方數字為近 28 天
         {publishedCount > syncedCount ? ' · 尚未回收的貼文可同步或手動補登' : ''}
       </p>
 
-      <div className="grid-5" style={{ marginBottom: 20 }}>
+      <div className="grid-5" style={{ marginBottom: 12 }}>
         <StatCard label="曝光" value={totals.impressions} delay={0} tone="var(--color-primary-dark)" />
         <StatCard label="點擊" value={totals.clicks} delay={0.03} />
         <StatCard label="留言" value={totals.comments} delay={0.06} />
         <StatCard label="分享" value={totals.shares} delay={0.09} />
         <StatCard label="收藏" value={totals.saves} delay={0.12} />
       </div>
+      {totalsAll && totalsAll.impressions !== totals.impressions && (
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 20 }}>
+          含 28 天以前的歷史貼文累計曝光 {totalsAll.impressions.toLocaleString()}、留言 {totalsAll.comments.toLocaleString()}、分享 {totalsAll.shares.toLocaleString()}
+        </p>
+      )}
 
       {suggestions.length > 0 && (
         <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
@@ -305,9 +313,12 @@ export function Analytics() {
                     <Badge tone={platformTone[post.job.platform] ?? 'default'}>
                       {platformLabel[post.job.platform] ?? post.job.platform}
                     </Badge>
-                    {post.content.genSource && (
-                      <Badge>{genSourceLabel[post.content.genSource] ?? post.content.genSource}</Badge>
-                    )}
+                    {(() => {
+                      const cat = post.content.genCategory;
+                      const label = (cat && genCategoryLabel[cat])
+                        || (post.content.genSource && (genSourceLabel[post.content.genSource] ?? post.content.genSource));
+                      return label ? <Badge>{label}</Badge> : null;
+                    })()}
                     {post.job.publishedAt && (
                       <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
                         {new Date(post.job.publishedAt).toLocaleString('zh-TW')}

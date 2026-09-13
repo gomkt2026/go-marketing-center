@@ -26,6 +26,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         c.title AS content_title,
         c.predicted_engagement_score,
         c.generation_prompt_meta->>'source' AS gen_source,
+        c.generation_prompt_meta->>'category' AS gen_category,
         LEFT(COALESCE(cv.body, ''), 220) AS body_preview,
         cv.cta,
         pr.id AS perf_id,
@@ -36,7 +37,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         pr.saves,
         pr.engagement_rate,
         pr.captured_at,
-        pr.raw_metrics
+        pr.raw_metrics,
+        (pj.published_at >= now() - interval '28 days') AS recent
       FROM publishing_jobs pj
       JOIN contents c ON c.id = pj.content_id
       LEFT JOIN LATERAL (
@@ -73,6 +75,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         id: r.content_id,
         title: r.content_title,
         genSource: r.gen_source,
+        genCategory: r.gen_category,
         predictedScore: r.predicted_engagement_score != null ? Number(r.predicted_engagement_score) : null,
         body: r.body_preview,
         cta: r.cta,
@@ -90,28 +93,30 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         capturedAt: r.captured_at,
         rawMetrics: raw,
       } : null,
+      recent: Boolean(r.recent),
     };
   });
 
-  const totals = posts.reduce(
-    (acc, p) => {
-      if (!p.perf) return acc;
-      return {
-        impressions: acc.impressions + p.perf.impressions,
-        clicks: acc.clicks + p.perf.clicks,
-        comments: acc.comments + p.perf.comments,
-        shares: acc.shares + p.perf.shares,
-        saves: acc.saves + p.perf.saves,
-        likes: acc.likes + p.perf.likes,
-      };
-    },
-    { impressions: 0, clicks: 0, comments: 0, shares: 0, saves: 0, likes: 0 },
-  );
+  const emptyTotals = { impressions: 0, clicks: 0, comments: 0, shares: 0, saves: 0, likes: 0 };
+  const addPerf = (acc: typeof emptyTotals, p: typeof posts[number]) => {
+    if (!p.perf) return acc;
+    return {
+      impressions: acc.impressions + p.perf.impressions,
+      clicks: acc.clicks + p.perf.clicks,
+      comments: acc.comments + p.perf.comments,
+      shares: acc.shares + p.perf.shares,
+      saves: acc.saves + p.perf.saves,
+      likes: acc.likes + p.perf.likes,
+    };
+  };
+  const totalsAll = posts.reduce(addPerf, { ...emptyTotals });
+  const totals = posts.filter((p) => p.recent).reduce(addPerf, { ...emptyTotals });
 
   return json({
     posts,
     suggestions: rowsToCamel(suggestionRows as Record<string, unknown>[]),
     totals,
+    totalsAll,
     publishedCount: posts.length,
     syncedCount: posts.filter((p) => p.perf).length,
     reports: posts.filter((p) => p.perf).map((p) => ({

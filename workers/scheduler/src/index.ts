@@ -508,10 +508,10 @@ async function generateThreadsSlot(
 }
 
 // ============================================================================
-// 主流程 2d:Threads 生活哏文(跟品牌/系統完全無關,衝自然流量與帳號真實感)
-//   - Homigo / Washgo / TaskGo(OFFTOPIC_BRANDS),跟品牌無關的生活哏文衝帳號真實感
-//   - 固定 2 檔:台灣 09:00 / 21:00,不佔用/不影響品牌相關貼文的 THREADS_DAILY_CAP
-//   - 完全不套用品牌語氣與知識庫,純文字、不配圖,見 functions/_shared/prompts.ts 的 OFFTOPIC_SYSTEM_PROMPT
+// 主流程 2d:Threads 生活哏文 / 生活散文
+//   - Homigo / Washgo / TaskGo(OFFTOPIC_BRANDS)
+//   - 固定 2 檔:台灣 09:00 生活哏文、21:00 品牌世界愛情散文(每品牌每天一篇,不經審閱直接排程)
+//   - 不佔用品牌相關貼文的 THREADS_DAILY_CAP;不提產品名
 // ============================================================================
 const OFFTOPIC_BRANDS = ['homigo', 'washgo', 'taskgo'];
 const THREADS_OFFTOPIC_DAILY_CAP = 2;
@@ -545,18 +545,29 @@ async function generateThreadsOfftopicSlot(
       if ((todayRows[0] as { n: number }).n >= THREADS_OFFTOPIC_DAILY_CAP) continue;
 
       const usedRows = await sql`
-        SELECT title FROM contents
+        SELECT title, generation_prompt_meta->>'loveAngle' AS angle FROM contents
         WHERE brand_id = ${brand.id}::uuid AND generation_prompt_meta->>'source' = 'threads_offtopic'
           AND created_at > now() - interval '14 days'
         ORDER BY created_at DESC LIMIT 20
       `;
-      const usedTopics = (usedRows as { title: string }[]).map((r) => r.title);
+      const usedTopics = (usedRows as { title: string; angle: string | null }[]).map((r) => r.title);
+      const usedAngles = (usedRows as { angle: string | null }[])
+        .map((r) => r.angle)
+        .filter((a): a is string => !!a);
+      const hourTW = (slotAt.getUTCHours() + 8) % 24;
+      const forceLoveStory = hourTW === 21;
 
       const agentId = await findBrandAgent(env, brand.id);
-      const result = await generateOfftopicPost(env, { usedTopics });
+      const result = await generateOfftopicPost(env, {
+        usedTopics,
+        brandSlug: brand.slug,
+        forceLoveStory,
+        usedAngles,
+      });
 
       const account = await getThreadsAccount(env, brand.id);
-      const willAutoPublish = !!account?.autoPublish;
+      // 21:00 愛情散文只要帳號連得上就自動發,不進審閱
+      const willAutoPublish = !!account && (account.autoPublish || forceLoveStory);
 
       const { contentId, versionId } = await saveGeneratedContent(env, {
         brandCtx: { brandId: brand.id, slug: brand.slug, name: brand.name, systemPrompt: '' },
@@ -564,7 +575,14 @@ async function generateThreadsOfftopicSlot(
         result,
         generatedByAgentId: agentId,
         status: willAutoPublish ? 'scheduled' : 'pending_review',
-        promptMeta: { source: 'threads_offtopic', slotAt: slotAt.toISOString(), audienceLane: 'b2c' },
+        promptMeta: {
+          source: 'threads_offtopic',
+          category: result.offtopicCategory ?? 'life_gag',
+          loveAngle: result.loveAngle,
+          slotAt: slotAt.toISOString(),
+          audienceLane: 'b2c',
+          replyBody: result.post.replyBody || undefined,
+        },
       });
 
       if (willAutoPublish) {
@@ -583,7 +601,7 @@ async function generateThreadsOfftopicSlot(
         entityId: contentId,
         afterState: { platform: 'threads', source: 'threads_offtopic', scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
       });
-      console.log(`[offtopic] ${brand.slug} 已排定生活哏文,${slotAt.toISOString()} 發布(${willAutoPublish ? '自動' : '待審核'})`);
+      console.log(`[offtopic] ${brand.slug} 已排定${forceLoveStory ? '愛情散文' : '生活哏文'},${slotAt.toISOString()} 發布(${willAutoPublish ? '自動' : '待審核'})`);
     } catch (e) {
       console.error(`[offtopic] 品牌 ${slug} 生成失敗`, e);
     }
@@ -1816,12 +1834,19 @@ async function requeueRecentFailedThreads(env: Env): Promise<void> {
   }
 }
 
+function threadsReplyBody(meta: unknown): string | undefined {
+  if (!meta || typeof meta !== 'object') return undefined;
+  const reply = (meta as { replyBody?: unknown }).replyBody;
+  return typeof reply === 'string' && reply.trim() ? reply.trim() : undefined;
+}
+
 async function publishDueJobs(env: Env): Promise<void> {
   const sql = getSql(env);
   const rows = await sql`
     SELECT pj.id AS job_id, pj.content_id, pj.content_version_id, pj.platform,
            c.brand_id, c.collaboration_id, b.slug AS brand_slug,
            cv.body, cv.hashtags,
+           c.generation_prompt_meta,
            a.file_url AS image_url,
            v.file_url AS video_url
     FROM publishing_jobs pj
@@ -1843,7 +1868,8 @@ async function publishDueJobs(env: Env): Promise<void> {
   for (const row of rows as {
     job_id: string; content_id: string; content_version_id: string; platform: SocialPlatform | 'x';
     brand_id: string | null; collaboration_id: string | null; brand_slug: string | null;
-    body: string | null; hashtags: string[] | null; image_url: string | null; video_url: string | null;
+    body: string | null; hashtags: string[] | null; generation_prompt_meta: unknown;
+    image_url: string | null; video_url: string | null;
   }[]) {
     const label = row.brand_slug ?? 'go-ecosystem';
     try {
@@ -1858,6 +1884,7 @@ async function publishDueJobs(env: Env): Promise<void> {
           text: row.body,
           imageUrl: toPublicMediaUrl(env, row.image_url),
           videoUrl: toPublicMediaUrl(env, row.video_url),
+          replyText: threadsReplyBody(row.generation_prompt_meta),
         });
       } else if (row.platform === 'facebook' && row.brand_id) {
         const account = await getMetaAccount(env, row.brand_id, 'facebook');

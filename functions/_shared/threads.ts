@@ -380,7 +380,7 @@ export async function replyToThreadsPost(
 /** 發布一則 Threads 貼文(純文字、單張圖或單支影片);失敗會 throw */
 export async function publishThreadsPost(
   account: ThreadsAccount,
-  params: { text: string; imageUrl?: string | null; videoUrl?: string | null },
+  params: { text: string; imageUrl?: string | null; videoUrl?: string | null; replyText?: string | null },
 ): Promise<ThreadsPublishResult> {
   let published: { id: string };
   try {
@@ -395,6 +395,17 @@ export async function publishThreadsPost(
       published = await createAndPublish(account.accessToken, { text: params.text });
     } else {
       throw e;
+    }
+  }
+
+  const replyText = params.replyText?.trim();
+  if (replyText) {
+    try {
+      await sleep(2500);
+      await replyToThreadsPost(account, { text: replyText, replyToId: published.id });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[threads] 串文 2/2 回覆失敗,主帖已發出: ${msg.slice(0, 200)}`);
     }
   }
 

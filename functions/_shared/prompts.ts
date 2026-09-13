@@ -3,7 +3,7 @@ import { getSql } from './db';
 import { loadPublishedPrimaryCoverages, publishedCoveragePrompt } from './press';
 import { loadBrandCollaterals, collateralPrompt } from './documents';
 import { officialWebsitePrompt, loadBrandWebsite } from './brand-profile';
-import { ensureAudienceLane, isMissingLaneColumn } from './audience-lane';
+import { isMissingLaneColumn } from './audience-lane';
 
 // ============================================================================
 // 品牌第一線角色視角:讓 AI 用「行業最前端人員」的思維寫貼文,而不是 AI 腔
@@ -251,12 +251,6 @@ export async function pickAudience(env: Env, brandId: string, slug: string, lane
     painPoints: [],
     appealAngle: null,
   };
-  try {
-    await ensureAudienceLane(env);
-  } catch (e) {
-    console.error('[audience] ensureAudienceLane 失敗,改用 fallback', e);
-    return fallback;
-  }
   const sql = getSql(env);
   try {
     const audienceRows = await sql`
@@ -385,12 +379,15 @@ function formatApprovedLearning(row: { insight: string; supporting_data: unknown
 
 export async function buildBrandContext(env: Env, brandId: string): Promise<BrandContext> {
   const sql = getSql(env);
-  const [brandRows, personaRows, ruleRows, channelRows, keywordRows, learningRows, coverages, collaterals, website] = await Promise.all([
+  // Workers 單次最多 6 條對外連線;一次 Promise.all 9 路會互相搶 Neon 連線。
+  const [brandRows, personaRows, ruleRows, channelRows, keywordRows] = await Promise.all([
     sql`SELECT id, slug, name, tagline FROM brands WHERE id = ${brandId}::uuid LIMIT 1`,
     sql`SELECT name, age_range, profile, pain_points, appeal_angle FROM brand_personas WHERE brand_id = ${brandId}::uuid ORDER BY sort_order LIMIT 6`,
     sql`SELECT rule_type, statement, condition_note FROM brand_rules WHERE brand_id = ${brandId}::uuid ORDER BY sort_order LIMIT 30`,
     sql`SELECT platform, tone_of_voice, length_guideline, format_guideline, hashtag_count_min, hashtag_count_max FROM brand_channels WHERE brand_id = ${brandId}::uuid`,
     sql`SELECT category, value FROM brand_keywords WHERE brand_id = ${brandId}::uuid LIMIT 40`,
+  ]);
+  const [learningRows, coverages, collaterals, website] = await Promise.all([
     sql`SELECT insight, supporting_data FROM learning_records WHERE brand_id = ${brandId}::uuid AND status = 'approved' ORDER BY created_at DESC LIMIT 8`,
     loadPublishedPrimaryCoverages(env, brandId, 4),
     loadBrandCollaterals(env, brandId, 8),
@@ -494,6 +491,8 @@ export interface GeneratedPost {
   hashtags: string[];
   cta: string;
   imagePrompt?: string;
+  /** Threads 串文 2/2:發布後自動回覆在主帖下面,用來邀請大家分享故事 */
+  replyBody?: string;
 }
 
 export interface EngagementPrediction {
@@ -802,11 +801,11 @@ export const THREADS_HOURLY_CATEGORIES: ThreadsHourlyCategory[] = [
   {
     id: 'emotion',
     label: '感情/人際視角',
-    weight: 1,
+    weight: 2,
     instruction:
       '這篇從「人際互動/感情」的角度切入:依這個行業實際會出現的關係去想' +
-      '(可能是家人、伴侶、室友、房東房客、業主與工班之間,自然會有的摩擦、體貼或溫馨互動),' +
-      '不要生套跟行業無關的戀愛哏。用一個具體的小場景或一句真實對話開頭,自然帶到品牌日常會遇到的情境,' +
+      '(Homigo:房東房客巧遇/租屋愛情;TaskGo:工班被看不起卻被真心選擇;Washgo:洗衣店巧遇或送洗後被重新喜歡),' +
+      '用一個具體的小場景或一句真實對話開頭,讓人想分享自己的故事。不要硬塞產品功能。' +
       '結尾不用刻意收在促銷。如果下面的熱門話題裡有適合的人際/感情類話題也可以參考,但不強求:\n{{TRENDS}}',
   },
   {
@@ -862,24 +861,30 @@ export function pickThreadsHourlyCategory(
 }
 
 // ============================================================================
-// Threads 生活哏文(跟品牌/服務完全無關的個人碎念,拿來衝自然流量與帳號真實感)
-//   目前 Washgo + TaskGo(見排程 Worker 的 OFFTOPIC_BRANDS)。
+// Threads 生活哏文 / 生活散文(衝自然流量與帳號真實感)
+//   Homigo / Washgo / TaskGo(見排程 Worker 的 OFFTOPIC_BRANDS)
+//   一部分完全不提行業;一部分用品牌世界當愛情場景(不提產品名),複製高互動感情散文公式。
 // ============================================================================
 
 /** 生活哏文的通用人設:完全不提品牌,像帳號背後真的有一個會講幹話的人 */
 export const OFFTOPIC_SYSTEM_PROMPT =
-  '你是一個 20-35 歲的台灣人,平常就愛在 Threads 上分享生活觀察、幹話、感情觀,完全不是任何品牌的代言人或行銷帳號,' +
-  '這篇貼文純粹是你的個人碎念,跟任何工作、品牌、商業一律沒有關係。' +
-  '你講話很真實、有個人風格,偶爾自嘲、偶爾毒舌,像朋友圈裡那個很會講話又敢講真心話的人。';
+  '你是一個 20-35 歲的台灣人,平常就愛在 Threads 上分享生活觀察、幹話、感情觀,完全不是任何品牌的代言人或行銷帳號。' +
+  '你講話很真實、有個人風格,偶爾自嘲、偶爾毒舌,像朋友圈裡那個很會講話又敢講真心話的人。' +
+  '寫感情文時要像深夜散文:具體畫面、內心小劇場、一句讓人想截圖的立場,結尾邀請大家分享自己的故事。';
 
 interface OfftopicPostType {
   label: string;
+  category: string;
   instruction: string;
+  /** 品牌世界愛情故事才有:行業當生活場景,仍禁止產品名 */
+  worldSlug?: string;
+  replyHint?: string;
 }
 
 const OFFTOPIC_TYPES: OfftopicPostType[] = [
   {
     label: '好笑生活哏',
+    category: 'life_gag',
     instruction:
       '寫一則會讓人邊看邊笑出來的生活觀察或自嘲哏,主題從台灣人共通的日常小尷尬/小崩潰取材' +
       '(通勤、外送、家人 LINE 群組、減肥、上班、社交軟體、颱風天、租屋室友…都可以),' +
@@ -887,37 +892,304 @@ const OFFTOPIC_TYPES: OfftopicPostType[] = [
   },
   {
     label: '引人省思的一段話',
+    category: 'reflection',
     instruction:
       '寫一段簡短但有記憶點的省思,像是深夜突然想通某件事的感覺,主題可以是成長、時間、選擇、人際關係、與自己相處等,' +
       '語氣真誠不說教,結尾留一點餘韻讓人想截圖收藏,不要寫成長文說教或條列金句。',
   },
   {
     label: '感情觀/戀愛觀點表態',
+    category: 'love_view',
     instruction:
       '對戀愛/感情/單身/交往相處中的某個現象講出你的真實看法或立場' +
       '(例如:曖昧該不該講清楚、多久沒聯絡算是不喜歡了、遠距離戀愛、分帳、已讀不回、家人催婚…),' +
-      '可以稍微犀利或有態度,但要讓人覺得「講得對」而不是說教或攻擊某群人。',
+      '可以稍微犀利或有態度,但要讓人覺得「講得對」而不是說教或攻擊某群人。' +
+      '結構對齊高互動感情散文:開頭一句反轉認知 → 具體畫面 → 「其實…」點破真正原因 → 「所以…」表態。',
   },
 ];
 
-/** 隨機挑一種類型組成生活哏文的 user prompt;usedTopics 是近期已寫過的標題,避免重複哏 */
-export function buildOfftopicUserPrompt(usedTopics: string[]): string {
-  const picked = OFFTOPIC_TYPES[Math.floor(Math.random() * OFFTOPIC_TYPES.length)];
-  return [
-    `請寫一篇 Threads 貼文,類型是「${picked.label}」。`,
-    picked.instruction,
-    '',
-    '鐵則(違反任何一條都不合格):',
-    '1. 完全不能提到任何品牌、公司、產品、服務,或洗衣、送洗、包租代管、裝修裝潢等相關字眼——就是一則單純的個人生活貼文。',
-    '2. 不放連結、不放促銷、不放 CTA、不放 hashtag(hashtags 回傳空陣列,cta 回傳空字串)。',
-    '3. 500 字以內,前 3 行要抓住眼球(數據、衝突、或反常識的一句話),口語、像真人隨手發的短文,不要鋪陳開場。',
-    '4. 避免政治、宗教、災難、性別對立等真正的爭議雷區;感情觀可以有立場,但走輕鬆有共鳴的路線,不要說教或攻擊性言論。',
-    usedTopics.length ? `以下主題最近寫過了,不要重複類似的角度:\n${usedTopics.join('、')}` : '',
-    '',
-    ANTI_AI_RULES,
-    '',
-    '回傳 JSON 物件:{"title": "內部管理用標題(15字內,方便去重比對,不會公開發布)", "body": "貼文全文", "hashtags": [], "cta": ""}',
-  ].filter(Boolean).join('\n');
+interface LoveStoryAngle {
+  id: string;
+  label: string;
+  instruction: string;
+  replyHint: string;
+}
+
+/** 每天 21:00 輪替,七天內盡量不重複同一條弧線 */
+const BRAND_LOVE_ANGLES: Record<string, LoveStoryAngle[]> = {
+  taskgo: [
+    {
+      id: 'looked_down',
+      label: '工班愛情故事',
+      replyHint: '歡迎分享你看過、聽過、自己走過的工地愛情。被看不起也好、被珍惜也好,鬼故事也好,我都想聽。 2/2',
+      instruction:
+        '場景在工地/做工的人。弧線:手黑衣服髒、被長輩或對方朋友看不起 → 心虛 → 遇見不在乎這些的人,得到真摯愛情。' +
+        '畫面:安全帽、水泥鞋、便當、收工機車後座。點破:被看不起的是工作不是人;被真心選中比體面值錢。',
+    },
+    {
+      id: 'jobsite_long_distance',
+      label: '工班遠距離',
+      replyHint: '工地人北上做案、另一半留在南部的,距離多遠、撐了多久,歡迎分享。 2/2',
+      instruction:
+        '場景是工班南北趕工造成的遠距離。你在工地加班,他在家裡傳「今天有收工嗎」。電話越打越短,最後只剩「到了」「嗯」。' +
+        '點破:不是不愛,是工地的時間把人切成兩半。結尾:做工的人最怕的不是高空,是收工沒有人等。',
+    },
+    {
+      id: 'bento_wait',
+      label: '工地門口等他',
+      replyHint: '你有沒有遇過,收工後有人在工地門口等?便當、機車後座、安全帽,都想聽。 2/2',
+      instruction:
+        '寫收工後的愛情:工地鐵門、兩個便當、機車後座的安全帽。對方願意等他洗掉一天的灰。' +
+        '點破:對做工的人來說,被等,比被誇獎更像被愛。',
+    },
+    {
+      id: 'owner_tool',
+      label: '被當工具人的愛情',
+      replyHint: '業主把你當工具、卻有人把你當人的故事,歡迎講。 2/2',
+      instruction:
+        '業主LINE奪命call、把師傅當工具人;只有一個人會問「你吃飯了沒」「膝蓋還好嗎」。' +
+        '點破:工地最缺的不是工,是把人當人看。愛情有時只是一句「先收工」。',
+    },
+    {
+      id: 'danger_worry',
+      label: '危險工作被心疼',
+      replyHint: '另一半會不會怕你爬鷹架、怕颱風天還要出工?分享你們怎麼吵、怎麼和好。 2/2',
+      instruction:
+        '高空、鷹架、颱風天還是得出工。對方每晚看氣象、看「到家了沒」。你覺得自己在賺錢,他覺得你在玩命。' +
+        '點破:被擔心很煩,但不被擔心更空。',
+    },
+    {
+      id: 'new_year_site',
+      label: '過年留守工地',
+      replyHint: '過年還在工地留守、或收工趕不回去的,你們怎麼過? 2/2',
+      instruction:
+        '別人圍爐,他在工地留守或趕不回去。視訊裡的年夜飯,背景是未完工的水泥牆。' +
+        '點破:做工的人最貴的不是加班費,是錯過的團圓。有人願意把圍爐改成「等你收工再吃」,就是愛情。',
+    },
+    {
+      id: 'dirty_hands_hold',
+      label: '髒手牽手',
+      replyHint: '不敢牽手、不敢帶回家見家長的工地愛情,有人要講嗎。 2/2',
+      instruction:
+        '洗手洗不掉的水泥縫、不敢牽對方的手、第一次見家長先解釋「這是做工的」。' +
+        '點破:髒的是手,不是人。敢牽這雙手的人,才懂什麼叫真心。',
+    },
+  ],
+  homigo: [
+    {
+      id: 'landlord_tenant',
+      label: '租屋愛情故事',
+      replyHint: '歡迎分享你的租屋愛情。房東房客、室友、樓上樓下,修羅場也好、擦槍走火也好,我都想聽。 2/2',
+      instruction:
+        '房東與房客:報修巧遇、認識、戀愛、為租金吵架。可有一點點情慾張力(寬鬆白T、鎖骨水氣、關門後的吻、衣領滑落),' +
+        '禁止性行為過程、禁止部位特寫、禁止色情、禁止未成年。點破:你住在他的房子裡,也住進他的生活裡。',
+    },
+    {
+      id: 'roommate_line',
+      label: '室友越線',
+      replyHint: '跟室友從分帳變曖昧、或差點越線的,分享一下界線是怎麼破的。 2/2',
+      instruction:
+        '合租室友:共用冰箱、共用衛生紙、半夜客廳遇到。從「你的牛奶我喝掉了」變成不敢問「今晚回不回來」。' +
+        '點破:租屋最危險的不是押金,是跟每天開門都會遇到的人產生感情。',
+    },
+    {
+      id: 'viewing_glance',
+      label: '看屋一眼',
+      replyHint: '看屋、交屋、驗屋時對上眼的,有這種故事嗎,我都想聽。 2/2',
+      instruction:
+        '看屋當下對上眼:一個在量客廳、一個在看衛浴。後來加LINE只為「租約問題」,聊著聊著就不是租約了。' +
+        '點破:有些緣分不是交友軟體,是一間剛空出來的套房。',
+    },
+    {
+      id: 'upstairs_noise',
+      label: '樓上樓下',
+      replyHint: '因為噪音、漏水、樓上走路而變成傳訊對象的,歡迎分享。 2/2',
+      instruction:
+        '一開始是抱怨樓上走路太重、或樓下抽煙飄上來。後來變成「我要敲牆壁當晚安」。' +
+        '點破:租屋最煩的隔壁,有時候會變成最熟的人。',
+    },
+    {
+      id: 'breakup_same_lease',
+      label: '合租分手',
+      replyHint: '跟情人合租後分手、還要一起繳租或搶房間的,修羅場請益。 2/2',
+      instruction:
+        '合租情侶分手後還在同一份租約裡。客廳變成中立區,衛浴時段要錯開,押金變成最後一場談判。' +
+        '點破:愛情可以結束,租約還有八個月。這才是租屋最痛的地方。',
+    },
+    {
+      id: 'moving_out_confess',
+      label: '搬家才告白',
+      replyHint: '快搬走才發現自己喜歡對方、或被留下來的,有人要講嗎。 2/2',
+      instruction:
+        '退租前一週才發現自己喜歡對方。紙箱堆在門口,他來幫你搬,什麼都來不及。' +
+        '點破:租屋愛情常在結束時才開始,因為搬家比告白容易。',
+    },
+    {
+      id: 'repair_night',
+      label: '半夜報修',
+      replyHint: '半夜熱水器爆、冷氣不涼,對方出現的那種故事,歡迎講。 2/2',
+      instruction:
+        '半夜熱水器或冷氣壞了。對方只套一件衣服來開門或上來修。近到能聽到呼吸,後來這件事被拿來當笑話,但其實兩個人都記得。' +
+        '情慾只暗示,不要寫性行為。點破:報修是藉口,留下來才是真心。',
+    },
+  ],
+  washgo: [
+    {
+      id: 'date_unwashed',
+      label: '送洗愛情故事',
+      replyHint: '歡迎分享你因為洗衣服遇上的緣分。拿錯衣服、烘衣等太久、約會前的髒衣山,我都想聽。 2/2',
+      instruction:
+        '約會前衣服沒洗、衝去洗衣店、並肩等烘衣從「這台很慢」聊到消夜。氣味與觸感:柔軟精、帽T。' +
+        '點破:愛情有時不是在餐廳開始,是在等烘衣的那二十分鐘。',
+    },
+    {
+      id: 'wrong_bag',
+      label: '拿錯衣服',
+      replyHint: '拿錯過衣服、或在別人袋裡找到自己的,後來怎麼了? 2/2',
+      instruction:
+        '領衣時拿錯袋,打開是陌生的帽T或一件還有體溫記憶的襯衫。後來兩個人在店門口交換,變成加LINE的理由。' +
+        '點破:拿錯的不一定是衣服,有時候是遇見該遇見的人。',
+    },
+    {
+      id: 'softener_scent',
+      label: '柔軟精氣味',
+      replyHint: '會不會因為一件衣服上的味道想起一個人?分享你的味道故事。 2/2',
+      instruction:
+        '他穿過的帽T上還有柔軟精氣味,你把臉埋進去。衣服送洗拿回來那天,像被重新喜歡一次。' +
+        '點破:喜歡一個人,常常是從一件乾淨衣服開始的。',
+    },
+    {
+      id: 'season_coat',
+      label: '換季羽絨',
+      replyHint: '厚外套、羽絨、棉被送洗領回來那天,有沒有剛好見面的故事。 2/2',
+      instruction:
+        '換季把羽絨或大衣送洗。領回來那天剛好要見面,整個人被烘得蓬鬆、連心情都變輕。' +
+        '點破:有些關係跟換季衣服一樣,不送洗就會發霉;洗過才能再穿出門。',
+    },
+    {
+      id: 'late_closed',
+      label: '洗衣店打烊',
+      replyHint: '加班趕不上關門、或跟店員/下一個客人一起等到最後一台的,有人遇過嗎。 2/2',
+      instruction:
+        '加班到洗衣店快打烊,兩個人搶最後一台烘衣。店員要關門了,只好一起在騎樓等。' +
+        '點破:最狼狽的時候遇見的人,通常最真實。',
+    },
+    {
+      id: 'fold_together',
+      label: '一起摺衣服',
+      replyHint: '會幫對方摺衣服的,算不算很愛?歡迎分享你們的摺衣日常。 2/2',
+      instruction:
+        '同居或交往後開始幫對方摺衣服。摺到一件你沒看過的襯衫會吃醋,摺到自己的衣服被疊得整整齊齊又會心軟。' +
+        '點破:愛情不是大餐,是有人願意把你的T恤邊對邊。',
+    },
+    {
+      id: 'wine_stain',
+      label: '汙漬急救',
+      replyHint: '約會灑到紅酒、油漬,後來衣服救回來或沒救回來的故事,都想聽。 2/2',
+      instruction:
+        '第一次正式約會灑到紅酒或油。以為這件衣服毀了,也以為這段關係會很尷尬。洗完後又敢穿出門見面。' +
+        '點破:汙漬去得掉,難堪的當下也會過去;敢再穿出去的人,才會再見面。',
+    },
+  ],
+};
+
+export interface OfftopicPromptSpec {
+  prompt: string;
+  category: string;
+  label: string;
+  isLoveStory: boolean;
+  replyHint?: string;
+  loveAngle?: string;
+}
+
+export interface ComposeOfftopicOptions {
+  /** 每天 21:00 生活檔固定走品牌世界愛情散文 */
+  forceLoveStory?: boolean;
+  /** 近 14 天已用過的 loveAngle id,用來輪替 */
+  usedAngles?: string[];
+}
+
+function taiwanDayNumber(now = Date.now()): number {
+  return Math.floor((now + 8 * 60 * 60 * 1000) / (24 * 60 * 60 * 1000));
+}
+
+function pickLoveStoryType(brandSlug: string, usedAngles: string[]): OfftopicPostType & { angleId: string } {
+  const angles = BRAND_LOVE_ANGLES[brandSlug] ?? [];
+  const unused = angles.filter((a) => !usedAngles.includes(a.id));
+  const pool = unused.length ? unused : angles;
+  const picked = pool[taiwanDayNumber() % Math.max(pool.length, 1)] ?? angles[0];
+  return {
+    label: picked.label,
+    category: 'love_story',
+    worldSlug: brandSlug,
+    replyHint: picked.replyHint,
+    instruction:
+      `寫一篇 Threads 感情散文。${picked.instruction}` +
+      '不要提任何品牌、App、系統、CTA。開頭一句反轉認知,像「不管你有多愛對方…」。',
+    angleId: picked.id,
+  };
+}
+
+function pickOfftopicType(
+  brandSlug: string | undefined,
+  opts: ComposeOfftopicOptions,
+): OfftopicPostType & { angleId?: string } {
+  if (opts.forceLoveStory && brandSlug && BRAND_LOVE_ANGLES[brandSlug]) {
+    return pickLoveStoryType(brandSlug, opts.usedAngles ?? []);
+  }
+  // 09:00 檔走一般生活哏,不要跟 21:00 愛情散文重複
+  return OFFTOPIC_TYPES[Math.floor(Math.random() * OFFTOPIC_TYPES.length)];
+}
+
+/** 組成生活哏文/生活散文的 user prompt;usedTopics 是近期已寫過的標題,避免重複哏 */
+export function composeOfftopicPrompt(
+  usedTopics: string[],
+  brandSlug?: string,
+  opts: ComposeOfftopicOptions = {},
+): OfftopicPromptSpec {
+  const picked = pickOfftopicType(brandSlug, opts);
+  const isLoveStory = picked.category === 'love_story';
+  const industryBan = isLoveStory
+    ? '1. 不能提到任何品牌名、公司、產品、App、系統、CTA 或聯絡方式。行業只能當生活場景,不能變成廣告。'
+    : '1. 完全不能提到任何品牌、公司、產品、服務,或洗衣、送洗、包租代管、裝修裝潢等相關字眼——就是一則單純的個人生活貼文。';
+  const craft = isLoveStory || picked.category === 'love_view'
+    ? [
+        '寫作範式(高互動感情散文,對齊已驗證爆款):',
+        '開頭一句反轉認知(不管你有多愛對方…)。接著「你還記得嗎？」丟出具體畫面。',
+        '中段用「其實…」點破真正原因,不要停在抱怨。再來「我覺得…」給一句能截圖的立場。',
+        '正文 350-500 字,分段留白,像真人深夜發的長文,不要條列。正文結尾加「 1/2」。',
+        '另外寫 replyBody 當串文 2/2:一句話邀請大家分享自己的故事(鬼故事也好、扯故事也好),語氣輕、好回。',
+      ].join('\n')
+    : '口語、像真人隨手發的短文,不要鋪陳開場。replyBody 可留空字串。';
+  return {
+    category: picked.category,
+    label: picked.label,
+    isLoveStory,
+    replyHint: picked.replyHint,
+    loveAngle: picked.angleId,
+    prompt: [
+      `請寫一篇 Threads 貼文,類型是「${picked.label}」。`,
+      picked.instruction,
+      '',
+      craft,
+      '',
+      '鐵則(違反任何一條都不合格):',
+      industryBan,
+      '2. 不放連結、不放促銷、不放 CTA、不放 hashtag(hashtags 回傳空陣列,cta 回傳空字串)。',
+      '3. body 500 字以內;若有 replyBody 則 120 字以內。前 3 行要抓住眼球。',
+      '4. 避免政治、宗教、災難、性別對立;情慾最多暗示,禁止色情描寫與未成年。',
+      usedTopics.length ? `以下主題最近寫過了,不要重複類似的角度:\n${usedTopics.join('、')}` : '',
+      '',
+      ANTI_AI_RULES,
+      '',
+      '回傳 JSON 物件:{"title": "內部管理用標題(15字內,方便去重比對,不會公開發布)", "body": "貼文全文", "replyBody": "串文2/2或空字串", "hashtags": [], "cta": ""}',
+    ].filter(Boolean).join('\n'),
+  };
+}
+
+/** @deprecated 改用 composeOfftopicPrompt;保留給舊呼叫 */
+export function buildOfftopicUserPrompt(usedTopics: string[], brandSlug?: string): string {
+  return composeOfftopicPrompt(usedTopics, brandSlug).prompt;
 }
 
 // ============================================================================

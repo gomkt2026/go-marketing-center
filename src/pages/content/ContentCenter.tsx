@@ -324,6 +324,14 @@ export function ContentCenter() {
                   }}
                 >
                   <p style={{ fontSize: 14, color: 'var(--color-text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{latestVersion(selected).body}</p>
+                  {selected.generationPromptMeta?.replyBody && (
+                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--color-border)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 6 }}>串文 2/2（發布後自動回覆）</div>
+                      <p style={{ fontSize: 14, color: 'var(--color-text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                        {selected.generationPromptMeta.replyBody}
+                      </p>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
                     {latestVersion(selected).hashtags.map((h) => <Badge key={h} tone="primary">{h}</Badge>)}
                   </div>

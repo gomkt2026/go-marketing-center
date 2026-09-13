@@ -447,6 +447,11 @@ export interface Content {
   predictedEngagementScore?: number | null;
   engagementAnalysis?: string | null;
   sourceMarketSignalId?: string | null;
+  generationPromptMeta?: {
+    source?: string;
+    category?: string;
+    replyBody?: string;
+  } | null;
   versions: ContentVersion[];
   reviews: ContentReviewAction[];
 }
@@ -628,17 +633,20 @@ export interface AnalyticsPost {
     id: string;
     title: string | null;
     genSource: string | null;
+    genCategory?: string | null;
     predictedScore: number | null;
     body: string | null;
     cta: string | null;
   };
   perf: PerformanceReport | null;
+  recent?: boolean;
 }
 
 export interface AnalyticsPayload {
   posts: AnalyticsPost[];
   suggestions: LearningRecord[];
   totals: { impressions: number; clicks: number; comments: number; shares: number; saves: number; likes: number };
+  totalsAll?: { impressions: number; clicks: number; comments: number; shares: number; saves: number; likes: number };
   publishedCount: number;
   syncedCount: number;
 }

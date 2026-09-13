@@ -4,7 +4,7 @@ import { chatCompleteJson, generateImage, generateImageWithReference } from './o
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   HOMIGO_TEXT_MARK_RULE, BRAND_DESIGN_IMAGE_STYLE, SYSTEM_SCREENSHOT_POSTER_RULE,
-  OFFTOPIC_SYSTEM_PROMPT, buildOfftopicUserPrompt,
+  OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
   buildImageInspiredPostPrompt,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
   defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
@@ -70,6 +70,8 @@ export interface GenerationResult {
   imageSource?: 'asset' | 'generated' | null;
   imageStyle?: ImageStyleId | null;
   assetId?: string | null;
+  offtopicCategory?: string;
+  loveAngle?: string;
 }
 
 export interface BrandAssetPick {
@@ -458,15 +460,19 @@ export async function generatePlatformPost(
 }
 
 /**
- * Threads 生活哏文:跟品牌/服務完全無關的個人碎念(笑話/省思/感情觀三選一)。
- * 刻意不套用 brandCtx.systemPrompt(不帶品牌語氣與知識庫),只借 brandCtx.brandId 存檔用。
+ * Threads 生活哏文/生活散文。
+ * 刻意不套用 brandCtx.systemPrompt(不帶產品知識庫),只借 brandSlug 決定要不要用品牌世界當愛情場景。
  * 不強制配圖:這類貼文用純文字表現最自然,才不會混進品牌視覺風格。
  */
 export async function generateOfftopicPost(
   env: Env,
-  params: { usedTopics: string[] },
+  params: { usedTopics: string[]; brandSlug?: string; forceLoveStory?: boolean; usedAngles?: string[] },
 ): Promise<GenerationResult> {
-  const userPrompt = buildOfftopicUserPrompt(params.usedTopics);
+  const spec = composeOfftopicPrompt(params.usedTopics, params.brandSlug, {
+    forceLoveStory: params.forceLoveStory,
+    usedAngles: params.usedAngles,
+  });
+  const userPrompt = spec.prompt;
   let post = await chatCompleteJson<GeneratedPost>(env, {
     messages: [
       { role: 'system', content: OFFTOPIC_SYSTEM_PROMPT },
@@ -475,8 +481,10 @@ export async function generateOfftopicPost(
     temperature: 0.9,
   });
   post.body = normalizeMultilineText(post.body);
+  post.replyBody = post.replyBody ? normalizeMultilineText(post.replyBody).slice(0, 120) : '';
   post.hashtags = [];
   post.imagePrompt = undefined;
+  if (spec.isLoveStory && !post.replyBody && spec.replyHint) post.replyBody = spec.replyHint;
 
   if (post.body.length > 500) {
     post = await chatCompleteJson<GeneratedPost>(env, {
@@ -484,13 +492,15 @@ export async function generateOfftopicPost(
         { role: 'system', content: OFFTOPIC_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇 ${post.body.length} 字,超過 Threads 500 字上限。只保留一個核心重點,縮短到 500 字以內,回傳同格式 JSON。` },
+        { role: 'user', content: `這篇 body ${post.body.length} 字,超過 Threads 500 字上限。只保留一個核心重點,縮短到 500 字以內,回傳同格式 JSON。` },
       ],
       temperature: 0.7,
     });
     post.body = normalizeMultilineText(post.body);
+    post.replyBody = post.replyBody ? normalizeMultilineText(post.replyBody).slice(0, 120) : '';
     post.hashtags = [];
     post.imagePrompt = undefined;
+    if (spec.isLoveStory && !post.replyBody && spec.replyHint) post.replyBody = spec.replyHint;
   }
 
   const prediction = await chatCompleteJson<EngagementPrediction>(env, {
@@ -501,7 +511,7 @@ export async function generateOfftopicPost(
     temperature: 0.3,
   });
 
-  return { post, prediction, imageUrl: null, imageError: null };
+  return { post, prediction, imageUrl: null, imageError: null, offtopicCategory: spec.category, loveAngle: spec.loveAngle };
 }
 
 /**
@@ -663,6 +673,7 @@ export async function saveGeneratedContent(
         imageSource: params.promptMeta?.imageSource ?? result.imageSource,
         imageStyle: params.promptMeta?.imageStyle ?? result.imageStyle,
         assetId: params.promptMeta?.assetId ?? result.assetId,
+        replyBody: params.promptMeta?.replyBody ?? result.post.replyBody ?? undefined,
       })},
       ${params.sourceMarketSignalId ?? null}
     ) RETURNING id

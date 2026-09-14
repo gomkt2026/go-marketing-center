@@ -1,0 +1,7 @@
+/privacy/*
+  X-Robots-Tag: index, follow
+  Cache-Control: public, max-age=300
+
+/legal/*
+  X-Robots-Tag: index, follow
+  Cache-Control: public, max-age=300

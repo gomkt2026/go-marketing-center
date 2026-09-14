@@ -7,11 +7,12 @@ import { rowsToCamel } from '../../../_shared/case';
 import { json, error } from '../../../_shared/response';
 import {
   publishReplyTarget, getReplyQuotaState, replyQuotaIssue, clampReplyHourlyCap, clampReplyDailyCap,
-  getLatestReplyScan,
+  getLatestReplyScan, replyTextIssue, generateThreadsReplyDrafts, getThreadsReplyGuide,
 } from '../../../_shared/threads-replies';
 import { processBrandReplyRound } from '../../../_shared/threads-reply-round';
 import { getThreadsAccount } from '../../../_shared/threads';
 import { logActivity } from '../../../_shared/activity';
+import { toClientError } from '../../../_shared/openai';
 
 // ============================================================================
 // Threads 熱門貼文回覆佇列
@@ -95,6 +96,47 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const autoReply = !!acc.auto_reply;
   const autoReplyReady = hasThreadsAccount && canSearchPublic === true && quota.failedRecent === 0;
 
+  const baseHits = lastScan?.hits ?? [];
+  const hitIds = baseHits.map((h) => h.id);
+  const replyByPost = new Map<string, {
+    status: string;
+    reply_text: string | null;
+    reply_permalink: string | null;
+    reply_post_id: string | null;
+    replied_at: string | null;
+    error_message: string | null;
+  }>();
+  if (hitIds.length) {
+    const replyRows = await sql`
+      SELECT target_post_id, status, reply_text, reply_permalink, reply_post_id, replied_at, error_message
+      FROM threads_reply_targets
+      WHERE brand_id = ${brand.id}::uuid AND target_post_id = ANY(${hitIds})
+    `;
+    for (const row of replyRows as Array<{
+      target_post_id: string; status: string; reply_text: string | null;
+      reply_permalink: string | null; reply_post_id: string | null;
+      replied_at: string | null; error_message: string | null;
+    }>) {
+      replyByPost.set(row.target_post_id, row);
+    }
+  }
+  const searchHits = baseHits.map((hit) => {
+    const rec = replyByPost.get(hit.id);
+    const stored = rec?.reply_text ?? null;
+    const usable = stored && rec?.status === 'replied'
+      ? stored
+      : (stored && !replyTextIssue(stored) ? stored : null);
+    return {
+      ...hit,
+      replyText: usable,
+      replyStatus: rec?.status ?? null,
+      replyPermalink: rec?.reply_permalink ?? null,
+      replyPostId: rec?.reply_post_id ?? null,
+      repliedAt: rec?.replied_at ?? null,
+      errorMessage: rec?.error_message ?? null,
+    };
+  });
+
   return json({
     targets: rowsToCamel(rows as Record<string, unknown>[]),
     replied1h: quota.replied1h,
@@ -108,6 +150,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     autoReplyReady,
     blockReason,
     lastScan,
+    searchHits,
+    scanKeywords: lastScan?.keywords ?? [],
+    replyGuide: getThreadsReplyGuide(slug),
   });
 };
 
@@ -121,6 +166,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   const body = await context.request.json() as {
     id?: string; action?: string; replyText?: string; autoReply?: boolean;
+    postId?: string; permalink?: string; username?: string; text?: string; keyword?: string;
   };
 
   if (body.action === 'scan') {
@@ -138,6 +184,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       autoReply: result.autoReply,
       queued: result.queued,
       published: result.published,
+      searchHits: result.hits,
+      scanKeywords: result.keywords,
     });
   }
 
@@ -177,8 +225,99 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     });
   }
 
+  if (body.action === 'generate-reply') {
+    const postText = (body.text ?? '').trim();
+    if (!postText) return error('需要原文才能產回覆', 400);
+    try {
+      const generated = await generateThreadsReplyDrafts(context.env, {
+        brandSlug: brand.slug,
+        brandName: brand.name,
+        postText,
+        username: body.username,
+        keyword: body.keyword,
+      });
+      return json({
+        ok: true,
+        status: 'generated',
+        logic: generated.logic,
+        drafts: generated.drafts,
+      });
+    } catch (e) {
+      const mapped = toClientError(e, '產回覆');
+      return error(mapped.message, mapped.status);
+    }
+  }
+
+  if (body.action === 'demo-reply') {
+    if (!body.postId) return error('需要 postId', 400);
+    const replyText = (body.replyText ?? '').trim();
+    if (!replyText) return error('請先按「AI 產回覆」或自己填回覆', 400);
+    const issue = replyTextIssue(replyText);
+    if (issue) return error(issue, 400);
+
+    const account = await getThreadsAccount(context.env, brand.id);
+    if (!account) return error('請先在社群帳號貼上 Threads token', 400);
+    const quota = await getReplyQuotaState(context.env, brand.id);
+    const capIssue = replyQuotaIssue({
+      replied1h: quota.replied1h,
+      replied24h: quota.replied24h,
+      hourlyCap: account.replyHourlyCap,
+      dailyCap: account.replyDailyCap,
+    });
+    if (capIssue) return error(capIssue, 429);
+
+    const sql = getSql(context.env);
+    const existing = await sql`
+      SELECT id, status FROM threads_reply_targets
+      WHERE brand_id = ${brand.id}::uuid AND target_post_id = ${body.postId}
+      LIMIT 1
+    `;
+    if (existing.length) {
+      const row = existing[0] as { id: string; status: string };
+      if (row.status === 'replied') return error('這則已經回覆過了', 400);
+      const result = await publishReplyTarget(context.env, {
+        targetId: row.id,
+        reviewedByUserId: auth.id,
+        replyTextOverride: replyText,
+      });
+      if (!result.ok) return error(result.error ?? '發布失敗', 500);
+      return json({
+        ok: true,
+        status: 'replied',
+        permalink: result.replyPermalink ?? null,
+        replyText,
+        replyPostId: result.replyPostId ?? null,
+      });
+    }
+
+    const inserted = await sql`
+      INSERT INTO threads_reply_targets (
+        brand_id, target_post_id, target_permalink, target_username, target_text,
+        source_keyword, reply_text, status, reviewed_by_user_id
+      ) VALUES (
+        ${brand.id}::uuid, ${body.postId}, ${body.permalink ?? null}, ${body.username ?? null},
+        ${body.text ?? null}, ${body.keyword || 'demo'}, ${replyText}, 'pending', ${auth.id}::uuid
+      )
+      RETURNING id
+    `;
+    const targetId = (inserted[0] as { id: string }).id;
+    const result = await publishReplyTarget(context.env, {
+      targetId,
+      reviewedByUserId: auth.id,
+      replyTextOverride: replyText,
+    });
+    if (!result.ok) return error(result.error ?? '發布失敗', 500);
+    return json({
+      ok: true,
+      status: 'replied',
+      permalink: result.replyPermalink ?? null,
+      replyText,
+      replyPostId: result.replyPostId ?? null,
+    });
+  }
+
   if (!body.id || !body.action || !['approve', 'skip'].includes(body.action)) {
-    return error('需要 id 與 action(approve / skip / scan / set-auto-reply)', 400);
+    return error('需要 id 與 action(approve / skip / scan / set-auto-reply / demo-reply / generate-reply)', 400);
   }
 
   const sql = getSql(context.env);

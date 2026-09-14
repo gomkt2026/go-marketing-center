@@ -482,6 +482,35 @@ export interface SocialAccount {
 
 export type ThreadsReplyStatus = 'pending' | 'approved' | 'replied' | 'skipped' | 'failed';
 
+export interface ThreadsReplyDraft {
+  label: string;
+  text: string;
+  why: string;
+}
+
+export interface ThreadsReplyGuide {
+  persona: string;
+  logic: string[];
+  kusoExamples: string[];
+  donts: string[];
+}
+
+export interface ThreadsKeywordHit {
+  id: string;
+  text: string | null;
+  username: string | null;
+  permalink: string | null;
+  timestamp: string | null;
+  sourceKeyword: string;
+  isOwn: boolean;
+  replyText?: string | null;
+  replyStatus?: ThreadsReplyStatus | null;
+  replyPermalink?: string | null;
+  replyPostId?: string | null;
+  repliedAt?: string | null;
+  errorMessage?: string | null;
+}
+
 /** Threads 熱門貼文回覆佇列項目 */
 export interface ThreadsReplyTarget {
   id: string;

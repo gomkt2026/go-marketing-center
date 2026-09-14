@@ -549,11 +549,16 @@ export const api = {
       canSearchPublic: boolean | null;
       autoReplyReady: boolean;
       blockReason: string | null;
+      searchHits?: import('@/types').ThreadsKeywordHit[];
+      scanKeywords?: string[];
+      replyGuide?: import('@/types').ThreadsReplyGuide;
       lastScan?: {
         at: string; detail: string;
         canSearchPublic?: boolean | null;
         publicCount?: number | null;
         queued?: number | null;
+        keywords?: string[];
+        hits?: import('@/types').ThreadsKeywordHit[];
       } | null;
     }>(
       `/api/brands/${slug}/thread-replies?status=${status}`,
@@ -561,13 +566,24 @@ export const api = {
 
   actThreadReply: (slug: string, body: {
     id?: string;
-    action: 'approve' | 'skip' | 'scan' | 'set-auto-reply';
+    action: 'approve' | 'skip' | 'scan' | 'set-auto-reply' | 'demo-reply' | 'generate-reply';
     replyText?: string;
     autoReply?: boolean;
+    postId?: string;
+    permalink?: string | null;
+    username?: string | null;
+    text?: string | null;
+    keyword?: string;
   }) =>
     request<{
       ok: boolean; status: string; permalink?: string | null; detail?: string;
       canSearchPublic?: boolean; autoReply?: boolean; queued?: number; published?: number;
+      searchHits?: import('@/types').ThreadsKeywordHit[];
+      scanKeywords?: string[];
+      replyText?: string;
+      replyPostId?: string | null;
+      logic?: string;
+      drafts?: import('@/types').ThreadsReplyDraft[];
     }>(`/api/brands/${slug}/thread-replies`, {
       method: 'POST',
       body: JSON.stringify(body),

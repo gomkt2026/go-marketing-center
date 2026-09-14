@@ -5,7 +5,7 @@ import { getBrandVoice, ANTI_AI_RULES } from './prompts';
 import { getThreadsAccount, searchThreadsPosts, type ThreadsAccount, type ThreadsSearchPost } from './threads';
 import {
   publishReplyTarget, replyTextIssue, getReplyQuotaState, replyQuotaIssue,
-  THREADS_REPLY_KEYWORDS, recordReplyScan,
+  THREADS_REPLY_KEYWORDS, recordReplyScan, snapshotKeywordHits, type ThreadsKeywordHit,
 } from './threads-replies';
 import { logActivity } from './activity';
 import { fetchGoogleTrendsTW } from './sources';
@@ -46,6 +46,7 @@ export interface BrandReplyRoundResult {
   publicCount: number;
   queued: number;
   published: number;
+  hits: ThreadsKeywordHit[];
 }
 
 function emptyResult(partial: Partial<BrandReplyRoundResult> & Pick<BrandReplyRoundResult, 'status' | 'detail'>): BrandReplyRoundResult {
@@ -62,6 +63,7 @@ function emptyResult(partial: Partial<BrandReplyRoundResult> & Pick<BrandReplyRo
     publicCount: partial.publicCount ?? 0,
     queued: partial.queued ?? 0,
     published: partial.published ?? 0,
+    hits: partial.hits ?? [],
   };
 }
 
@@ -228,6 +230,7 @@ export async function processBrandReplyRound(env: Env, params: {
   const ownCount = found.filter((p) => (p.username ?? '').toLowerCase() === ownUsername).length;
   const publicCount = Math.max(0, found.length - ownCount);
   const canSearchPublic = publicCount > 0;
+  const hits = snapshotKeywordHits(found, ownUsername);
 
   const publishIfEnabled = async (queued: number, status: BrandReplyRoundResult['status'], detail: string) => {
     let published = 0;
@@ -258,7 +261,7 @@ export async function processBrandReplyRound(env: Env, params: {
     const searched = !queueFull;
     await recordReplyScan(env, params.brandId, finalDetail, {
       keywords, queued, published,
-      ...(searched ? { total: found.length, ownCount, publicCount, canSearchPublic } : {}),
+      ...(searched ? { total: found.length, ownCount, publicCount, canSearchPublic, hits } : {}),
     });
     return emptyResult({
       ok: status !== 'blocked_search' && status !== 'no_account',
@@ -273,6 +276,7 @@ export async function processBrandReplyRound(env: Env, params: {
       publicCount,
       queued,
       published,
+      hits: searched ? hits : [],
     });
   };
 
@@ -329,13 +333,15 @@ export async function processBrandReplyRound(env: Env, params: {
     .map((p, i) => `${i}. @${p.username ?? '匿名'}:${p.text!.slice(0, 280)}`)
     .join('\n---\n');
   const selection = await chatCompleteJson<{ selections: ReplySelection[] }>(env, {
-    temperature: 0.7,
+    temperature: 0.9,
     messages: [
       {
         role: 'system',
         content: [
           `你是品牌「${params.brandName}」的第一線人員,正在用個人身分逛 Threads、跟大家聊天。${voice.frontlinePersona}`,
+          voice.replyCraft ?? '',
           ANTI_AI_RULES,
+          '這是留言不是貼文:禁止放電話、Email、LINE、官網、匠管聯絡方式。',
         ].join('\n'),
       },
       {
@@ -345,10 +351,12 @@ export async function processBrandReplyRound(env: Env, params: {
           listText,
           '',
           '回覆鐵則(違反任何一條就不要選那則):',
-          '1. 像真人搭話:分享自己第一線的經驗、觀點或一個小故事,30-120 字。',
+          '1. 像真人搭話:分享自己第一線的經驗或輕 KUSO 接梗,30-120 字。',
+          voice.replyCraft ?? '',
           '2. 絕對不放連結、不提優惠促銷、不推銷服務、不叫人私訊;可以自然透露你的職業身分。',
-          '3. 不說教、不糾正對方;先同理再補充,或幽默接梗。',
+          '3. 不說教、不糾正對方;先同理再補充,或幽默接梗。KUSO 只准自嘲自己的工作,不准嘲諷發文的人。',
           '4. 政治、宗教、災難、性別對立等爭議話題一律不回。',
+          '5. 不要寫系統測試句。',
           '',
           '回傳 JSON:{"selections":[{"index":清單編號,"relevance":0到1,"reason":"為什麼值得回(30字內)","reply":"回覆全文"}]}',
           '如果都不值得回,回傳 {"selections":[]}',

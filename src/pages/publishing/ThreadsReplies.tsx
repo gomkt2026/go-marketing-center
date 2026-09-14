@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
-import type { ThreadsReplyStatus, ThreadsReplyTarget } from '@/types';
+import type { ThreadsKeywordHit, ThreadsReplyDraft, ThreadsReplyStatus, ThreadsReplyTarget } from '@/types';
 
 const TABS: { id: string; label: string }[] = [
   { id: 'pending', label: '待審核' },
@@ -40,6 +40,9 @@ export function ThreadsReplies() {
   const [scanning, setScanning] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [draftReplies, setDraftReplies] = useState<Record<string, string>>({});
+  const [generated, setGenerated] = useState<Record<string, { logic: string; drafts: ThreadsReplyDraft[] }>>({});
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
 
   const { data, loading, error, reload } = useAsyncData(
     () => slug ? api.threadReplies(slug, tab) : Promise.reject(new Error('no slug')),
@@ -59,6 +62,7 @@ export function ThreadsReplies() {
       const bits = [res.detail];
       if (res.queued) bits.push(`入庫 ${res.queued} 則`);
       if (res.published) bits.push(`已自動發布 ${res.published} 則`);
+      if (res.searchHits?.length) bits.push(`畫面顯示 ${res.searchHits.length} 則搜尋結果`);
       setMessage(bits.filter(Boolean).join(' · ') || '掃描完成');
       reload();
     } catch (e) {
@@ -80,6 +84,70 @@ export function ThreadsReplies() {
       setMessage(`開關失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
     } finally {
       setToggling(false);
+    }
+  }
+
+  async function generateReply(params: {
+    key: string;
+    text: string;
+    username?: string | null;
+    keyword?: string;
+    applyToEdit?: boolean;
+  }) {
+    if (!slug) return;
+    setGeneratingId(params.key);
+    setMessage(null);
+    try {
+      const res = await api.actThreadReply(slug, {
+        action: 'generate-reply',
+        text: params.text,
+        username: params.username,
+        keyword: params.keyword,
+      });
+      const drafts = res.drafts ?? [];
+      if (!drafts.length) throw new Error('沒有可用的草稿');
+      setGenerated((prev) => ({ ...prev, [params.key]: { logic: res.logic ?? '', drafts } }));
+      const kuso = drafts.find((d) => d.label.includes('KUSO')) ?? drafts[drafts.length - 1];
+      setDraftReplies((prev) => ({ ...prev, [params.key]: kuso.text }));
+      if (params.applyToEdit) {
+        setEditingId(params.key);
+        setEditText(kuso.text);
+      }
+      setMessage(`已產 ${drafts.map((d) => d.label).join('／')}，預設帶入 ${kuso.label}，可改完再發`);
+    } catch (e) {
+      setMessage(`產回覆失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
+    } finally {
+      setGeneratingId(null);
+    }
+  }
+
+  async function demoReply(hit: ThreadsKeywordHit) {
+    if (!slug) return;
+    const replyText = (draftReplies[hit.id] ?? hit.replyText ?? '').trim();
+    if (!replyText) {
+      setMessage('請先按「AI 產回覆」，或自己寫一則再發');
+      return;
+    }
+    setBusyId(hit.id);
+    setMessage(null);
+    try {
+      const res = await api.actThreadReply(slug, {
+        action: 'demo-reply',
+        postId: hit.id,
+        permalink: hit.permalink,
+        username: hit.username,
+        text: hit.text,
+        keyword: hit.sourceKeyword,
+        replyText,
+      });
+      setMessage(res.permalink
+        ? `已在本頁記下回覆，Threads 連結：${res.permalink}`
+        : '已發出示範回覆，回覆內容顯示在這則卡片裡');
+      reload();
+    } catch (e) {
+      setMessage(`示範回覆失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -161,6 +229,27 @@ export function ThreadsReplies() {
         </Card>
       )}
 
+      {data?.replyGuide && (
+        <Card style={{ marginBottom: 14, background: 'var(--color-bg-soft)' }}>
+          <strong style={{ fontSize: 14 }}>回覆時的品牌邏輯</strong>
+          <p style={{ fontSize: 13, marginTop: 6 }}>{data.replyGuide.persona}</p>
+          <ul style={{ fontSize: 12.5, color: 'var(--color-text)', lineHeight: 1.8, paddingLeft: 18, marginTop: 6 }}>
+            {data.replyGuide.logic.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+          {data.replyGuide.kusoExamples.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 4 }}>KUSO 語氣參考（學感覺，不要整句貼）</div>
+              {data.replyGuide.kusoExamples.map((ex) => (
+                <p key={ex} style={{ fontSize: 12.5, color: 'var(--color-text-muted)', margin: '0 0 4px' }}>「{ex}」</p>
+              ))}
+            </div>
+          )}
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
+            不要：{data.replyGuide.donts.join('、')}
+          </p>
+        </Card>
+      )}
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         {TABS.map((t) => (
           <Button
@@ -197,6 +286,168 @@ export function ThreadsReplies() {
         </Card>
       )}
 
+      {!loading && data && (data.searchHits?.length || data.lastScan?.hits?.length) ? (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            <strong style={{ fontSize: 14 }}>本輪關鍵字搜尋結果</strong>
+            <span style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>
+              {(data.scanKeywords?.length ? data.scanKeywords : data.lastScan?.keywords ?? []).join('、') || '關鍵字搜尋'}
+              {' · '}
+              顯示 {(data.searchHits?.length ? data.searchHits : data.lastScan?.hits ?? []).length} 則
+            </span>
+          </div>
+          <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginBottom: 10 }}>
+            先按「AI 產回覆」會依品牌邏輯生親切／KUSO 兩則，預設帶 KUSO。改完再發，內容會留在這張卡片。
+          </p>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {(data.searchHits ?? []).map((hit) => {
+              const busy = busyId === hit.id;
+              const alreadyReplied = hit.replyStatus === 'replied';
+              const gen = generated[hit.id];
+              const draft = draftReplies[hit.id] ?? hit.replyText ?? '';
+              return (
+                <Card key={hit.id}>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Badge tone={hit.isOwn ? 'default' : 'primary'}>
+                      {hit.isOwn ? '自家帳號（不入自動回覆佇列）' : '別人的公開文'}
+                    </Badge>
+                    {hit.sourceKeyword && <Badge tone="secondary">關鍵字:{hit.sourceKeyword}</Badge>}
+                    {hit.replyStatus && (
+                      <Badge tone={statusTone[(hit.replyStatus as ThreadsReplyStatus)] ?? 'default'}>
+                        {statusLabel[hit.replyStatus as ThreadsReplyStatus] ?? hit.replyStatus}
+                      </Badge>
+                    )}
+                    <span style={{ fontSize: 12.5, fontWeight: 700, marginLeft: 4 }}>
+                      @{hit.username ?? '匿名'}
+                    </span>
+                  </div>
+
+                  <div style={{
+                    background: 'var(--color-bg-soft)', borderRadius: 10, padding: '10px 12px', marginBottom: 10,
+                  }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 4 }}>
+                      原文
+                      {hit.permalink && (
+                        <a href={hit.permalink} target="_blank" rel="noreferrer" style={{ marginLeft: 8, fontWeight: 500 }}>
+                          查看原文 ↗
+                        </a>
+                      )}
+                    </div>
+                    <p style={{ fontSize: 13, whiteSpace: 'pre-wrap', color: 'var(--color-text)' }}>
+                      {hit.text || '（無文字）'}
+                    </p>
+                  </div>
+
+                  {gen?.logic && (
+                    <p style={{
+                      fontSize: 12.5, color: 'var(--color-text)', marginBottom: 10,
+                      padding: '8px 10px', background: 'var(--color-bg-soft)', borderRadius: 8,
+                    }}>
+                      <strong>這則為什麼這樣回：</strong>{gen.logic}
+                    </p>
+                  )}
+
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 4 }}>
+                      {alreadyReplied ? '已發布的回覆' : '將發布的回覆'}
+                      {hit.replyPermalink && (
+                        <a href={hit.replyPermalink} target="_blank" rel="noreferrer" style={{ marginLeft: 8, fontWeight: 500 }}>
+                          查看回覆 ↗
+                        </a>
+                      )}
+                    </div>
+                    {alreadyReplied ? (
+                      <p style={{
+                        fontSize: 13.5, whiteSpace: 'pre-wrap', padding: '10px 12px',
+                        border: '1px solid var(--color-border)', borderRadius: 10,
+                      }}>
+                        {hit.replyText || '（無回覆文字）'}
+                      </p>
+                    ) : (
+                      <>
+                        {gen?.drafts?.length ? (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                            {gen.drafts.map((d) => (
+                              <Button
+                                key={d.label}
+                                variant={draft === d.text ? 'primary' : 'ghost'}
+                                onClick={() => setDraftReplies((prev) => ({ ...prev, [hit.id]: d.text }))}
+                              >
+                                {d.label}
+                              </Button>
+                            ))}
+                          </div>
+                        ) : null}
+                        {gen?.drafts?.find((d) => d.text === draft)?.why && (
+                          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 6 }}>
+                            {gen.drafts.find((d) => d.text === draft)?.why}
+                          </p>
+                        )}
+                        <textarea
+                          value={draft}
+                          onChange={(e) => setDraftReplies((prev) => ({ ...prev, [hit.id]: e.target.value }))}
+                          placeholder="按「AI 產回覆」會依品牌邏輯生草稿；也可以自己寫。"
+                          rows={4}
+                          style={{
+                            width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 13,
+                            border: '1px solid var(--color-border)', background: 'var(--color-bg)',
+                            fontFamily: 'inherit', resize: 'vertical',
+                          }}
+                        />
+                      </>
+                    )}
+                  </div>
+
+                  <dl style={{
+                    display: 'grid', gridTemplateColumns: '88px 1fr', gap: '4px 10px',
+                    fontSize: 12.5, margin: '0 0 10px', color: 'var(--color-text)',
+                  }}>
+                    <dt style={{ color: 'var(--color-text-muted)' }}>回覆狀態</dt>
+                    <dd style={{ margin: 0 }}>{hit.replyStatus ? (statusLabel[hit.replyStatus as ThreadsReplyStatus] ?? hit.replyStatus) : '尚未發布'}</dd>
+                    <dt style={{ color: 'var(--color-text-muted)' }}>回覆連結</dt>
+                    <dd style={{ margin: 0, wordBreak: 'break-all' }}>
+                      {hit.replyPermalink
+                        ? <a href={hit.replyPermalink} target="_blank" rel="noreferrer">{hit.replyPermalink}</a>
+                        : '發布後會顯示在這裡'}
+                    </dd>
+                    <dt style={{ color: 'var(--color-text-muted)' }}>回覆貼文 ID</dt>
+                    <dd style={{ margin: 0 }}>{hit.replyPostId || '尚未發布'}</dd>
+                    <dt style={{ color: 'var(--color-text-muted)' }}>發布時間</dt>
+                    <dd style={{ margin: 0 }}>
+                      {hit.repliedAt ? new Date(hit.repliedAt).toLocaleString('zh-TW') : '尚未發布'}
+                    </dd>
+                  </dl>
+
+                  {hit.errorMessage && (
+                    <p style={{ fontSize: 12, color: '#B85454', marginBottom: 8 }}>錯誤:{hit.errorMessage}</p>
+                  )}
+
+                  {!alreadyReplied && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <Button
+                        variant="secondary"
+                        disabled={generatingId === hit.id || !hit.text}
+                        onClick={() => void generateReply({
+                          key: hit.id,
+                          text: hit.text ?? '',
+                          username: hit.username,
+                          keyword: hit.sourceKeyword,
+                        })}
+                      >
+                        {generatingId === hit.id ? 'AI 產稿中...' : gen ? '再產一輪' : 'AI 產回覆'}
+                      </Button>
+                      <Button variant="primary" disabled={busy || capReached || !draft.trim()} onClick={() => void demoReply(hit)}>
+                        {busy ? '發布中...' : '發這則回覆'}
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       {loading && <LoadingState />}
       {!loading && (error || !data) && <ErrorState message={error ?? '載入失敗'} onRetry={reload} />}
 
@@ -207,7 +458,7 @@ export function ThreadsReplies() {
               <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
                 {tab === 'pending'
                   ? (data.canSearchPublic === false
-                    ? '目前沒有待審核的回覆。關鍵字搜尋還只能看到自己的文,系統會略過自家帳號,佇列就會是空的。請到 Meta 送審 threads_keyword_search,過審後再按「立即掃文入庫」。'
+                    ? '待審核是空的，因為過審前只能搜到自己的文，系統不會拿自家帳號去自動回。請先看上方「本輪關鍵字搜尋結果」。'
                     : data.hasThreadsAccount
                       ? '目前沒有待審核的回覆。按「立即掃文入庫」立刻跑一輪搜尋與 AI 生成,不必等半點排程。'
                       : '目前沒有待審核的回覆。請先到社群帳號連接 Threads,再回來掃文。')
@@ -263,7 +514,7 @@ export function ThreadsReplies() {
                 {t.replyText != null && (
                   <div style={{ marginBottom: 10 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 4 }}>
-                      {t.status === 'replied' ? '已發布的回覆' : 'AI 生成的回覆'}
+                      {t.status === 'replied' ? '已發布的回覆' : '將發布的回覆'}
                       {t.replyPermalink && (
                         <a href={t.replyPermalink} target="_blank" rel="noreferrer" style={{ marginLeft: 8, fontWeight: 500 }}>
                           查看回覆 ↗
@@ -292,6 +543,26 @@ export function ThreadsReplies() {
                   </div>
                 )}
 
+                <dl style={{
+                  display: 'grid', gridTemplateColumns: '88px 1fr', gap: '4px 10px',
+                  fontSize: 12.5, margin: '0 0 10px', color: 'var(--color-text)',
+                }}>
+                  <dt style={{ color: 'var(--color-text-muted)' }}>回覆狀態</dt>
+                  <dd style={{ margin: 0 }}>{statusLabel[t.status]}</dd>
+                  <dt style={{ color: 'var(--color-text-muted)' }}>回覆連結</dt>
+                  <dd style={{ margin: 0, wordBreak: 'break-all' }}>
+                    {t.replyPermalink
+                      ? <a href={t.replyPermalink} target="_blank" rel="noreferrer">{t.replyPermalink}</a>
+                      : '發布後會顯示在這裡'}
+                  </dd>
+                  <dt style={{ color: 'var(--color-text-muted)' }}>回覆貼文 ID</dt>
+                  <dd style={{ margin: 0 }}>{t.replyPostId || '尚未發布'}</dd>
+                  <dt style={{ color: 'var(--color-text-muted)' }}>發布時間</dt>
+                  <dd style={{ margin: 0 }}>
+                    {t.repliedAt ? new Date(t.repliedAt).toLocaleString('zh-TW') : '尚未發布'}
+                  </dd>
+                </dl>
+
                 {t.errorMessage && (
                   <p style={{ fontSize: 12, color: '#B85454', marginBottom: 8 }}>錯誤:{t.errorMessage}</p>
                 )}
@@ -316,6 +587,19 @@ export function ThreadsReplies() {
                         >
                           編輯
                         </Button>
+                        <Button
+                          variant="secondary"
+                          disabled={generatingId === t.id || !t.targetText}
+                          onClick={() => void generateReply({
+                            key: t.id,
+                            text: t.targetText ?? '',
+                            username: t.targetUsername,
+                            keyword: t.sourceKeyword,
+                            applyToEdit: true,
+                          })}
+                        >
+                          {generatingId === t.id ? 'AI 產稿中...' : 'AI 重產'}
+                        </Button>
                         <Button variant="danger" disabled={busy} onClick={() => void act(t, 'skip')}>略過</Button>
                       </>
                     )}
@@ -331,8 +615,8 @@ export function ThreadsReplies() {
         <strong style={{ fontSize: 13 }}>Washgo 自動回覆怎麼開</strong>
         <ul style={{ fontSize: 12.5, color: 'var(--color-text-muted)', lineHeight: 1.9, paddingLeft: 18, marginTop: 6 }}>
           <li>先確認 Threads 已連線,再按「立即掃文入庫」。這一輪會真的搜尋、AI 寫稿、入待審;自動回覆開著才會直接發。</li>
-          <li>若掃描結果是「只能搜到自己的文」,代表 <code>threads_keyword_search</code> 還沒過 App Review,開開關也不會有佇列。</li>
-          <li>權限通了之後再開自動回覆。小時上限預設 5、每日上限預設 12,可在「<Link to={`/${slug}/social`}>社群帳號</Link>」調整。</li>
+          <li>若掃描結果是「只能搜到自己的文」,代表 <code>threads_keyword_search</code> 還沒過 App Review。上方仍會列出搜到的貼文；待審核不會有別人的文。</li>
+          <li>回覆前看上方「品牌邏輯」。按「AI 產回覆」會生親切／KUSO 兩則，預設帶 KUSO，小編改完再發。</li>
           <li>回覆走品牌第一線人設、不放連結、不促銷;發布失敗會暫停該品牌 12 小時。</li>
           <li>排程每 30 分鐘掃一輪(台灣凌晨 2–6 點靜默);不想等就按這一頁的立即掃文。</li>
         </ul>

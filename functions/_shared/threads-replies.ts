@@ -2,6 +2,8 @@ import type { Env } from './env';
 import { getSql } from './db';
 import { getThreadsAccount, replyToThreadsPost, diagnoseThreadsKeywordSearch, type ThreadsAccount } from './threads';
 import { logActivity } from './activity';
+import { chatCompleteJson } from './openai';
+import { getBrandVoice, ANTI_AI_RULES } from './prompts';
 
 // ============================================================================
 // Threads 熱門貼文回覆佇列:共用的安全檢查與發布邏輯
@@ -88,6 +90,71 @@ export function replyQuotaIssue(params: {
   return null;
 }
 
+export const SEARCH_HIT_PREVIEW_LIMIT = 20;
+export const SEARCH_HIT_TEXT_MAX = 280;
+export const DEMO_REPLY_TEXT = '這則先回一下，確認關鍵字搜尋後可以留言。';
+
+export interface ThreadsKeywordHit {
+  id: string;
+  text: string | null;
+  username: string | null;
+  permalink: string | null;
+  timestamp: string | null;
+  sourceKeyword: string;
+  isOwn: boolean;
+}
+
+export function snapshotKeywordHits(
+  posts: Array<{
+    id: string;
+    text: string | null;
+    username: string | null;
+    permalink: string | null;
+    timestamp: string | null;
+    sourceKeyword: string;
+  }>,
+  ownUsername: string,
+): ThreadsKeywordHit[] {
+  const own = ownUsername.toLowerCase();
+  const seen = new Set<string>();
+  const hits: ThreadsKeywordHit[] = [];
+  for (const p of posts) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    hits.push({
+      id: p.id,
+      text: p.text ? p.text.slice(0, SEARCH_HIT_TEXT_MAX) : null,
+      username: p.username,
+      permalink: p.permalink,
+      timestamp: p.timestamp,
+      sourceKeyword: p.sourceKeyword,
+      isOwn: (p.username ?? '').toLowerCase() === own,
+    });
+    if (hits.length >= SEARCH_HIT_PREVIEW_LIMIT) break;
+  }
+  return hits;
+}
+
+function parseKeywordHits(raw: unknown): ThreadsKeywordHit[] {
+  if (!Array.isArray(raw)) return [];
+  const hits: ThreadsKeywordHit[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const p = item as Record<string, unknown>;
+    if (typeof p.id !== 'string' || !p.id) continue;
+    hits.push({
+      id: p.id,
+      text: typeof p.text === 'string' ? p.text : null,
+      username: typeof p.username === 'string' ? p.username : null,
+      permalink: typeof p.permalink === 'string' ? p.permalink : null,
+      timestamp: typeof p.timestamp === 'string' ? p.timestamp : null,
+      sourceKeyword: typeof p.sourceKeyword === 'string' ? p.sourceKeyword : '',
+      isOwn: p.isOwn === true,
+    });
+  }
+  return hits;
+}
+
 export async function recordReplyScan(env: Env, brandId: string, detail: string, extra?: Record<string, unknown>): Promise<void> {
   await logActivity(env, {
     brandId,
@@ -105,14 +172,30 @@ export interface LatestReplyScan {
   canSearchPublic: boolean | null;
   publicCount: number | null;
   queued: number | null;
+  keywords: string[];
+  hits: ThreadsKeywordHit[];
 }
 
-function parseScanState(raw: unknown): { detail?: string; canSearchPublic?: boolean; publicCount?: number; queued?: number } {
+function parseScanState(raw: unknown): {
+  detail?: string;
+  canSearchPublic?: boolean;
+  publicCount?: number;
+  queued?: number;
+  keywords?: string[];
+  hits?: unknown;
+} {
   if (typeof raw === 'string') {
-    try { return JSON.parse(raw) as { detail?: string; canSearchPublic?: boolean; publicCount?: number; queued?: number }; }
-    catch { return { detail: raw }; }
+    try {
+      return JSON.parse(raw) as {
+        detail?: string; canSearchPublic?: boolean; publicCount?: number;
+        queued?: number; keywords?: string[]; hits?: unknown;
+      };
+    } catch { return { detail: raw }; }
   }
-  return (raw ?? {}) as { detail?: string; canSearchPublic?: boolean; publicCount?: number; queued?: number };
+  return (raw ?? {}) as {
+    detail?: string; canSearchPublic?: boolean; publicCount?: number;
+    queued?: number; keywords?: string[]; hits?: unknown;
+  };
 }
 
 export async function getLatestReplyScan(env: Env, brandId: string): Promise<LatestReplyScan | null> {
@@ -136,6 +219,8 @@ export async function getLatestReplyScan(env: Env, brandId: string): Promise<Lat
     canSearchPublic,
     publicCount: typeof state.publicCount === 'number' ? state.publicCount : null,
     queued: typeof state.queued === 'number' ? state.queued : null,
+    keywords: Array.isArray(state.keywords) ? state.keywords.filter((k): k is string => typeof k === 'string') : [],
+    hits: parseKeywordHits(state.hits),
   };
 }
 
@@ -160,7 +245,137 @@ export function replyTextIssue(text: string | null | undefined): string | null {
   if (t.length > 480) return '回覆超過 Threads 長度上限';
   if (/https?:\/\/|www\.|\.com\b|\.tw\b|\.net\b/i.test(t)) return '回覆不可包含連結';
   if (/(優惠|折扣|限時|下單|購買|私訊我|加\s?line|加賴|官網|報名連結)/i.test(t)) return '回覆不可包含促銷用語';
+  if (/這則先回一下|確認關鍵字搜尋後可以留言/.test(t)) return '請改成品牌口吻,不要用系統測試句';
   return null;
+}
+
+export interface ThreadsReplyGuide {
+  persona: string;
+  logic: string[];
+  kusoExamples: string[];
+  donts: string[];
+}
+
+export interface ThreadsReplyDraft {
+  label: string;
+  text: string;
+  why: string;
+}
+
+const REPLY_GUIDES: Record<string, ThreadsReplyGuide> = {
+  washgo: {
+    persona: '洗衣店櫃台店員，像鄰居年輕店員在 Threads 跟大家哈拉。',
+    logic: [
+      '先接對方的煩：發霉、羽絨扁、洗標天書、梅雨曬不乾、換季衣櫃爆炸',
+      '再補一句現場觀察或洗衣小知識，不要上課、不要客服罐頭',
+      'KUSO 只准自嘲櫃台日常，不要嘲諷發文的人',
+      '不放連結、不促銷、不留電話／LINE，也不要系統測試句',
+    ],
+    kusoExamples: [
+      '洗標密密麻麻，櫃台每天都在當外星文翻譯。',
+      '羽絨被洗完膨脹到差點要跟它分房睡。',
+      '梅雨季衣服比人還潮，我懷疑它在家裡開過泳池。',
+    ],
+    donts: ['放連結', '講優惠折扣', '叫人私訊／加 LINE', '系統測試句', '說教糾正對方'],
+  },
+  taskgo: {
+    persona: '帶工班的頭，講話短、江湖味、帶工地幽默。',
+    logic: [
+      '先接現場痛：排班、殺價、順便、LINE 群考古',
+      '用一句工地觀察接話，不要估價、不要叫人私訊',
+      'KUSO 可以吐槽奪命 call，不要人身攻擊',
+    ],
+    kusoExamples: [
+      '業主說順便，通常後面還有三個順便。',
+      '白板排班被雨打掉那天，我才知道字是寫給天看的。',
+    ],
+    donts: ['放連結', '報價促銷', '人身攻擊', '系統測試句'],
+  },
+  homigo: {
+    persona: '包租代管第一線，像在租屋板幫腔，不站隊開罵。',
+    logic: [
+      '先同理租金、押金、修繕沒人理',
+      '再補一句整理關係／紀錄的觀察，不要教人鑽漏洞',
+      'KUSO 可以自嘲半夜爆管電話，不要罵死房東或房客',
+    ],
+    kusoExamples: [
+      '押金有時候比感情還難拿回來。',
+      '熱水器選在半夜爆，是它的傳統技藝。',
+    ],
+    donts: ['開罵站隊', '教鑽法律漏洞', '放連結聯絡方式', '系統測試句'],
+  },
+};
+
+export function getThreadsReplyGuide(slug: string): ThreadsReplyGuide {
+  return REPLY_GUIDES[slug] ?? {
+    persona: '品牌第一線人員，用客戶每天真正關心的話題回覆。',
+    logic: ['先同理再補充', '不放連結、不促銷', '可以輕鬆，不要嘲諷對方'],
+    kusoExamples: [],
+    donts: ['放連結', '優惠促銷', '系統測試句'],
+  };
+}
+
+export async function generateThreadsReplyDrafts(env: Env, params: {
+  brandSlug: string;
+  brandName: string;
+  postText: string;
+  username?: string | null;
+  keyword?: string;
+}): Promise<{ logic: string; drafts: ThreadsReplyDraft[] }> {
+  const voice = getBrandVoice(params.brandSlug);
+  const guide = getThreadsReplyGuide(params.brandSlug);
+  const post = params.postText.trim().slice(0, 500);
+  if (post.length < 8) throw new Error('原文太短，無法產回覆');
+
+  const raw = await chatCompleteJson<{ logic?: string; drafts?: Array<{ label?: string; text?: string; why?: string }> }>(env, {
+    temperature: 0.95,
+    messages: [
+      {
+        role: 'system',
+        content: [
+          `你是品牌「${params.brandName}」的第一線人員,正在 Threads 用個人身分留言聊天。${voice.frontlinePersona}`,
+          voice.replyCraft ?? '',
+          ANTI_AI_RULES,
+          '這是留言不是貼文:禁止放電話、Email、LINE、官網、匠管聯絡方式。',
+        ].join('\n'),
+      },
+      {
+        role: 'user',
+        content: [
+          `對方帳號:@${params.username ?? '匿名'}`,
+          params.keyword ? `搜尋關鍵字:${params.keyword}` : '',
+          `原文:\n${post}`,
+          '',
+          '請依這則原文產 2 則可直接貼上的回覆草稿。',
+          `品牌回覆邏輯:${guide.logic.join('；')}`,
+          `KUSO 參考(學語氣,不要整句複製):${guide.kusoExamples.join('／') || '輕鬆接梗,自嘲自己的工作'}`,
+          '',
+          '鐵則:',
+          '1. 兩則都要回這則原文的具體內容,不要空泛打氣。',
+          '2. drafts[0] label 用「親切」,30-90 字,先同理再補一句現場觀察。',
+          '3. drafts[1] label 用「KUSO」,30-90 字,台灣網路口吻、可諧音或輕吐槽自己的班表;不要嘲諷對方、不要髒話。',
+          '4. 不放連結、不促銷、不叫人私訊。why 各 20 字內,說明為什麼符合品牌邏輯。',
+          '5. logic 用 40-80 字,寫給小編看:這則原文踩到什麼痛、為什麼這樣回。',
+          '',
+          '回傳 JSON:{"logic":"...","drafts":[{"label":"親切","text":"...","why":"..."},{"label":"KUSO","text":"...","why":"..."}]}',
+        ].filter(Boolean).join('\n'),
+      },
+    ],
+  });
+
+  const drafts = (raw.drafts ?? [])
+    .map((d) => ({
+      label: (d.label ?? '').trim() || '草稿',
+      text: (d.text ?? '').trim(),
+      why: (d.why ?? '').trim(),
+    }))
+    .filter((d) => d.text && !replyTextIssue(d.text));
+
+  if (!drafts.length) throw new Error('AI 產的回覆沒通過安全檢查,請再試一次');
+  return {
+    logic: (raw.logic ?? '').trim() || '先同理對方的煩惱,再用第一線語氣接話。',
+    drafts,
+  };
 }
 
 export interface PublishReplyResult {

@@ -14,9 +14,9 @@ const RESVG_WASM_KEY = 'fonts/resvg-index_bg.wasm';
 /** 給 gpt-image 的硬性規則:模型一畫中文就會錯字,主標改後製 */
 export const POSTER_NO_GLYPHS_RULE = [
   'CRITICAL TYPOGRAPHY RULE: Do not render ANY letters, numbers, Chinese/Japanese/Korean characters, Latin text, UI labels, captions, watermarks, logos, or fake glyphs anywhere in the image. Typography is composited later in Traditional Chinese.',
-  'PORTRAIT: leave the top 25% as a clean empty banner (solid or very soft brand-color gradient). No people, objects, icons, or text in that zone.',
-  'LANDSCAPE: leave the left 38% as a clean empty banner for the headline. Scene and device card stay on the right.',
-  'Poster composition: generous margins, one strong Taiwanese figure, a small white device/UI card in the lower third made of abstract grey bars and color blocks only (no glyphs). Looks like a finished brand poster, not a screenshot dump and not a quote card.',
+  'PORTRAIT: leave the top 25% as empty designed paper or a clean brand-color block. No people, objects, icons, or text in that zone. Negative space is a design element for later type.',
+  'LANDSCAPE: leave the left 38% as empty designed paper or a clean brand-color block for the headline and advantage line. Scene stays on the right.',
+  'Poster composition: generous margins, one strong Taiwanese figure occupying 15–30% of the frame, optional tiny device card of abstract grey bars only (no glyphs). Looks like a finished editorial cover or graphic poster, not a screenshot dump and not a quote card.',
 ].join(' ');
 
 const SIMP_TO_TRAD: Record<string, string> = {
@@ -41,23 +41,36 @@ interface PosterTheme {
   main: string;
   accent: string;
   stripe: string;
+  advantage: string;
+  kicker: string;
   bannerOpacity: number;
   slant: boolean;
+  /** editorial = 紙本留白上的安靜小字; graphic = 斜切色塊海報 */
+  mode: 'editorial' | 'graphic';
 }
 
 const THEME: Record<string, PosterTheme> = {
   homigo: {
     banner: '#F5F1EA', main: '#0B2D5C', accent: '#F7B500', stripe: '#F7B500',
-    bannerOpacity: 0.96, slant: false,
+    advantage: '#5C5346', kicker: '#0B2D5C',
+    bannerOpacity: 0.0, slant: false, mode: 'editorial',
   },
   taskgo: {
     banner: '#0B2D5C', main: '#FFFFFF', accent: '#F7B500', stripe: '#2BA3D6',
-    bannerOpacity: 0.94, slant: true,
+    advantage: '#D7F0FA', kicker: '#2BA3D6',
+    bannerOpacity: 0.94, slant: true, mode: 'graphic',
   },
   washgo: {
-    banner: '#1D4F8C', main: '#FFFFFF', accent: '#FFB84D', stripe: '#FFB84D',
-    bannerOpacity: 0.94, slant: false,
+    banner: '#F3EDE3', main: '#1D4F8C', accent: '#FFB84D', stripe: '#FFB84D',
+    advantage: '#5C5346', kicker: '#1D4F8C',
+    bannerOpacity: 0.0, slant: false, mode: 'editorial',
   },
+};
+
+export const POSTER_ADVANTAGE_FALLBACK: Record<string, string> = {
+  homigo: '把散落的事整理回同一個地方',
+  washgo: '每件衣服都有送洗履歷',
+  taskgo: '讓職人經驗變成可複製的標準',
 };
 
 let fontBytesCache: Uint8Array | null = null;
@@ -132,6 +145,26 @@ export function splitPosterAccent(headline: string, accent?: string): { main: st
   return { main: headline, accent: '' };
 }
 
+export function sanitizePosterAdvantage(raw: string | undefined, brandSlug: string): string {
+  const fallback = POSTER_ADVANTAGE_FALLBACK[brandSlug] ?? POSTER_ADVANTAGE_FALLBACK.homigo;
+  const clean = toTraditionalHeadline(
+    (raw ?? '')
+      .replace(/[A-Za-z0-9#@]/g, '')
+      .replace(/[「」『』""''']/g, '')
+      .replace(/\s+/g, '')
+      .trim(),
+  );
+  if (clean.length < 6) return fallback;
+  return clean.length > 18 ? clean.slice(0, 16) : clean;
+}
+
+export function sanitizePosterKicker(raw: string | undefined, brandSlug: string): string {
+  if (brandSlug !== 'taskgo') return '';
+  const word = (raw ?? '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 14);
+  if (word.length >= 3) return word;
+  return 'STANDARD';
+}
+
 function estimateTextWidth(text: string, fontSize: number): number {
   let w = 0;
   for (const ch of text) {
@@ -164,51 +197,118 @@ function bannerGeometry(width: number, height: number, landscape: boolean) {
   };
 }
 
-function buildBannerSvg(params: {
+function letterSpacingPx(fontSize: number, editorial: boolean): number {
+  return editorial ? Math.round(fontSize * 0.12) : 0;
+}
+
+function spacedWidth(text: string, fontSize: number, tracking: number): number {
+  return estimateTextWidth(text, fontSize) + Math.max(0, text.length - 1) * tracking;
+}
+
+function buildGraphicBannerSvg(params: {
   geo: { x: number; y: number; w: number; h: number; pad: number };
   theme: PosterTheme;
   main: string;
   accent: string;
+  advantage: string;
+  kicker: string;
   landscape: boolean;
 }): { svg: string; x: number; y: number } {
-  const { geo, theme, main, accent, landscape } = params;
+  const { geo, theme, main, accent, advantage, kicker, landscape } = params;
   const maxTextW = geo.w - geo.pad * 2;
   const lines = accent ? [main, accent] : [main];
   const longestLine = lines.reduce((a, b) => (a.length >= b.length ? a : b));
-  let fontSize = landscape ? Math.round(geo.w * 0.16) : Math.round(geo.w * 0.13);
-  while (estimateTextWidth(longestLine, fontSize) > maxTextW && fontSize > 36) {
+  let fontSize = landscape ? Math.round(geo.w * 0.14) : Math.round(geo.w * 0.12);
+  while (estimateTextWidth(longestLine, fontSize) > maxTextW && fontSize > 32) {
     fontSize -= 4;
   }
-  const lineGap = Math.round(fontSize * 1.18);
-  const blockH = lines.length === 1 ? fontSize : fontSize + lineGap;
+  const kickerSize = Math.max(18, Math.round(fontSize * 0.32));
+  const advSize = Math.max(18, Math.round(fontSize * 0.34));
+  const lineGap = Math.round(fontSize * 1.12);
   const cx = Math.round(geo.w / 2);
-  const startY = Math.round((geo.h - blockH) / 2 + fontSize * 0.82);
-  const rx = theme.slant ? 0 : Math.round(Math.min(geo.w, geo.h) * 0.08);
-  const stripeH = Math.max(6, Math.round(geo.h * (landscape ? 0.012 : 0.035)));
-  const skew = theme.slant ? Math.round(geo.w * 0.14) : 0;
+  const kickerH = kicker ? Math.round(kickerSize * 1.6) : 0;
+  const advH = advantage ? Math.round(advSize * 1.8) : 0;
+  const blockH = (lines.length === 1 ? fontSize : fontSize + lineGap) + kickerH + advH;
+  const startY = Math.round((geo.h - blockH) / 2 + fontSize * 0.82 + kickerH);
+  const stripeH = Math.max(6, Math.round(geo.h * (landscape ? 0.012 : 0.03)));
+  const skew = Math.round(geo.w * 0.14);
 
-  const bg = theme.slant
-    ? `<polygon points="0,0 ${geo.w},0 ${geo.w - skew},${geo.h} 0,${geo.h}" fill="${theme.banner}" fill-opacity="${theme.bannerOpacity}"/>`
-    : `<rect width="${geo.w}" height="${geo.h}" rx="${rx}" fill="${theme.banner}" fill-opacity="${theme.bannerOpacity}"/>`;
-
+  const bg = `<polygon points="0,0 ${geo.w},0 ${geo.w - skew},${geo.h} 0,${geo.h}" fill="${theme.banner}" fill-opacity="${theme.bannerOpacity}"/>`;
+  const kickerEl = kicker
+    ? `<text x="${cx}" y="${startY - kickerH}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${kickerSize}" font-weight="700" fill="${theme.kicker}" letter-spacing="${Math.round(kickerSize * 0.28)}">${escapeXml(kicker)}</text>`
+    : '';
   const texts = lines.map((line, i) => {
     const fill = i === 0 ? theme.main : theme.accent;
     const y = startY + i * lineGap;
     return `<text x="${cx}" y="${y}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700" fill="${fill}">${escapeXml(line)}</text>`;
   }).join('');
-
   const stripeY = Math.round(startY + (lines.length === 1 ? fontSize * 0.28 : lineGap + fontSize * 0.18));
   const stripeW = Math.round(Math.min(maxTextW * 0.36, estimateTextWidth(lines[lines.length - 1], fontSize) * 0.55));
   const stripe = `<rect x="${cx - Math.round(stripeW / 2)}" y="${stripeY}" width="${stripeW}" height="${stripeH}" rx="${Math.round(stripeH / 2)}" fill="${theme.stripe}"/>`;
+  const advY = stripeY + stripeH + Math.round(advSize * 1.45);
+  let advFont = advSize;
+  while (estimateTextWidth(advantage, advFont) > maxTextW && advFont > 16) advFont -= 2;
+  const advEl = advantage
+    ? `<text x="${cx}" y="${advY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${advFont}" font-weight="700" fill="${theme.advantage}">${escapeXml(advantage)}</text>`
+    : '';
 
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${geo.w}" height="${geo.h}">`,
-    bg,
-    texts,
-    stripe,
+    bg, kickerEl, texts, stripe, advEl,
     '</svg>',
   ].join('');
   return { svg, x: geo.x, y: geo.y };
+}
+
+function buildEditorialSvg(params: {
+  width: number;
+  height: number;
+  theme: PosterTheme;
+  main: string;
+  accent: string;
+  advantage: string;
+  landscape: boolean;
+}): { svg: string; x: number; y: number } {
+  const { width, height, theme, main, accent, advantage, landscape } = params;
+  const pad = Math.round(width * (landscape ? 0.04 : 0.08));
+  const colW = landscape ? Math.round(width * 0.38) : width;
+  const cx = landscape ? Math.round(colW / 2) : Math.round(width / 2);
+  const maxTextW = colW - pad * 2;
+  const lines = accent ? [main, accent] : [main];
+  const longest = lines.reduce((a, b) => (a.length >= b.length ? a : b));
+  let fontSize = landscape ? Math.round(colW * 0.11) : Math.round(width * 0.072);
+  while (spacedWidth(longest, fontSize, letterSpacingPx(fontSize, true)) > maxTextW && fontSize > 28) {
+    fontSize -= 2;
+  }
+  const tracking = letterSpacingPx(fontSize, true);
+  const lineGap = Math.round(fontSize * 1.22);
+  const headY = landscape
+    ? Math.round(height * 0.22 + fontSize * 0.8)
+    : Math.round(height * 0.09 + fontSize * 0.8);
+  const stripeH = Math.max(4, Math.round(fontSize * 0.08));
+  const texts = lines.map((line, i) => {
+    const fill = i === 0 ? theme.main : theme.accent;
+    const y = headY + i * lineGap;
+    return `<text x="${cx}" y="${y}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700" fill="${fill}" letter-spacing="${tracking}">${escapeXml(line)}</text>`;
+  }).join('');
+  const stripeY = headY + (lines.length === 1 ? Math.round(fontSize * 0.28) : lineGap + Math.round(fontSize * 0.16));
+  const stripeW = Math.round(Math.min(maxTextW * 0.28, estimateTextWidth(lines[lines.length - 1], fontSize) * 0.45));
+  const stripe = `<rect x="${cx - Math.round(stripeW / 2)}" y="${stripeY}" width="${stripeW}" height="${stripeH}" rx="${Math.round(stripeH / 2)}" fill="${theme.stripe}" fill-opacity="0.9"/>`;
+
+  let advSize = landscape ? Math.round(colW * 0.045) : Math.round(width * 0.032);
+  const advTrack = letterSpacingPx(advSize, true);
+  while (spacedWidth(advantage, advSize, advTrack) > maxTextW && advSize > 16) advSize -= 2;
+  const advY = landscape ? Math.round(height * 0.88) : Math.round(height * 0.93);
+  const advEl = advantage
+    ? `<text x="${cx}" y="${advY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${advSize}" font-weight="700" fill="${theme.advantage}" fill-opacity="0.88" letter-spacing="${letterSpacingPx(advSize, true)}">${escapeXml(advantage)}</text>`
+    : '';
+
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`,
+    texts, stripe, advEl,
+    '</svg>',
+  ].join('');
+  return { svg, x: 0, y: 0 };
 }
 
 export async function burnPosterHeadline(
@@ -218,6 +318,8 @@ export async function burnPosterHeadline(
     brandSlug: string;
     headline: string;
     accent?: string;
+    advantage?: string;
+    kicker?: string;
     body?: string;
     landscape?: boolean;
   },
@@ -237,8 +339,18 @@ export async function burnPosterHeadline(
     const landscape = params.landscape ?? width > height;
     const theme = THEME[params.brandSlug] ?? THEME.homigo;
     const split = splitPosterAccent(headline, params.accent);
-    const geo = bannerGeometry(width, height, landscape);
-    const overlay = buildBannerSvg({ geo, theme, main: split.main, accent: split.accent, landscape });
+    const advantage = sanitizePosterAdvantage(params.advantage, params.brandSlug);
+    const kicker = sanitizePosterKicker(params.kicker, params.brandSlug);
+    const overlay = theme.mode === 'editorial'
+      ? buildEditorialSvg({
+        width, height, theme,
+        main: split.main, accent: split.accent, advantage, landscape,
+      })
+      : buildGraphicBannerSvg({
+        geo: bannerGeometry(width, height, landscape),
+        theme, main: split.main, accent: split.accent,
+        advantage, kicker, landscape,
+      });
 
     const resvg = new Resvg(overlay.svg, {
       fitTo: { mode: 'original' },

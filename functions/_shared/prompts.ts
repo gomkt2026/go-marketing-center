@@ -73,14 +73,14 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '3. 搜尋導向:本篇只對準「一個」房東/代管會搜的問題,把該搜尋詞自然寫進第一句與 hashtag。' +
       '4. 只服務一個對象,不要同時講房客吐槽與房東報稅。' +
       '5. Hashtag 8-12 個:1 品牌 + 2-3 利基搜尋詞 + 其餘發現用。禁止無關標、禁止重複堆疊。' +
-      '6. 視覺必須看得出是 Homigo(米白底、深藍資訊、黃強調)。寧可穩、不要為了爆款換成不像自己的風格。系統畫面做成痛點海報的解法卡,不要整頁後台直發。' +
+      '6. 視覺必須看得出是 Homigo:米白藝術紙留白、深藍鋼筆線、黃只做小色塊。主體很小、被紙面包圍。系統畫面做成痛點海報的解法卡,不要整頁後台直發。' +
       '7. 禁止標題黨、禁止「留言才告訴你」、禁止假裝限時優惠——會傷害推薦資格。',
     instagramMaxChars: 220,
     igSearchQueries: ['包租代管', '房東報修', '收租對帳', '租屋合約管理', '代管系統'],
     imageStyle:
-      'Documentary photography of Taiwanese apartments and old-house living: street arcades, terrazzo stairwells, ' +
-      'wooden window frames with soft daylight, rooftop water towers against the city skyline; ' +
-      'muted nostalgic film tones, quiet dignified composition. The building or space itself can be the subject; people are optional.',
+      'Editorial hand-drawn art-book cover of Taiwanese apartments and old-house living: street arcades, terrazzo stairwells, ' +
+      'wooden window frames, rooftop water towers; tiny subject on warm ivory fiber paper, pencil construction lines, light watercolor wash. ' +
+      'The building or a quiet person can be the subject. Not photoreal, not a real-estate flyer.',
   },
   taskgo: {
     frontlinePersona:
@@ -103,18 +103,18 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '2. 圖上主標與文案第一句同義;少字多圖,重點放在圖上的 4-10 字語錄。' +
       '3. 搜尋導向:對準工程行老闆/工班頭會搜的一個詞(派工、現場回報、工班管理、工程行系統),寫進第一句與 hashtag。' +
       '4. Hashtag 8-12 個,混用大流量(#做工的人 #工地日常)與利基(#派工 #工程行 #現場回報)。' +
-      '5. 視覺必須看得出是匠管 TaskGo:海軍藍/青藍/白、斜切色塊、蜂巢科技紋;橘或黃只做強調。可放藍色圓頭機器人吉祥物。要有台灣工地文化(安全帽、反光背心、LINE、案場)。系統畫面做成痛點海報的解法卡,不要整頁後台直發。不要深灰語錄卡、不要歐美棚拍、不要電商廣告感。' +
+      '5. 視覺必須看得出是匠管 TaskGo:海軍藍/青藍/白大色塊、斜切、蜂巢;橘或黃只做強調。人物是平面海報構圖元素(側臉、回望、邁步),不是寫實工地風景照。可放藍色圓頭機器人吉祥物。要有台灣工地文化(安全帽、反光背心、LINE、案場)。系統畫面做成痛點海報的解法卡,不要整頁後台直發。不要深灰語錄卡、不要歐美棚拍、不要洋紅珊瑚當主色。' +
       '6. 禁止標題黨與互動勒索,主題不要飄到跟工班無關的生活文。',
     instagramMaxChars: 220,
     igSearchQueries: ['派工系統', '工班管理', '工程行', '現場回報', '工地打卡'],
     imageStyle:
-      'Professional Taiwan construction-tech photography: bright daylight on a real site with cranes or scaffolding, ' +
-      'Taiwanese craftsmen in white or yellow hard hats and high-vis vests using a tablet or LINE on a phone; ' +
-      'navy-cyan color grade, clean tech-utility feel. East Asian faces, natural body types. Not muted film nostalgia, not Western stock models.',
+      'Graphic editorial poster for Taiwan construction-tech: navy #0B2D5C and cyan #2BA3D6 color blocks, diagonal cuts, honeycomb; ' +
+      'Taiwanese craftsmen in hard hats and high-vis as flat cel-shaded poster figures, cinematic crop; ' +
+      'small blue round robot in a corner. Not photoreal site photography, not muted film nostalgia, not Western stock models.',
     imageStyleB2b:
-      'B2B documentary of a Taiwan engineering crew at work: site office or mid-rise Taipei construction, ' +
-      'foreman pointing at a plan, tablet showing a simple checklist, hard hats and reflective vests, ' +
-      'bright professional light, navy-cyan grade. The workspace or a clean system screen can be the subject.',
+      'B2B graphic poster of a Taiwan engineering crew: site office marks as simplified shapes, ' +
+      'foreman with a tablet, hard hats and reflective vests, navy-cyan blocks and honeycomb. ' +
+      'The figure is a design element, not a documentary photograph.',
     threadsCraft:
       'TaskGo 的 Threads 專屬規則(與通用規則衝突時,以這裡為準):' +
       '1. 字數 80-180 字,絕對不超過 220 字。2-5 個短段落,一句一行,前 3 行決定停滑。' +
@@ -134,9 +134,9 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
     operatorConcerns:
       '手寫單據對不攏、多門市調撥、司機派遣與運費、客源老化、價目管理、品管掃碼、LINE 會員經營、平台導流',
     imageStyleB2b:
-      'Documentary photography of Taiwanese laundry-shop operations: garment racks, folding tables, receipt counters, ' +
-      'delivery scooters at the alley, staff scanning tags; muted warm tones, quiet workplace dignity. ' +
-      'The workspace or a clean system screen can be the subject; people are optional.',
+      'Editorial paper-sketch of Taiwanese laundry-shop operations: garment racks, folding tables, receipt counters, ' +
+      'delivery scooters at the alley; warm ivory fiber paper, muted washgo blue ink, tiny gold chip. ' +
+      'Quiet workplace dignity. Never Ghibli, never smiling washing machines.',
     threadsCraft:
       'Washgo 的 Threads 專屬規則(與通用規則衝突時,以這裡為準):' +
       '1. 字數嚴格控制在 60-120 字,絕對不超過 150 字。2-4 個短段落、一句一行的節奏,讀者滑到 10 秒內就能讀完;寧短勿長。' +
@@ -151,7 +151,7 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
     instagramCraft:
       'Washgo IG 專屬規則:' +
       '1. 80-180 字,絕對不超過 220 字。前 125 字必須是完整一句業者痛點 hook(手寫單、對不攏、衣服洗到哪沒人知)。' +
-      '2. 配圖必須是 B 端痛點海報:店主真實煩惱場景 + 4-10 字主標 + Washgo 系統重點畫面卡(訂單/履歷/調撥擇一)。禁止只把整頁後台截圖置中鋪在色塊上。禁止吉卜力卡通、禁止笑臉洗衣機。' +
+      '2. 配圖必須是 B 端痛點海報:店主真實煩惱場景畫成極簡手繪紙本封面 + 4-10 字主標 + 優勢小字 + Washgo 系統重點畫面卡(訂單/履歷/調撥擇一)。禁止只把整頁後台截圖置中鋪在色塊上。禁止吉卜力卡通、禁止笑臉洗衣機。' +
       '3. 文案要講畫面上看得見的事(欄位、狀態、對不攏的單),像店主在看自己後台,不要寫「邁向數位化的未來就是現在」「告別繁瑣」「輕鬆數位化」空心廣告句。' +
       '4. 搜尋導向:對準洗衣店主會搜的一個詞(洗衣店系統、送洗履歷、門市調撥、洗衣店數位轉型)。' +
       '5. Hashtag 8-12 個:品牌 + 利基搜尋詞 + 發現用。不要塞 #換季 #羽絨被 這種 C 端生活標到 B 端圖文。' +
@@ -160,10 +160,8 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
     instagramMaxChars: 220,
     igSearchQueries: ['洗衣店系統', '送洗履歷', '門市調撥', '洗衣店數位轉型'],
     imageStyle:
-      'Studio Ghibli-inspired hand-drawn animation style: soft watercolor textures, warm pastel palette, gentle golden lighting; ' +
-      'a cozy whimsical Taiwanese self-service laundry scene with an adorable tech twist — round friendly washing machines with cute glowing faces, ' +
-      'a small helper robot folding fluffy towels, floating soap bubbles catching the light, steam swirls, plants by the window; ' +
-      'heartwarming, wholesome, storybook-like anime film quality that makes people smile and want to like the post.',
+      'Minimal hand-drawn editorial still life on warm ivory fiber paper: one tiny laundry subject (stacked towels, a tagged shirt, a fluffy comforter) ' +
+      'surrounded by designed paper space, pencil construction lines and light wash. Heartwarming but quiet. Never Studio Ghibli, never smiling washing machines.',
     imageRendering: 'illustration',
   },
 };
@@ -499,6 +497,10 @@ export interface GeneratedPost {
   posterHeadline?: string;
   /** 主標裡要用品牌強調色的 2-6 字(如「不理？」);沒有就空 */
   posterAccent?: string;
+  /** 留白區小字:品牌優勢 8-16 字,讓觀眾一眼看到這套系統解決什麼 */
+  posterAdvantage?: string;
+  /** TaskGo 選填:一個全大寫英文使命詞(如 STANDARD),後製小字,不要叫模型畫 */
+  posterKicker?: string;
   /** Threads 串文 2/2:發布後自動回覆在主帖下面,用來邀請大家分享故事 */
   replyBody?: string;
 }
@@ -516,64 +518,138 @@ export interface EngagementPrediction {
 /** 海報主標 JSON:後製印字,禁止寫進 imagePrompt 叫模型去畫 */
 export const POSTER_HEADLINE_JSON_SPEC =
   '"posterHeadline": "必填:4-10 字台灣繁體中文痛點主標,必須與文案第一句同義,禁止簡體(例如「房東修繕不理？」「講不清楚」「手寫單對不攏」「今天做到哪」)", ' +
-  '"posterAccent": "主標裡要用品牌強調色的 2-6 字(例如「不理？」「對不攏」);沒有就空字串"';
+  '"posterAccent": "主標裡要用品牌強調色的 2-6 字(例如「不理？」「對不攏」);沒有就空字串", ' +
+  '"posterAdvantage": "必填:8-16 字台灣繁中品牌優勢,印在留白區讓觀眾看見這套系統解決什麼(Homigo 如「把散落的事整理回同一個地方」;Washgo 如「每件衣服都有送洗履歷」;TaskGo 如「讓職人經驗變成可複製的標準」)", ' +
+  '"posterKicker": "選填:僅 TaskGo 給一個全大寫英文使命詞(STANDARD / TRACE / CREW / CONTROL 擇一);其他品牌空字串"';
+
+const EDITORIAL_PAPER_CORE = [
+  'Redraw the entire frame as one complete hand-drawn editorial art-book cover on warm natural-fiber paper.',
+  'Not a photo, not a filter, not a collage, not a split-screen, not vector art, not 3D, not anime, not an ad.',
+  'Tiny readable subject: 15–30% of the frame, centered or slightly low. Designed negative space of paper must dominate. Quiet, poetic, museum-publication quality.',
+  'Paper: warm ivory / cream / off-white with visible fibers, grain, faint ink bleed, dry-brush, slight printing unevenness. Never pure digital white, never dirty grunge.',
+  'Drawing mix: pencil construction + ink contour + light watercolor/marker wash. Keep the working sketch: overlapping contours, construction lines, broken lines fading into paper, imperfect pressure, a few stray strokes. Main silhouette slightly darker; background lines dissolve at the edges.',
+  'Max 4 muted paper-like colors sampled from the scene. No neon, no glossy 3D, no photoreal skin pores, no airbrush gradients.',
+  'People: keep count, pose, clothes, hair, glasses, shoes, held objects, and relationships. Simplified hand-drawn faces — recognizable, gentle, not photographic.',
+  'Environment: only a few identifying marks; sky, plants, walls, roads fade into paper.',
+].join(' ');
+
+const EDITORIAL_PAPER_CONVERT = [
+  'The attached photograph is the ONLY composition and content source.',
+  'Keep the most recognizable subjects, poses, clothing silhouettes, key objects, spatial relations and narrative.',
+  'Do not add important elements that are not in the photo. Do not change the number of people or their identity.',
+  'Fully redraw as a hand-drawn illustration — no photographic patches, no photo frames, no leftover camera texture.',
+  'Keep the original aspect: portrait stays portrait, landscape stays landscape.',
+].join(' ');
+
+const TASKGO_GRAPHIC_CORE = [
+  'Graphic editorial poster for 匠管 TaskGo. The person is both the hero and a layout element.',
+  'Japanese contemporary illustration × fashion-editorial poster × Nordic graphic design. Flat cel-shaded color planes, 2–3 shadow steps, no 3D CGI, no photoreal portrait.',
+  'LOCKED palette: navy #0B2D5C, cyan #2BA3D6, white. Safety orange #ED9121 and yellow #F7B500 only as tiny accents. Never a dark-grey quote card. Never magenta/coral/pink as the main field.',
+  'Background is GRAPHIC, not a landscape photo: bold navy/cyan color blocks covering about 50–60%, diagonal cuts, honeycomb/halftone, ink splash, paper grain. Negative space is designed.',
+  'Cinematic crop: bust or full body, profile, three-quarter, walking, or looking back. Slightly small face, longer neck, calm intelligence. Taiwanese East Asian craftsman.',
+  'Workwear as original couture: hard hat, reflective vest, navy work shirt, tablet or LINE — each detail is symbolic, not a luxury-brand copy.',
+  'Small blue round-head robot mascot in a corner (big round eyes, short antenna, optional blue hard hat) as an AI helper, never the hero, never chibi-cute.',
+  'Taiwan site culture as graphic marks (crane silhouette, honeycomb, rice dumpling, typhoon tarp, arcade scaffold) — not a full scenery painting.',
+].join(' ');
 
 /** 指示文案 AI 為 Homigo IG 圖撰寫設計描述(不是純照片描述) */
 export const HOMIGO_IG_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:這張圖是 Homigo 的直式品牌海報畫面(不是純照片、不是語錄卡)。只描述畫面,不要描述任何要印在圖上的文字:' +
-  '1) 構圖:上方 25% 完全留空(米白或極淡漸層,沒有人、沒有物件、沒有任何文字),留給後製主標;' +
-  '2) 情境:台灣年輕房東或房客的真實疲憊場景(LINE 訊息爆炸、合約找不到、報修沒人理、電費算不清),自然表情、不要商業假笑;' +
-  '3) 解法:畫面下方一個簡潔白底手機/平板卡,UI 只有抽象灰線與色塊,禁止任何文字、數字、假按鈕"';
+  '"imagePrompt": "必填:這張圖是 Homigo 極簡手繪紙本編輯封面(不是純照片、不是語錄卡)。只描述畫面,不要描述任何要印在圖上的文字:' +
+  '1) 構圖:微小清楚的主體佔畫面 15-30%,被大面積米白藝術紙留白包圍;上方 25% 完全留空(只有紙張質感,沒有人、沒有物件、沒有文字),留給後製主標與優勢小字;' +
+  '2) 情境:台灣年輕房東或房客的真實疲憊場景(LINE 訊息爆炸、合約找不到、報修沒人理),自然表情、不要商業假笑;' +
+  '3) 解法:畫面偏下一個很小的手繪手機/平板卡,UI 只有抽象灰線與色塊,禁止任何文字、數字、假按鈕"';
 
-/** Homigo IG 圖片生成的固定設計規格(直接附加在圖片 prompt 後) */
+/** Homigo 紙本編輯封面規格(直接附加在圖片 prompt 後) */
 export const HOMIGO_IG_IMAGE_STYLE = [
-  '【設計規格】直式品牌海報。米白背景(#F5F1EA)大面積留白;深藍(#0B2D5C)為主要資訊色;黃色(#F7B500)只做色塊強調,禁止花俏。',
-  '上下左右留白要足夠,畫面不可過滿,像一張會被印出來的社群海報。',
-  '【閱讀順序】上方留空 banner → 中間有共鳴的情境人物 → 下方才是 Homigo 解法卡。先讓人感受到問題,不要一開始就像廣告。',
-  '【人物】東亞臉孔的台灣年輕人,自然表情、不要過度微笑、不要商業假笑,情緒偏真實與疲憊(房東焦慮、房客無奈)。',
-  '【系統畫面】解法是平板或白卡上的 Homigo 重點畫面,不要把整頁後台截圖置中鋪在色塊上。' +
-  '【手機UI】簡潔、白底、深藍色塊、黃色重點;UI 一律用抽象灰色線條與色塊示意,絕對不要畫任何文字、數字、假 icon 標籤(模型畫中文一定會變成亂碼)。',
-  '【禁止文字】圖上不要出現任何中文、英文、數字、logo、浮水印。主標由系統後製疊上正確台灣繁體中文。',
-  '【整體感覺】像新創品牌內容海報,有觀點、有情緒、有生活感;不要電商廣告、保險 DM、傳統房仲海報。',
+  EDITORIAL_PAPER_CORE,
+  'Homigo palette: paper #F5F1EA, navy ink #0B2D5C, yellow #F7B500 only as a tiny color chip. Quiet rental dignity.',
+  'Taiwan rental cues: arcade, terrazzo stair, iron window, lease folder, LINE on a phone, landlord/tenant fatigue.',
+  'Optional tiny sketched device card in the lower third with abstract grey bars and a navy chip — no glyphs.',
+  'Mood: still, warm, unfinished-on-purpose, independent art publication. Not a real-estate flyer.',
 ].join('\n');
 
-/** Homigo 品牌標:無 logo 檔時的文字標 fallback */
+/** 角落留給官方 logo 與後製繁中,模型不要自己畫字 */
 export const HOMIGO_TEXT_MARK_RULE =
-  '【品牌標】畫面左下角或 footer 放小小的深藍色「Homigo」文字標,乾淨、不可過大、不可貼底。';
+  '【品牌標】不要在圖上畫任何 logo 或品牌字樣;角落留乾淨,官方標與繁中主標由系統後製。';
 
-/** 各品牌 B 端「社群設計圖」規格(痛點主標 + 系統 UI 卡);Homigo 沿用既有 IG 規範 */
+/** 各品牌 B 端「社群設計圖」規格;Homigo/Washgo 紙本編輯封面,TaskGo 匠管平面海報 */
 export const BRAND_DESIGN_IMAGE_STYLE: Record<string, string> = {
   homigo: HOMIGO_IG_IMAGE_STYLE,
   washgo: [
-    '【設計規格】直式 B 端痛點海報。深藍(#1D4F8C)主底,品牌藍(#3A8DDE)層次,金橘(#FFB84D)只做色塊強調。',
-    '【構圖】上方 25% 完全留空給後製主標(純深藍或極淡漸層,不要人物、不要任何文字)。中間是店內情境,下方才是系統卡。',
-    '【人物】東亞臉、自然身形的台灣店主或櫃檯,polo 或工作服,店內衣架與摺衣台。真實疲憊可以,不要歐美模特、不要吉卜力、不要笑臉洗衣機。',
-    '【系統畫面】只放一個重點區塊,UI 用抽象灰線與色塊,禁止任何文字數字。不要整頁後台置中鋪在純色底上。',
-    '【禁止文字】圖上不要出現任何中文、英文、數字、logo。主標由系統後製疊上正確台灣繁體中文。',
+    EDITORIAL_PAPER_CORE,
+    'Washgo palette: ivory paper, muted ink blues #1D4F8C and #3A8DDE, gold #FFB84D only as a tiny chip. Never a full-bleed navy poster.',
+    'Taiwan laundry cues: garment racks, folding table, polo staff, alley delivery scooter, tagged shirts. Quiet workplace dignity.',
+    'NEVER Studio Ghibli, NEVER smiling washing machines, NEVER cute robot as hero, NEVER kawaii mascot takeover.',
+    'Optional tiny sketched device card in the lower third with abstract grey bars — no glyphs.',
+    'Mood: still, warm, unfinished-on-purpose, independent art publication. Not a promo DM.',
   ].join('\n'),
   taskgo: [
-    '【設計規格】直式「匠管 TaskGo」品牌海報。主色海軍藍(#0B2D5C)與青藍(#2BA3D6),大面積白;安全橘(#ED9121)與黃(#F7B500)只做色塊。禁止深灰語錄卡當主視覺。',
-    '【構圖】斜切色塊/平行四邊形、半透明海軍藍疊在工地實拍上、淡青蜂巢或六角科技紋。上方 25%(直式)或左側 38%(橫式)完全留空給後製主標,不要人物、不要任何文字。',
-    '【人物】東亞臉孔的台灣工班:白或黃安全帽、反光背心、深藍工作服;自然表情,不要歐美模特、不要棚拍假笑。可出現工地主任看圖、師傅打卡、後勤看報表。',
-    '【吉祥物】可在邊角放藍色圓頭機器人(大圓眼、短天線,可戴藍安全帽或拿鉛筆),當 AI 幫手,不要佔據主體、不要日式大眼萌。',
-    '【台灣文化】場景長在台灣:大台北案場、騎樓、塔吊、中元普渡工安、端午工地粽、開工、颱風天收工、LINE 群。不要歐美工地。',
-    '【系統畫面】解法是平板或白卡上的派工/回報重點,UI 用抽象灰線與色塊,禁止任何文字數字。不要整頁後台置中。',
-    '【禁止文字】圖上不要出現任何中文、英文、數字、logo 或品牌英文字(官方 logo 與主標會後製合成)。不要電商廣告感。',
+    TASKGO_GRAPHIC_CORE,
+    '斜切平行四邊形 banner、淡青蜂巢紋必須在。直式上方 25% 或橫式左側 38% 是空的海軍藍或青藍色塊,不要人物、不要任何文字。',
+    '台灣工班:白或黃安全帽、反光背心、深藍工作服;工地主任看圖、師傅打卡、後勤看報表皆可。不要歐美模特、不要棚拍假笑。',
+    '可在下三分之一放很小的平板/白卡,UI 用抽象灰線與青藍色塊,禁止文字數字。不要整頁後台置中。',
+    'Every element has meaning: workwear = craft philosophy, cyan = digital clarity, navy = trust, empty block = the future overlay, honeycomb = copyable standard.',
   ].join('\n'),
 };
 
-/** Washgo Threads 專用:每篇必配一張可愛插畫衝曝光(短文 + 可愛圖是流量策略核心;只用於 Threads C 端) */
+/** 無參考圖的「照片風格」:仍走品牌插畫語言,只是沒有系統卡、更靠近被轉換的現場 */
+export const BRAND_PHOTO_IMAGE_STYLE: Record<string, string> = {
+  homigo: [
+    EDITORIAL_PAPER_CORE,
+    'Homigo palette: paper #F5F1EA, navy #0B2D5C, yellow #F7B500 tiny chip.',
+    'A single Taiwan rental moment redrawn as a quiet art-book cover. No device UI card. Subject even smaller than the design poster.',
+  ].join('\n'),
+  washgo: [
+    EDITORIAL_PAPER_CORE,
+    'Washgo palette: ivory paper, muted #1D4F8C / #3A8DDE, gold #FFB84D tiny chip.',
+    'A single Taiwan laundry moment redrawn as a quiet art-book cover. No device UI card. NEVER Ghibli or smiling washers.',
+  ].join('\n'),
+  taskgo: [
+    TASKGO_GRAPHIC_CORE,
+    'More cinematic figure, slightly more site texture as stylized graphic marks. No full photoreal site. No device UI card.',
+    '直式上方 25% 或橫式左側 38% 空的海軍藍/青藍色塊給後製字。',
+  ].join('\n'),
+};
+
+export const PHOTO_EDITORIAL_CONVERT_RULE = `${EDITORIAL_PAPER_CONVERT} ${EDITORIAL_PAPER_CORE}`;
+export const TASKGO_GRAPHIC_CONVERT_RULE =
+  `${EDITORIAL_PAPER_CONVERT} Translate that photo into the TaskGo graphic editorial poster language. ${TASKGO_GRAPHIC_CORE}`;
+
+/** 組給 gpt-image 的完整 prompt(文案 AI 的 scene + 品牌固定風格 + 禁字) */
+export function buildSocialImagePrompt(params: {
+  brandSlug: string;
+  scene: string;
+  imageStyle: ImageStyleId;
+  landscape: boolean;
+  hasLogo: boolean;
+}): string {
+  const designSpec = BRAND_DESIGN_IMAGE_STYLE[params.brandSlug] ?? BRAND_DESIGN_IMAGE_STYLE.homigo;
+  const photoSpec = BRAND_PHOTO_IMAGE_STYLE[params.brandSlug] ?? designSpec;
+  const styleBlock = params.imageStyle === 'photo' ? photoSpec : designSpec;
+  return [
+    params.scene,
+    styleBlock,
+    'CRITICAL: no letters, numbers, CJK, Latin, UI labels, captions, watermarks, or logos. Typography is composited later in Traditional Chinese.',
+    params.landscape
+      ? 'LANDSCAPE poster 3:2. Left 38% empty designed paper or brand color block. Subject stays on the right.'
+      : 'PORTRAIT poster. Top 25% empty designed paper or brand color block.',
+    params.hasLogo
+      ? 'Do not draw any logo or brand wordmark; leave a clean corner for the official logo composite.'
+      : HOMIGO_TEXT_MARK_RULE,
+  ].filter(Boolean).join('\n\n');
+}
+
+/** Washgo Threads 專用:紙本編輯靜物衝曝光(短文 + 一張會停滑的圖;只用於 Threads C 端) */
 export const WASHGO_THREADS_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:Washgo 的 Threads 每篇都要配一張「可愛系插畫」來增加曝光。' +
-  '給圖片生成模型的英文描述:畫出這篇貼文主題的療癒場景,構圖要簡單、主體只有一個、一眼看懂' +
-  '(例如圓滾滾有笑臉的洗衣機、蓬鬆的羽絨被、疊得整齊的毛巾山、幫忙摺衣服的小幫手角色),' +
-  '讓人滑到會停下來按讚的可愛程度,不含文字"';
+  '"imagePrompt": "必填:Washgo 的 Threads 每篇都要配一張極簡手繪紙本靜物。' +
+  '給圖片生成模型的英文描述:暖象牙色藝術紙上一個很小很清楚的主體(蓬鬆羽絨被、疊好的毛巾山、掛著的襯衫、店口機車置物籃),被大面積留白包圍,' +
+  '鉛筆草稿線+淡彩,不要吉卜力、不要笑臉洗衣機、不含文字"';
 
 const DESIGN_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:這張圖是直式 B 端痛點海報畫面。只描述畫面,不要描述任何要印在圖上的文字:' +
-  '1) 構圖:上方 25% 完全留空給後製主標(純色或極淡漸層,沒有人、沒有物件、沒有文字);' +
+  '"imagePrompt": "必填:這張圖是極簡手繪紙本編輯封面。只描述畫面,不要描述任何要印在圖上的文字:' +
+  '1) 構圖:主體只佔 15-30%,被藝術紙留白包圍;上方 25% 完全留空給後製主標與優勢小字(只有紙張,沒有人、沒有物件、沒有文字);' +
   '2) 情境:台灣業者在現場的真實煩惱(依品牌:洗衣店主/房東代管/工班頭);' +
-  '3) 解法:平板或白卡只露出一個系統重點,UI 用抽象灰線與色塊,禁止任何文字;' +
+  '3) 解法:偏下一個很小的手繪平板/白卡,UI 用抽象灰線與色塊,禁止任何文字;' +
   '4) 禁止:整頁截圖鋪在純色底、吉卜力、笑臉洗衣機、任何中英數字、自己畫 logo"';
 
 /** 有真實系統截圖時:指示文案 AI 寫出海報構圖,截圖會當參考圖做成解法卡 */
@@ -587,24 +663,31 @@ export const B2B_SCREENSHOT_POSTER_PROMPT_SPEC =
 /** 帶參考截圖生海報時附加在圖片 prompt 後 */
 export const SYSTEM_SCREENSHOT_POSTER_RULE =
   'The attached image is a REAL product screenshot. Build a B2B social poster, not a screenshot dump. ' +
-  'Leave the top 25% (portrait) or left 38% (landscape) as a clean empty brand-color banner with NO text — the headline is composited later in Traditional Chinese. ' +
-  'Second glance: a Taiwanese B2B operator in their real workplace showing the pain. ' +
+  'Leave the top 25% (portrait) or left 38% (landscape) as empty designed paper or a clean brand-color block with NO text — the headline and advantage line are composited later in Traditional Chinese. ' +
+  'Second glance: a Taiwanese B2B operator redrawn in this brand’s illustration language (Homigo/Washgo = editorial paper sketch; TaskGo = navy-cyan graphic poster), showing the workplace pain. ' +
   'Third glance: a tablet, phone, or floating white card that shows THIS exact screenshot — crop to the key panel, keep the UI recognizable, do not invent a different software. ' +
   'Do not place the raw full screenshot centered on a solid navy or blue field. ' +
   'Do not draw extra Chinese headlines, captions, or logos.';
 
 const TASKGO_DESIGN_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:這張圖是匠管 TaskGo 的直式品牌海報(海軍藍斜切+台灣工地,不是深灰語錄卡)。只描述畫面,不要描述任何要印在圖上的文字:' +
-  '1) 構圖:上方 25% 完全留空給後製主標;斜切深藍色塊、青藍蜂巢紋;' +
-  '2) 情境:台灣工班真實場景——安全帽、反光背心、塔吊或案場、師傅用平板/LINE;可點出一個台灣文化錨(開工、端午工地粽、中元普渡工安、颱風天收工、大台北工地);' +
+  '"imagePrompt": "必填:這張圖是匠管 TaskGo 的平面編輯海報(海軍藍斜切+青藍蜂巢,日本當代插畫×時尚海報構圖,不是深灰語錄卡、不是寫實工地風景照)。只描述畫面,不要描述任何要印在圖上的文字:' +
+  '1) 構圖:上方 25% 完全留空給後製主標與優勢小字;斜切深藍色塊約佔背景 50-60%、青藍蜂巢紋;人物是構圖元素不是風景主角;' +
+  '2) 情境:台灣工班——安全帽、反光背心、平板或 LINE;電影截幀式構圖(側臉、回望、邁步);可點出一個台灣文化錨(開工、端午工地粽、中元普渡工安、颱風天收工、大台北工地);' +
   '3) 解法:邊角可放藍色圓頭機器人吉祥物;平板或白卡只放抽象 UI 色塊,不要整頁截圖鋪底、不要任何文字;' +
-  '4) 禁止:歐美工地棚拍、深灰純文字卡、整頁後台置中、任何中英數字、自己畫 logo"';
+  '4) 禁止:歐美工地棚拍、深灰純文字卡、整頁後台置中、洋紅/珊瑚當主色、任何中英數字、自己畫 logo"';
 
 const TASKGO_PHOTO_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:給圖片生成模型的英文描述,走「台灣工地×數位工具」專業寫實,不是懷舊底片風。' +
-  '主角是台灣工班(東亞臉孔、自然身形,白或黃安全帽、反光背心),在案場用平板或 LINE;' +
-  '場景在台灣(大台北工地、騎樓整修、工務所),明亮日光、海軍藍青藍色調。' +
-  '禁止歐美模特、棚拍廣告、黃昏懷舊、不含文字"';
+  '"imagePrompt": "必填:給圖片生成模型的英文描述,走匠管平面編輯海報,不是寫實攝影、不是懷舊底片。' +
+  '主角是台灣工班(東亞臉孔、自然身形,白或黃安全帽、反光背心),胸上或全身,側臉或回望;' +
+  '背景是海軍藍與青藍大色塊+蜂巢,不是完整工地風景。上方 25% 留空。禁止歐美模特、棚拍廣告、不含文字"';
+
+const PHOTO_CONVERT_PROMPT_SPEC =
+  '"imagePrompt": "必填:描述如何把這張原照片重畫成品牌編輯海報。只保留原照片主體、姿勢、物件與敘事,不要新增不屬於原圖的重要元素。不要描述要印在圖上的文字"';
+
+const PAPER_PHOTO_IMAGE_PROMPT_SPEC =
+  '"imagePrompt": "必填:給圖片生成模型的英文描述,把這個台灣日常瞬間畫成極簡手繪紙本編輯封面。' +
+  '微小清楚的主體被大面積暖象牙色藝術紙包圍,鉛筆草稿線與淡彩,不要照片、不要濾鏡。' +
+  '上方 25% 只留紙張給後製字。主角是台灣人(東亞臉、日常穿著)或台灣空間本身。不含文字"';
 
 /** 各平台配圖描述的要求:FB 走寫實攝影、IG 走溫暖插畫/自然攝影,Threads 預設純文字、AI 判斷有圖更好才選填 */
 const IMAGE_PROMPT_SPEC: Record<'facebook' | 'instagram' | 'threads', string> = {
@@ -647,11 +730,13 @@ function resolveImagePromptSpec(params: {
     return WASHGO_THREADS_IMAGE_PROMPT_SPEC;
   }
   if (style === 'illustration') {
+    if (slug === 'homigo' || slug === 'washgo') return PAPER_PHOTO_IMAGE_PROMPT_SPEC;
     return '"imagePrompt": "必填:給圖片生成模型的英文描述,走溫暖手繪插畫,主體單一、一眼看懂,不含文字"';
   }
   if (slug === 'taskgo' && (style === 'photo' || params.platform === 'facebook' || params.platform === 'instagram')) {
     return TASKGO_PHOTO_IMAGE_PROMPT_SPEC;
   }
+  if (style === 'photo' && (slug === 'homigo' || slug === 'washgo')) return PAPER_PHOTO_IMAGE_PROMPT_SPEC;
   if (style === 'photo') return IMAGE_PROMPT_SPEC.facebook;
   return IMAGE_PROMPT_SPEC[params.platform];
 }
@@ -667,6 +752,7 @@ export function buildPostUserPrompt(params: {
   imageStyle?: ImageStyleId;
   skipImagePrompt?: boolean;
   screenshotPoster?: boolean;
+  convertPhotoPoster?: boolean;
 }): string {
   const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
   const guideline = params.platform === 'threads' && voice?.threadsCraft
@@ -691,7 +777,11 @@ export function buildPostUserPrompt(params: {
   });
   const overlayHeadline = !params.skipImagePrompt && (
     params.screenshotPoster
+    || params.convertPhotoPoster
     || params.imageStyle === 'design'
+    || params.imageStyle === 'photo'
+    || params.platform === 'facebook'
+    || params.platform === 'instagram'
     || (params.brandSlug === 'homigo' && params.platform === 'instagram' && !params.imageStyle)
   );
   return [
@@ -704,9 +794,11 @@ export function buildPostUserPrompt(params: {
     searchBlock,
     params.extraInstruction ?? '',
     params.screenshotPoster
-      ? '配圖會把品牌上傳的真實系統畫面做成 B 端痛點海報(現場煩惱 + 後製繁中主標 + 這張畫面當解法卡),必須提供 imagePrompt 與 posterHeadline。'
+      ? '配圖會把品牌上傳的真實系統畫面做成 B 端痛點海報(現場煩惱 + 後製繁中主標與優勢小字 + 這張畫面當解法卡),必須提供 imagePrompt、posterHeadline、posterAdvantage。'
+      : params.convertPhotoPoster
+        ? '配圖會把品牌上傳的實拍轉成品牌編輯海報(Homigo/Washgo 紙本手繪封面;TaskGo 海軍藍平面海報),必須提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
       : params.skipImagePrompt ? '配圖已指定為品牌上傳的真實截圖或實拍,不要提供 imagePrompt。' : '',
-    overlayHeadline ? 'posterHeadline 必須是正確台灣繁體中文(禁止簡體)。主標會由系統印在圖上,不要把這句字寫進 imagePrompt 叫圖片模型去畫。' : '',
+    overlayHeadline ? 'posterHeadline 與 posterAdvantage 必須是正確台灣繁體中文(禁止簡體)。主標與優勢小字會由系統印在留白區,不要把這些字寫進 imagePrompt 叫圖片模型去畫。' : '',
     '',
     '回傳 JSON 物件,格式:',
     `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${imageSpec ? `, ${imageSpec}` : ''}${overlayHeadline ? `, ${POSTER_HEADLINE_JSON_SPEC}` : ''}}`,
@@ -731,6 +823,7 @@ export function buildImageInspiredPostPrompt(params: {
   audienceLane?: AudienceLane;
   audienceName?: string;
   extraInstruction?: string;
+  convertPhotoPoster?: boolean;
 }): string {
   const voice = params.brandSlug ? getBrandVoice(params.brandSlug) : undefined;
   const guideline = params.platform === 'threads' && voice?.threadsCraft
@@ -751,12 +844,18 @@ export function buildImageInspiredPostPrompt(params: {
     : '';
   const screenshotPoster = params.imageCategory === 'system_screenshot'
     && (params.platform === 'facebook' || params.platform === 'instagram');
+  const convertPhotoPoster = !!params.convertPhotoPoster
+    || (!screenshotPoster && (params.platform === 'facebook' || params.platform === 'instagram')
+      && ['real_photo', 'people', 'scene', 'brand_collab'].includes(params.imageCategory ?? ''));
+  const overlayFields = screenshotPoster || convertPhotoPoster;
   return [
     `這是品牌上傳的一張${categoryLabel}${params.caption ? `,說明:${params.caption}` : ''}。`,
     `請仔細看這張圖,挑一個畫面裡真的有的細節或情境當鉤子,寫一篇 ${params.platform} 貼文。`,
     '不要憑空描述圖片裡沒有的東西,也不要寫成單純的圖片說明文;要像有人真的看到/用到這個畫面後,寫下的一則真實感想或分享。',
     screenshotPoster
-      ? '這張系統畫面會被做成 B 端痛點海報(現場煩惱 + 後製繁中主標 + 畫面當解法卡),不是原圖直發。請一併提供 imagePrompt 與 posterHeadline。主標不要寫進 imagePrompt。'
+      ? '這張系統畫面會被做成 B 端痛點海報(現場煩惱 + 後製繁中主標與優勢小字 + 畫面當解法卡),不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。主標不要寫進 imagePrompt。'
+      : convertPhotoPoster
+        ? '這張實拍會被轉成品牌編輯海報(Homigo/Washgo:極簡手繪紙本封面;TaskGo:海軍藍平面海報),不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
       : '',
     '',
     guideline,
@@ -765,7 +864,7 @@ export function buildImageInspiredPostPrompt(params: {
     params.extraInstruction ?? '',
     '',
     '回傳 JSON 物件:',
-    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${screenshotPoster ? `, ${B2B_SCREENSHOT_POSTER_PROMPT_SPEC}, ${POSTER_HEADLINE_JSON_SPEC}` : ''}}`,
+    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${overlayFields ? `, ${screenshotPoster ? B2B_SCREENSHOT_POSTER_PROMPT_SPEC : PHOTO_CONVERT_PROMPT_SPEC}, ${POSTER_HEADLINE_JSON_SPEC}` : ''}}`,
   ].filter(Boolean).join('\n');
 }
 

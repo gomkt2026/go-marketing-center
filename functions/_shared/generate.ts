@@ -9,6 +9,7 @@ import {
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
   defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
   SEO_TOPIC_BANK, brandSeoFacts,
+  buildSocialImagePrompt, PHOTO_EDITORIAL_CONVERT_RULE, TASKGO_GRAPHIC_CONVERT_RULE,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
   type GeneratedXPost, type EcosystemXAngle,
   type AudienceLane, type ImageStyleId,
@@ -154,6 +155,8 @@ async function finishPosterImage(
     landscape: boolean;
     headline?: string;
     accent?: string;
+    advantage?: string;
+    kicker?: string;
     body: string;
     logo: Uint8Array | null;
     logoPosition: 'bottom-left' | 'bottom-right';
@@ -164,6 +167,8 @@ async function finishPosterImage(
       brandSlug: params.brandSlug,
       headline: params.headline,
       accent: params.accent,
+      advantage: params.advantage,
+      kicker: params.kicker,
       body: params.body,
       landscape: params.landscape,
     });
@@ -189,6 +194,8 @@ async function generateSystemScreenshotPoster(
     imagePrompt?: string | null;
     posterHeadline?: string;
     posterAccent?: string;
+    posterAdvantage?: string;
+    posterKicker?: string;
     body?: string;
     screenshotUrl: string;
   },
@@ -223,6 +230,8 @@ async function generateSystemScreenshotPoster(
       landscape: isFb,
       headline: params.posterHeadline,
       accent: params.posterAccent,
+      advantage: params.posterAdvantage,
+      kicker: params.posterKicker,
       body: params.body ?? '',
       logo,
       logoPosition: isIg && params.brandSlug === 'homigo' ? 'bottom-left' : 'bottom-right',
@@ -231,6 +240,60 @@ async function generateSystemScreenshotPoster(
     return await putMedia(env, key, bytes, 'image/jpeg');
   } catch (e) {
     console.error('[generate] 系統畫面海報生成失敗,改用簡報框原圖', e);
+    return null;
+  }
+}
+
+/** 把實拍轉成品牌編輯海報(Homigo/Washgo 紙本;TaskGo 平面);失敗回 null 沿用原圖 */
+async function generatePhotoEditorialPoster(
+  env: Env,
+  params: {
+    brandSlug: string;
+    platform: SocialPlatform;
+    imagePrompt?: string | null;
+    posterHeadline?: string;
+    posterAccent?: string;
+    posterAdvantage?: string;
+    posterKicker?: string;
+    body?: string;
+    photoUrl: string;
+  },
+): Promise<string | null> {
+  try {
+    const ref = await loadAssetBytes(env, params.photoUrl);
+    if (!ref) return null;
+    const isFb = params.platform === 'facebook';
+    const isIg = params.platform === 'instagram';
+    const logo = await getBrandLogo(env, params.brandSlug);
+    const convertRule = params.brandSlug === 'taskgo'
+      ? TASKGO_GRAPHIC_CONVERT_RULE
+      : PHOTO_EDITORIAL_CONVERT_RULE;
+    const prompt = buildSocialImagePrompt({
+      brandSlug: params.brandSlug,
+      scene: [params.imagePrompt?.trim() || 'Redraw this photograph as a brand editorial poster.', convertRule].join('\n\n'),
+      imageStyle: 'photo',
+      landscape: isFb,
+      hasLogo: !!logo,
+    });
+    const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
+    let bytes = await generateImageWithReference(env, {
+      prompt, reference: ref, size, quality: 'high', inputFidelity: 'high',
+    });
+    bytes = await finishPosterImage(env, bytes, {
+      brandSlug: params.brandSlug,
+      landscape: isFb,
+      headline: params.posterHeadline,
+      accent: params.posterAccent,
+      advantage: params.posterAdvantage,
+      kicker: params.posterKicker,
+      body: params.body ?? '',
+      logo,
+      logoPosition: isIg && params.brandSlug === 'homigo' ? 'bottom-left' : 'bottom-right',
+    });
+    const key = buildMediaKey(params.brandSlug, 'jpg');
+    return await putMedia(env, key, bytes, 'image/jpeg');
+  } catch (e) {
+    console.error('[generate] 實拍編輯海報轉換失敗,沿用原圖', e);
     return null;
   }
 }
@@ -332,13 +395,14 @@ export async function generatePlatformPost(
 
   const screenshotPoster = !!(reusedAsset && isSystemScreenshot(reusedAsset)
     && (platform === 'facebook' || platform === 'instagram'));
-  const reusePhotoAsIs = !!reusedAsset && !screenshotPoster;
-  const recentStyles = reusePhotoAsIs ? [] : await recentImageStyles(env, brandCtx.brandId).catch(() => [] as ImageStyleId[]);
-  const imageStyle = screenshotPoster
+  const convertPhotoPoster = !!(reusedAsset && !screenshotPoster
+    && (platform === 'facebook' || platform === 'instagram'));
+  const recentStyles = convertPhotoPoster || screenshotPoster
+    ? []
+    : await recentImageStyles(env, brandCtx.brandId).catch(() => [] as ImageStyleId[]);
+  const imageStyle = screenshotPoster || convertPhotoPoster
     ? 'design' as const
-    : reusePhotoAsIs
-      ? null
-      : pickImageStyle({ platform, lane, brandSlug: brandCtx.slug, recentStyles });
+    : pickImageStyle({ platform, lane, brandSlug: brandCtx.slug, recentStyles });
 
   const userPrompt = buildPostUserPrompt({
     platform, topic: params.topic, topicSummary: params.topicSummary,
@@ -346,16 +410,17 @@ export async function generatePlatformPost(
       params.extraInstruction ?? '',
       screenshotPoster
         ? `本篇會用品牌上傳的系統畫面「${reusedAsset?.caption ?? '後台截圖'}」做成痛點海報。文案要對得上這張真實畫面。`
-        : reusedAsset
-          ? `本篇配圖已指定為品牌上傳的「${reusedAsset.imageCategory ?? '素材'}」${reusedAsset.caption ? `:${reusedAsset.caption}` : ''}。文案要對得上這張真實畫面,不要另外要 imagePrompt。`
+        : convertPhotoPoster
+          ? `本篇會把品牌上傳的「${reusedAsset?.imageCategory ?? '實拍'}」${reusedAsset?.caption ? `:${reusedAsset.caption}` : ''}轉成品牌編輯海報。文案要對得上原照片裡真的有的細節。`
           : '',
     ].filter(Boolean).join('\n'),
     brandSlug: brandCtx.slug,
     audienceLane: lane,
     audienceName: audience.name,
     imageStyle: imageStyle ?? undefined,
-    skipImagePrompt: reusePhotoAsIs,
+    skipImagePrompt: false,
     screenshotPoster,
+    convertPhotoPoster,
   });
   const systemPrompt = params.collaborationContext
     ? `${brandCtx.systemPrompt}\n\n${audienceLaneInstruction(brandCtx.slug, lane)}\n\n${params.collaborationContext}`
@@ -384,7 +449,7 @@ export async function generatePlatformPost(
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${hardLimit} 字上限。請只保留一個核心重點,縮短到 ${hardLimit} 字以內,回傳同格式 JSON(imagePrompt 與 posterHeadline 保留不變)。` },
+        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${hardLimit} 字上限。請只保留一個核心重點,縮短到 ${hardLimit} 字以內,回傳同格式 JSON(imagePrompt、posterHeadline、posterAdvantage 保留不變)。` },
       ],
       temperature: 0.5,
     });
@@ -409,6 +474,8 @@ export async function generatePlatformPost(
       imagePrompt: post.imagePrompt,
       posterHeadline: post.posterHeadline,
       posterAccent: post.posterAccent,
+      posterAdvantage: post.posterAdvantage,
+      posterKicker: post.posterKicker,
       body: post.body,
       screenshotUrl: reusedAsset.fileUrl,
     });
@@ -429,13 +496,30 @@ export async function generatePlatformPost(
     };
   }
 
-  if (reusedAsset) {
-    post.imagePrompt = undefined;
-    const imageUrl = platform === 'instagram'
+  if (convertPhotoPoster && reusedAsset) {
+    const posterUrl = await generatePhotoEditorialPoster(env, {
+      brandSlug: brandCtx.slug,
+      platform,
+      imagePrompt: post.imagePrompt,
+      posterHeadline: post.posterHeadline,
+      posterAccent: post.posterAccent,
+      posterAdvantage: post.posterAdvantage,
+      posterKicker: post.posterKicker,
+      body: post.body,
+      photoUrl: reusedAsset.fileUrl,
+    });
+    if (posterUrl) {
+      return {
+        post, prediction, imageUrl: posterUrl, imageError: null,
+        audienceLane: lane, audienceName: audience.name,
+        imageSource: 'generated', imageStyle: 'design', assetId: reusedAsset.id,
+      };
+    }
+    const fallbackUrl = platform === 'instagram'
       ? await frameAssetForInstagram(env, brandCtx.slug, reusedAsset.fileUrl) ?? reusedAsset.fileUrl
       : reusedAsset.fileUrl;
     return {
-      post, prediction, imageUrl, imageError: null,
+      post, prediction, imageUrl: fallbackUrl, imageError: '實拍編輯海報轉換失敗,沿用原圖',
       audienceLane: lane, audienceName: audience.name,
       imageSource: 'asset', imageStyle: null, assetId: reusedAsset.id,
     };
@@ -461,45 +545,31 @@ export async function generatePlatformPost(
   if (wantsImage && post.imagePrompt) {
     try {
       const isFb = platform === 'facebook';
-      const style = imageStyle ?? 'photo';
-      const isDesign = style === 'design';
-      const isIllustration = style === 'illustration';
-      const logo = await getBrandLogo(env, brandCtx.slug);
-      const twPeople = 'any people shown are Taiwanese with East Asian facial features and natural everyday body types, authentic Taiwan daily-life setting';
-      const voice = getBrandVoice(brandCtx.slug);
-      const photoRef = (lane === 'b2b' && voice.imageStyleB2b) ? voice.imageStyleB2b : voice.imageStyle;
-      const designSpec = BRAND_DESIGN_IMAGE_STYLE[brandCtx.slug] ?? BRAND_DESIGN_IMAGE_STYLE.homigo;
-      const photoBase = brandCtx.slug === 'taskgo'
-        ? `Photorealistic professional construction-tech photography in Taiwan, bright daylight, navy-cyan color grade, ${twPeople}, workers in hard hats and reflective vests using a tablet or LINE on site, shallow depth of field. Not film nostalgia, not Western stock-model look.`
-        : `Photorealistic candid documentary photography, natural lighting, warm tones, ${twPeople}, genuine emotions, shallow depth of field, shot on 35mm film, heartwarming and relatable.`;
-      const prompt = isDesign
-        ? [
-            post.imagePrompt,
-            designSpec,
-            POSTER_NO_GLYPHS_RULE,
-            isFb
-              ? 'LANDSCAPE poster 3:2. Empty left 38% banner. Scene and device card on the right.'
-              : 'PORTRAIT poster. Empty top 25% banner.',
-            logo
-              ? '【品牌標】不要在圖上畫任何 logo 或品牌字樣;畫面角落留乾淨,官方 logo 會在生成後由系統合成上去。'
-              : brandCtx.slug === 'homigo' ? HOMIGO_TEXT_MARK_RULE : '',
-          ].filter(Boolean).join('\n\n')
-        : isIllustration
-          ? `${post.imagePrompt}. ${voice.imageStyle ?? 'Warm hand-drawn illustration style.'} Any people shown are Taiwanese, authentic Taiwan daily-life setting. No text. No watermark. No logo.`
-          : `${post.imagePrompt}. ${photoBase}${photoRef ? ` Style reference: ${photoRef}` : ''} No text. No watermark. No logo.`;
       const isIg = platform === 'instagram';
-      const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : isDesign ? '1024x1536' as const : '1024x1024' as const;
-      const quality = isDesign ? 'high' as const : 'medium' as const;
+      const style = imageStyle ?? 'photo';
+      const logo = await getBrandLogo(env, brandCtx.slug);
+      const prompt = buildSocialImagePrompt({
+        brandSlug: brandCtx.slug,
+        scene: post.imagePrompt,
+        imageStyle: style === 'illustration' ? 'photo' : style,
+        landscape: isFb,
+        hasLogo: !!logo,
+      });
+      const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
+      const quality = style === 'design' || isFb || isIg ? 'high' as const : 'medium' as const;
       let bytes = await generateImage(env, { prompt, size, quality });
-      if (isDesign) {
+      const shouldOverlay = isFb || isIg || !!post.posterHeadline;
+      if (shouldOverlay) {
         bytes = await finishPosterImage(env, bytes, {
           brandSlug: brandCtx.slug,
           landscape: isFb,
           headline: post.posterHeadline,
           accent: post.posterAccent,
+          advantage: post.posterAdvantage,
+          kicker: post.posterKicker,
           body: post.body,
           logo,
-          logoPosition: isDesign && brandCtx.slug === 'homigo' ? 'bottom-left' : 'bottom-right',
+          logoPosition: isIg && brandCtx.slug === 'homigo' ? 'bottom-left' : 'bottom-right',
         });
       } else if (logo) {
         try {
@@ -578,8 +648,8 @@ export async function generateOfftopicPost(
 }
 
 /**
- * 看圖寫貼文:用品牌智慧素材庫上傳的一張圖當話題,配圖沿用原圖。
- * FB/IG 預設 B 端,Threads 預設 C 端。
+ * 看圖寫貼文:用品牌智慧素材庫上傳的一張圖當話題。
+ * 系統截圖與實拍在 FB/IG 會轉成品牌編輯海報;失敗才沿用原圖。
  */
 export async function generatePostFromImage(
   env: Env,
@@ -614,11 +684,13 @@ export async function generatePostFromImage(
 
   const screenshotPoster = params.imageCategory === 'system_screenshot'
     && (platform === 'facebook' || platform === 'instagram');
+  const convertPhotoPoster = !screenshotPoster && (platform === 'facebook' || platform === 'instagram')
+    && ['real_photo', 'people', 'scene', 'brand_collab'].includes(params.imageCategory ?? '');
   let post = await chatCompleteJson<GeneratedPost>(env, {
     messages: [{ role: 'system', content: systemPrompt }, visionUserMessage],
   });
   post.body = normalizeMultilineText(post.body);
-  if (!screenshotPoster) post.imagePrompt = undefined;
+  if (!screenshotPoster && !convertPhotoPoster) post.imagePrompt = undefined;
   post.hashtags = clampHashtags(post.hashtags, platform);
   post.cta = SHARED_BRAND_CTA;
 
@@ -638,7 +710,7 @@ export async function generatePostFromImage(
       temperature: 0.5,
     });
     post.body = normalizeMultilineText(post.body);
-    if (!screenshotPoster) post.imagePrompt = undefined;
+    if (!screenshotPoster && !convertPhotoPoster) post.imagePrompt = undefined;
     post.hashtags = clampHashtags(post.hashtags, platform);
   }
   post.cta = SHARED_BRAND_CTA;
@@ -659,8 +731,31 @@ export async function generatePostFromImage(
       imagePrompt: post.imagePrompt,
       posterHeadline: post.posterHeadline,
       posterAccent: post.posterAccent,
+      posterAdvantage: post.posterAdvantage,
+      posterKicker: post.posterKicker,
       body: post.body,
       screenshotUrl: imageUrl,
+    });
+    if (posterUrl) {
+      return {
+        post, prediction, imageUrl: posterUrl, imageError: null,
+        audienceLane: lane, audienceName, imageSource: 'generated', imageStyle: 'design',
+        assetId: params.assetId ?? null,
+      };
+    }
+  }
+
+  if (convertPhotoPoster) {
+    const posterUrl = await generatePhotoEditorialPoster(env, {
+      brandSlug: brandCtx.slug,
+      platform,
+      imagePrompt: post.imagePrompt,
+      posterHeadline: post.posterHeadline,
+      posterAccent: post.posterAccent,
+      posterAdvantage: post.posterAdvantage,
+      posterKicker: post.posterKicker,
+      body: post.body,
+      photoUrl: imageUrl,
     });
     if (posterUrl) {
       return {
@@ -742,6 +837,8 @@ export async function saveGeneratedContent(
         replyBody: params.promptMeta?.replyBody ?? result.post.replyBody ?? undefined,
         posterHeadline: result.post.posterHeadline ?? undefined,
         posterAccent: result.post.posterAccent ?? undefined,
+        posterAdvantage: result.post.posterAdvantage ?? undefined,
+        posterKicker: result.post.posterKicker ?? undefined,
       })},
       ${params.sourceMarketSignalId ?? null}
     ) RETURNING id

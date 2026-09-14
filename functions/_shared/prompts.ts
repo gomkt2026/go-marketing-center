@@ -782,7 +782,6 @@ export function buildPostUserPrompt(params: {
     || params.imageStyle === 'photo'
     || params.platform === 'facebook'
     || params.platform === 'instagram'
-    || (params.brandSlug === 'homigo' && params.platform === 'instagram' && !params.imageStyle)
   );
   return [
     `請針對以下主題,為 ${params.platform} 平台寫一篇貼文。`,

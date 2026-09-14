@@ -316,7 +316,7 @@ export async function burnPosterHeadline(
   imageBytes: Uint8Array,
   params: {
     brandSlug: string;
-    headline: string;
+    headline?: string;
     accent?: string;
     advantage?: string;
     kicker?: string;

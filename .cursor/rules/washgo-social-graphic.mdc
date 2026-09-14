@@ -1,0 +1,19 @@
+---
+description: Washgo 社群圖必須用活潑可愛的洗衣插畫，不要鉛筆素描或水彩藝廊靜物
+globs: functions/_shared/prompts.ts,functions/_shared/generate.ts,functions/_shared/poster-text.ts
+alwaysApply: false
+---
+
+# Washgo 社群圖文（可愛洗衣風）
+
+產生 Washgo 的 FB／IG／Threads 圖、自動發文配圖、或改產圖 prompt 時：
+
+1. 洗滌產業社群要活潑、可愛、乾淨、明亮，讓人想停滑
+2. 圓潤角色 + 平塗色面 + 肥皂泡／蒸汽／摺好的衣物；主體佔畫面約一半
+3. 主色奶油 `#FFF8F0`、淡天藍 `#E6F2FF`、品牌藍 `#3A8DDE`／深藍 `#1D4F8C`／天藍 `#6CC3F5`；金橘 `#FFB84D` 只做小色塊
+4. 可放角落一顆 Washgo 藍小泡泡幫手，不當主角
+5. 禁止：鉛筆草稿線、水彩藝廊靜物、微小孤獨人物配大面積象牙紙、吉卜力電影感、寫實人像
+6. Threads 滿版可愛圖，不要留一大塊空白紙；FB／IG 才留空給後製繁中主標
+7. 文案也要輕快，像洗衣店年輕店員；不要捷運哲思、成長和解、深夜散文
+
+程式規格：`functions/_shared/prompts.ts` 的 `WASHGO_CUTE_CORE`／`BRAND_DESIGN_IMAGE_STYLE.washgo`

@@ -9,11 +9,11 @@ alwaysApply: false
 產生 Homigo、TaskGo、Washgo 的 FB／IG 圖、自動發文配圖、或改產圖 prompt 時：
 
 1. 有系統截圖也要做成海報：現場煩惱 + 平板／白卡只露這張畫面的一個重點
-2. 有實拍也要轉成品牌編輯海報：Homigo／Washgo 極簡手繪紙本封面；TaskGo 海軍藍平面海報。失敗才沿用原圖
+2. 有實拍也要轉成品牌編輯海報：Homigo 極簡手繪紙本封面；Washgo 活潑可愛洗衣插畫；TaskGo 海軍藍平面海報。失敗才沿用原圖
 3. 禁止把整頁後台置中鋪在海軍藍或純色底上
 4. 主標與文案第一句同義，留白區再印一句品牌優勢小字；由系統用思源黑體 TW 後製印上正確繁中；圖片模型禁止畫任何字
-5. 直式上方 25%、橫式左側 38% 留空給後製字（Homigo／Washgo 是藝術紙留白，TaskGo 是斜切色塊）
-6. Washgo 不要吉卜力、不要笑臉洗衣機；TaskGo 維持海軍藍斜切工地風，人物當平面海報構圖元素
+5. 直式上方 25%、橫式左側 38% 留空給後製字（Homigo 是藝術紙留白，Washgo 是奶油／淡天藍留白，TaskGo 是斜切色塊）
+6. Washgo 走圓潤可愛洗衣插畫，不要鉛筆素描、不要水彩藝廊靜物、不要吉卜力電影感；TaskGo 維持海軍藍斜切工地風，人物當平面海報構圖元素
 7. 簡報框原圖只當海報生成失敗的後備
 
 程式：`functions/_shared/poster-text.ts`（疊字）、`functions/_shared/prompts.ts` 的 `SYSTEM_SCREENSHOT_POSTER_RULE`、`functions/_shared/generate.ts` 的 `generateSystemScreenshotPoster`

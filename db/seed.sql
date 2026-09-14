@@ -295,7 +295,8 @@ BEGIN
     (b_washgo, v_washgo_1, '主色-深藍', '#1D4F8C', 'color', 1),
     (b_washgo, v_washgo_1, '主色-品牌藍', '#3A8DDE', 'color', 2),
     (b_washgo, v_washgo_1, '輔助色-天藍', '#6CC3F5', 'color', 3),
-    (b_washgo, v_washgo_1, '強調色-金橘', '#FFB84D', 'color', 4);
+    (b_washgo, v_washgo_1, '強調色-金橘', '#FFB84D', 'color', 4),
+    (b_washgo, v_washgo_1, '圖文構圖', '圓潤可愛洗衣插畫+肥皂泡+奶油/淡天藍底,不要素描紙本', 'layout', 6);
 
   -- ==========================================================================
   -- Brand Histories(里程碑)

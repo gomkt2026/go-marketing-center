@@ -45,8 +45,8 @@ interface PosterTheme {
   kicker: string;
   bannerOpacity: number;
   slant: boolean;
-  /** editorial = 紙本留白上的安靜小字; graphic = 斜切色塊海報 */
-  mode: 'editorial' | 'graphic';
+  /** editorial = 紙本留白上的安靜小字; graphic = 斜切色塊海報; lively = 可愛品牌的圓潤主標 */
+  mode: 'editorial' | 'graphic' | 'lively';
 }
 
 const THEME: Record<string, PosterTheme> = {
@@ -61,9 +61,9 @@ const THEME: Record<string, PosterTheme> = {
     bannerOpacity: 0.94, slant: true, mode: 'graphic',
   },
   washgo: {
-    banner: '#F3EDE3', main: '#1D4F8C', accent: '#FFB84D', stripe: '#FFB84D',
-    advantage: '#5C5346', kicker: '#1D4F8C',
-    bannerOpacity: 0.0, slant: false, mode: 'editorial',
+    banner: '#E6F2FF', main: '#1D4F8C', accent: '#3A8DDE', stripe: '#FFB84D',
+    advantage: '#3A8DDE', kicker: '#3A8DDE',
+    bannerOpacity: 0.0, slant: false, mode: 'lively',
   },
 };
 
@@ -197,8 +197,10 @@ function bannerGeometry(width: number, height: number, landscape: boolean) {
   };
 }
 
-function letterSpacingPx(fontSize: number, editorial: boolean): number {
-  return editorial ? Math.round(fontSize * 0.12) : 0;
+function letterSpacingPx(fontSize: number, mode: PosterTheme['mode']): number {
+  if (mode === 'editorial') return Math.round(fontSize * 0.12);
+  if (mode === 'lively') return Math.round(fontSize * 0.02);
+  return 0;
 }
 
 function spacedWidth(text: string, fontSize: number, tracking: number): number {
@@ -276,16 +278,16 @@ function buildEditorialSvg(params: {
   const maxTextW = colW - pad * 2;
   const lines = accent ? [main, accent] : [main];
   const longest = lines.reduce((a, b) => (a.length >= b.length ? a : b));
-  let fontSize = landscape ? Math.round(colW * 0.11) : Math.round(width * 0.072);
-  while (spacedWidth(longest, fontSize, letterSpacingPx(fontSize, true)) > maxTextW && fontSize > 28) {
+  let fontSize = landscape ? Math.round(colW * 0.11) : Math.round(width * (theme.mode === 'lively' ? 0.078 : 0.072));
+  while (spacedWidth(longest, fontSize, letterSpacingPx(fontSize, theme.mode)) > maxTextW && fontSize > 28) {
     fontSize -= 2;
   }
-  const tracking = letterSpacingPx(fontSize, true);
-  const lineGap = Math.round(fontSize * 1.22);
+  const tracking = letterSpacingPx(fontSize, theme.mode);
+  const lineGap = Math.round(fontSize * (theme.mode === 'lively' ? 1.14 : 1.22));
   const headY = landscape
     ? Math.round(height * 0.22 + fontSize * 0.8)
     : Math.round(height * 0.09 + fontSize * 0.8);
-  const stripeH = Math.max(4, Math.round(fontSize * 0.08));
+  const stripeH = Math.max(theme.mode === 'lively' ? 6 : 4, Math.round(fontSize * (theme.mode === 'lively' ? 0.12 : 0.08)));
   const texts = lines.map((line, i) => {
     const fill = i === 0 ? theme.main : theme.accent;
     const y = headY + i * lineGap;
@@ -296,11 +298,11 @@ function buildEditorialSvg(params: {
   const stripe = `<rect x="${cx - Math.round(stripeW / 2)}" y="${stripeY}" width="${stripeW}" height="${stripeH}" rx="${Math.round(stripeH / 2)}" fill="${theme.stripe}" fill-opacity="0.9"/>`;
 
   let advSize = landscape ? Math.round(colW * 0.045) : Math.round(width * 0.032);
-  const advTrack = letterSpacingPx(advSize, true);
+  const advTrack = letterSpacingPx(advSize, theme.mode);
   while (spacedWidth(advantage, advSize, advTrack) > maxTextW && advSize > 16) advSize -= 2;
   const advY = landscape ? Math.round(height * 0.88) : Math.round(height * 0.93);
   const advEl = advantage
-    ? `<text x="${cx}" y="${advY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${advSize}" font-weight="700" fill="${theme.advantage}" fill-opacity="0.88" letter-spacing="${letterSpacingPx(advSize, true)}">${escapeXml(advantage)}</text>`
+    ? `<text x="${cx}" y="${advY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${advSize}" font-weight="700" fill="${theme.advantage}" fill-opacity="0.88" letter-spacing="${letterSpacingPx(advSize, theme.mode)}">${escapeXml(advantage)}</text>`
     : '';
 
   const svg = [
@@ -341,15 +343,15 @@ export async function burnPosterHeadline(
     const split = splitPosterAccent(headline, params.accent);
     const advantage = sanitizePosterAdvantage(params.advantage, params.brandSlug);
     const kicker = sanitizePosterKicker(params.kicker, params.brandSlug);
-    const overlay = theme.mode === 'editorial'
-      ? buildEditorialSvg({
-        width, height, theme,
-        main: split.main, accent: split.accent, advantage, landscape,
-      })
-      : buildGraphicBannerSvg({
+    const overlay = theme.mode === 'graphic'
+      ? buildGraphicBannerSvg({
         geo: bannerGeometry(width, height, landscape),
         theme, main: split.main, accent: split.accent,
         advantage, kicker, landscape,
+      })
+      : buildEditorialSvg({
+        width, height, theme,
+        main: split.main, accent: split.accent, advantage, landscape,
       });
 
     const resvg = new Resvg(overlay.svg, {

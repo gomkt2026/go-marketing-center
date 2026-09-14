@@ -150,9 +150,9 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
     operatorConcerns:
       '手寫單據對不攏、多門市調撥、司機派遣與運費、客源老化、價目管理、品管掃碼、LINE 會員經營、平台導流',
     imageStyleB2b:
-      'Editorial paper-sketch of Taiwanese laundry-shop operations: garment racks, folding tables, receipt counters, ' +
-      'delivery scooters at the alley; warm ivory fiber paper, muted washgo blue ink, tiny gold chip. ' +
-      'Quiet workplace dignity. Never Ghibli, never smiling washing machines.',
+      'Cute bright Taiwanese laundry-shop illustration: rounded staff in polo, garment racks, folding tables, alley scooters; ' +
+      'cream and sky-blue fields, Washgo blues #1D4F8C / #3A8DDE / #6CC3F5, gold #FFB84D as a tiny chip. ' +
+      'Friendly and lively, still readable as a shop-ops poster. Never pencil-sketch, never watercolor art-book, never Ghibli cinematic.',
     threadsCraft:
       'Washgo 的 Threads 專屬規則(與通用規則衝突時,以這裡為準):' +
       '1. 字數嚴格控制在 60-120 字,絕對不超過 150 字。2-4 個短段落、一句一行的節奏,讀者滑到 10 秒內就能讀完;寧短勿長。' +
@@ -162,12 +162,14 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       'C【流行洗法】現在最流行的洗滌方式與保養觀念:羽絨怎麼洗才蓬、拍照讓 AI 看洗標、換季衣物怎麼保存。' +
       '3. 時事熱點只當開頭「一句話」的鉤子,一句帶到就進主題,不要花整段解釋時事;掛不上就不要硬蹭,直接寫日常觀察。' +
       '4. 說話對象是所有有送洗需求的人:上班族、媽媽、包租代管業者、飯店、民宿、醫院…用他們的日常場景開頭(例如「床單換季一次 30 套」「加班到十點洗衣店早關了」)。' +
-      '5. 禁止一篇塞多個賣點、禁止連續反問句、禁止「簡直是懶人福音」這種廣告腔;像朋友隨手發的一則短文,結尾最多留一個輕鬆的問題。',
+      '5. 語氣活潑、輕快、像洗衣店年輕店員在哈拉;可以吐槽羽絨被膨脹、洗標外星文、梅雨衣服比人還潮。' +
+      '禁止文青獨白、捷運哲思、成長和解、深夜散文;洗滌產業社群要可愛有生活感,不要藝廊感。' +
+      '6. 禁止一篇塞多個賣點、禁止連續反問句、禁止「簡直是懶人福音」這種廣告腔;像朋友隨手發的一則短文,結尾最多留一個輕鬆的問題。',
     threadsMaxChars: 150,
     instagramCraft:
       'Washgo IG 專屬規則:' +
       '1. 80-180 字,絕對不超過 220 字。前 125 字必須是完整一句業者痛點 hook(手寫單、對不攏、衣服洗到哪沒人知)。' +
-      '2. 配圖必須是 B 端痛點海報:店主真實煩惱場景畫成極簡手繪紙本封面 + 4-10 字主標 + 優勢小字 + Washgo 系統重點畫面卡(訂單/履歷/調撥擇一)。禁止只把整頁後台截圖置中鋪在色塊上。禁止吉卜力卡通、禁止笑臉洗衣機。' +
+      '2. 配圖必須是 B 端痛點海報:店主現場畫成活潑可愛的洗衣店插畫 + 4-10 字主標 + 優勢小字 + Washgo 系統重點畫面卡(訂單/履歷/調撥擇一)。禁止只把整頁後台截圖置中鋪在色塊上。禁止鉛筆素描、禁止水彩藝廊靜物、禁止吉卜力電影感。' +
       '3. 文案要講畫面上看得見的事(欄位、狀態、對不攏的單),像店主在看自己後台,不要寫「邁向數位化的未來就是現在」「告別繁瑣」「輕鬆數位化」空心廣告句。' +
       '4. 搜尋導向:對準洗衣店主會搜的一個詞(洗衣店系統、送洗履歷、門市調撥、洗衣店數位轉型)。' +
       '5. Hashtag 8-12 個:品牌 + 利基搜尋詞 + 發現用。不要塞 #換季 #羽絨被 這種 C 端生活標到 B 端圖文。' +
@@ -176,8 +178,8 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
     instagramMaxChars: 220,
     igSearchQueries: ['洗衣店系統', '送洗履歷', '門市調撥', '洗衣店數位轉型'],
     imageStyle:
-      'Minimal hand-drawn editorial still life on warm ivory fiber paper: one tiny laundry subject (stacked towels, a tagged shirt, a fluffy comforter) ' +
-      'surrounded by designed paper space, pencil construction lines and light wash. Heartwarming but quiet. Never Studio Ghibli, never smiling washing machines.',
+      'Cute bright Taiwanese laundry lifestyle illustration: rounded characters, soap bubbles, folded towels, tagged shirts, fluffy comforter; ' +
+      'cream / sky / mint, Washgo blues and a gold chip. Lively, clean, Instagram-native. Never pencil sketch, never watercolor art-book, never Ghibli cinematic.',
     imageRendering: 'illustration',
   },
 };
@@ -210,7 +212,7 @@ const B2B_LANE_INSTRUCTIONS: Record<string, string> = {
     SHARED_BRAND_CTA_RULE +
     '禁止「可愛洗衣機」「懶人福音」「加班到十點的媽媽」。' +
     '禁止「邁向數位化的未來就是現在」「告別繁瑣」「輕鬆數位化」「數位轉型解決方案」這類空心廣告句。' +
-    '視覺要做成 B 端痛點海報:現場煩惱 + 主標 + 系統重點畫面卡,證明系統對店主真的有用。禁止只貼整頁截圖。禁止吉卜力與笑臉洗衣機。' +
+    '視覺要做成 B 端痛點海報:現場煩惱 + 主標 + 系統重點畫面卡,證明系統對店主真的有用。禁止只貼整頁截圖。禁止鉛筆素描與水彩藝廊靜物。' +
     '可提 Go 生態系(Homigo 布巾案源、三平台同一條資訊流),但只能引用下方 Collaboration Brief 已有的事實;沒有 Brief 就不要提其他品牌。',
   homigo:
     '【本篇受眾車道:B 端】只寫給自管房東或包租代管業者,不是房客吐槽文。' +
@@ -568,6 +570,26 @@ const TASKGO_GRAPHIC_CORE = [
   'Taiwan site culture as graphic marks (crane silhouette, honeycomb, rice dumpling, typhoon tarp, arcade scaffold) — not a full scenery painting.',
 ].join(' ');
 
+/** Washgo 社群圖:洗滌產業要活潑可愛,不要素描寫實 */
+const WASHGO_CUTE_CORE = [
+  'Cute Taiwanese laundry-lifestyle illustration for Washgo. Instagram-native, bright, friendly, instantly stop-the-scroll.',
+  'NOT a pencil sketch, not a watercolor art-book cover, not museum still life, not photoreal, not 3D CGI, not Studio Ghibli / Miyazaki cinematic.',
+  'Style: rounded character illustration + clean outlines + soft 2–3 step cel shading + candy-pastel laundry shop. Think LINE-sticker energy with brand control, not a kids sticker explosion.',
+  'LOCKED palette: cream #FFF8F0, pale sky #E6F2FF, mint #C8EDE4, Washgo navy #1D4F8C, brand blue #3A8DDE, sky #6CC3F5. Gold #FFB84D only as a tiny chip (bubble, tag, sock). Never muted brown-ink paper, never full-bleed navy, never grey melancholy.',
+  'Characters: Taiwanese East Asian everyday people with slightly large heads, round cheeks, simple friendly eyes. Staff polo, office workers, moms, scooter delivery. Expressive and lively — smiling, puffing steam, hugging a comforter — never solitary melancholy.',
+  'Props as cute objects: soap bubbles, steam puffs, folded towel stacks, tagged shirts, fluffy comforter, laundry bag. Optional tiny Washgo-blue soap-bubble helper in a corner (round, two dots for eyes) — never the hero, never a giant smiling washing machine.',
+  'Background: airy cream / pale sky / mint interior. Simple Taiwan laundry cues (shop counter, balcony drying rack, LINE on a round-corner phone). Decorative circles and bubbles, not paper grain, not construction lines, not ink bleed.',
+  'Mood: sunny wash day, clean, healing, a little playful. The brand should feel like a cheerful laundry neighbor, not an independent art publication.',
+].join(' ');
+
+const WASHGO_CUTE_CONVERT = [
+  'The attached photograph is the ONLY composition and content source.',
+  'Keep the most recognizable subjects, poses, clothing silhouettes, key objects, spatial relations and narrative.',
+  'Do not add important elements that are not in the photo. Do not change the number of people or their identity.',
+  'Fully redraw in Washgo cute laundry illustration language — rounded, bright, cel-shaded. No photographic patches, no leftover camera texture, no pencil-sketch conversion.',
+  'Keep the original aspect: portrait stays portrait, landscape stays landscape.',
+].join(' ');
+
 /** 指示文案 AI 為 Homigo IG 圖撰寫設計描述(不是純照片描述) */
 export const HOMIGO_IG_IMAGE_PROMPT_SPEC =
   '"imagePrompt": "必填:這張圖是 Homigo 極簡手繪紙本編輯封面(不是純照片、不是語錄卡)。只描述畫面,不要描述任何要印在圖上的文字:' +
@@ -588,16 +610,15 @@ export const HOMIGO_IG_IMAGE_STYLE = [
 export const HOMIGO_TEXT_MARK_RULE =
   '【品牌標】不要在圖上畫任何 logo 或品牌字樣;角落留乾淨,官方標與繁中主標由系統後製。';
 
-/** 各品牌 B 端「社群設計圖」規格;Homigo/Washgo 紙本編輯封面,TaskGo 匠管平面海報 */
+/** 各品牌 B 端「社群設計圖」規格;Homigo 紙本編輯、Washgo 可愛洗衣插畫、TaskGo 匠管平面海報 */
 export const BRAND_DESIGN_IMAGE_STYLE: Record<string, string> = {
   homigo: HOMIGO_IG_IMAGE_STYLE,
   washgo: [
-    EDITORIAL_PAPER_CORE,
-    'Washgo palette: ivory paper, muted ink blues #1D4F8C and #3A8DDE, gold #FFB84D only as a tiny chip. Never a full-bleed navy poster.',
-    'Taiwan laundry cues: garment racks, folding table, polo staff, alley delivery scooter, tagged shirts. Quiet workplace dignity.',
-    'NEVER Studio Ghibli, NEVER smiling washing machines, NEVER cute robot as hero, NEVER kawaii mascot takeover.',
-    'Optional tiny sketched device card in the lower third with abstract grey bars — no glyphs.',
-    'Mood: still, warm, unfinished-on-purpose, independent art publication. Not a promo DM.',
+    WASHGO_CUTE_CORE,
+    'B2B shop-ops poster: Taiwanese laundry owner or staff in a lively shop scene (receipts, folding table, polo, alley scooter).',
+    '直式上方 25% 或橫式左側 38% 是空的奶油色或淡天藍底,不要人物、不要任何文字。',
+    'Optional tiny rounded tablet/white card in the lower third with abstract grey bars and a Washgo-blue chip — no glyphs.',
+    'Cute and bright, still readable as a shop-ops poster — not a kids sticker sheet, not a quiet art-book cover.',
   ].join('\n'),
   taskgo: [
     TASKGO_GRAPHIC_CORE,
@@ -616,9 +637,9 @@ export const BRAND_PHOTO_IMAGE_STYLE: Record<string, string> = {
     'A single Taiwan rental moment redrawn as a quiet art-book cover. No device UI card. Subject even smaller than the design poster.',
   ].join('\n'),
   washgo: [
-    EDITORIAL_PAPER_CORE,
-    'Washgo palette: ivory paper, muted #1D4F8C / #3A8DDE, gold #FFB84D tiny chip.',
-    'A single Taiwan laundry moment redrawn as a quiet art-book cover. No device UI card. NEVER Ghibli or smiling washers.',
+    WASHGO_CUTE_CORE,
+    'A single Taiwan laundry moment as a cute lifestyle illustration. Subject fills 45–65% of the frame. No device UI card.',
+    'Hero can be a person OR a cute laundry object (comforter, towel mountain, tagged shirt) with bubbles. Never a tiny lonely figure on empty paper.',
   ].join('\n'),
   taskgo: [
     TASKGO_GRAPHIC_CORE,
@@ -630,6 +651,8 @@ export const BRAND_PHOTO_IMAGE_STYLE: Record<string, string> = {
 export const PHOTO_EDITORIAL_CONVERT_RULE = `${EDITORIAL_PAPER_CONVERT} ${EDITORIAL_PAPER_CORE}`;
 export const TASKGO_GRAPHIC_CONVERT_RULE =
   `${EDITORIAL_PAPER_CONVERT} Translate that photo into the TaskGo graphic editorial poster language. ${TASKGO_GRAPHIC_CORE}`;
+export const WASHGO_CUTE_CONVERT_RULE =
+  `${WASHGO_CUTE_CONVERT} Translate that photo into the Washgo cute laundry illustration language. ${WASHGO_CUTE_CORE}`;
 
 /** 組給 gpt-image 的完整 prompt(文案 AI 的 scene + 品牌固定風格 + 禁字) */
 export function buildSocialImagePrompt(params: {
@@ -638,28 +661,48 @@ export function buildSocialImagePrompt(params: {
   imageStyle: ImageStyleId;
   landscape: boolean;
   hasLogo: boolean;
+  /** FB/IG 海報要留空給後製字;Threads 可愛圖滿版 */
+  emptyBanner?: boolean;
 }): string {
   const designSpec = BRAND_DESIGN_IMAGE_STYLE[params.brandSlug] ?? BRAND_DESIGN_IMAGE_STYLE.homigo;
   const photoSpec = BRAND_PHOTO_IMAGE_STYLE[params.brandSlug] ?? designSpec;
   const styleBlock = params.imageStyle === 'photo' ? photoSpec : designSpec;
+  const emptyBanner = params.emptyBanner ?? true;
+  const washgoCute = params.brandSlug === 'washgo';
+  const frameRule = !emptyBanner
+    ? (washgoCute
+      ? 'SQUARE 1:1. Fill the frame with the cute laundry scene. Subject occupies 45–65%. No empty paper banner, no tiny lonely figure.'
+      : 'SQUARE 1:1. Fill the frame with the scene. No empty typography banner.')
+    : params.landscape
+      ? (washgoCute
+        ? 'LANDSCAPE poster 3:2. Left 38% empty cream or pale-sky block. Subject stays on the right.'
+        : 'LANDSCAPE poster 3:2. Left 38% empty designed paper or brand color block. Subject stays on the right.')
+      : (washgoCute
+        ? 'PORTRAIT poster. Top 25% empty cream or pale-sky block for later type. Scene is lively below, not a tiny sketch on paper.'
+        : 'PORTRAIT poster. Top 25% empty designed paper or brand color block.');
   return [
     params.scene,
     styleBlock,
     'CRITICAL: no letters, numbers, CJK, Latin, UI labels, captions, watermarks, or logos. Typography is composited later in Traditional Chinese.',
-    params.landscape
-      ? 'LANDSCAPE poster 3:2. Left 38% empty designed paper or brand color block. Subject stays on the right.'
-      : 'PORTRAIT poster. Top 25% empty designed paper or brand color block.',
+    frameRule,
     params.hasLogo
       ? 'Do not draw any logo or brand wordmark; leave a clean corner for the official logo composite.'
       : HOMIGO_TEXT_MARK_RULE,
   ].filter(Boolean).join('\n\n');
 }
 
-/** Washgo Threads 專用:紙本編輯靜物衝曝光(短文 + 一張會停滑的圖;只用於 Threads C 端) */
+/** Washgo Threads 專用:可愛洗衣插畫衝曝光(短文 + 一張會停滑的圖;只用於 Threads C 端) */
 export const WASHGO_THREADS_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:Washgo 的 Threads 每篇都要配一張極簡手繪紙本靜物。' +
-  '給圖片生成模型的英文描述:暖象牙色藝術紙上一個很小很清楚的主體(蓬鬆羽絨被、疊好的毛巾山、掛著的襯衫、店口機車置物籃),被大面積留白包圍,' +
-  '鉛筆草稿線+淡彩,不要吉卜力、不要笑臉洗衣機、不含文字"';
+  '"imagePrompt": "必填:Washgo 的 Threads 每篇都要配一張活潑可愛的洗衣生活插畫。' +
+  '給圖片生成模型的英文描述:圓潤角色或可愛洗衣物件佔畫面 45-65%(蓬鬆羽絨被、毛巾山、掛著的襯衫、店口機車置物籃、年輕店員),' +
+  '奶油色/淡天藍/薄荷綠,肥皂泡與蒸汽,台灣生活感,不要鉛筆素描、不要水彩藝廊靜物、不要吉卜力電影感、不含文字"';
+
+const WASHGO_DESIGN_IMAGE_PROMPT_SPEC =
+  '"imagePrompt": "必填:這張圖是 Washgo 活潑可愛的洗衣店插畫海報(不是素描紙本、不是語錄卡)。只描述畫面,不要描述任何要印在圖上的文字:' +
+  '1) 構圖:上方 25% 完全留空給後製主標(奶油色或淡天藍底,沒有人、沒有物件、沒有文字);主體圓潤、佔畫面下半清楚可讀;' +
+  '2) 情境:台灣洗衣店主或店員的現場(手寫單、摺衣、調撥、店口機車),表情可以無奈但畫面仍明亮可愛;' +
+  '3) 解法:偏下一個很小的圓角平板/白卡,UI 用抽象灰線與品牌藍色塊,禁止任何文字;' +
+  '4) 禁止:整頁截圖鋪在純色底、鉛筆素描、水彩藝廊、吉卜力電影感、任何中英數字、自己畫 logo"';
 
 const DESIGN_IMAGE_PROMPT_SPEC =
   '"imagePrompt": "必填:這張圖是極簡手繪紙本編輯封面。只描述畫面,不要描述任何要印在圖上的文字:' +
@@ -680,7 +723,7 @@ export const B2B_SCREENSHOT_POSTER_PROMPT_SPEC =
 export const SYSTEM_SCREENSHOT_POSTER_RULE =
   'The attached image is a REAL product screenshot. Build a B2B social poster, not a screenshot dump. ' +
   'Leave the top 25% (portrait) or left 38% (landscape) as empty designed paper or a clean brand-color block with NO text — the headline and advantage line are composited later in Traditional Chinese. ' +
-  'Second glance: a Taiwanese B2B operator redrawn in this brand’s illustration language (Homigo/Washgo = editorial paper sketch; TaskGo = navy-cyan graphic poster), showing the workplace pain. ' +
+  'Second glance: a Taiwanese B2B operator redrawn in this brand’s illustration language (Homigo = editorial paper sketch; Washgo = cute laundry illustration; TaskGo = navy-cyan graphic poster), showing the workplace pain. ' +
   'Third glance: a tablet, phone, or floating white card that shows THIS exact screenshot — crop to the key panel, keep the UI recognizable, do not invent a different software. ' +
   'Do not place the raw full screenshot centered on a solid navy or blue field. ' +
   'Do not draw extra Chinese headlines, captions, or logos.';
@@ -740,19 +783,22 @@ function resolveImagePromptSpec(params: {
   if (style === 'design' || (slug === 'homigo' && params.platform === 'instagram' && !style)) {
     if (slug === 'homigo') return HOMIGO_IG_IMAGE_PROMPT_SPEC;
     if (slug === 'taskgo') return TASKGO_DESIGN_IMAGE_PROMPT_SPEC;
+    if (slug === 'washgo') return WASHGO_DESIGN_IMAGE_PROMPT_SPEC;
     return DESIGN_IMAGE_PROMPT_SPEC;
   }
   if (slug === 'washgo' && params.platform === 'threads' && (params.lane ?? 'b2c') === 'b2c') {
     return WASHGO_THREADS_IMAGE_PROMPT_SPEC;
   }
   if (style === 'illustration') {
-    if (slug === 'homigo' || slug === 'washgo') return PAPER_PHOTO_IMAGE_PROMPT_SPEC;
+    if (slug === 'washgo') return WASHGO_THREADS_IMAGE_PROMPT_SPEC;
+    if (slug === 'homigo') return PAPER_PHOTO_IMAGE_PROMPT_SPEC;
     return '"imagePrompt": "必填:給圖片生成模型的英文描述,走溫暖手繪插畫,主體單一、一眼看懂,不含文字"';
   }
   if (slug === 'taskgo' && (style === 'photo' || params.platform === 'facebook' || params.platform === 'instagram')) {
     return TASKGO_PHOTO_IMAGE_PROMPT_SPEC;
   }
-  if (style === 'photo' && (slug === 'homigo' || slug === 'washgo')) return PAPER_PHOTO_IMAGE_PROMPT_SPEC;
+  if (style === 'photo' && slug === 'homigo') return PAPER_PHOTO_IMAGE_PROMPT_SPEC;
+  if (style === 'photo' && slug === 'washgo') return WASHGO_THREADS_IMAGE_PROMPT_SPEC;
   if (style === 'photo') return IMAGE_PROMPT_SPEC.facebook;
   return IMAGE_PROMPT_SPEC[params.platform];
 }
@@ -811,7 +857,11 @@ export function buildPostUserPrompt(params: {
     params.screenshotPoster
       ? '配圖會把品牌上傳的真實系統畫面做成 B 端痛點海報(現場煩惱 + 後製繁中主標與優勢小字 + 這張畫面當解法卡),必須提供 imagePrompt、posterHeadline、posterAdvantage。'
       : params.convertPhotoPoster
-        ? '配圖會把品牌上傳的實拍轉成品牌編輯海報(Homigo/Washgo 紙本手繪封面;TaskGo 海軍藍平面海報),必須提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
+        ? (params.brandSlug === 'washgo'
+          ? '配圖會把品牌上傳的實拍轉成 Washgo 可愛洗衣插畫海報,必須提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
+          : params.brandSlug === 'taskgo'
+            ? '配圖會把品牌上傳的實拍轉成匠管海軍藍平面海報,必須提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
+            : '配圖會把品牌上傳的實拍轉成 Homigo 紙本手繪封面,必須提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。')
       : params.skipImagePrompt ? '配圖已指定為品牌上傳的真實截圖或實拍,不要提供 imagePrompt。' : '',
     overlayHeadline ? 'posterHeadline 與 posterAdvantage 必須是正確台灣繁體中文(禁止簡體)。主標與優勢小字會由系統印在留白區,不要把這些字寫進 imagePrompt 叫圖片模型去畫。' : '',
     '',
@@ -870,7 +920,11 @@ export function buildImageInspiredPostPrompt(params: {
     screenshotPoster
       ? '這張系統畫面會被做成 B 端痛點海報(現場煩惱 + 後製繁中主標與優勢小字 + 畫面當解法卡),不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。主標不要寫進 imagePrompt。'
       : convertPhotoPoster
-        ? '這張實拍會被轉成品牌編輯海報(Homigo/Washgo:極簡手繪紙本封面;TaskGo:海軍藍平面海報),不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
+        ? (params.brandSlug === 'washgo'
+          ? '這張實拍會被轉成 Washgo 可愛洗衣插畫海報,不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
+          : params.brandSlug === 'taskgo'
+            ? '這張實拍會被轉成匠管海軍藍平面海報,不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
+            : '這張實拍會被轉成 Homigo 極簡手繪紙本封面,不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。')
       : '',
     '',
     guideline,
@@ -1266,7 +1320,11 @@ function pickOfftopicType(
     return pickLoveStoryType(brandSlug, opts.usedAngles ?? []);
   }
   // 09:00 檔走一般生活哏,不要跟 21:00 愛情散文重複
-  return OFFTOPIC_TYPES[Math.floor(Math.random() * OFFTOPIC_TYPES.length)];
+  // Washgo 帳號要活潑可愛,不要深夜哲思文和洗衣視覺打架
+  const pool = brandSlug === 'washgo'
+    ? OFFTOPIC_TYPES.filter((t) => t.category !== 'reflection')
+    : OFFTOPIC_TYPES;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 /** 組成生活哏文/生活散文的 user prompt;usedTopics 是近期已寫過的標題,避免重複哏 */

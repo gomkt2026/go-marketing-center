@@ -10,6 +10,7 @@ import {
   defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
   SEO_TOPIC_BANK, brandSeoFacts,
   buildSocialImagePrompt, PHOTO_EDITORIAL_CONVERT_RULE, TASKGO_GRAPHIC_CONVERT_RULE,
+  WASHGO_CUTE_CONVERT_RULE,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
   type GeneratedXPost, type EcosystemXAngle,
   type AudienceLane, type ImageStyleId,
@@ -244,7 +245,7 @@ async function generateSystemScreenshotPoster(
   }
 }
 
-/** 把實拍轉成品牌編輯海報(Homigo/Washgo 紙本;TaskGo 平面);失敗回 null 沿用原圖 */
+/** 把實拍轉成品牌編輯海報(Homigo 紙本;Washgo 可愛插畫;TaskGo 平面);失敗回 null 沿用原圖 */
 async function generatePhotoEditorialPoster(
   env: Env,
   params: {
@@ -267,13 +268,16 @@ async function generatePhotoEditorialPoster(
     const logo = await getBrandLogo(env, params.brandSlug);
     const convertRule = params.brandSlug === 'taskgo'
       ? TASKGO_GRAPHIC_CONVERT_RULE
-      : PHOTO_EDITORIAL_CONVERT_RULE;
+      : params.brandSlug === 'washgo'
+        ? WASHGO_CUTE_CONVERT_RULE
+        : PHOTO_EDITORIAL_CONVERT_RULE;
     const prompt = buildSocialImagePrompt({
       brandSlug: params.brandSlug,
       scene: [params.imagePrompt?.trim() || 'Redraw this photograph as a brand editorial poster.', convertRule].join('\n\n'),
       imageStyle: 'photo',
       landscape: isFb,
       hasLogo: !!logo,
+      emptyBanner: true,
     });
     const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
     let bytes = await generateImageWithReference(env, {
@@ -411,7 +415,7 @@ export async function generatePlatformPost(
       screenshotPoster
         ? `本篇會用品牌上傳的系統畫面「${reusedAsset?.caption ?? '後台截圖'}」做成痛點海報。文案要對得上這張真實畫面。`
         : convertPhotoPoster
-          ? `本篇會把品牌上傳的「${reusedAsset?.imageCategory ?? '實拍'}」${reusedAsset?.caption ? `:${reusedAsset.caption}` : ''}轉成品牌編輯海報。文案要對得上原照片裡真的有的細節。`
+          ? `本篇會把品牌上傳的「${reusedAsset?.imageCategory ?? '實拍'}」${reusedAsset?.caption ? `:${reusedAsset.caption}` : ''}轉成${brandCtx.slug === 'washgo' ? 'Washgo 可愛洗衣插畫海報' : '品牌編輯海報'}。文案要對得上原照片裡真的有的細節。`
           : '',
     ].filter(Boolean).join('\n'),
     brandSlug: brandCtx.slug,
@@ -554,9 +558,10 @@ export async function generatePlatformPost(
         imageStyle: style === 'illustration' ? 'photo' : style,
         landscape: isFb,
         hasLogo: !!logo,
+        emptyBanner: isFb || isIg,
       });
       const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
-      const quality = style === 'design' || isFb || isIg ? 'high' as const : 'medium' as const;
+      const quality = style === 'design' || isFb || isIg || brandCtx.slug === 'washgo' ? 'high' as const : 'medium' as const;
       let bytes = await generateImage(env, { prompt, size, quality });
       const shouldOverlay = isFb || isIg || !!post.posterHeadline;
       if (shouldOverlay) {
@@ -649,7 +654,7 @@ export async function generateOfftopicPost(
 
 /**
  * 看圖寫貼文:用品牌智慧素材庫上傳的一張圖當話題。
- * 系統截圖與實拍在 FB/IG 會轉成品牌編輯海報;失敗才沿用原圖。
+ * 系統截圖與實拍在 FB/IG 會轉成品牌編輯海報(Homigo 紙本、Washgo 可愛插畫、TaskGo 平面);失敗才沿用原圖。
  */
 export async function generatePostFromImage(
   env: Env,

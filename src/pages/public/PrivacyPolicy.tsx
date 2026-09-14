@@ -10,7 +10,7 @@ import { useParams, Link } from 'react-router-dom';
 
 const CONTACT_EMAIL = 'service@inforcraft.com.tw';
 
-const LAST_UPDATED = '2026-08-09';
+const LAST_UPDATED = '2026-09-14';
 
 interface BrandInfo {
   name: string;
@@ -89,7 +89,10 @@ export function PrivacyPolicy() {
           <h2 style={sectionTitle}>三、資料使用目的</h2>
           <ul style={listStyle}>
             <li>協助品牌管理者集中管理多平台社群內容的建立、審核與發布。</li>
-            <li>提供行業相關公開討論之搜尋結果,供品牌管理者<strong>人工審核後</strong>參與互動;本服務不會在未經人工設定或授權的情況下擅自代表使用者行動。</li>
+            <li>
+              提供行業相關公開討論之搜尋結果,供品牌管理者審核後參與互動。
+              若品牌管理者另行開啟「自動回覆」,系統會在其設定的小時與每日上限內,自動發布已生成的回覆。
+            </li>
             <li>分析品牌自有貼文成效,協助改善內容品質。</li>
           </ul>
           <p style={paragraph}>

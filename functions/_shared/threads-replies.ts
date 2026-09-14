@@ -99,7 +99,23 @@ export async function recordReplyScan(env: Env, brandId: string, detail: string,
   });
 }
 
-export async function getLatestReplyScan(env: Env, brandId: string): Promise<{ at: string; detail: string } | null> {
+export interface LatestReplyScan {
+  at: string;
+  detail: string;
+  canSearchPublic: boolean | null;
+  publicCount: number | null;
+  queued: number | null;
+}
+
+function parseScanState(raw: unknown): { detail?: string; canSearchPublic?: boolean; publicCount?: number; queued?: number } {
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw) as { detail?: string; canSearchPublic?: boolean; publicCount?: number; queued?: number }; }
+    catch { return { detail: raw }; }
+  }
+  return (raw ?? {}) as { detail?: string; canSearchPublic?: boolean; publicCount?: number; queued?: number };
+}
+
+export async function getLatestReplyScan(env: Env, brandId: string): Promise<LatestReplyScan | null> {
   const sql = getSql(env);
   const rows = await sql`
     SELECT created_at, after_state
@@ -109,11 +125,18 @@ export async function getLatestReplyScan(env: Env, brandId: string): Promise<{ a
     LIMIT 1
   `;
   if (!rows.length) return null;
-  const row = rows[0] as { created_at: string; after_state: { detail?: string } | string | null };
-  const state = typeof row.after_state === 'string'
-    ? JSON.parse(row.after_state) as { detail?: string }
-    : (row.after_state ?? {});
-  return { at: row.created_at, detail: state.detail ?? '' };
+  const row = rows[0] as { created_at: string; after_state: unknown };
+  const state = parseScanState(row.after_state);
+  const canSearchPublic = typeof state.canSearchPublic === 'boolean'
+    ? state.canSearchPublic
+    : (typeof state.publicCount === 'number' ? state.publicCount > 0 : null);
+  return {
+    at: row.created_at,
+    detail: state.detail ?? '',
+    canSearchPublic,
+    publicCount: typeof state.publicCount === 'number' ? state.publicCount : null,
+    queued: typeof state.queued === 'number' ? state.queued : null,
+  };
 }
 
 /** 用品牌第一個痛點關鍵字探測能不能搜到別人的公開文 */

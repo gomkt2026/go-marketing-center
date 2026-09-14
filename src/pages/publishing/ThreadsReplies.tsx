@@ -23,6 +23,12 @@ const statusLabel: Record<ThreadsReplyStatus, string> = {
   pending: '待審核', approved: '已核准', replied: '已回覆', skipped: '已略過', failed: '發布失敗',
 };
 
+function checkTone(ok: boolean | null): BadgeTone {
+  if (ok === true) return 'primary';
+  if (ok === false) return 'danger';
+  return 'default';
+}
+
 export function ThreadsReplies() {
   const { brand: slug } = useParams();
   const { brandBySlug, brandsLoading } = useBrand();
@@ -32,6 +38,7 @@ export function ThreadsReplies() {
   const [editText, setEditText] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const { data, loading, error, reload } = useAsyncData(
@@ -49,12 +56,30 @@ export function ThreadsReplies() {
     setMessage(null);
     try {
       const res = await api.actThreadReply(slug, { action: 'scan' });
-      setMessage(res.detail ?? (res.ok ? '搜尋可用,下一輪會開始入庫' : '搜尋仍無法看到別人的公開文'));
+      const bits = [res.detail];
+      if (res.queued) bits.push(`入庫 ${res.queued} 則`);
+      if (res.published) bits.push(`已自動發布 ${res.published} 則`);
+      setMessage(bits.filter(Boolean).join(' · ') || '掃描完成');
       reload();
     } catch (e) {
       setMessage(`掃描失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
     } finally {
       setScanning(false);
+    }
+  }
+
+  async function setAutoReply(on: boolean) {
+    if (!slug) return;
+    setToggling(true);
+    setMessage(null);
+    try {
+      const res = await api.actThreadReply(slug, { action: 'set-auto-reply', autoReply: on });
+      setMessage(res.detail ?? (on ? '已開啟自動回覆' : '已關閉自動回覆'));
+      reload();
+    } catch (e) {
+      setMessage(`開關失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
+    } finally {
+      setToggling(false);
     }
   }
 
@@ -80,8 +105,61 @@ export function ThreadsReplies() {
     <div>
       <PageHeader
         title={`${brand.name} Threads 互動引流`}
-        subtitle="系統每 30 分鐘搜尋熱門相關公開貼文,以品牌第一線人設生成回覆;開啟自動回覆後會在額度內直接發布,也可在此人工核准或改稿"
+        subtitle="掃熱門公開貼文、以品牌第一線語氣生成回覆;可人工核准,或開啟自動回覆在額度內直接發布"
       />
+
+      {data && (
+        <Card style={{ marginBottom: 14, borderLeft: `4px solid ${data.autoReplyReady && data.autoReply ? 'var(--color-primary)' : 'var(--color-border)'}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div>
+              <strong style={{ fontSize: 14 }}>自動回覆狀態</strong>
+              <p style={{ fontSize: 13, marginTop: 6, color: 'var(--color-text)' }}>
+                {data.autoReply && data.autoReplyReady
+                  ? `${brand.name} 可以自動回覆:半點排程會搜文入庫,並在額度內直接發布。`
+                  : data.autoReply && !data.autoReplyReady
+                    ? `開關已開,但現在還不能真的自動發。${data.blockReason ?? ''}`
+                    : data.autoReplyReady
+                      ? '搜尋權限已通。開啟自動回覆後,待審稿會在額度內直接發布;關閉則全部等人審。'
+                      : data.blockReason ?? '請先掃一輪,確認能不能搜到別人的公開文。'}
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Button
+                variant={data.autoReply ? 'danger' : 'primary'}
+                disabled={toggling || !data.hasThreadsAccount}
+                onClick={() => void setAutoReply(!data.autoReply)}
+              >
+                {toggling ? '儲存中...' : data.autoReply ? '關閉自動回覆' : '開啟自動回覆'}
+              </Button>
+              {!data.hasThreadsAccount && (
+                <Link to={`/${slug}/social`}>
+                  <Button variant="secondary">去連接 Threads</Button>
+                </Link>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            <Badge tone={checkTone(data.hasThreadsAccount)}>
+              {data.hasThreadsAccount
+                ? `Threads 已連接${data.threadsUsername ? ` @${data.threadsUsername}` : ''}`
+                : '尚未連接 Threads'}
+            </Badge>
+            <Badge tone={checkTone(data.canSearchPublic)}>
+              {data.canSearchPublic === true
+                ? '可搜到別人的公開文'
+                : data.canSearchPublic === false
+                  ? '只能搜到自己的文(App Review 未過)'
+                  : '尚未確認搜尋權限'}
+            </Badge>
+            <Badge tone={data.autoReply ? 'primary' : 'default'}>
+              {data.autoReply ? '自動回覆已開啟' : '自動回覆關閉(僅人工核准)'}
+            </Badge>
+            <Badge tone={data.autoReplyReady ? 'primary' : 'default'}>
+              {data.autoReplyReady ? '技術上可自動發' : '尚未就緒'}
+            </Badge>
+          </div>
+        </Card>
+      )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         {TABS.map((t) => (
@@ -95,12 +173,11 @@ export function ThreadsReplies() {
         ))}
         {data && (
           <span style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
-            {data.autoReply ? '自動回覆已開啟 · ' : '自動回覆關閉(僅人工核准) · '}
             本小時 {data.replied1h}/{data.replyHourlyCap} · 近 24 小時 {data.replied24h}/{data.replyDailyCap}
           </span>
         )}
         <Button variant="secondary" disabled={scanning} onClick={() => void scanNow()}>
-          {scanning ? '掃描中...' : '立即掃描搜尋權限'}
+          {scanning ? '掃文中...' : data?.autoReply ? '立即掃文並自動發' : '立即掃文入庫'}
         </Button>
       </div>
 
@@ -129,14 +206,18 @@ export function ThreadsReplies() {
             <Card>
               <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
                 {tab === 'pending'
-                  ? '目前沒有待審核的回覆。開關開了還是空的,通常不是設定沒存到,而是 Meta 規定 threads_keyword_search 未過 App Review 前只能搜到自己的文;系統會略過自己的文,佇列就會一直是空的。請按「立即掃描搜尋權限」,或到社群帳號按「測試連線」看實際搜尋結果。'
+                  ? (data.canSearchPublic === false
+                    ? '目前沒有待審核的回覆。關鍵字搜尋還只能看到自己的文,系統會略過自家帳號,佇列就會是空的。請到 Meta 送審 threads_keyword_search,過審後再按「立即掃文入庫」。'
+                    : data.hasThreadsAccount
+                      ? '目前沒有待審核的回覆。按「立即掃文入庫」立刻跑一輪搜尋與 AI 生成,不必等半點排程。'
+                      : '目前沒有待審核的回覆。請先到社群帳號連接 Threads,再回來掃文。')
                   : '這個分類目前沒有項目'}
-                {data.lastScan?.detail && (
-                  <p style={{ fontSize: 12.5, marginTop: 8, color: 'var(--color-text)' }}>
-                    最近一次掃描({new Date(data.lastScan.at).toLocaleString('zh-TW')}):{data.lastScan.detail}
-                  </p>
-                )}
               </p>
+              {data.lastScan?.detail && (
+                <p style={{ fontSize: 12.5, marginTop: 8, color: 'var(--color-text)' }}>
+                  最近一次掃描({new Date(data.lastScan.at).toLocaleString('zh-TW')}):{data.lastScan.detail}
+                </p>
+              )}
             </Card>
           )}
           {data.targets.map((t) => {
@@ -157,7 +238,6 @@ export function ThreadsReplies() {
                   </span>
                 </div>
 
-                {/* 目標貼文 */}
                 <div style={{
                   background: 'var(--color-bg-soft)', borderRadius: 10, padding: '10px 12px', marginBottom: 10,
                 }}>
@@ -180,7 +260,6 @@ export function ThreadsReplies() {
                   </p>
                 )}
 
-                {/* 回覆內容 */}
                 {t.replyText != null && (
                   <div style={{ marginBottom: 10 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 4 }}>
@@ -217,7 +296,6 @@ export function ThreadsReplies() {
                   <p style={{ fontSize: 12, color: '#B85454', marginBottom: 8 }}>錯誤:{t.errorMessage}</p>
                 )}
 
-                {/* 操作 */}
                 {(t.status === 'pending' || t.status === 'failed') && t.replyText != null && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {isEditing ? (
@@ -250,13 +328,13 @@ export function ThreadsReplies() {
       )}
 
       <Card style={{ marginTop: 16, background: 'var(--color-bg-soft)' }}>
-        <strong style={{ fontSize: 13 }}>運作方式與防封號機制</strong>
+        <strong style={{ fontSize: 13 }}>Washgo 自動回覆怎麼開</strong>
         <ul style={{ fontSize: 12.5, color: 'var(--color-text-muted)', lineHeight: 1.9, paddingLeft: 18, marginTop: 6 }}>
-          <li>每 30 分鐘掃一輪,優先處理已開自動回覆的品牌(每輪最多 2 個);關鍵字含行業痛點,AI 只挑相關性 ≥ 70% 的文</li>
-          <li>熱度訊號:官方 TOP 搜尋 + 已有人回覆 + 48 小時內新文優先(API 沒有瀏覽數)</li>
-          <li>回覆走品牌第一線人設、不放連結、不促銷;小時上限預設 5(硬頂 20)、每日上限與自動回覆開關在「<Link to={`/${slug}/social`}>社群帳號</Link>」</li>
-          <li>開啟「自動回覆」後,待審佇列會在額度內自動發布;關閉則全部等你核准</li>
-          <li>發布失敗(如被限流)會暫停該品牌 12 小時,避免觸發平台風控</li>
+          <li>先確認 Threads 已連線,再按「立即掃文入庫」。這一輪會真的搜尋、AI 寫稿、入待審;自動回覆開著才會直接發。</li>
+          <li>若掃描結果是「只能搜到自己的文」,代表 <code>threads_keyword_search</code> 還沒過 App Review,開開關也不會有佇列。</li>
+          <li>權限通了之後再開自動回覆。小時上限預設 5、每日上限預設 12,可在「<Link to={`/${slug}/social`}>社群帳號</Link>」調整。</li>
+          <li>回覆走品牌第一線人設、不放連結、不促銷;發布失敗會暫停該品牌 12 小時。</li>
+          <li>排程每 30 分鐘掃一輪(台灣凌晨 2–6 點靜默);不想等就按這一頁的立即掃文。</li>
         </ul>
       </Card>
     </div>

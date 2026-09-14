@@ -7,20 +7,35 @@ import { rowsToCamel } from '../../../_shared/case';
 import { json, error } from '../../../_shared/response';
 import {
   publishReplyTarget, getReplyQuotaState, replyQuotaIssue, clampReplyHourlyCap, clampReplyDailyCap,
-  getLatestReplyScan, diagnoseBrandReplySearch,
+  getLatestReplyScan,
 } from '../../../_shared/threads-replies';
+import { processBrandReplyRound } from '../../../_shared/threads-reply-round';
 import { getThreadsAccount } from '../../../_shared/threads';
 import { logActivity } from '../../../_shared/activity';
 
 // ============================================================================
 // Threads 熱門貼文回覆佇列
-//   GET  ?status=pending|replied|skipped|failed|all  → 列表(預設 pending)
+//   GET  ?status=pending|replied|skipped|failed|all  → 列表 + 自動回覆就緒狀態
+//   POST { action: 'scan' }                         → 掃文入庫(自動回覆開則一併發布)
+//   POST { action: 'set-auto-reply', autoReply }     → 開關自動回覆
 //   POST { id, action: 'approve' | 'skip', replyText? }
-//     approve → (可帶編輯後的 replyText)立即發布回覆
-//     skip    → 標記略過
 // ============================================================================
 
 const LIST_STATUSES = ['pending', 'replied', 'skipped', 'failed'];
+
+function autoReplyBlockReason(params: {
+  hasAccount: boolean;
+  canSearchPublic: boolean | null;
+  failedRecent: number;
+}): string | null {
+  if (!params.hasAccount) return '尚未連接可用的 Threads 帳號';
+  if (params.canSearchPublic === false) {
+    return '關鍵字搜尋還看不到別人的公開文(通常是 threads_keyword_search 未過 App Review)';
+  }
+  if (params.canSearchPublic == null) return '尚未掃描搜尋權限,請先按「立即掃文入庫」確認';
+  if (params.failedRecent > 0) return '近 12 小時有發布失敗,系統暫停自動發布';
+  return null;
+}
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -47,10 +62,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       `;
 
   const quota = await getReplyQuotaState(context.env, brand.id);
-  let acc: { auto_reply?: boolean; reply_daily_cap?: number; reply_hourly_cap?: number } = {};
+  let acc: {
+    auto_reply?: boolean; reply_daily_cap?: number; reply_hourly_cap?: number;
+    access_token_enc?: string | null; status?: string; account_name?: string | null;
+  } = {};
   try {
     const accRows = await sql`
-      SELECT auto_reply, reply_daily_cap, reply_hourly_cap
+      SELECT auto_reply, reply_daily_cap, reply_hourly_cap, access_token_enc, status, account_name
       FROM brand_social_accounts
       WHERE brand_id = ${brand.id}::uuid AND platform = 'threads'
       LIMIT 1
@@ -58,7 +76,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     acc = (accRows[0] ?? {}) as typeof acc;
   } catch {
     const accRows = await sql`
-      SELECT auto_reply, reply_daily_cap
+      SELECT auto_reply, reply_daily_cap, access_token_enc, status, account_name
       FROM brand_social_accounts
       WHERE brand_id = ${brand.id}::uuid AND platform = 'threads'
       LIMIT 1
@@ -66,14 +84,30 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     acc = (accRows[0] ?? {}) as typeof acc;
   }
 
+  const lastScan = await getLatestReplyScan(context.env, brand.id);
+  const hasThreadsAccount = !!acc.access_token_enc && acc.status !== 'error';
+  const canSearchPublic = lastScan?.canSearchPublic ?? null;
+  const blockReason = autoReplyBlockReason({
+    hasAccount: hasThreadsAccount,
+    canSearchPublic,
+    failedRecent: quota.failedRecent,
+  });
+  const autoReply = !!acc.auto_reply;
+  const autoReplyReady = hasThreadsAccount && canSearchPublic === true && quota.failedRecent === 0;
+
   return json({
     targets: rowsToCamel(rows as Record<string, unknown>[]),
     replied1h: quota.replied1h,
     replied24h: quota.replied24h,
     replyHourlyCap: clampReplyHourlyCap(acc.reply_hourly_cap),
     replyDailyCap: clampReplyDailyCap(acc.reply_daily_cap),
-    autoReply: !!acc.auto_reply,
-    lastScan: await getLatestReplyScan(context.env, brand.id),
+    autoReply,
+    hasThreadsAccount,
+    threadsUsername: acc.account_name ?? null,
+    canSearchPublic,
+    autoReplyReady,
+    blockReason,
+    lastScan,
   });
 };
 
@@ -85,13 +119,66 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const brand = await getBrandBySlug(context.env, slug);
   if (!brand) return error('Brand not found', 404);
 
-  const body = await context.request.json() as { id?: string; action?: string; replyText?: string };
+  const body = await context.request.json() as {
+    id?: string; action?: string; replyText?: string; autoReply?: boolean;
+  };
+
   if (body.action === 'scan') {
-    const result = await diagnoseBrandReplySearch(context.env, brand.id, brand.slug);
-    return json({ ok: result.ok, status: result.ok ? 'ready' : 'blocked', detail: result.detail });
+    const result = await processBrandReplyRound(context.env, {
+      brandId: brand.id,
+      brandSlug: brand.slug,
+      brandName: brand.name,
+      mode: 'manual',
+    });
+    return json({
+      ok: result.ok || result.queued > 0 || result.published > 0,
+      status: result.status,
+      detail: result.detail,
+      canSearchPublic: result.canSearchPublic,
+      autoReply: result.autoReply,
+      queued: result.queued,
+      published: result.published,
+    });
   }
+
+  if (body.action === 'set-auto-reply') {
+    if (typeof body.autoReply !== 'boolean') return error('需要 autoReply: true / false', 400);
+    const sql = getSql(context.env);
+    const accRows = await sql`
+      SELECT id, access_token_enc FROM brand_social_accounts
+      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads'
+      LIMIT 1
+    `;
+    if (!accRows.length || !(accRows[0] as { access_token_enc: string | null }).access_token_enc) {
+      return error('請先在社群帳號貼上 Threads token', 400);
+    }
+    const accountId = (accRows[0] as { id: string }).id;
+    await sql`
+      UPDATE brand_social_accounts
+      SET auto_reply = ${body.autoReply}
+      WHERE id = ${accountId}::uuid
+    `;
+    await logActivity(context.env, {
+      brandId: brand.id,
+      actorType: 'user',
+      actorUserId: auth.id,
+      action: 'social_account.updated',
+      entityType: 'brand_social_account',
+      entityId: accountId,
+      afterState: { platform: 'threads', autoReply: body.autoReply },
+    });
+    return json({
+      ok: true,
+      status: body.autoReply ? 'auto_reply_on' : 'auto_reply_off',
+      detail: body.autoReply
+        ? '已開啟自動回覆:之後掃到的待審稿會在額度內直接發布'
+        : '已關閉自動回覆:之後只入庫待審,不會自動發',
+      autoReply: body.autoReply,
+    });
+  }
+
   if (!body.id || !body.action || !['approve', 'skip'].includes(body.action)) {
-    return error('需要 id 與 action(approve / skip / scan)', 400);
+    return error('需要 id 與 action(approve / skip / scan / set-auto-reply)', 400);
   }
 
   const sql = getSql(context.env);
@@ -121,7 +208,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return json({ ok: true, status: 'skipped' });
   }
 
-  // approve:立即發布(可帶編輯後文字);小時/日上限與自動回覆共用
   const account = await getThreadsAccount(context.env, brand.id);
   const quota = await getReplyQuotaState(context.env, brand.id);
   const capIssue = replyQuotaIssue({

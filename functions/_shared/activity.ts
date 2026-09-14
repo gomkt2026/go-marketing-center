@@ -71,6 +71,7 @@ export const ACTION_LABELS: Record<string, string> = {
   'threads_reply.generated': '生成 Threads 熱門貼文回覆',
   'threads_reply.published': '發布 Threads 回覆',
   'threads_reply.skipped': '略過 Threads 回覆',
+  'threads_reply.scan': '掃描 Threads 熱門貼文',
   'meeting.created': '建立會議',
   'meeting.concluded': '產生會議結論',
   'brand_rule.adopted': '採納會議結論為品牌規則',

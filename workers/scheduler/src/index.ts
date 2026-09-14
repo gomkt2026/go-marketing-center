@@ -3,7 +3,7 @@ import type { Env } from '../../../functions/_shared/env';
 import { getSql } from '../../../functions/_shared/db';
 import { chatCompleteJson } from '../../../functions/_shared/openai';
 import {
-  buildBrandContext, getBrandVoice, ANTI_AI_RULES,
+  buildBrandContext, getBrandVoice,
   THREADS_HOURLY_CATEGORIES, pickThreadsHourlyCategory, type ThreadsHourlyCategoryId,
   buildCollaborationContext, findEcosystemCollaborationId, pickEcosystemXAngle,
   pickAudience, audienceLaneInstruction,
@@ -14,14 +14,11 @@ import {
   generateEcosystemXPost, saveEcosystemXContent, findEcosystemAgent,
   pickBrandScreenshot, SPOTLIGHT_SLUG,
 } from '../../../functions/_shared/generate';
-import { getThreadsAccount, publishThreadsPost, searchThreadsPosts, isThreadsAccessBlocked, THREADS_ACCESS_BLOCKED_NOTE, type ThreadsAccount, type ThreadsSearchPost } from '../../../functions/_shared/threads';
+import { getThreadsAccount, publishThreadsPost, isThreadsAccessBlocked, THREADS_ACCESS_BLOCKED_NOTE, type ThreadsAccount } from '../../../functions/_shared/threads';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, META_TOKEN_INVALID_NOTE } from '../../../functions/_shared/meta';
 import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '../../../functions/_shared/x';
 import { toPublicMediaUrl } from '../../../functions/_shared/media';
-import {
-  publishReplyTarget, replyTextIssue, getReplyQuotaState, replyQuotaIssue, THREADS_REPLY_KEYWORDS,
-  recordReplyScan,
-} from '../../../functions/_shared/threads-replies';
+import { processBrandReplyRound } from '../../../functions/_shared/threads-reply-round';
 import { encryptToken, decryptToken } from '../../../functions/_shared/crypto';
 import { logActivity } from '../../../functions/_shared/activity';
 import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from '../../../functions/_shared/sources';
@@ -809,39 +806,7 @@ async function catchupTodayAutoPosts(env: Env): Promise<void> {
 //   - auto_reply 開啟 → 在小時/日上限內自動發布;否則存 pending 待前台審核
 //   - 防封號:小時上限(預設 5 / 硬頂 20)、每日上限、失敗即暫停、去重、作者冷卻、禁連結促銷
 // ============================================================================
-const REPLY_RELEVANCE_MIN = 0.7;
-const REPLY_KEYWORDS_PER_ROUND = 3;    // 每輪最多 3 次 keyword search
-const REPLY_CANDIDATES_FOR_AI = 8;     // 交給 AI 評估的候選貼文數
-const REPLY_MAX_QUEUED_PER_ROUND = 4;  // 每輪最多入庫的回覆數
-const REPLY_MAX_AUTO_PUBLISH_PER_ROUND = 3;
 const REPLY_BRANDS_PER_ROUND = 2;
-const REPLY_PENDING_QUEUE_LIMIT = 10;  // 待審佇列滿了就先不生成
-const REPLY_MIN_INTERVAL_MS = 8 * 60 * 1000;
-const REPLY_MAX_POST_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 不回覆超過 7 天的舊貼文
-const REPLY_FRESH_MS = 48 * 60 * 60 * 1000; // 48 小時內的文優先當熱度
-
-interface ReplySelection {
-  index: number;
-  relevance: number;
-  reason: string;
-  reply: string;
-}
-
-function replyHeatRank(a: ThreadsSearchPost, b: ThreadsSearchPost): number {
-  const now = Date.now();
-  const age = (p: ThreadsSearchPost) => p.timestamp ? now - new Date(p.timestamp).getTime() : Number.MAX_SAFE_INTEGER;
-  const recency = (p: ThreadsSearchPost) => {
-    const ms = age(p);
-    if (ms < 24 * 60 * 60 * 1000) return 2;
-    if (ms < REPLY_FRESH_MS) return 1;
-    return 0;
-  };
-  const heat = Number(b.hasReplies) - Number(a.hasReplies);
-  if (heat !== 0) return heat;
-  const fresh = recency(b) - recency(a);
-  if (fresh !== 0) return fresh;
-  return age(a) - age(b);
-}
 
 async function threadsReplyRound(env: Env): Promise<void> {
   const sql = getSql(env);
@@ -860,275 +825,16 @@ async function threadsReplyRound(env: Env): Promise<void> {
   let processed = 0;
   for (const brand of brands as { id: string; slug: string; name: string; auto_reply: boolean; last_at: string | null }[]) {
     if (processed >= REPLY_BRANDS_PER_ROUND) break;
-    const account = await getThreadsAccount(env, brand.id);
-    if (!account) continue;
-
     try {
-      const state = await getReplyQuotaState(env, brand.id);
-      if (state.failedRecent > 0) {
-        console.log(`[replies] ${brand.slug} 近 12 小時有發布失敗,本輪跳過`);
-        continue;
-      }
-      const quotaBlocked = !!replyQuotaIssue({
-        replied1h: state.replied1h,
-        replied24h: state.replied24h,
-        hourlyCap: account.replyHourlyCap,
-        dailyCap: account.replyDailyCap,
+      const result = await processBrandReplyRound(env, {
+        brandId: brand.id,
+        brandSlug: brand.slug,
+        brandName: brand.name,
+        mode: 'cron',
       });
-      if (quotaBlocked) {
-        console.log(`[replies] ${brand.slug} 已達回覆上限(小時 ${state.replied1h}/${account.replyHourlyCap}, 日 ${state.replied24h}/${account.replyDailyCap}),本輪跳過`);
-        continue;
-      }
-      const queueFull = state.pendingCount >= REPLY_PENDING_QUEUE_LIMIT;
-      const baseKeywords = THREADS_REPLY_KEYWORDS[brand.slug] ?? [brand.name];
-      const keywords: string[] = [];
-      let found: ThreadsSearchPost[] = [];
-
-      if (queueFull) {
-        console.log(`[replies] ${brand.slug} 待審佇列已滿 ${REPLY_PENDING_QUEUE_LIMIT},本輪只消化自動回覆`);
-      } else {
-        // 關鍵字:品牌回覆痛點詞為主,有跟行業重疊的 Google Trends 熱詞優先
-        let trendKeywords: string[] = [];
-        try {
-          const trends = await fetchGoogleTrendsTW(10);
-          trendKeywords = trends
-            .map((t) => t.title)
-            .filter((title) => baseKeywords.some((k) => title.includes(k)));
-        } catch { /* trends 抓不到不影響 */ }
-        const shuffled = [...baseKeywords].sort(() => Math.random() - 0.5);
-        keywords.push(...[...new Set([...trendKeywords, ...shuffled])].slice(0, REPLY_KEYWORDS_PER_ROUND));
-
-        for (const kw of keywords) {
-          try {
-            const posts = await searchThreadsPosts(account, kw, 25);
-            found.push(...posts.map((p) => ({ ...p, sourceKeyword: kw }) as ThreadsSearchPost & { sourceKeyword: string }));
-          } catch (e) {
-            console.error(`[replies] ${brand.slug} 搜尋「${kw}」失敗`, e);
-          }
-        }
-        if (!found.length) {
-          const detail = keywords.length
-            ? `關鍵字「${keywords.join('、')}」沒有搜到貼文。token 可能缺少 threads_keyword_search,或 App 還在開發模式。`
-            : '本輪未執行搜尋';
-          console.log(`[replies] ${brand.slug} ${detail}`);
-          await recordReplyScan(env, brand.id, detail, { keywords, total: 0 });
-        }
-      }
-
-      // 過濾:去掉回覆/自家貼文/太舊/太短,並比對已處理過的貼文與 7 天內回覆過的作者
-      const ownUsername = (account.username ?? '').toLowerCase();
-      const postIds = found.map((p) => p.id);
-      if (!found.length) {
-        if (account.autoReply) {
-          await autoPublishPendingReplies(env, {
-            brandId: brand.id, brandSlug: brand.slug, account,
-            lastRepliedAt: state.lastRepliedAt, replied1h: state.replied1h, replied24h: state.replied24h,
-          });
-        }
-        processed += 1;
-        continue;
-      }
-      const [seenRows, authorRows] = await Promise.all([
-        sql`SELECT target_post_id FROM threads_reply_targets WHERE brand_id = ${brand.id}::uuid AND target_post_id = ANY(${postIds})`,
-        sql`
-          SELECT DISTINCT lower(target_username) AS username FROM threads_reply_targets
-          WHERE brand_id = ${brand.id}::uuid AND target_username IS NOT NULL
-            AND status IN ('replied', 'pending', 'approved')
-            AND created_at > now() - interval '7 days'
-        `,
-      ]);
-      const seenIds = new Set((seenRows as { target_post_id: string }[]).map((r) => r.target_post_id));
-      const cooledAuthors = new Set((authorRows as { username: string }[]).map((r) => r.username));
-      const uniq = new Set<string>();
-      const candidates = (found as (ThreadsSearchPost & { sourceKeyword: string })[])
-        .filter((p) => {
-          if (uniq.has(p.id)) return false;
-          uniq.add(p.id);
-          if (seenIds.has(p.id)) return false;
-          if (p.isReply || !p.text || p.text.trim().length < 20) return false;
-          if (p.username && p.username.toLowerCase() === ownUsername) return false;
-          if (p.username && cooledAuthors.has(p.username.toLowerCase())) return false;
-          if (p.timestamp && Date.now() - new Date(p.timestamp).getTime() > REPLY_MAX_POST_AGE_MS) return false;
-          return true;
-        })
-        // 有人回過的貼文 + 越新越優先(官方搜尋沒有瀏覽數)
-        .sort(replyHeatRank)
-        .slice(0, REPLY_CANDIDATES_FOR_AI);
-      if (!candidates.length) {
-        const ownCount = found.filter((p) => (p.username ?? '').toLowerCase() === ownUsername).length;
-        const detail = ownCount === found.length
-          ? `搜到 ${found.length} 則都是自己的帳號 @${account.username}。Meta 規定 threads_keyword_search 未過 App Review 前只能搜自己的文,自動回覆佇列會是空的。`
-          : `搜到 ${found.length} 則,過濾後沒有可回覆的公開文(太舊、已處理、作者冷卻或是回覆串)。`;
-        console.log(`[replies] ${brand.slug} ${detail}`);
-        await recordReplyScan(env, brand.id, detail, { total: found.length, ownCount, publicCount: found.length - ownCount });
-        if (account.autoReply) {
-          await autoPublishPendingReplies(env, {
-            brandId: brand.id, brandSlug: brand.slug, account,
-            lastRepliedAt: state.lastRepliedAt, replied1h: state.replied1h, replied24h: state.replied24h,
-          });
-        }
-        processed += 1;
-        continue;
-      }
-
-      // AI 一次完成:相關性評分 + 真人語氣回覆
-      const voice = getBrandVoice(brand.slug);
-      const agentId = await findBrandAgent(env, brand.id);
-      const listText = candidates
-        .map((p, i) => `${i}. @${p.username ?? '匿名'}:${p.text!.slice(0, 280)}`)
-        .join('\n---\n');
-      const selection = await chatCompleteJson<{ selections: ReplySelection[] }>(env, {
-        temperature: 0.7,
-        messages: [
-          {
-            role: 'system',
-            content: [
-              `你是品牌「${brand.name}」的第一線人員,正在用個人身分逛 Threads、跟大家聊天。${voice.frontlinePersona}`,
-              ANTI_AI_RULES,
-            ].join('\n'),
-          },
-          {
-            role: 'user',
-            content: [
-              `以下是 Threads 上搜到的熱門貼文,挑「最多 ${REPLY_MAX_QUEUED_PER_ROUND} 則」你真的有話想說的來回覆(relevance 至少 ${REPLY_RELEVANCE_MIN} 才選,寧缺勿濫):`,
-              listText,
-              '',
-              '回覆鐵則(違反任何一條就不要選那則):',
-              '1. 像真人搭話:分享自己第一線的經驗、觀點或一個小故事,30-120 字。',
-              '2. 絕對不放連結、不提優惠促銷、不推銷服務、不叫人私訊;可以自然透露你的職業身分。',
-              '3. 不說教、不糾正對方;先同理再補充,或幽默接梗。',
-              '4. 政治、宗教、災難、性別對立等爭議話題一律不回。',
-              '',
-              '回傳 JSON:{"selections":[{"index":清單編號,"relevance":0到1,"reason":"為什麼值得回(30字內)","reply":"回覆全文"}]}',
-              '如果都不值得回,回傳 {"selections":[]}',
-            ].join('\n'),
-          },
-        ],
-      });
-
-      const picked = (selection.selections ?? [])
-        .filter((s) => candidates[s.index] && s.relevance >= REPLY_RELEVANCE_MIN && !replyTextIssue(s.reply))
-        .sort((a, b) => b.relevance - a.relevance)
-        .slice(0, REPLY_MAX_QUEUED_PER_ROUND);
-
-      // 入庫:選中的存 pending;其餘評估過的存 skipped(避免下輪重複評估)
-      const pickedIndexes = new Set(picked.map((s) => s.index));
-      const insertedIds: string[] = [];
-      for (const sel of picked) {
-        const p = candidates[sel.index];
-        const rows = await sql`
-          INSERT INTO threads_reply_targets (
-            brand_id, target_post_id, target_permalink, target_username, target_text, target_timestamp,
-            source_keyword, relevance_score, relevance_reason, reply_text, status, generated_by_agent_id
-          ) VALUES (
-            ${brand.id}::uuid, ${p.id}, ${p.permalink}, ${p.username}, ${p.text}, ${p.timestamp},
-            ${p.sourceKeyword}, ${Math.min(1, Math.max(0, sel.relevance))}, ${sel.reason},
-            ${sel.reply.trim()}, 'pending', ${agentId}
-          ) ON CONFLICT (brand_id, target_post_id) DO NOTHING
-          RETURNING id
-        `;
-        if (rows.length) {
-          const id = (rows[0] as { id: string }).id;
-          insertedIds.push(id);
-          await logActivity(env, {
-            brandId: brand.id,
-            actorType: 'ai_agent',
-            actorAgentId: agentId,
-            action: 'threads_reply.generated',
-            entityType: 'threads_reply_target',
-            entityId: id,
-            afterState: { targetUsername: p.username, keyword: p.sourceKeyword, relevance: sel.relevance },
-          });
-        }
-      }
-      for (const [i, p] of candidates.entries()) {
-        if (pickedIndexes.has(i)) continue;
-        await sql`
-          INSERT INTO threads_reply_targets (
-            brand_id, target_post_id, target_permalink, target_username, target_text, target_timestamp,
-            source_keyword, status
-          ) VALUES (
-            ${brand.id}::uuid, ${p.id}, ${p.permalink}, ${p.username}, ${p.text}, ${p.timestamp},
-            ${p.sourceKeyword}, 'skipped'
-          ) ON CONFLICT (brand_id, target_post_id) DO NOTHING
-        `;
-      }
-      const scanDetail = `關鍵字「${keywords.join('、')}」候選 ${candidates.length} 則,入庫 ${insertedIds.length} 則`;
-      console.log(`[replies] ${brand.slug} ${scanDetail}`);
-      await recordReplyScan(env, brand.id, scanDetail, { keywords, candidates: candidates.length, queued: insertedIds.length });
-
-      if (account.autoReply) {
-        await autoPublishPendingReplies(env, {
-          brandId: brand.id,
-          brandSlug: brand.slug,
-          account,
-          lastRepliedAt: state.lastRepliedAt,
-          replied1h: state.replied1h,
-          replied24h: state.replied24h,
-        });
-      }
-      processed += 1;
+      if (result.counted) processed += 1;
     } catch (e) {
       console.error(`[replies] 品牌 ${brand.slug} 回覆輪失敗`, e);
-    }
-  }
-}
-
-async function autoPublishPendingReplies(
-  env: Env,
-  params: {
-    brandId: string;
-    brandSlug: string;
-    account: ThreadsAccount;
-    lastRepliedAt: string | null;
-    replied1h: number;
-    replied24h: number;
-  },
-): Promise<void> {
-  const account = params.account;
-  const intervalOk = !params.lastRepliedAt ||
-    Date.now() - new Date(params.lastRepliedAt).getTime() >= REPLY_MIN_INTERVAL_MS;
-  if (!intervalOk) {
-    console.log(`[replies] ${params.brandSlug} 距上次回覆未滿間隔,本輪不自動發`);
-    return;
-  }
-
-  let remaining = Math.min(
-    REPLY_MAX_AUTO_PUBLISH_PER_ROUND,
-    account.replyHourlyCap - params.replied1h,
-    account.replyDailyCap - params.replied24h,
-  );
-  if (remaining <= 0) return;
-
-  const sql = getSql(env);
-  const pending = await sql`
-    SELECT id FROM threads_reply_targets
-    WHERE brand_id = ${params.brandId}::uuid
-      AND status = 'pending'
-      AND reply_text IS NOT NULL
-    ORDER BY relevance_score DESC NULLS LAST, created_at ASC
-    LIMIT ${remaining}
-  `;
-  for (const row of pending as { id: string }[]) {
-    const quota = replyQuotaIssue({
-      replied1h: params.replied1h,
-      replied24h: params.replied24h,
-      hourlyCap: account.replyHourlyCap,
-      dailyCap: account.replyDailyCap,
-    });
-    if (quota) {
-      console.log(`[replies] ${params.brandSlug} ${quota}`);
-      break;
-    }
-    const result = await publishReplyTarget(env, { targetId: row.id, account });
-    if (result.ok) {
-      params.replied1h += 1;
-      params.replied24h += 1;
-      remaining -= 1;
-      console.log(`[replies] ${params.brandSlug} 已自動回覆:${result.replyPermalink ?? result.replyPostId}`);
-    } else {
-      console.error(`[replies] ${params.brandSlug} 自動回覆失敗:${result.error}`);
-      break;
     }
   }
 }

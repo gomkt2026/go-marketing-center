@@ -544,13 +544,31 @@ export const api = {
       replyHourlyCap: number;
       replyDailyCap: number;
       autoReply: boolean;
-      lastScan?: { at: string; detail: string } | null;
+      hasThreadsAccount: boolean;
+      threadsUsername: string | null;
+      canSearchPublic: boolean | null;
+      autoReplyReady: boolean;
+      blockReason: string | null;
+      lastScan?: {
+        at: string; detail: string;
+        canSearchPublic?: boolean | null;
+        publicCount?: number | null;
+        queued?: number | null;
+      } | null;
     }>(
       `/api/brands/${slug}/thread-replies?status=${status}`,
     ),
 
-  actThreadReply: (slug: string, body: { id?: string; action: 'approve' | 'skip' | 'scan'; replyText?: string }) =>
-    request<{ ok: boolean; status: string; permalink?: string | null; detail?: string }>(`/api/brands/${slug}/thread-replies`, {
+  actThreadReply: (slug: string, body: {
+    id?: string;
+    action: 'approve' | 'skip' | 'scan' | 'set-auto-reply';
+    replyText?: string;
+    autoReply?: boolean;
+  }) =>
+    request<{
+      ok: boolean; status: string; permalink?: string | null; detail?: string;
+      canSearchPublic?: boolean; autoReply?: boolean; queued?: number; published?: number;
+    }>(`/api/brands/${slug}/thread-replies`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -956,7 +974,7 @@ export const api = {
 
   matchNetworkVendors: (slug: string, text: string) =>
     request<{
-      ask: { isVendorAsk: boolean; category: string | null; region: string | null; summary: string | null };
+      ask: { isVendorAsk: boolean; category: string | null; region: string | null; summary: string | null; aliases?: string[] };
       matches: { contact: import('@/types').NetworkContact; score: number; reasons: string[] }[];
       reply: string;
     }>(`/api/brands/${slug}/network/match`, {

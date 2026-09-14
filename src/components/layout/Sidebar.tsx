@@ -48,7 +48,7 @@ const groups: MenuGroup[] = [
       { label: '短影音', path: '/shorts', brandScoped: true },
       { label: '發布管理', path: '/publishing', brandScoped: true },
       { label: '行程表', path: '/schedule', brandScoped: true },
-      { label: 'Threads 互動', path: '/thread-replies', brandScoped: true },
+      { label: 'Threads 工作台', path: '/threads', brandScoped: true },
       { label: '社群帳號', path: '/social', brandScoped: true },
     ],
   },

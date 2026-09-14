@@ -4,17 +4,21 @@ import { getSql } from '../../../functions/_shared/db';
 import { chatCompleteJson } from '../../../functions/_shared/openai';
 import {
   buildBrandContext, getBrandVoice,
-  THREADS_HOURLY_CATEGORIES, pickThreadsHourlyCategory, type ThreadsHourlyCategoryId,
   buildCollaborationContext, findEcosystemCollaborationId, pickEcosystemXAngle,
   pickAudience, audienceLaneInstruction,
 } from '../../../functions/_shared/prompts';
 import {
-  generatePlatformPost, generateOfftopicPost, generateThreadsFromImage,
+  generatePlatformPost,
   saveGeneratedContent, findBrandAgent, type SocialPlatform,
   generateEcosystemXPost, saveEcosystemXContent, findEcosystemAgent,
   pickBrandScreenshot, SPOTLIGHT_SLUG,
 } from '../../../functions/_shared/generate';
-import { getThreadsAccount, publishThreadsPost, isThreadsAccessBlocked, THREADS_ACCESS_BLOCKED_NOTE, type ThreadsAccount } from '../../../functions/_shared/threads';
+import {
+  generateThreadsSlot, generateThreadsOfftopicSlot, promoteDueThreadsSafetyNet,
+  slotAtToday,
+  THREADS_POST_HOURS_TW, THREADS_OFFTOPIC_HOURS_TW,
+} from '../../../functions/_shared/threads-slots';
+import { getThreadsAccount, publishThreadsPost, isThreadsAccessBlocked, THREADS_ACCESS_BLOCKED_NOTE } from '../../../functions/_shared/threads';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, META_TOKEN_INVALID_NOTE } from '../../../functions/_shared/meta';
 import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '../../../functions/_shared/x';
 import { toPublicMediaUrl } from '../../../functions/_shared/media';
@@ -335,310 +339,13 @@ async function generateSignalDrafts(env: Env): Promise<void> {
 
 // ============================================================================
 // 主流程 2:Threads 熱門議題貼文(固定 4 檔:台灣 06:00 / 12:00 / 18:00 / 00:00)
-//   - 降頻避免被平台判定為機器人:每品牌每天最多 4 篇、每檔間隔 6 小時
-//   - 每次處理最多 3 個品牌;已連 Threads 且開自動發布的品牌(會真正發文)優先
-//   - 熱門議題來源:Google Trends TW + 近期自抓的社群情報(PTT/Dcard)
-//   - 生成與發布拆開:這裡只生成內容 + 存 scheduled 排程,實際發布交給 publishDueJobs
-//     在 scheduled_at(=slotAt,即這篇該發布的時段)到了之後才真正呼叫平台 API
+//   產稿邏輯在 functions/_shared/threads-slots.ts:一律 pending_review,先不建 job。
+//   auto_publish 是到期安全網,由 promoteDueThreadsSafetyNet 在 slot 到了才補單。
 // ============================================================================
-const THREADS_DAILY_CAP = 4; // 每品牌每日上限(以排定時段所在的台灣時區當天計)
-const THREADS_BRANDS_PER_TICK = 3; // Homigo / TaskGo / Washgo 同一檔都產,不再互搶
 const AUTO_POST_BRANDS = ['homigo', 'taskgo', 'washgo'] as const;
 const CATCHUP_GENERATIONS_PER_TICK = 1; // 每 tick 只補 1 則,避開 Workers 子請求上限(Neon 每條 SQL 都算 1 次)
 
-async function generateThreadsSlot(
-  env: Env,
-  slotAt: Date,
-  opts?: { slugs?: string[]; ignoreInterval?: boolean; onlyMissing?: boolean },
-): Promise<void> {
-  const sql = getSql(env);
-  const trends = await fetchGoogleTrendsTW(8);
-  if (!trends.length) {
-    console.warn('[threads] Google Trends 為空,改走非時事類型,不略過整檔');
-  }
-
-  // 會真正發文的品牌(已連 Threads + 開自動發布)優先,其餘品牌輪流補位
-  // today_count 只算「品牌相關跟風文」(threads_hourly),不受生活哏文(threads_offtopic)影響
-  // recent_categories:最近 2 篇用過的類型(見 THREADS_HOURLY_CATEGORIES),用來排除連續重複的角度(例如連續兩篇都在講換季)
-  const brands = await sql`
-    SELECT b.id, b.slug, b.name,
-           (SELECT max(c.created_at) FROM contents c
-            WHERE c.brand_id = b.id AND c.target_platform = 'threads'
-              AND c.generation_prompt_meta->>'source' = 'threads_hourly') AS last_at,
-           (SELECT count(*)::int FROM contents c
-            WHERE c.brand_id = b.id AND c.target_platform = 'threads'
-              AND c.generation_prompt_meta->>'source' = 'threads_hourly'
-              AND (c.generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
-              AND (c.generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
-           ) AS today_count,
-           (SELECT array_agg(cat) FROM (
-              SELECT c.generation_prompt_meta->>'category' AS cat FROM contents c
-              WHERE c.brand_id = b.id AND c.target_platform = 'threads'
-                AND c.generation_prompt_meta->>'source' = 'threads_hourly'
-              ORDER BY c.created_at DESC LIMIT 2
-            ) recent) AS recent_categories,
-           EXISTS(SELECT 1 FROM brand_social_accounts a
-                  WHERE a.brand_id = b.id AND a.platform = 'threads'
-                    AND a.status = 'connected' AND a.auto_publish) AS can_publish
-    FROM brands b
-    WHERE b.is_active = true AND b.slug IN ('homigo', 'taskgo', 'washgo')
-    ORDER BY can_publish DESC, last_at ASC NULLS FIRST
-    LIMIT ${opts?.slugs?.length ? 20 : THREADS_BRANDS_PER_TICK}
-  `;
-  const selected = (brands as {
-    id: string; slug: string; name: string; last_at: string | null; today_count: number;
-    recent_categories: (string | null)[] | null;
-  }[]).filter((b) => !opts?.slugs?.length || opts.slugs.includes(b.slug));
-
-  for (const brand of selected) {
-    if (await brandHasSlotContent(env, brand.id, 'threads', 'threads_hourly', slotAt)) {
-      if (opts?.onlyMissing) {
-        console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} Threads 跟風檔已存在,跳過`);
-      }
-      continue;
-    }
-    if (brand.today_count >= THREADS_DAILY_CAP) continue;
-    try {
-      const brandCtx = await buildBrandContext(env, brand.id);
-      const agentId = await findBrandAgent(env, brand.id);
-      const trendList = trends.map((t) => t.title).join('、');
-
-      // 品牌近期自抓的社群情報(PTT/Dcard 熱門討論)當作社群風向參考
-      const socialRows = await sql`
-        SELECT title FROM market_signals
-        WHERE brand_id = ${brand.id}::uuid
-          AND source_platform IN ('ptt', 'dcard')
-          AND discovered_at > now() - interval '48 hours'
-        ORDER BY relevance_score DESC LIMIT 5
-      `;
-      const socialTopics = (socialRows as { title: string }[]).map((r) => r.title);
-
-      // 圖片靈感類型:只有品牌智慧素材庫裡有可用圖片時才進候選池;挑最少被用過/最久沒用過的一張,讓庫存輪流曝光
-      const imageRows = await sql`
-        SELECT id, file_url, caption, image_category FROM brand_assets
-        WHERE brand_id = ${brand.id}::uuid AND asset_type = 'image'
-        ORDER BY used_in_threads_count ASC, last_used_at ASC NULLS FIRST
-        LIMIT 1
-      `;
-      const candidateImage = imageRows.length
-        ? imageRows[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null }
-        : null;
-
-      const recentCategoryIds = (brand.recent_categories ?? []).filter((c): c is string => !!c) as ThreadsHourlyCategoryId[];
-      const availableCategoryIds = (candidateImage
-        ? THREADS_HOURLY_CATEGORIES
-        : THREADS_HOURLY_CATEGORIES.filter((c) => c.id !== 'image_inspired')
-      ).filter((c) => trends.length > 0 || c.id !== 'seasonal_trend')
-        .map((c) => c.id);
-      const category = pickThreadsHourlyCategory(recentCategoryIds, availableCategoryIds);
-
-      let result;
-      if (category.id === 'image_inspired' && candidateImage) {
-        const publicImageUrl = toPublicMediaUrl(env, candidateImage.file_url);
-        if (!publicImageUrl) throw new Error('圖片素材缺少可用網址');
-        result = await generateThreadsFromImage(env, {
-          brandCtx,
-          imageUrl: publicImageUrl,
-          caption: candidateImage.caption ?? undefined,
-          imageCategory: candidateImage.image_category ?? undefined,
-          assetId: candidateImage.id,
-        });
-      } else {
-        const trendsBlock = [
-          `台灣現在的熱門話題:${trendList}`,
-          socialTopics.length
-            ? `目前社群(PTT/Dcard)正在討論的行業話題,也可以從這裡取材:\n${socialTopics.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
-            : '',
-        ].filter(Boolean).join('\n\n');
-        const topic = category.id === 'seasonal_trend' ? `台灣現在的熱門話題:${trendList}` : `Threads 貼文類型:${category.label}`;
-        result = await generatePlatformPost(env, {
-          brandCtx,
-          platform: 'threads',
-          topic,
-          extraInstruction: category.instruction.replace('{{TRENDS}}', trendsBlock),
-          audienceLane: 'b2c',
-        });
-      }
-
-      const account = await getThreadsAccount(env, brand.id);
-      const willAutoPublish = !!account?.autoPublish;
-
-      const { contentId, versionId } = await saveGeneratedContent(env, {
-        brandCtx,
-        platform: 'threads',
-        result,
-        generatedByAgentId: agentId,
-        status: willAutoPublish ? 'scheduled' : 'pending_review',
-        promptMeta: {
-          source: 'threads_hourly', category: category.id, trends: trends.map((t) => t.title), socialTopics,
-          slotAt: slotAt.toISOString(),
-          audienceLane: 'b2c',
-          audienceName: result.audienceName,
-          assetId: category.id === 'image_inspired' && candidateImage ? candidateImage.id : undefined,
-        },
-        imageAssetMeta: category.id === 'image_inspired' && candidateImage
-          ? { sourceAssetId: candidateImage.id, generated: false, reused: true }
-          : undefined,
-      });
-
-      if (willAutoPublish) {
-        await sql`
-          INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
-          VALUES (${contentId}::uuid, ${versionId}::uuid, 'threads', 'scheduled', ${slotAt.toISOString()}::timestamptz)
-        `;
-      }
-
-      await logActivity(env, {
-        brandId: brand.id,
-        actorType: 'ai_agent',
-        actorAgentId: agentId,
-        action: 'content.generated',
-        entityType: 'content',
-        entityId: contentId,
-        afterState: { platform: 'threads', category: category.id, auto: true, scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
-      });
-      console.log(`[threads] ${brand.slug} 已排定 ${slotAt.toISOString()} 發布(類型:${category.label},${willAutoPublish ? '自動' : '待審核'})`);
-    } catch (e) {
-      console.error(`[threads] 品牌 ${brand.slug} 生成失敗`, e);
-    }
-  }
-}
-
-// ============================================================================
-// 主流程 2d:Threads 生活哏文 / 生活散文
-//   - Homigo / Washgo / TaskGo(OFFTOPIC_BRANDS)
-//   - 固定 2 檔:台灣 09:00 生活哏文、21:00 品牌世界愛情散文(每品牌每天一篇,不經審閱直接排程)
-//   - 不佔用品牌相關貼文的 THREADS_DAILY_CAP;不提產品名
-// ============================================================================
-const OFFTOPIC_BRANDS = ['homigo', 'washgo', 'taskgo'];
-const THREADS_OFFTOPIC_DAILY_CAP = 2;
-
-async function generateThreadsOfftopicSlot(
-  env: Env,
-  slotAt: Date,
-  opts?: { slugs?: string[]; onlyMissing?: boolean },
-): Promise<void> {
-  const sql = getSql(env);
-  const targetSlugs = opts?.slugs?.length ? opts.slugs.filter((s) => OFFTOPIC_BRANDS.includes(s)) : OFFTOPIC_BRANDS;
-  for (const slug of targetSlugs) {
-    try {
-      const brandRows = await sql`SELECT id, slug, name FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1`;
-      if (!brandRows.length) continue;
-      const brand = brandRows[0] as { id: string; slug: string; name: string };
-      if (await brandHasSlotContent(env, brand.id, 'threads', 'threads_offtopic', slotAt)) {
-        if (opts?.onlyMissing) {
-          console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} Threads 生活哏文已存在,跳過`);
-        }
-        continue;
-      }
-
-      const todayRows = await sql`
-        SELECT count(*)::int AS n FROM contents
-        WHERE brand_id = ${brand.id}::uuid
-          AND generation_prompt_meta->>'source' = 'threads_offtopic'
-          AND (generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
-          AND (generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
-      `;
-      if ((todayRows[0] as { n: number }).n >= THREADS_OFFTOPIC_DAILY_CAP) continue;
-
-      const usedRows = await sql`
-        SELECT title, generation_prompt_meta->>'loveAngle' AS angle FROM contents
-        WHERE brand_id = ${brand.id}::uuid AND generation_prompt_meta->>'source' = 'threads_offtopic'
-          AND created_at > now() - interval '14 days'
-        ORDER BY created_at DESC LIMIT 20
-      `;
-      const usedTopics = (usedRows as { title: string; angle: string | null }[]).map((r) => r.title);
-      const usedAngles = (usedRows as { angle: string | null }[])
-        .map((r) => r.angle)
-        .filter((a): a is string => !!a);
-      const hourTW = (slotAt.getUTCHours() + 8) % 24;
-      const forceLoveStory = hourTW === 21;
-
-      const agentId = await findBrandAgent(env, brand.id);
-      const result = await generateOfftopicPost(env, {
-        usedTopics,
-        brandSlug: brand.slug,
-        forceLoveStory,
-        usedAngles,
-      });
-
-      const account = await getThreadsAccount(env, brand.id);
-      // 21:00 愛情散文只要帳號連得上就自動發,不進審閱
-      const willAutoPublish = !!account && (account.autoPublish || forceLoveStory);
-
-      const { contentId, versionId } = await saveGeneratedContent(env, {
-        brandCtx: { brandId: brand.id, slug: brand.slug, name: brand.name, systemPrompt: '' },
-        platform: 'threads',
-        result,
-        generatedByAgentId: agentId,
-        status: willAutoPublish ? 'scheduled' : 'pending_review',
-        promptMeta: {
-          source: 'threads_offtopic',
-          category: result.offtopicCategory ?? 'life_gag',
-          loveAngle: result.loveAngle,
-          slotAt: slotAt.toISOString(),
-          audienceLane: 'b2c',
-          replyBody: result.post.replyBody || undefined,
-        },
-      });
-
-      if (willAutoPublish) {
-        await sql`
-          INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
-          VALUES (${contentId}::uuid, ${versionId}::uuid, 'threads', 'scheduled', ${slotAt.toISOString()}::timestamptz)
-        `;
-      }
-
-      await logActivity(env, {
-        brandId: brand.id,
-        actorType: 'ai_agent',
-        actorAgentId: agentId,
-        action: 'content.generated',
-        entityType: 'content',
-        entityId: contentId,
-        afterState: { platform: 'threads', source: 'threads_offtopic', scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
-      });
-      console.log(`[offtopic] ${brand.slug} 已排定${forceLoveStory ? '愛情散文' : '生活哏文'},${slotAt.toISOString()} 發布(${willAutoPublish ? '自動' : '待審核'})`);
-    } catch (e) {
-      console.error(`[offtopic] 品牌 ${slug} 生成失敗`, e);
-    }
-  }
-}
-
 const CATCHUP_BRANDS = AUTO_POST_BRANDS;
-
-function taiwanDayStartUtc(now = new Date()): Date {
-  const twMs = now.getTime() + 8 * 60 * 60 * 1000;
-  const dayMs = 24 * 60 * 60 * 1000;
-  return new Date(Math.floor(twMs / dayMs) * dayMs - 8 * 60 * 60 * 1000);
-}
-
-function slotAtToday(hourTW: number, now = new Date()): Date {
-  return new Date(taiwanDayStartUtc(now).getTime() + hourTW * 60 * 60 * 1000);
-}
-
-async function brandHasSlotContent(
-  env: Env,
-  brandId: string,
-  platform: string,
-  source: string,
-  slotAt: Date,
-  windowMin = 90,
-): Promise<boolean> {
-  const sql = getSql(env);
-  const from = new Date(slotAt.getTime() - windowMin * 60 * 1000).toISOString();
-  const to = new Date(slotAt.getTime() + windowMin * 60 * 1000).toISOString();
-  const rows = await sql`
-    SELECT c.id FROM contents c
-    WHERE c.brand_id = ${brandId}::uuid
-      AND c.target_platform = ${platform}
-      AND c.generation_prompt_meta->>'source' = ${source}
-      AND (c.generation_prompt_meta->>'slotAt')::timestamptz
-          BETWEEN ${from}::timestamptz AND ${to}::timestamptz
-    LIMIT 1
-  `;
-  return rows.length > 0;
-}
 
 async function brandHasSlotJob(
   env: Env,
@@ -785,6 +492,7 @@ async function catchupTodayAutoPosts(env: Env): Promise<void> {
   await recoverStuckPublishingJobs(env);
   await ensureDailyThemePublishJobs(env, slugs);
   await ensureAutoPublishJobs(env);
+  await promoteDueThreadsSafetyNet(env);
   await publishDueJobs(env);
   const threadsFilled = await catchupMissingThreadsSlots(env, slugs, 1);
   if (!threadsFilled && slotGenerationDue(DAILY_THEME_HOUR_TW)) {
@@ -794,6 +502,7 @@ async function catchupTodayAutoPosts(env: Env): Promise<void> {
     });
   }
   await ensureAutoPublishJobs(env);
+  await promoteDueThreadsSafetyNet(env);
   await publishDueJobs(env);
   console.log('[catchup] 補齊與發布輪結束');
 }
@@ -1410,14 +1119,12 @@ async function refreshXTokens(env: Env): Promise<void> {
 // ============================================================================
 // 生成與發布拆開後的統一調度:
 //   - 固定時段(台灣時間):Threads 品牌相關 00/06/12/18、Threads 生活哏文 09/21、FB+IG 每日主題 19
-//   - 生成階段:每個時段提前 1 小時,在對應的整點 tick 生成內容並存成 scheduled 排程
-//     (例如 06:00 檔在 05:00 的 tick 生成)→ 行程表可以提早看到「已排定、內容是什麼」
+//   - 生成階段:每個時段提前 1 小時,在對應的整點 tick 生成 Threads 待審稿(工作台批准後才建 job)
+//     (例如 06:00 檔在 05:00 的 tick 生成)。auto_publish 開著時,到期還沒人審會當安全網自動發出。
 //   - 發布階段:每個 tick 都檢查有沒有到期的 scheduled 排程,到了時間才真正呼叫平台 API 發布
 //     (由 publishDueJobs 負責;因為排程時段本身就避開凌晨 2-6 點,不需要額外的靜默判斷)
 //   - Threads 熱門貼文回覆輪:凌晨 2-6 點靜默(避免被平台判定為機器人),其餘偶數小時的半點 tick 跑一次
 // ============================================================================
-const THREADS_POST_HOURS_TW = [0, 6, 12, 18];       // 品牌相關跟風文
-const THREADS_OFFTOPIC_HOURS_TW = [9, 21];          // 生活哏文(見 generateThreadsOfftopicSlot)
 const DAILY_THEME_HOUR_TW = 19;                     // FB/IG 每日主題
 const ECOSYSTEM_CROSS_PROMO_HOUR_TW = 20;           // Go 生態系跨品牌導流(僅週三、週日)
 const ECOSYSTEM_CROSS_PROMO_DAYS_TW = [0, 3];       // 0=週日, 3=週三(以台灣時區換算後的星期)
@@ -1493,6 +1200,9 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
 
   // 近 48 小時失敗的 Threads 每次只重試 1 則,避免半點一次塞 3 則被 Meta 擋
   await requeueRecentFailedThreads(env);
+
+  // Threads 到期仍待審且開了 auto_publish → 當安全網補單,再交給 publishDueJobs
+  await promoteDueThreadsSafetyNet(env);
 
   // 發布階段:每個 tick 都檢查有沒有已經到期的排程要真正發出去(呼叫平台 API)
   await publishDueJobs(env);

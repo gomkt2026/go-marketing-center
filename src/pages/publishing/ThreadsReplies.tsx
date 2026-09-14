@@ -172,8 +172,13 @@ export function ThreadsReplies() {
   return (
     <div>
       <PageHeader
-        title={`${brand.name} Threads 互動引流`}
-        subtitle="掃熱門公開貼文、以品牌第一線語氣生成回覆;可人工核准,或開啟自動回覆在額度內直接發布"
+        title={`${brand.name} Threads 回覆歷史`}
+        subtitle="進階佇列:看已回覆 / 已略過 / 失敗。日常審稿請回 Threads 工作台。"
+        actions={
+          <Link to={`/${slug}/threads`}>
+            <Button variant="secondary">回工作台</Button>
+          </Link>
+        }
       />
 
       {data && (

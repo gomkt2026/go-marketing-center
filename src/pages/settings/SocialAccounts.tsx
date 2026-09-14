@@ -10,8 +10,8 @@ import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { SocialAccount, SocialAccountStatus } from '@/types';
 
 const PLATFORMS: { id: 'facebook' | 'instagram' | 'threads'; label: string; hint: string }[] = [
-  { id: 'facebook', label: 'Facebook 粉絲專頁', hint: '必須存粉絲專頁權杖(Page Access Token),不要存個人 User Token。新版粉專體驗用 User Token 回收成效會出現 OAuth 190 / 2069032。自動發文需粉專發文權限;成效回收另需 pages_read_engagement' },
-  { id: 'instagram', label: 'Instagram 商業帳號', hint: '需要 IG 商業帳號 ID(與 FB 粉專綁定)與相同的 Page Token。成效回收另需 instagram_manage_insights' },
+  { id: 'facebook', label: 'Facebook 粉絲專頁', hint: '必須存粉絲專頁權杖(Page Access Token),不要存個人 User Token。新版粉專體驗用 User Token 回收成效會出現 OAuth 190 / 2069032。自動發文需粉專發文權限;成效回收另需 pages_read_engagement、pages_read_user_content' },
+  { id: 'instagram', label: 'Instagram 商業帳號', hint: '需要 IG 商業帳號 ID(與 FB 粉專綁定)與相同的 Page Token。成效回收另需 instagram_manage_insights，否則曝光會是 0' },
   { id: 'threads', label: 'Threads', hint: '需要 Threads App 的 access token(threads_basic / threads_content_publish;自動回覆需 threads_keyword_search 與 threads_manage_replies;成效回收需 threads_manage_insights)' },
 ];
 
@@ -119,7 +119,7 @@ function TokenHowTo({ brandName }: { brandName: string }) {
           </li>
           <li>
             自動回覆搜的是「別人的」熱門公開文。Meta 規定 <code>threads_keyword_search</code> <strong>未過 App Review 前只會搜到自己的貼文</strong>，
-            系統會略過自己的文，所以「Threads 互動」會一直是空的。要真正衝觸及，請在 App Review 送審這個權限；過審前開關開了也不會有佇列。
+            系統會略過自己的文，所以「Threads 工作台」回覆區會一直是空的。要真正衝觸及，請在 App Review 送審這個權限；過審前開關開了也不會有佇列。
           </li>
           <li>
             若行程表出現 <code>API access blocked</code>：先開{' '}
@@ -258,7 +258,9 @@ export function SocialAccounts() {
                           {tokenExpiryLabel(acc.tokenExpiresAt)}
                         </div>
                       )}
-                      {acc.autoPublish && <div>🚀 排程自動發布:已開啟</div>}
+                      {acc.autoPublish && (
+                        <div>{p.id === 'threads' ? '到期安全網:已開啟(工作台沒人批准時,到點仍會發)' : '排程自動發布:已開啟'}</div>
+                      )}
                       {acc.autoReply && (
                         <div>💬 自動回覆熱門貼文:已開啟(每小時 {acc.replyHourlyCap ?? 5} 則 / 每日 {acc.replyDailyCap ?? 12} 則)</div>
                       )}
@@ -327,7 +329,7 @@ export function SocialAccounts() {
                           checked={form.autoPublish}
                           onChange={(e) => setForm((f) => ({ ...f, autoPublish: e.target.checked }))}
                         />
-                        排程自動發布(約每 2 小時一篇 Threads 熱門議題貼文直接發布,凌晨 2-6 點停發,不經人工審核;需已填入有效 token)
+                        到期安全網(每天 00/06/09/12/18/21 六檔先到 Threads 工作台待批准;勾選後若到期還沒人審,仍會自動發出。需已填入有效 token)
                       </label>
                       <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                         <input
@@ -335,7 +337,7 @@ export function SocialAccounts() {
                           checked={form.autoReply}
                           onChange={(e) => setForm((f) => ({ ...f, autoReply: e.target.checked }))}
                         />
-                        自動回覆熱門貼文(每 30 分鐘掃熱門相關貼文,在小時/日上限內自動發布;關閉則全部進「Threads 互動」待審核。token 需具備 threads_keyword_search 與 threads_manage_replies)
+                        自動回覆熱門貼文(每 30 分鐘掃熱門相關貼文,在小時/日上限內自動發布;關閉則全部進 Threads 工作台待審核。token 需具備 threads_keyword_search 與 threads_manage_replies)
                       </label>
                       <label style={{ fontSize: 12.5 }}>
                         每小時回覆上限(建議 3-5,硬頂 20)

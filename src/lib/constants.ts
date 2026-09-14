@@ -6,7 +6,7 @@ export const RESERVED_APP_PATHS = new Set([
 
 export const BRAND_SCOPED_PREFIXES = [
   'workspace', 'intelligence', 'help', 'network', 'market', 'campaigns', 'events', 'contents',
-  'shorts', 'publishing', 'schedule', 'thread-replies', 'social', 'analytics', 'learning',
+  'shorts', 'publishing', 'schedule', 'threads', 'thread-replies', 'social', 'analytics', 'learning',
 ];
 
 export function brandSlugFromPath(pathname: string): string | null {

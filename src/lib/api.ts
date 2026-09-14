@@ -564,6 +564,39 @@ export const api = {
       `/api/brands/${slug}/thread-replies?status=${status}`,
     ),
 
+  threadsDesk: (slug: string) =>
+    request<import('@/types').ThreadsDeskData>(`/api/brands/${slug}/threads-desk`),
+
+  actThreadsDesk: (slug: string, body: {
+    action: 'save' | 'approve' | 'publish_now' | 'skip' | 'cancel' | 'retry' | 'generate_slot'
+      | 'scan' | 'set_auto_reply' | 'set_auto_publish' | 'reply_approve' | 'reply_skip';
+    contentId?: string;
+    jobId?: string;
+    hour?: number;
+    body?: string;
+    replyBody?: string;
+    replyId?: string;
+    replyText?: string;
+    autoReply?: boolean;
+    autoPublish?: boolean;
+  }) =>
+    request<{
+      ok: boolean;
+      status: string;
+      detail?: string;
+      contentId?: string;
+      jobId?: string;
+      when?: string;
+      permalink?: string | null;
+      queued?: number;
+      published?: number;
+      autoReply?: boolean;
+      autoPublish?: boolean;
+    }>(`/api/brands/${slug}/threads-desk`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   actThreadReply: (slug: string, body: {
     id?: string;
     action: 'approve' | 'skip' | 'scan' | 'set-auto-reply' | 'demo-reply' | 'generate-reply';

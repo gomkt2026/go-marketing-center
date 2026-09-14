@@ -532,6 +532,50 @@ export interface ThreadsReplyTarget {
   createdAt: string;
 }
 
+/** Threads 小編工作台:今日固定時段的自家發文卡片 */
+export interface ThreadsDeskSlot {
+  hour: number;
+  source: 'threads_hourly' | 'threads_offtopic';
+  slotAt: string;
+  label: string;
+  categoryLabel?: string | null;
+  contentId?: string | null;
+  title?: string | null;
+  status?: ContentStatus | null;
+  skipped?: boolean;
+  body?: string | null;
+  replyBody?: string | null;
+  hashtags?: string[] | null;
+  imageUrl?: string | null;
+  predictedEngagementScore?: number | null;
+  jobId?: string | null;
+  jobStatus?: PublishingJobStatus | null;
+  scheduledAt?: string | null;
+  publishedAt?: string | null;
+  externalPostId?: string | null;
+  lastLogDetail?: string | null;
+}
+
+export interface ThreadsDeskData {
+  date: string;
+  slots: ThreadsDeskSlot[];
+  replies: ThreadsReplyTarget[];
+  autoPublish: boolean;
+  autoReply: boolean;
+  hasThreadsAccount: boolean;
+  threadsUsername: string | null;
+  accountStatus: string | null;
+  replied1h: number;
+  replied24h: number;
+  replyHourlyCap: number;
+  replyDailyCap: number;
+  canSearchPublic: boolean | null;
+  autoReplyReady: boolean;
+  blockReason: string | null;
+  pendingCount: number;
+  scheduledCount: number;
+}
+
 export type PublishingJobStatus = 'queued' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
 
 /** 發布管理頁:各平台待發布佇列項目 */

@@ -128,7 +128,12 @@ export async function applyPressMigration(env: Env): Promise<string[]> {
     const existing = await sql`
       SELECT id FROM press_releases
       WHERE brand_id = ${brandId}::uuid
-        AND title LIKE ${'匠管打造生活工程管理生態系%'}
+        AND (
+          title = ${WASHGO_PRESS_RELEASE.title}
+          OR title LIKE ${'匠管打造生活工程管理生態系%'}
+          OR title LIKE ${'匠管 Washgo%'}
+        )
+      ORDER BY updated_at DESC
       LIMIT 1
     `;
     if (existing.length) {

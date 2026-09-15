@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -63,6 +64,19 @@ export function Settings() {
   return (
     <div>
       <PageHeader title="設定" subtitle="AI Agents 管理、權限架構與品牌登入帳號" />
+      <Card style={{ marginBottom: 16, borderLeft: '4px solid var(--color-primary)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div>
+            <strong style={{ fontSize: 14 }}>Threads／Meta 申請手冊</strong>
+            <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 6, lineHeight: 1.7 }}>
+              App Review 送審畫面、可貼文案、資料處理與過審後接新品牌的步驟，都記在這一頁，避免之後重做。
+            </p>
+          </div>
+          <Link to="/settings/meta-threads">
+            <Button variant="secondary">打開手冊</Button>
+          </Link>
+        </div>
+      </Card>
       <Card style={{ padding: 0, marginBottom: 16 }}>
         <div style={{ padding: '4px 16px 0' }}>
           <Tabs tabs={tabs} active={tab} onChange={setTab} />

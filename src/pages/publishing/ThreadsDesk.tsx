@@ -112,9 +112,14 @@ export function ThreadsDesk() {
         title={`${brand.name} Threads 工作台`}
         subtitle={`${todayLabel} · AI 提前寫好,小編在這一頁改字、批准、跳過或現在發。批准後依原時段發出。`}
         actions={
-          <Link to={`/${slug}/thread-replies`} style={{ fontSize: 13 }}>
-            回覆歷史
-          </Link>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <Link to="/settings/meta-threads" style={{ fontSize: 13 }}>
+              申請手冊
+            </Link>
+            <Link to={`/${slug}/thread-replies`} style={{ fontSize: 13 }}>
+              回覆歷史
+            </Link>
+          </div>
         }
       />
 

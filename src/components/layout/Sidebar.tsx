@@ -50,6 +50,7 @@ const groups: MenuGroup[] = [
       { label: '行程表', path: '/schedule', brandScoped: true },
       { label: 'Threads 工作台', path: '/threads', brandScoped: true },
       { label: '社群帳號', path: '/social', brandScoped: true },
+      { label: 'Threads 申請手冊', path: '/settings/meta-threads' },
     ],
   },
   {

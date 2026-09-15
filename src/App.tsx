@@ -27,6 +27,7 @@ import { Analytics } from '@/pages/analytics/Analytics';
 import { Learning } from '@/pages/learning/Learning';
 import { Timeline } from '@/pages/timeline/Timeline';
 import { Settings } from '@/pages/settings/Settings';
+import { MetaThreadsPlaybook } from '@/pages/settings/MetaThreadsPlaybook';
 import { SocialAccounts } from '@/pages/settings/SocialAccounts';
 import { AgentPersonas } from '@/pages/settings/AgentPersonas';
 import { EventList } from '@/pages/event/EventList';
@@ -98,6 +99,7 @@ export default function App() {
 
                         <Route path="/timeline" element={<Timeline />} />
                         <Route path="/settings" element={<Settings />} />
+                        <Route path="/settings/meta-threads" element={<MetaThreadsPlaybook />} />
 
                         <Route path="*" element={<Navigate to="/" replace />} />
                       </Routes>

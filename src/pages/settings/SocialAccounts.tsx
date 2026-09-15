@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams, Navigate, Link } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -119,7 +119,8 @@ function TokenHowTo({ brandName }: { brandName: string }) {
           </li>
           <li>
             自動回覆搜的是「別人的」熱門公開文。Meta 規定 <code>threads_keyword_search</code> <strong>未過 App Review 前只會搜到自己的貼文</strong>，
-            系統會略過自己的文，所以「Threads 工作台」回覆區會一直是空的。要真正衝觸及，請在 App Review 送審這個權限；過審前開關開了也不會有佇列。
+            系統會略過自己的文，所以「Threads 工作台」回覆區會一直是空的。送審畫面、可貼文案與錄影在{' '}
+            <Link to="/settings/meta-threads">Threads 申請手冊</Link>。
           </li>
           <li>
             若行程表出現 <code>API access blocked</code>：先開{' '}
@@ -225,6 +226,21 @@ export function SocialAccounts() {
         title={`${brand.name} 社群帳號串接`}
         subtitle="Token 在 Meta 產生、在這一頁貼上。主控板與行程表都不會產生權杖。"
       />
+
+      <Card style={{ marginBottom: 14, borderLeft: '4px solid var(--color-primary)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div>
+            <strong style={{ fontSize: 14 }}>接 Threads 之前先看申請手冊</strong>
+            <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 6, lineHeight: 1.7 }}>
+              三品牌共用 WashgoMarketing（App ID <code>1050575724086471</code>）。
+              keyword search／manage replies 的送審畫面、可貼文案、資料處理與錄影都記在手冊裡，不要另開一支 App。
+            </p>
+          </div>
+          <Link to="/settings/meta-threads">
+            <Button variant="secondary">打開 Threads 申請手冊</Button>
+          </Link>
+        </div>
+      </Card>
 
       <TokenHowTo brandName={brand.name} />
 

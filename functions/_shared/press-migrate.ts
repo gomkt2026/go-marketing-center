@@ -132,6 +132,7 @@ export async function applyPressMigration(env: Env): Promise<string[]> {
           title = ${WASHGO_PRESS_RELEASE.title}
           OR title LIKE ${'匠管打造生活工程管理生態系%'}
           OR title LIKE ${'匠管 Washgo%'}
+          OR title LIKE ${'匠管完成 Washgo%'}
         )
       ORDER BY updated_at DESC
       LIMIT 1

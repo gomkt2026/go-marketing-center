@@ -1,9 +1,14 @@
-/** Washgo 自家新聞稿（審核版全文）。供種子、遷移與線上 upsert 共用。 */
-export const WASHGO_PRESS_RELEASE = {
-  title: '匠管完成 Washgo 中部落地，正式開放洗衣、乾洗品牌加入',
-  embargoOn: '2026-08-16',
-  status: 'pending_review' as const,
-  body: `匠管完成 Washgo 中部落地，正式開放洗衣、乾洗品牌加入
+-- ============================================================================
+-- Migration 038: Washgo 新聞稿改為最終招商版（中部落地、開放品牌加入）
+--   已存在的舊稿會被覆寫。可安全重複執行。
+-- ----------------------------------------------------------------------------
+-- 執行方式: psql "$DATABASE_URL" -f db/migrations/038_washgo_press_release_final.sql
+-- ============================================================================
+
+WITH payload AS (
+  SELECT
+    '匠管完成 Washgo 中部落地，正式開放洗衣、乾洗品牌加入'::text AS title,
+    $washgo$匠管完成 Washgo 中部落地，正式開放洗衣、乾洗品牌加入
 以中部洗滌業者「洗楽」實際營運驗證，從洗滌切入，逐步打造工作、居住與生活服務生態系
 
 【台北訊】——匠管宣布，旗下洗滌產業數位平台 Washgo 已於中部洗滌業者洗楽完成實際場域導入，並正式開放更多洗衣、乾洗品牌與門市加入。
@@ -118,5 +123,16 @@ Taskgo 為匠管旗下修繕與工程任務協作平台，協助工程與修繕�
 Service@inforcraft.com.tw
 0972-395-117
 
-「從工作、居住到生活，匠管正透過科技重新定義管理。」`,
-};
+「從工作、居住到生活，匠管正透過科技重新定義管理。」$washgo$::text AS body
+)
+UPDATE press_releases pr
+SET title = payload.title, body = payload.body, embargo_on = DATE '2026-08-16'
+FROM brands b, payload
+WHERE pr.brand_id = b.id
+  AND b.slug = 'washgo'
+  AND (
+    pr.title LIKE '匠管打造生活工程管理生態系%'
+    OR pr.title LIKE '匠管 Washgo%'
+    OR pr.title LIKE '匠管完成 Washgo%'
+    OR pr.title = payload.title
+  );

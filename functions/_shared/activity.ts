@@ -48,6 +48,8 @@ export const ACTION_LABELS: Record<string, string> = {
   'content.generated': '生成內容草稿',
   'content.rejected': '退回內容',
   'publishing.published': '發布內容',
+  'publishing.scheduled': '排程發布',
+  'editor.session': '開啟小編對話',
   'brand_version.published': '發布品牌版本',
   'brand_rule.created': '新增品牌規則',
   'brand_rule.updated': '更新品牌規則',

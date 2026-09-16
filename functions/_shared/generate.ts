@@ -378,6 +378,8 @@ export async function generatePlatformPost(
     audienceName?: string;
     /** 不查素材庫、一律走 AI 生圖(測試或明確要求時) */
     skipAssetLookup?: boolean;
+    /** 小編語音工作台先回文案,配圖之後再補 */
+    skipImage?: boolean;
   },
 ): Promise<GenerationResult> {
   const { brandCtx, platform } = params;
@@ -470,6 +472,14 @@ export async function generatePlatformPost(
     ],
     temperature: 0.3,
   });
+
+  if (params.skipImage) {
+    return {
+      post, prediction, imageUrl: null, imageError: null,
+      audienceLane: lane, audienceName: audience.name,
+      imageSource: null, imageStyle, assetId: reusedAsset?.id ?? null,
+    };
+  }
 
   if (screenshotPoster && reusedAsset) {
     const posterUrl = await generateSystemScreenshotPoster(env, {

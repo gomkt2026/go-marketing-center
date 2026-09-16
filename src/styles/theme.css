@@ -361,7 +361,8 @@ a {
   }
 
   .grid-3,
-  .grid-split {
+  .grid-split,
+  .editor-desk {
     grid-template-columns: 1fr;
   }
 

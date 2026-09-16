@@ -268,6 +268,7 @@ export interface AgentPersona {
   temperament?: string;
   catchphrase?: string;
   focus?: string;
+  voiceId?: string | null;
 }
 
 /** /api/agents 回傳的 Agent(含人設與品牌) */
@@ -1109,4 +1110,74 @@ export interface NetworkStats {
   fromCards: number;
   fromLine: number;
   acceptsDispatch: number;
+}
+
+/** 品牌小編 1:1 工作台 */
+export interface BrandEditorPersona {
+  agentId: string | null;
+  nickname: string;
+  characterTitle: string;
+  avatarUrl: string | null;
+  temperament: string;
+  catchphrase: string;
+  focus: string;
+  voiceId: string | null;
+  color: string;
+}
+
+export interface EditorDeskContext {
+  pressCoverages: Array<{
+    id: string; outlet: string; headline: string; publishedOn: string | null;
+    status: string; summary: string | null; articleUrl: string | null; keyQuotes: string[];
+  }>;
+  pressReleases: Array<{ id: string; title: string; status: string; updatedAt?: string }>;
+  documents: Array<{ id: string; title: string; sourceType: string }>;
+  assets: Array<{ id: string; caption: string | null; fileUrl: string | null }>;
+  schedule: Array<{
+    id: string; title: string | null; platform: string; status: string;
+    scheduledAt: string | null; body: string | null; imageUrl: string | null;
+  }>;
+  queue: Array<{
+    id: string; title: string; status: string; targetPlatform: string;
+    body: string | null; imageUrl: string | null;
+  }>;
+}
+
+export interface EditorDraftCard {
+  contentId: string;
+  contentVersionId: string;
+  platform: string;
+  title: string;
+  body: string;
+  hashtags: string[];
+  imageUrl: string | null;
+  status: string;
+  scheduledAt?: string | null;
+}
+
+export interface EditorToolResult {
+  ok: boolean;
+  tool: 'list_context' | 'draft_post' | 'schedule_post' | 'list_schedule';
+  summary: string;
+  context?: EditorDeskContext;
+  draft?: EditorDraftCard;
+  drafts?: EditorDraftCard[];
+}
+
+export interface EditorChatMessage {
+  id: string;
+  role: string;
+  content: string;
+  toolName: string | null;
+  createdAt: string;
+}
+
+export interface EditorDeskPayload {
+  editor: BrandEditorPersona;
+  brand: { id: string; slug: string; name: string };
+  context: EditorDeskContext;
+  digest: string;
+  firstMessage: string;
+  voiceEnabled: boolean;
+  convaiConfigured: boolean;
 }

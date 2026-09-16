@@ -454,6 +454,56 @@ export const api = {
 
   agents: () => request<{ agents: import('@/types').AgentWithPersona[] }>('/api/agents'),
 
+  editorDesk: (slug: string) =>
+    request<import('@/types').EditorDeskPayload>(`/api/brands/${slug}/editor`),
+
+  editorStartSession: (slug: string) =>
+    request<{
+      sessionId: string;
+      editor: import('@/types').BrandEditorPersona;
+      firstMessage: string;
+      voiceEnabled: boolean;
+      signedUrl: string | null;
+      conversationToken: string | null;
+      convaiAgentId: string | null;
+      dynamicVariables: Record<string, string>;
+    }>(`/api/brands/${slug}/editor/session`, { method: 'POST', body: JSON.stringify({}) }),
+
+  editorGetSession: (slug: string, sessionId: string) =>
+    request<{
+      session: { id: string; status: string; elevenlabsConversationId: string | null };
+      messages: import('@/types').EditorChatMessage[];
+    }>(`/api/brands/${slug}/editor/session?sessionId=${encodeURIComponent(sessionId)}`),
+
+  editorPatchSession: (slug: string, body: {
+    sessionId: string; elevenlabsConversationId?: string; pinnedContext?: unknown; status?: 'active' | 'ended';
+  }) =>
+    request<{ ok: boolean }>(`/api/brands/${slug}/editor/session`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+
+  editorChat: (slug: string, body: {
+    sessionId: string; message: string; pinned?: { type?: string; id?: string; label?: string } | null;
+  }) =>
+    request<{
+      reply: string;
+      toolResult: import('@/types').EditorToolResult | null;
+      messages: import('@/types').EditorChatMessage[];
+    }>(`/api/brands/${slug}/editor/chat`, { method: 'POST', body: JSON.stringify(body) }),
+
+  editorTool: (slug: string, body: Record<string, unknown>) =>
+    request<import('@/types').EditorToolResult>(`/api/brands/${slug}/editor/tools`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+
+  editorMessage: (slug: string, body: {
+    sessionId: string; role: 'user' | 'assistant' | 'tool'; content: string; toolName?: string; toolPayload?: unknown;
+  }) =>
+    request<{ ok: boolean; messages: import('@/types').EditorChatMessage[] }>(
+      `/api/brands/${slug}/editor/messages`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   updateAgentPersona: (id: string, body: {
     nickname?: string; characterTitle?: string; temperament?: string; catchphrase?: string; focus?: string;
   }) =>

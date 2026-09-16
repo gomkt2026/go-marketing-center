@@ -22,6 +22,7 @@ const groups: MenuGroup[] = [
     title: '品牌經營',
     items: [
       { label: '品牌工作區', path: '/workspace', brandScoped: true },
+      { label: '跟小編聊', path: '/editor', brandScoped: true },
       { label: '品牌智慧', path: '/intelligence', brandScoped: true },
       { label: '品牌客服資料庫', path: '/help', brandScoped: true },
       { label: '人脈資料庫', path: '/network', brandScoped: true },

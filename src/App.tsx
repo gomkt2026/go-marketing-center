@@ -39,6 +39,7 @@ import { CheckinScan } from '@/pages/public/CheckinScan';
 import { PrivacyPolicy } from '@/pages/public/PrivacyPolicy';
 import { BrandCsKnowledge } from '@/pages/help/BrandCsKnowledge';
 import { BrandNetwork } from '@/pages/network/BrandNetwork';
+import { BrandEditorDesk } from '@/pages/editor/BrandEditorDesk';
 
 export default function App() {
   return (
@@ -72,6 +73,7 @@ export default function App() {
                         <Route path="/trending" element={<Trending />} />
 
                         <Route path="/:brand/workspace" element={<BrandWorkspace />} />
+                        <Route path="/:brand/editor" element={<BrandEditorDesk />} />
                         <Route path="/:brand/intelligence" element={<BrandIntelligence />} />
                         <Route path="/:brand/help" element={<BrandCsKnowledge />} />
                         <Route path="/:brand/network" element={<BrandNetwork />} />

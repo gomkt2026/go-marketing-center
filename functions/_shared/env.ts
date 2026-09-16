@@ -14,8 +14,16 @@ export interface Env {
   OPENAI_TEXT_MODEL?: string;
   /** 選填:覆寫圖片模型,預設 gpt-image-1 */
   OPENAI_IMAGE_MODEL?: string;
-  /** ElevenLabs API key(Podcast 語音合成) */
+  /** ElevenLabs API key(Podcast 語音合成、Conversational AI) */
   ELEVENLABS_API_KEY?: string;
+  /** Washgo 阿樂 Conversational Agent id */
+  ELEVENLABS_WASHGO_AGENT_ID?: string;
+  /** Homigo 小咪 Conversational Agent id(工作台品牌化後使用) */
+  ELEVENLABS_HOMIGO_AGENT_ID?: string;
+  /** TaskGo 阿豪 Conversational Agent id(工作台品牌化後使用) */
+  ELEVENLABS_TASKGO_AGENT_ID?: string;
+  /** 小編工作台 webhook tools 共用密鑰 */
+  ELEVENLABS_TOOL_SECRET?: string;
   /** 選填:社群 token 加密金鑰,未設定則以 SESSION_SECRET 衍生 */
   TOKEN_ENCRYPTION_KEY?: string;
   /** X(Twitter) OAuth2 App 的 Client ID / Client Secret(Go 生態系共用帳號 token 續期用) */

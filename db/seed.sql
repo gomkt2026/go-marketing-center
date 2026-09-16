@@ -8,6 +8,8 @@
 -- 執行方式: psql "$DATABASE_URL" -f db/seed.sql
 -- 注意: 本腳本會先清空業務資料表(TRUNCATE ... CASCADE),僅保留 schema.sql
 --       已種入的 agent_roles。可重複執行。
+-- 禁止對正式環境(go-marketing-center.pages.dev / Neon production)執行:
+--       會清掉社群 token、行程表 publishing_jobs、客服文件與人脈。
 -- ============================================================================
 
 BEGIN;
@@ -153,6 +155,21 @@ BEGIN
     (b_washgo, 'washgo', 'Washgo', '衣物送洗,交給 Washgo', '#A87C64', true),
     (b_fixer,  'fixercowork', 'FIXERCOWORK', 'REPAIR & MAINTAIN SOLUTIONS', '#1A2F4B', true);
 
+  UPDATE brands SET
+    logo_url = '/api/media/brand-assets/homigo/logo.png',
+    website_url = 'https://cc.homigo.workers.dev',
+    website_note = 'Homigo 指揮中心；房客／房東主要走 LINE LIFF'
+    WHERE id = b_homigo;
+  UPDATE brands SET
+    logo_url = '/api/media/brand-assets/taskgo/logo.png',
+    website_url = 'https://app.taskgo.com.tw',
+    website_note = '產品入口與註冊頁,價格與方案以官網為準'
+    WHERE id = b_taskgo;
+  UPDATE brands SET
+    logo_url = '/api/media/brand-assets/washgo/logo.png',
+    website_url = 'https://washgo.pages.dev',
+    website_note = 'Washgo 產品網站；門市與司機作業走 LINE LIFF（washgo-liff.pages.dev）'
+    WHERE id = b_washgo;
   UPDATE brands SET logo_url = '/brands/fixercowork-logo.png' WHERE id = b_fixer;
 
   INSERT INTO brand_members (brand_id, user_id, role) VALUES
@@ -237,7 +254,7 @@ BEGIN
     (b_taskgo, v_taskgo_1, 'can_claim', '工商時報、三立曾報導 TaskGo 工班數位回報', '可引用媒體名與已見報事實,不可把轉載數說成全台專訪', 'verified', 20),
     (b_taskgo, v_taskgo_1, 'cannot_claim', '保證接案量、保證數位轉型成功、全台各大媒體專訪', '見報不代表保證成效', 'verified', 21),
     (b_homigo, v_homigo_1, 'can_claim', '匠管攜手達觀推出 Homigo,見報於民眾日報／Yahoo', '提及 300 萬租屋人口必須帶「根據市場統計」', 'verified', 20),
-    (b_washgo, v_washgo_1, 'cannot_claim', '不可宣稱 Washgo 已被媒體報導', '新聞稿尚未見報前絕對禁止', 'verified', 20);
+    (b_washgo, v_washgo_1, 'can_claim', 'Yahoo、經濟日報等媒體曾報導 Washgo 中部落地、開放洗衣乾洗品牌加入', '可引用已列媒體名與已見報事實；不可把同一則轉載算成多次獨立專訪；不可宣稱全台專訪或保證導入成效', 'verified', 20);
 
   UPDATE brand_rules SET valid_until = (now() + interval '60 days')::date
     WHERE brand_id = b_washgo AND statement LIKE '新會員禮%';
@@ -326,7 +343,95 @@ BEGIN
      '2026-07-01', 'published', 'manual',
      '匠管攜手達觀推出 Homigo,以 LINE Bot 整合招租到退租,開發經驗源自 TaskGo。',
      '["未來企業競爭將不僅是系統功能,而是管理能力的數位化。"]',
-     '["匠管攜手達觀推出 Homigo","房東房客免下載 App","開發經驗源自 TaskGo"]', true, '["taskgo"]');
+     '["匠管攜手達觀推出 Homigo","房東房客免下載 App","開發經驗源自 TaskGo"]', true, '["taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', 'Yahoo',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://tw.news.yahoo.com/%E5%82%B3%E7%B5%B1%E6%B4%97%E8%A1%A3%E5%BA%97%E4%B9%9F%E6%8B%9Aai%E6%95%B8%E4%BD%8D%E8%BD%89%E5%9E%8B-%E5%8C%A0%E7%AE%A1washgo%E4%B8%AD%E9%83%A8%E8%90%BD%E5%9C%B0-%E9%96%8B%E6%94%BE%E5%93%81%E7%89%8C%E5%8A%A0%E5%85%A5-091737161.html',
+     '2026-09-15', 'published', 'manual',
+     '匠管旗下 Washgo 已於中部洗滌業者洗楽完成實際場域導入，以 LINE 為入口串聯送洗、報價、品管與收送，並正式開放洗衣、乾洗品牌加入。',
+     '["洗楽願意讓Washgo進入真實營運現場，對我們來說非常重要。因為系統到底好不好，不是我們自己說了算，而是現場每天願不願意用。","品牌是你的，數位能力由匠管提供","Taskgo、Homigo、Washgo是我們進入產業的入口，每一個產品先解決一個真實問題，再慢慢把不同場景串起來。"]',
+     '["Washgo 已於中部洗滌業者洗楽完成實際場域導入","以 LINE 為主要服務入口，消費者免另下載 App","正式開放洗衣、乾洗品牌與門市加入","品牌是你的，數位能力由匠管提供","見報於 Yahoo、經濟日報等；同一則轉載不可算成多次獨立專訪"]',
+     true, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '經濟日報',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     NULL, '2026-09-15', 'published', 'manual',
+     '匠管旗下 Washgo 已於中部洗滌業者洗楽完成實際場域導入，以 LINE 為入口串聯送洗、報價、品管與收送，並正式開放洗衣、乾洗品牌加入。',
+     '["洗楽願意讓Washgo進入真實營運現場，對我們來說非常重要。因為系統到底好不好，不是我們自己說了算，而是現場每天願不願意用。","品牌是你的，數位能力由匠管提供","Taskgo、Homigo、Washgo是我們進入產業的入口，每一個產品先解決一個真實問題，再慢慢把不同場景串起來。"]',
+     '["Washgo 已於中部洗滌業者洗楽完成實際場域導入","以 LINE 為主要服務入口，消費者免另下載 App","正式開放洗衣、乾洗品牌與門市加入","品牌是你的，數位能力由匠管提供","見報於 Yahoo、經濟日報等；同一則轉載不可算成多次獨立專訪"]',
+     true, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '臺灣郵報',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://taiwanpost.net/2026/life/167962/', '2026-09-15', 'syndicated', 'manual',
+     '臺灣郵報轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '民眾新聞網',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://mypeoplevol.com/2026/life/111715', '2026-09-15', 'syndicated', 'manual',
+     '民眾新聞網轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '民聲新聞',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://91postnews.com/life/136166', '2026-09-15', 'syndicated', 'manual',
+     '民聲新聞轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '福爾摩沙新聞',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://formosalive.com/2026/life/351908', '2026-09-15', 'syndicated', 'manual',
+     '福爾摩沙新聞轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '玉山新聞',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://yushanmedia.com/2026/life/153433/', '2026-09-15', 'syndicated', 'manual',
+     '玉山新聞轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '蕃新聞',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://n.yam.com/Article/20260915866777', '2026-09-15', 'syndicated', 'manual',
+     '蕃新聞轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', 'PChome 新聞',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://news.pchome.com.tw/living/mypeople/20260915/index-78945263708716219009.html', '2026-09-15', 'syndicated', 'manual',
+     'PChome 新聞轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', 'LIFE生活網',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://life.tw/article/%E5%82%B3%E7%B5%B1%E6%B4%97%E8%A1%A3%E5%BA%97%E4%B9%9F%E6%8B%9Aai%E6%95%B8%E4%BD%8D%E8%BD%89%E5%9E%8B-%E5%8C%A0%E7%AE%A1washgo%E4%B8%AD%E9%83%A8%E8%90%BD%E5%9C%B0-%E9%96%8B%E6%94%BE%E5%93%81-3149739',
+     '2026-09-15', 'syndicated', 'manual',
+     'LIFE生活網轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', 'yes新聞網',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://www.yesmedia.com.tw/%e5%82%b3%e7%b5%b1%e6%b4%97%e8%a1%a3%e5%ba%97%e4%b9%9f%e6%8b%9aai%e6%95%b8%e4%bd%8d%e8%bd%89%e5%9e%8b%ef%bc%81%e5%8c%a0%e7%ae%a1washgo%e4%b8%ad%e9%83%a8%e8%90%bd%e5%9c%b0%e3%80%81%e9%96%8b%e6%94%be/',
+     '2026-09-15', 'syndicated', 'manual',
+     'yes新聞網轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '中聞社',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://chiwannews.com/39612/', '2026-09-15', 'syndicated', 'manual',
+     '中聞社轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '爆了媒',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://bowmedia.tw/81326/', '2026-09-15', 'syndicated', 'manual',
+     '爆了媒轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '獨家報導',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://www.scooptw.com/taiwanpost/527874/%e5%82%b3%e7%b5%b1%e6%b4%97%e8%a1%a3%e5%ba%97%e4%b9%9f%e6%8b%9aai%e6%95%b8%e4%bd%8d%e8%bd%89%e5%9e%8b%ef%bc%81%e5%8c%a0%e7%ae%a1washgo%e4%b8%ad%e9%83%a8%e8%90%bd%e5%9c%b0%e3%80%81%e9%96%8b%e6%94%be/',
+     '2026-09-15', 'syndicated', 'manual',
+     '獨家報導轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '數智傳媒',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://pressunion.net/2026/edit-center/life/494857', '2026-09-15', 'syndicated', 'manual',
+     '數智傳媒轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '奧丁丁',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://news.owlting.com/articles/1454907', '2026-09-15', 'syndicated', 'manual',
+     '奧丁丁新聞轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '商傳媒',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://sunmedia.tw/news/Industry-information/%E5%82%B3%E7%B5%B1%E6%B4%97%E8%A1%A3%E5%BA%97%E4%B9%9F%E6%8B%9AAI%E6%95%B8%E4%BD%8D%E8%BD%89%E5%9E%8B%EF%BC%81%E5%8C%A0%E7%AE%A1Washgo%E4%B8%AD%E9%83%A8%E8%90%BD%E5%9C%B0%E3%80%81%E9%96%8B%E6%94%BE%E5%93%81%E7%89%8C%E5%8A%A0%E5%85%A5-1789457185940',
+     '2026-09-15', 'syndicated', 'manual',
+     '商傳媒轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '火報',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://firenews.com.tw/2026/09/15/%E5%82%B3%E7%B5%B1%E6%B4%97%E8%A1%A3%E5%BA%97%E4%B9%9F%E6%8B%9Aai%E6%95%B8%E4%BD%8D%E8%BD%89%E5%9E%8B%EF%BC%81%E5%8C%A0%E7%AE%A1washgo%E4%B8%AD%E9%83%A8%E8%90%BD%E5%9C%B0%E3%80%81%E9%96%8B%E6%94%BE/',
+     '2026-09-15', 'syndicated', 'manual',
+     '火報轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]'),
+    (b_washgo, 'washgo-2026-09-central-landing', '台灣電報',
+     '傳統洗衣店也拚AI數位轉型！匠管Washgo中部落地、開放品牌加入',
+     'https://enn.tw/779363/', '2026-09-15', 'syndicated', 'manual',
+     '台灣電報轉載同一則 Washgo 中部落地稿。', '[]', '[]', false, '["homigo","taskgo"]');
 
   INSERT INTO press_releases (brand_id, title, body, status, embargo_on) VALUES
     (b_washgo, '匠管完成 Washgo 中部落地，正式開放洗衣、乾洗品牌加入',
@@ -446,7 +551,15 @@ Service@inforcraft.com.tw
 0972-395-117
 
 「從工作、居住到生活，匠管正透過科技重新定義管理。」$washgo$,
-     'pending_review', '2026-08-16');
+     'final', '2026-08-16');
+
+  UPDATE press_coverages pc
+  SET press_release_id = pr.id
+  FROM press_releases pr
+  WHERE pc.brand_id = b_washgo
+    AND pr.brand_id = b_washgo
+    AND pc.story_key = 'washgo-2026-09-central-landing'
+    AND pc.press_release_id IS NULL;
 
   -- ==========================================================================
   -- Brand Examples(內容支柱 / 敘事素材 / 熱點主題庫)

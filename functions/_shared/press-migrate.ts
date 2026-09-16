@@ -1,6 +1,13 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { WASHGO_PRESS_RELEASE } from './washgo-press-release';
+import {
+  WASHGO_CAN_CLAIM_PRESS,
+  WASHGO_PRESS_COVERAGES,
+  WASHGO_PRESS_HEADLINE,
+  WASHGO_PRESS_PUBLISHED_ON,
+  WASHGO_PRESS_STORY_KEY,
+} from './washgo-press-coverages';
 
 export function isMissingPressRelation(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -142,7 +149,8 @@ export async function applyPressMigration(env: Env): Promise<string[]> {
         UPDATE press_releases SET
           title = ${WASHGO_PRESS_RELEASE.title},
           body = ${WASHGO_PRESS_RELEASE.body},
-          embargo_on = ${WASHGO_PRESS_RELEASE.embargoOn}
+          embargo_on = ${WASHGO_PRESS_RELEASE.embargoOn},
+          status = ${WASHGO_PRESS_RELEASE.status}
         WHERE id = ${(existing[0] as { id: string }).id}::uuid
       `;
     } else {
@@ -157,6 +165,81 @@ export async function applyPressMigration(env: Env): Promise<string[]> {
         )
       `;
     }
+    const releaseRows = await sql`
+      SELECT id FROM press_releases
+      WHERE brand_id = ${brandId}::uuid
+        AND (
+          title = ${WASHGO_PRESS_RELEASE.title}
+          OR title LIKE ${'匠管打造生活工程管理生態系%'}
+          OR title LIKE ${'匠管 Washgo%'}
+          OR title LIKE ${'匠管完成 Washgo%'}
+        )
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
+    const pressReleaseId = (releaseRows[0] as { id: string } | undefined)?.id ?? null;
+    for (const coverage of WASHGO_PRESS_COVERAGES) {
+      const url = coverage.articleUrl;
+      const outlet = coverage.outlet;
+      const exists = url
+        ? await sql`
+            SELECT 1 FROM press_coverages
+            WHERE brand_id = ${brandId}::uuid AND article_url = ${url}
+            LIMIT 1
+          `
+        : await sql`
+            SELECT 1 FROM press_coverages
+            WHERE brand_id = ${brandId}::uuid
+              AND story_key = ${WASHGO_PRESS_STORY_KEY}
+              AND outlet = ${outlet}
+              AND article_url IS NULL
+            LIMIT 1
+          `;
+      if (exists.length) continue;
+      await sql`
+        INSERT INTO press_coverages (
+          brand_id, press_release_id, story_key, outlet, headline, article_url, published_on,
+          status, discovery_source, summary, key_quotes, claimable_facts, is_primary, related_brand_slugs
+        ) VALUES (
+          ${brandId}::uuid,
+          ${pressReleaseId},
+          ${WASHGO_PRESS_STORY_KEY},
+          ${coverage.outlet},
+          ${WASHGO_PRESS_HEADLINE},
+          ${url},
+          ${WASHGO_PRESS_PUBLISHED_ON},
+          ${coverage.status},
+          'manual',
+          ${coverage.summary},
+          ${JSON.stringify(coverage.keyQuotes)},
+          ${JSON.stringify(coverage.claimableFacts)},
+          ${coverage.isPrimary},
+          ${JSON.stringify(['homigo', 'taskgo'])}
+        )
+      `;
+    }
+    await sql`
+      UPDATE brand_rules SET
+        rule_type = 'can_claim',
+        statement = ${WASHGO_CAN_CLAIM_PRESS.statement},
+        condition_note = ${WASHGO_CAN_CLAIM_PRESS.conditionNote},
+        verification = 'verified'
+      WHERE brand_id = ${brandId}::uuid
+        AND statement = ${'不可宣稱 Washgo 已被媒體報導'}
+    `;
+    await sql`
+      INSERT INTO brand_rules (brand_id, brand_version_id, rule_type, statement, condition_note, verification, sort_order)
+      SELECT b.id, b.current_version_id, 'can_claim',
+        ${WASHGO_CAN_CLAIM_PRESS.statement},
+        ${WASHGO_CAN_CLAIM_PRESS.conditionNote},
+        'verified', 20
+      FROM brands b
+      WHERE b.id = ${brandId}::uuid
+        AND NOT EXISTS (
+          SELECT 1 FROM brand_rules r
+          WHERE r.brand_id = b.id AND r.statement = ${WASHGO_CAN_CLAIM_PRESS.statement}
+        )
+    `;
   }
   await sql`
     INSERT INTO brand_rules (brand_id, brand_version_id, rule_type, statement, condition_note, verification, sort_order)
@@ -164,8 +247,7 @@ export async function applyPressMigration(env: Env): Promise<string[]> {
     FROM brands b
     JOIN (VALUES
       ('taskgo', 'can_claim', '工商時報、三立曾報導 TaskGo 工班數位回報', '可引用媒體名與已見報事實,不可把轉載數說成全台專訪', 'verified', 20),
-      ('homigo', 'can_claim', '匠管攜手達觀推出 Homigo,見報於民眾日報／Yahoo', '提及 300 萬租屋人口必須帶「根據市場統計」', 'verified', 20),
-      ('washgo', 'cannot_claim', '不可宣稱 Washgo 已被媒體報導', '新聞稿尚未見報前絕對禁止', 'verified', 20)
+      ('homigo', 'can_claim', '匠管攜手達觀推出 Homigo,見報於民眾日報／Yahoo', '提及 300 萬租屋人口必須帶「根據市場統計」', 'verified', 20)
     ) AS v(slug, rule_type, statement, condition_note, verification, sort_order)
       ON b.slug = v.slug
     WHERE NOT EXISTS (

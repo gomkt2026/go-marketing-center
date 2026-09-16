@@ -2,7 +2,7 @@
 export const WASHGO_PRESS_RELEASE = {
   title: '匠管完成 Washgo 中部落地，正式開放洗衣、乾洗品牌加入',
   embargoOn: '2026-08-16',
-  status: 'pending_review' as const,
+  status: 'final' as const,
   body: `匠管完成 Washgo 中部落地，正式開放洗衣、乾洗品牌加入
 以中部洗滌業者「洗楽」實際營運驗證，從洗滌切入，逐步打造工作、居住與生活服務生態系
 

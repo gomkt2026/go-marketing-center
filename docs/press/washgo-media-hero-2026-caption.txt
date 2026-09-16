@@ -7,6 +7,12 @@ Washgo 以 LINE 為統一入口，讓門市收件、品管與司機收送走在�
 檔案
 - 網頁／通訊稿：docs/press/washgo-media-hero-2026.jpg（3840×2160、16:9）
 - 高解析備檔：docs/press/washgo-media-hero-2026.png
+- 2026-09 見報配圖：
+  - washgo-press-2026-09-ecosystem.jpg（三塊拼圖：Homigo／Washgo／Taskgo）
+  - washgo-press-2026-09-on-site.jpg（洗滌現場＋系統畫面）
+  - washgo-press-2026-09-three-roles.jpg（LINE 顧客／員工／司機三端）
+  - washgo-press-2026-09-line-store.jpg（門市與收送實拍）
+  - washgo-press-2026-09-before-after.jpg（高額系統 vs 會用 LINE）
 
 已遮蔽
 - 司機姓名、客戶姓名

@@ -3,14 +3,13 @@ import type { AuthUser } from './auth';
 import { getSql } from './db';
 import { rowToCamel } from './case';
 import { chatCompleteJson } from './openai';
-import { ANTI_AI_RULES, buildBrandContext, getBrandVoice } from './prompts';
+import { ANTI_AI_RULES, SHARED_BRAND_CTA_RULE, getBrandVoice, type BrandContext } from './prompts';
 import {
-  generatePlatformPost, saveGeneratedContent, findBrandAgent,
+  generatePlatformPost, saveGeneratedContent,
   SUPPORTED_PLATFORMS, type SocialPlatform,
 } from './generate';
-import { toPressCoverage, coverageTopicSummary } from './press';
+import { toPressCoverage, coverageTopicSummary, loadPublishedPrimaryCoverages, publishedCoveragePrompt } from './press';
 import { toBrandDocument } from './documents';
-import { logActivity } from './activity';
 import { THREADS_DESK_HOURS_TW, slotAtToday } from './threads-slots';
 import { withEditorTables } from './editor-migrate';
 
@@ -175,6 +174,8 @@ export function buildEditorSystemPrompt(editor: EditorPersona, brandName: string
     '- 沒有確認前,不要呼叫 schedule_post',
     '- 只處理自己品牌。不要假裝已經發出去。',
     '- 產稿後用一句口語覆誦重點,再問要不要發。',
+    '- 對方只是要發文或排程時,不要呼叫 list_context / list_schedule。',
+    '- 對話裡已有草稿就直接 schedule_post,帶上 contentId 與 contentVersionId,不要重產。',
     ANTI_AI_RULES,
   ].filter(Boolean).join('\n');
 }
@@ -187,9 +188,60 @@ export function firstMessageFor(editor: EditorPersona, brandName: string): strin
   return `嗨～我是${editor.nickname}!今天要看${brandName}的媒體露出,還是想發文?`;
 }
 
+/** 對談輪只用 1 次查詢,避免跟產稿疊在同一次 Worker 打爆 subrequest */
+export async function loadEditorChatBrief(env: Env, brandId: string): Promise<string> {
+  const sql = getSql(env);
+  const coverages = await sql`
+    SELECT id, outlet, headline, published_on, status
+    FROM press_coverages
+    WHERE brand_id = ${brandId}::uuid
+    ORDER BY published_on DESC NULLS LAST
+    LIMIT 6
+  `.catch(() => []);
+  const press = (coverages as Record<string, unknown>[]).map((r) => {
+    const day = toDayLabel(r.published_on) ?? '日期未定';
+    return `- [${r.id}] ${day} ${r.outlet}「${r.headline}」(${r.status})`;
+  });
+  return press.length ? `最近媒體露出:\n${press.join('\n')}` : '最近沒有媒體露出。';
+}
+
+/** 工作台產稿用精簡品牌知識,比完整 buildBrandContext 少約 7 次 Neon 查詢 */
+async function buildEditorBrandContext(
+  env: Env,
+  brandId: string,
+  slug: string,
+  brandName: string,
+): Promise<BrandContext> {
+  const sql = getSql(env);
+  const [ruleRows, coverages] = await Promise.all([
+    sql`
+      SELECT rule_type, statement, condition_note FROM brand_rules
+      WHERE brand_id = ${brandId}::uuid
+      ORDER BY sort_order LIMIT 20
+    `.catch(() => []),
+    loadPublishedPrimaryCoverages(env, brandId, 4),
+  ]);
+  const voice = getBrandVoice(slug);
+  const rules = (ruleRows as { rule_type: string; statement: string; condition_note: string | null }[])
+    .map((r) => `- [${r.rule_type}] ${r.statement}${r.condition_note ? `(條件:${r.condition_note})` : ''}`)
+    .join('\n');
+  const systemPrompt = [
+    `品牌:${brandName}`,
+    voice.frontlinePersona,
+    voice.dailyConcerns ? `這個行業每天在聊的話題:${voice.dailyConcerns}` : '',
+    voice.contentCraft ?? '',
+    editorGroundingRules(brandName, slug),
+    rules ? `品牌規則:\n${rules}` : '',
+    publishedCoveragePrompt(coverages),
+    SHARED_BRAND_CTA_RULE,
+    ANTI_AI_RULES,
+  ].filter(Boolean).join('\n');
+  return { brandId, slug, name: brandName, systemPrompt };
+}
+
 export async function loadEditorContext(env: Env, brandId: string): Promise<EditorDeskContext> {
   const sql = getSql(env);
-  const [coverages, releases, documents, assets, schedule, queue] = await Promise.all([
+  const [coverages, releases, documents] = await Promise.all([
     sql`
       SELECT id, outlet, headline, published_on, status, summary, article_url, key_quotes
       FROM press_coverages
@@ -208,6 +260,8 @@ export async function loadEditorContext(env: Env, brandId: string): Promise<Edit
       WHERE brand_id = ${brandId}::uuid
       ORDER BY created_at DESC LIMIT 8
     `.catch(() => []),
+  ]);
+  const [assets, schedule, queue] = await Promise.all([
     sql`
       SELECT id, caption, file_url FROM brand_assets
       WHERE brand_id = ${brandId}::uuid AND asset_type = 'image'
@@ -337,17 +391,59 @@ export async function appendEditorMessage(
         ${row.toolPayload ? JSON.stringify(row.toolPayload) : null}
       )
     `;
-    await sql`UPDATE editor_sessions SET updated_at = now() WHERE id = ${sessionId}::uuid`;
+    if (row.role !== 'user') {
+      await sql`UPDATE editor_sessions SET updated_at = now() WHERE id = ${sessionId}::uuid`;
+    }
   });
 }
 
-export async function listEditorMessages(env: Env, sessionId: string, limit = 40): Promise<Array<{
-  id: string; role: string; content: string; toolName: string | null; createdAt: string;
-}>> {
+export interface EditorMessageRow {
+  id: string;
+  role: string;
+  content: string;
+  toolName: string | null;
+  toolPayload: EditorToolResult | null;
+  createdAt: string;
+}
+
+function draftFromPayload(payload: unknown): EditorDraftCard | null {
+  const result = payload as EditorToolResult | null | undefined;
+  if (result?.draft?.contentId && result.draft.contentVersionId) return result.draft;
+  const first = result?.drafts?.[0];
+  if (first?.contentId && first.contentVersionId) return first;
+  return null;
+}
+
+export function findLatestDraft(messages: Array<{ toolPayload?: unknown }>): EditorDraftCard | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const draft = draftFromPayload(messages[i].toolPayload);
+    if (draft) return draft;
+  }
+  return null;
+}
+
+async function findLatestSessionDraft(env: Env, sessionId: string): Promise<EditorDraftCard | null> {
   return withEditorTables(env, async () => {
     const sql = getSql(env);
     const rows = await sql`
-      SELECT id, role, content, tool_name, created_at
+      SELECT tool_payload FROM editor_messages
+      WHERE session_id = ${sessionId}::uuid AND tool_payload IS NOT NULL
+      ORDER BY created_at DESC
+      LIMIT 8
+    `;
+    for (const r of rows as { tool_payload: unknown }[]) {
+      const draft = draftFromPayload(r.tool_payload);
+      if (draft) return draft;
+    }
+    return null;
+  });
+}
+
+export async function listEditorMessages(env: Env, sessionId: string, limit = 40): Promise<EditorMessageRow[]> {
+  return withEditorTables(env, async () => {
+    const sql = getSql(env);
+    const rows = await sql`
+      SELECT id, role, content, tool_name, tool_payload, created_at
       FROM editor_messages
       WHERE session_id = ${sessionId}::uuid
       ORDER BY created_at DESC
@@ -358,6 +454,7 @@ export async function listEditorMessages(env: Env, sessionId: string, limit = 40
       role: r.role as string,
       content: r.content as string,
       toolName: (r.tool_name as string | null) ?? null,
+      toolPayload: (r.tool_payload as EditorToolResult | null) ?? null,
       createdAt: r.created_at as string,
     }));
   });
@@ -379,6 +476,8 @@ export async function executeEditorTool(
     brandName: string;
     auth: AuthUser | null;
     args: EditorToolArgs;
+    sessionId?: string;
+    recentDraft?: EditorDraftCard | null;
   },
 ): Promise<EditorToolResult> {
   const { brandId, slug, args } = params;
@@ -398,8 +497,7 @@ export async function executeEditorTool(
 
   if (args.name === 'draft_post') {
     const platform = parsePlatform(args.platform);
-    const brandCtx = await buildBrandContext(env, brandId);
-    const agentId = await findBrandAgent(env, brandId);
+    const brandCtx = await buildEditorBrandContext(env, brandId, slug, params.brandName);
     let topic = args.topic?.trim() || `${params.brandName} 社群貼文`;
     let extra = args.instruction ?? '';
     let topicSummary: string | undefined;
@@ -419,26 +517,17 @@ export async function executeEditorTool(
       extra,
     ].filter(Boolean).join('\n');
     const result = await generatePlatformPost(env, {
-      brandCtx, platform, topic, topicSummary, extraInstruction: groundedExtra, skipImage: true,
+      brandCtx, platform, topic, topicSummary, extraInstruction: groundedExtra,
+      skipImage: true, skipPrediction: true,
     });
     const saved = await saveGeneratedContent(env, {
-      brandCtx, platform, result, generatedByAgentId: agentId,
+      brandCtx, platform, result, generatedByAgentId: null,
       status: 'pending_review',
       promptMeta: {
         source: 'editor_desk',
         coverageId: args.coverageId ?? null,
         editorTool: 'draft_post',
       },
-    });
-    await logActivity(env, {
-      brandId,
-      actorType: agentId ? 'ai_agent' : 'user',
-      actorAgentId: agentId,
-      actorUserId: agentId ? null : params.auth?.id ?? null,
-      action: 'content.generated',
-      entityType: 'content',
-      entityId: saved.contentId,
-      afterState: { platform, source: 'editor_desk' },
     });
     const draft: EditorDraftCard = {
       contentId: saved.contentId,
@@ -465,6 +554,17 @@ export async function executeEditorTool(
     let contentVersionId = args.contentVersionId;
     let platform = parsePlatform(args.platform);
     let draft: EditorDraftCard | undefined;
+    const reused = params.recentDraft
+      ?? (params.sessionId && (!contentId || !contentVersionId)
+        ? await findLatestSessionDraft(env, params.sessionId)
+        : null);
+
+    if ((!contentId || !contentVersionId) && reused) {
+      contentId = reused.contentId;
+      contentVersionId = reused.contentVersionId;
+      platform = parsePlatform(args.platform || reused.platform);
+      draft = reused;
+    }
 
     if (!contentId || !contentVersionId) {
       const drafted = await executeEditorTool(env, {
@@ -498,23 +598,12 @@ export async function executeEditorTool(
     if (!existing.length) return { ok: false, tool: 'schedule_post', summary: '找不到這篇稿' };
 
     await sql`UPDATE contents SET status = 'scheduled', updated_at = now() WHERE id = ${contentId}::uuid`;
-    const inserted = await sql`
+    await sql`
       INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
       VALUES (
         ${contentId}::uuid, ${contentVersionId}::uuid, ${platform}, 'scheduled', ${scheduledAt.toISOString()}
       )
-      RETURNING id
     `;
-    const jobId = (inserted[0] as { id: string }).id;
-    await logActivity(env, {
-      brandId,
-      actorType: 'ai_agent',
-      actorAgentId: (await findBrandAgent(env, brandId)),
-      action: 'publishing.scheduled',
-      entityType: 'publishing_job',
-      entityId: jobId,
-      afterState: { platform, scheduledAt: scheduledAt.toISOString(), source: 'editor_desk' },
-    });
     const when = scheduledAt.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     return {
       ok: true,
@@ -549,18 +638,20 @@ export async function runEditorChatTurn(
     pinned?: { type?: string; id?: string; label?: string } | null;
     auth: AuthUser;
   },
-): Promise<{ reply: string; toolResult?: EditorToolResult }> {
-  const ctx = await loadEditorContext(env, params.brandId);
-  const history = await listEditorMessages(env, params.sessionId, 24);
-  const brandCtx = await buildBrandContext(env, params.brandId);
+): Promise<{ reply: string; toolResult?: EditorToolResult; messages: EditorMessageRow[] }> {
+  const [history, brief] = await Promise.all([
+    listEditorMessages(env, params.sessionId, 16),
+    loadEditorChatBrief(env, params.brandId),
+  ]);
+  const recentDraft = findLatestDraft(history);
   const system = [
     buildEditorSystemPrompt(params.editor, params.brandName, params.slug),
     '',
-    '以下是這個品牌唯一可引用的知識(規則、受眾、露出、官方素材)。回答不准超出這份。',
-    brandCtx.systemPrompt,
-    '',
-    '你現在看到的營運現況:',
-    contextDigest(ctx),
+    '你現在看到的媒體現況(只能引用這裡出現的露出,不要發明媒體名或數字):',
+    brief,
+    recentDraft
+      ? `對話裡已有草稿,排程請用 contentId=${recentDraft.contentId} contentVersionId=${recentDraft.contentVersionId} platform=${recentDraft.platform}`
+      : '',
     params.pinned?.label ? `對方剛點選:${params.pinned.label}` : '',
     '',
     '回傳 JSON:{"reply":"口語回覆","tool":null 或 {"name":"list_context|draft_post|schedule_post|list_schedule","platform":"threads|facebook|instagram","topic":"","coverageId":"","contentId":"","contentVersionId":"","scheduledAt":"ISO","mode":"review|publish","instruction":""}}',
@@ -583,12 +674,20 @@ export async function runEditorChatTurn(
   let toolResult: EditorToolResult | undefined;
   let reply = (plan.reply || '').trim() || '好的,我聽到了。';
   if (plan.tool?.name) {
+    const toolArgs = { ...plan.tool };
+    if (toolArgs.name === 'schedule_post' && recentDraft && (!toolArgs.contentId || !toolArgs.contentVersionId)) {
+      toolArgs.contentId = recentDraft.contentId;
+      toolArgs.contentVersionId = recentDraft.contentVersionId;
+      toolArgs.platform = toolArgs.platform || recentDraft.platform;
+    }
     toolResult = await executeEditorTool(env, {
       brandId: params.brandId,
       slug: params.slug,
       brandName: params.brandName,
       auth: params.auth,
-      args: plan.tool,
+      args: toolArgs,
+      sessionId: params.sessionId,
+      recentDraft,
     });
     if (toolResult.summary && !/要我主動發文|排/.test(reply)) {
       reply = `${reply.replace(/\s+$/, '')} ${toolResult.summary}`.trim();
@@ -602,7 +701,22 @@ export async function runEditorChatTurn(
     toolName: toolResult?.tool,
     toolPayload: toolResult,
   });
-  return { reply, toolResult };
+  const now = new Date().toISOString();
+  return {
+    reply,
+    toolResult,
+    messages: [
+      ...history,
+      {
+        id: `local-user-${now}`, role: 'user', content: params.userMessage,
+        toolName: null, toolPayload: null, createdAt: now,
+      },
+      {
+        id: `local-asst-${now}`, role: 'assistant', content: reply,
+        toolName: toolResult?.tool ?? null, toolPayload: toolResult ?? null, createdAt: now,
+      },
+    ],
+  };
 }
 
 const ELEVENLABS_BASE = 'https://api.elevenlabs.io';

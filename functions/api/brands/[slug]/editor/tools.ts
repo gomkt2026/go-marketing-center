@@ -30,6 +30,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       brandName: brand.name,
       auth: auth && !(auth instanceof Response) ? auth : null,
       args: body,
+      sessionId: body.sessionId,
     });
     if (body.sessionId && result.ok) {
       await appendEditorMessage(context.env, body.sessionId, {

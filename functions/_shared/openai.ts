@@ -49,6 +49,13 @@ export function toClientError(err: unknown, action: string): ClientFacingError {
   if (/OPENAI_API_KEY 尚未設定/.test(raw)) {
     return { status: 503, message: raw, retryable: false };
   }
+  if (/too many subrequests/i.test(blob)) {
+    return {
+      status: 503,
+      message: `${action}失敗:這輪動作一次打太多次資料庫,請再送一次「幫我排程」,不要重講整段背景`,
+      retryable: true,
+    };
+  }
   return { status: 502, message: `${action}失敗:${raw.slice(0, 240)}`, retryable: status >= 500 };
 }
 

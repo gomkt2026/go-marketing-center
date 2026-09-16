@@ -380,18 +380,22 @@ export async function generatePlatformPost(
     skipAssetLookup?: boolean;
     /** 小編語音工作台先回文案,配圖之後再補 */
     skipImage?: boolean;
+    /** 工作台產稿省掉互動評估的額外 LLM,降低 Worker subrequest */
+    skipPrediction?: boolean;
   },
 ): Promise<GenerationResult> {
   const { brandCtx, platform } = params;
   const lane = params.audienceLane ?? defaultAudienceLane(platform);
   const audience = params.audienceName
     ? { name: params.audienceName, lane, painPoints: [], appealAngle: null }
-    : await pickAudience(env, brandCtx.brandId, brandCtx.slug, lane);
+    : params.skipImage
+      ? { name: lane === 'b2b' ? '業者' : '使用者', lane, painPoints: [], appealAngle: null }
+      : await pickAudience(env, brandCtx.brandId, brandCtx.slug, lane);
 
   let reusedAsset: BrandAssetPick | null = null;
   // B 端 FB/IG 優先取真實系統畫面當素材,但要做成痛點海報,不是整頁截圖直發。
   // Threads 本來就不走素材庫。
-  if (!params.skipAssetLookup && (platform === 'facebook' || platform === 'instagram')) {
+  if (!params.skipImage && !params.skipAssetLookup && (platform === 'facebook' || platform === 'instagram')) {
     try {
       reusedAsset = await pickBrandAsset(env, brandCtx.brandId, lane === 'b2b');
     } catch (e) {
@@ -403,7 +407,7 @@ export async function generatePlatformPost(
     && (platform === 'facebook' || platform === 'instagram'));
   const convertPhotoPoster = !!(reusedAsset && !screenshotPoster
     && (platform === 'facebook' || platform === 'instagram'));
-  const recentStyles = convertPhotoPoster || screenshotPoster
+  const recentStyles = params.skipImage || convertPhotoPoster || screenshotPoster
     ? []
     : await recentImageStyles(env, brandCtx.brandId).catch(() => [] as ImageStyleId[]);
   const imageStyle = screenshotPoster || convertPhotoPoster
@@ -465,13 +469,15 @@ export async function generatePlatformPost(
   post.cta = SHARED_BRAND_CTA;
   post.hashtags = clampHashtags(post.hashtags, platform);
 
-  const prediction = await chatCompleteJson<EngagementPrediction>(env, {
-    messages: [
-      { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
-      { role: 'user', content: buildEngagementEvalPrompt({ platform, body: post.body }) },
-    ],
-    temperature: 0.3,
-  });
+  const prediction = params.skipPrediction
+    ? { score: 0, analysis: '', suggestions: [] }
+    : await chatCompleteJson<EngagementPrediction>(env, {
+      messages: [
+        { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
+        { role: 'user', content: buildEngagementEvalPrompt({ platform, body: post.body }) },
+      ],
+      temperature: 0.3,
+    });
 
   if (params.skipImage) {
     return {

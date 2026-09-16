@@ -5,7 +5,7 @@ import { getSql } from '../../../../_shared/db';
 import { getBrandBySlug } from '../../../../_shared/queries';
 import { json, error } from '../../../../_shared/response';
 import { toClientError } from '../../../../_shared/openai';
-import { loadBrandEditor, runEditorChatTurn, listEditorMessages } from '../../../../_shared/editor-agent';
+import { loadBrandEditor, runEditorChatTurn } from '../../../../_shared/editor-agent';
 import { withEditorTables } from '../../../../_shared/editor-migrate';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -48,8 +48,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       pinned: body.pinned ?? null,
       auth,
     });
-    const messages = await listEditorMessages(context.env, body.sessionId);
-    return json({ reply: result.reply, toolResult: result.toolResult ?? null, messages });
+    return json({ reply: result.reply, toolResult: result.toolResult ?? null, messages: result.messages });
   } catch (e) {
     const mapped = toClientError(e, '小編回覆');
     return error(mapped.message, mapped.status);

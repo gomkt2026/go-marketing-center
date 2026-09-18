@@ -106,7 +106,7 @@ CREATE TYPE content_review_action AS ENUM (
 );
 
 CREATE TYPE publishing_platform AS ENUM (
-  'instagram', 'facebook', 'threads', 'line_oa', 'tiktok', 'youtube', 'linkedin', 'x', 'edm'
+  'instagram', 'facebook', 'threads', 'line_oa', 'tiktok', 'youtube', 'linkedin', 'x', 'edm', 'website'
 );
 
 CREATE TYPE publishing_job_status AS ENUM (
@@ -163,6 +163,9 @@ CREATE TABLE brands (
   logo_url          TEXT,
   website_url       TEXT,                           -- 官方網站,給客戶 LINE 資訊包引用
   website_note      TEXT,                           -- 官網用途說明(例如產品入口、定價頁)
+  blog_base_url     TEXT,                           -- SEO 長文公開網域,例如 https://washgo.com.tw
+  ingest_base_url   TEXT,                           -- 官網 ingest API base
+  ingest_key_enc    TEXT,                           -- X-Go-Marketing-Key,AES-GCM
   primary_color     TEXT,
   is_active         BOOLEAN NOT NULL DEFAULT true,
   current_version_id UUID,          -- 指向目前已發布的 brand_versions(於下方建立後補 FK)

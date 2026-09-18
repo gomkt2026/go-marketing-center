@@ -52,10 +52,11 @@ const genSourceLabel: Record<string, string> = {
   auto_signal: '情報自動', market_signal: '市場情報', meeting_plan: '會議計畫',
 };
 
-const PLATFORM_COLUMNS: { id: 'facebook' | 'instagram' | 'threads'; label: string; note: string }[] = [
+const PLATFORM_COLUMNS: { id: 'facebook' | 'instagram' | 'threads' | 'website'; label: string; note: string }[] = [
   { id: 'facebook', label: 'Facebook', note: '每天台灣 19:00 一則業者主題;帳號需 API 已連線並開啟自動發布' },
   { id: 'instagram', label: 'Instagram', note: '與 FB 同一主題、每天 19:00 一則;必須有配圖才會自動發' },
   { id: 'threads', label: 'Threads', note: '每天 00/06/12/18 熱議跟風、09 生活哏文、21 愛情散文;日常請到 Threads 工作台批准後才發' },
+  { id: 'website', label: '官網長文', note: '批准後一鍵發到 /blog。Washgo / Homigo / TaskGo 依品牌 ingest。沒有金鑰會發布失敗。' },
 ];
 
 export function Publishing() {
@@ -88,11 +89,13 @@ export function Publishing() {
     <div>
       <PageHeader
         title={`${brand.name} 發布管理`}
-        subtitle="FB / IG / Threads 三平台獨立佇列;發布保留時間、平台、版本、發布人"
+        subtitle="FB / IG / Threads / 官網長文；發布保留時間、平台、版本、發布人"
       />
       <div className="grid-auto" style={{ gap: 14, alignItems: 'start' }}>
         {PLATFORM_COLUMNS.map((col) => {
-          const colQueue = queue.filter((q) => q.targetPlatform === col.id);
+          const colQueue = queue.filter((q) =>
+            q.targetPlatform === col.id || (col.id === 'website' && (q.targetPlatform === 'website' || !q.targetPlatform))
+          );
           const colJobs = data.jobs.filter((j) => (j.targetPlatform ?? j.platform) === col.id).slice(0, 10);
           return (
             <div key={col.id} style={{ display: 'grid', gap: 10 }}>

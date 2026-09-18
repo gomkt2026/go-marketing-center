@@ -95,6 +95,11 @@ export function BrandIntelligence() {
   const [documents, setDocuments] = useState<BrandDocument[]>([]);
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [websiteNote, setWebsiteNote] = useState('');
+  const [blogBaseUrl, setBlogBaseUrl] = useState('');
+  const [ingestBaseUrl, setIngestBaseUrl] = useState('');
+  const [ingestKey, setIngestKey] = useState('');
+  const [hasIngestKey, setHasIngestKey] = useState(false);
+  const [ingestTesting, setIngestTesting] = useState(false);
   const [websiteSaving, setWebsiteSaving] = useState(false);
   const [websiteMessage, setWebsiteMessage] = useState<string | null>(null);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
@@ -132,6 +137,10 @@ export function BrandIntelligence() {
     if (!b) return;
     setWebsiteUrl(b.websiteUrl ?? '');
     setWebsiteNote(b.websiteNote ?? '');
+    setBlogBaseUrl(b.blogBaseUrl ?? '');
+    setIngestBaseUrl(b.ingestBaseUrl ?? '');
+    setHasIngestKey(Boolean(b.hasIngestKey));
+    setIngestKey('');
   }, [brandQuery.data?.brand]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
@@ -335,10 +344,11 @@ export function BrandIntelligence() {
   async function generateCoveragePosts(id: string) {
     if (!slug) return;
     setPressBusyId(id);
-    setPressMessage(null);
+    setPressMessage('正在依序生成 FB / IG / Threads 草稿…');
     try {
       const res = await api.generateFromPressCoverage(slug, id);
-      setPressMessage(`已生成 ${res.created.length} 則社群草稿,請到內容中心審閱`);
+      const fail = res.failures.length ? `；${res.failures.length} 則失敗` : '';
+      setPressMessage(`已生成 ${res.created.length} 則社群草稿${fail},請到內容中心審閱`);
     } catch (e) {
       setPressMessage(e instanceof Error ? e.message : '生成失敗');
     } finally {
@@ -404,10 +414,11 @@ export function BrandIntelligence() {
   async function generateReleasePosts(id: string) {
     if (!slug) return;
     setPressBusyId(id);
-    setPressMessage(null);
+    setPressMessage('正在依序準備 FB / IG / Threads 素材…');
     try {
       const res = await api.generateFromPressRelease(slug, id);
-      setPressMessage(`已準備 ${res.created.length} 則社群素材(不會寫成已見報),請到內容中心審閱`);
+      const fail = res.failures.length ? `；${res.failures.length} 則失敗` : '';
+      setPressMessage(`已準備 ${res.created.length} 則社群素材(不會寫成已見報)${fail},請到內容中心審閱`);
     } catch (e) {
       setPressMessage(e instanceof Error ? e.message : '生成失敗');
     } finally {
@@ -502,14 +513,48 @@ export function BrandIntelligence() {
       const { brand: saved } = await api.updateBrand(slug, {
         websiteUrl: websiteUrl.trim() || null,
         websiteNote: websiteNote.trim() || null,
+        blogBaseUrl: blogBaseUrl.trim() || null,
+        ingestBaseUrl: ingestBaseUrl.trim() || null,
+        ingestKey: ingestKey.trim() || undefined,
       });
       setWebsiteUrl(saved.websiteUrl ?? '');
       setWebsiteNote(saved.websiteNote ?? '');
-      setWebsiteMessage('已寫入品牌資訊,給客戶的 LINE 訊息會帶上這個官網');
+      setBlogBaseUrl(saved.blogBaseUrl ?? '');
+      setIngestBaseUrl(saved.ingestBaseUrl ?? '');
+      setHasIngestKey(Boolean(saved.hasIngestKey) || hasIngestKey || Boolean(ingestKey.trim()));
+      setIngestKey('');
+      setWebsiteMessage('已寫入品牌資訊與官網長文目的地');
     } catch (e) {
       setWebsiteMessage(e instanceof Error ? e.message : '官網儲存失敗');
     } finally {
       setWebsiteSaving(false);
+    }
+  }
+
+  async function testIngest() {
+    if (!slug) return;
+    setIngestTesting(true);
+    setWebsiteMessage(null);
+    try {
+      if (ingestKey.trim() || blogBaseUrl.trim() || ingestBaseUrl.trim()) {
+        await api.updateBrand(slug, {
+          websiteUrl: websiteUrl.trim() || null,
+          websiteNote: websiteNote.trim() || null,
+          blogBaseUrl: blogBaseUrl.trim() || null,
+          ingestBaseUrl: ingestBaseUrl.trim() || null,
+          ingestKey: ingestKey.trim() || undefined,
+        });
+        if (ingestKey.trim()) {
+          setHasIngestKey(true);
+          setIngestKey('');
+        }
+      }
+      const res = await api.testWebsiteIngest(slug);
+      setWebsiteMessage(res.message);
+    } catch (e) {
+      setWebsiteMessage(e instanceof Error ? e.message : '連線測試失敗');
+    } finally {
+      setIngestTesting(false);
     }
   }
 
@@ -597,7 +642,7 @@ export function BrandIntelligence() {
                   <Field label="官方網站(給客戶 LINE 資訊包用,會寫進品牌資料)">
                     <div style={{ display: 'grid', gap: 8 }}>
                       <input
-                        placeholder="https:// 官方網站或產品入口"
+                        placeholder="https:// 產品入口（指揮中心 / app）"
                         value={websiteUrl}
                         onChange={(e) => setWebsiteUrl(e.target.value)}
                         style={inputStyle}
@@ -608,9 +653,38 @@ export function BrandIntelligence() {
                         onChange={(e) => setWebsiteNote(e.target.value)}
                         style={inputStyle}
                       />
-                      <Button variant="secondary" style={{ justifySelf: 'start' }} disabled={websiteSaving} onClick={() => void saveWebsite()}>
-                        {websiteSaving ? '儲存中…' : '儲存官網資訊'}
-                      </Button>
+                    </div>
+                  </Field>
+                  <Field label="官網長文目的地（SEO /blog ingest）">
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <input
+                        placeholder="公開網域，例如 https://washgo.com.tw"
+                        value={blogBaseUrl}
+                        onChange={(e) => setBlogBaseUrl(e.target.value)}
+                        style={inputStyle}
+                      />
+                      <input
+                        placeholder="ingest API，例如 https://washgo-api.washgotaskgo.workers.dev"
+                        value={ingestBaseUrl}
+                        onChange={(e) => setIngestBaseUrl(e.target.value)}
+                        style={inputStyle}
+                      />
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder={hasIngestKey ? '已儲存金鑰，留空則不改' : 'X-Go-Marketing-Key（對方提供）'}
+                        value={ingestKey}
+                        onChange={(e) => setIngestKey(e.target.value)}
+                        style={inputStyle}
+                      />
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <Button variant="secondary" style={{ justifySelf: 'start' }} disabled={websiteSaving} onClick={() => void saveWebsite()}>
+                          {websiteSaving ? '儲存中…' : '儲存官網資訊'}
+                        </Button>
+                        <Button variant="secondary" disabled={ingestTesting || websiteSaving} onClick={() => void testIngest()}>
+                          {ingestTesting ? '測試中…' : '測試 ingest 連線'}
+                        </Button>
+                      </div>
                       {websiteMessage && <p style={{ fontSize: 12, color: 'var(--color-primary-dark)', margin: 0 }}>{websiteMessage}</p>}
                     </div>
                   </Field>

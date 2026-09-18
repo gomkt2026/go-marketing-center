@@ -2,6 +2,7 @@ import type { Env } from './env';
 import { getSql } from './db';
 import { rowsToCamel, rowToCamel } from './case';
 import { applyBrandWebsiteMigration, isMissingWebsiteColumn } from './brand-profile';
+import { applyWebsiteArticleMigration, isMissingWebsiteArticleSchema } from './website-articles';
 
 export interface DbBrand {
   id: string;
@@ -12,11 +13,21 @@ export interface DbBrand {
   logoUrl: string | null;
   websiteUrl: string | null;
   websiteNote: string | null;
+  blogBaseUrl?: string | null;
+  ingestBaseUrl?: string | null;
+  hasIngestKey?: boolean;
   currentVersionId: string | null;
   versionNumber?: number | null;
 }
 
-export function mapBrand(row: Record<string, unknown>): DbBrand & { logoInitial: string } {
+const FALLBACK_LOGOS: Record<string, string> = {
+  homigo: '/api/media/brand-assets/homigo/logo.png',
+  taskgo: '/api/media/brand-assets/taskgo/logo.png',
+  washgo: '/api/media/brand-assets/washgo/logo.png',
+  fixercowork: '/brands/fixercowork-logo.png',
+};
+
+export function mapBrand(row: Record<string, unknown>): DbBrand & { logoInitial: string; slug: string } {
   const b = rowToCamel<DbBrand>(row);
   return {
     ...b,
@@ -24,6 +35,10 @@ export function mapBrand(row: Record<string, unknown>): DbBrand & { logoInitial:
     primaryColor: b.primaryColor ?? '#888',
     websiteUrl: b.websiteUrl ?? null,
     websiteNote: b.websiteNote ?? null,
+    blogBaseUrl: b.blogBaseUrl ?? null,
+    ingestBaseUrl: b.ingestBaseUrl ?? null,
+    hasIngestKey: Boolean(b.hasIngestKey),
+    logoUrl: b.logoUrl || FALLBACK_LOGOS[b.slug] || null,
     logoInitial: b.name.charAt(0).toUpperCase(),
   };
 }
@@ -60,16 +75,31 @@ export async function getBrandsForUser(env: Env, user: { role: string; brandIds:
 export async function getBrandBySlug(env: Env, slug: string) {
   const sql = getSql(env);
   const run = () => sql`
-    SELECT id, slug, name, tagline, primary_color, logo_url, website_url, website_note, current_version_id
+    SELECT id, slug, name, tagline, primary_color, logo_url, website_url, website_note,
+           blog_base_url, ingest_base_url,
+           (ingest_key_enc IS NOT NULL AND ingest_key_enc <> '') AS has_ingest_key,
+           current_version_id
     FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1
   `;
   let rows;
   try {
     rows = await run();
   } catch (e) {
-    if (!isMissingWebsiteColumn(e)) throw e;
-    await applyBrandWebsiteMigration(env);
-    rows = await run();
+    if (isMissingWebsiteArticleSchema(e)) {
+      await applyWebsiteArticleMigration(env);
+      rows = await run();
+    } else if (isMissingWebsiteColumn(e)) {
+      await applyBrandWebsiteMigration(env);
+      try {
+        rows = await run();
+      } catch (e2) {
+        if (!isMissingWebsiteArticleSchema(e2)) throw e2;
+        await applyWebsiteArticleMigration(env);
+        rows = await run();
+      }
+    } else {
+      throw e;
+    }
   }
   if (!rows.length) return null;
   return mapBrand(rows[0] as Record<string, unknown>);

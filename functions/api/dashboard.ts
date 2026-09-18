@@ -15,7 +15,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const [brands, pendingProposals, pendingContents, marketSignals, activityRows, campaignStats] = await Promise.all([
     getBrandsForUser(context.env, auth),
     sql`SELECT id, title, brand_id, collaboration_id, status FROM proposals WHERE status = 'pending_decision' ORDER BY created_at DESC`,
-    sql`SELECT id, title, brand_id, status FROM contents WHERE status = 'pending_review' ORDER BY updated_at DESC`,
+    sql`SELECT id, title, brand_id, status, target_platform FROM contents WHERE status = 'pending_review' ORDER BY updated_at DESC`,
     sql`SELECT id, title, brand_id, status, discovered_at FROM market_signals ORDER BY discovered_at DESC LIMIT 10`,
     sql`SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 20`,
     sql`

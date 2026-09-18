@@ -65,7 +65,13 @@ export const api = {
   brand: (slug: string) =>
     request<{ brand: import('@/types').Brand; version: import('@/types').BrandVersion | null }>(`/api/brands/${slug}`),
 
-  updateBrand: (slug: string, body: { websiteUrl?: string | null; websiteNote?: string | null }) =>
+  updateBrand: (slug: string, body: {
+    websiteUrl?: string | null;
+    websiteNote?: string | null;
+    blogBaseUrl?: string | null;
+    ingestBaseUrl?: string | null;
+    ingestKey?: string | null;
+  }) =>
     request<{ brand: import('@/types').Brand }>(`/api/brands/${slug}`, {
       method: 'PATCH', body: JSON.stringify(body),
     }),
@@ -394,7 +400,7 @@ export const api = {
     request<{
       brands: import('@/types').Brand[];
       pendingProposals: { id: string; title: string; brandId?: string; collaborationId?: string }[];
-      pendingContents: { id: string; title: string; brandId: string }[];
+      pendingContents: { id: string; title: string; brandId: string; targetPlatform?: string | null }[];
       marketSignals: import('@/types').MarketSignal[];
       recentActivity: import('@/types').ActivityLog[];
       actionLabels: Record<string, string>;
@@ -731,6 +737,12 @@ export const api = {
       `/api/contents/${contentId}/api-publish`,
       { method: 'POST' },
     ),
+
+  unpublishWebsiteArticle: (contentId: string) =>
+    request<{ ok: boolean }>(`/api/contents/${contentId}/website-unpublish`, { method: 'POST' }),
+
+  testWebsiteIngest: (slug: string) =>
+    request<{ ok: boolean; message: string }>(`/api/brands/${slug}/website-ingest-test`, { method: 'POST' }),
 
   createBrandRule: (body: {
     brandId: string;

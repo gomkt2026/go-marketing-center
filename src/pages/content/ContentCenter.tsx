@@ -33,19 +33,23 @@ const PLATFORM_FILTERS: { id: string; label: string }[] = [
   { id: 'facebook', label: 'Facebook' },
   { id: 'instagram', label: 'Instagram' },
   { id: 'threads', label: 'Threads' },
-  { id: 'seo', label: 'SEO 長文' },
+  { id: 'seo', label: '官網長文' },
 ];
 
 const platformTone: Record<string, BadgeTone> = {
-  facebook: 'primary', instagram: 'secondary', threads: 'accent',
+  facebook: 'primary', instagram: 'secondary', threads: 'accent', website: 'primary',
 };
 const platformLabel: Record<string, string> = {
-  facebook: 'FB', instagram: 'IG', threads: 'Threads',
+  facebook: 'FB', instagram: 'IG', threads: 'Threads', website: '官網',
 };
-const API_PUBLISH_PLATFORMS = ['threads', 'facebook', 'instagram'];
+const API_PUBLISH_PLATFORMS = ['threads', 'facebook', 'instagram', 'website'];
 const apiPublishLabel: Record<string, string> = {
-  facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads',
+  facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads', website: '官網',
 };
+
+function isWebsiteArticle(content: Content) {
+  return content.contentType === 'article' && (content.targetPlatform === 'website' || !content.targetPlatform);
+}
 
 function latestVersion(content: Content) {
   return content.versions[content.versions.length - 1];
@@ -103,7 +107,7 @@ export function ContentCenter() {
 
   const inTab = items.filter((c) => c.status === tab || (tab === 'approved' && c.status === 'published'));
   const filtered = platform === 'all' ? inTab
-    : platform === 'seo' ? inTab.filter((c) => !c.targetPlatform && c.contentType === 'article')
+    : platform === 'seo' ? inTab.filter((c) => isWebsiteArticle(c))
     : inTab.filter((c) => c.targetPlatform === platform);
   const selected = filtered.find((c) => c.id === selectedId) ?? filtered[0];
 
@@ -144,7 +148,7 @@ export function ContentCenter() {
     if (!selected || apiPublishing) return;
     setApiPublishing(true);
     setPublishMessage(null);
-    const label = apiPublishLabel[selected.targetPlatform ?? ''] ?? selected.targetPlatform;
+    const label = isWebsiteArticle(selected) ? '官網' : (apiPublishLabel[selected.targetPlatform ?? ''] ?? selected.targetPlatform);
     try {
       const res = await api.apiPublishContent(selected.id);
       setPublishMessage(res.permalink ? `已發布到 ${label}:${res.permalink}` : `已發布到 ${label}`);
@@ -156,13 +160,29 @@ export function ContentCenter() {
     }
   }
 
+  async function unpublishWebsite() {
+    if (!selected || apiPublishing) return;
+    if (!window.confirm('確定從官網下架？列表與 sitemap 會移除，該網址將 404。')) return;
+    setApiPublishing(true);
+    setPublishMessage(null);
+    try {
+      await api.unpublishWebsiteArticle(selected.id);
+      setPublishMessage('已從官網下架');
+      reload();
+    } catch (e) {
+      setPublishMessage(`下架失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
+    } finally {
+      setApiPublishing(false);
+    }
+  }
+
   async function generateSeo(topic?: string) {
     if (!slug || seoGenerating) return;
     setSeoGenerating(true);
     setSeoError(null);
     try {
       const res = await api.generateSeoFromTopic(slug, topic ? { topic } : undefined);
-      setPublishMessage(`已生成 SEO 長文「${res.title}」,請審閱`);
+      setPublishMessage(`已生成官網長文「${res.title}」,請審閱`);
       setPlatform('seo');
       setTab('pending_review');
       setSelectedId(res.contentId);
@@ -196,7 +216,7 @@ export function ContentCenter() {
         subtitle="所有內容必須人工審閱:批准、修改、退回、重新生成、延期、否決"
         actions={
           <Button variant="primary" disabled={seoGenerating} onClick={() => void generateSeo()}>
-            {seoGenerating ? '⏳ 產生 SEO 長文中...' : '產生 SEO 長文'}
+            {seoGenerating ? '⏳ 產生官網長文中...' : '產生官網長文'}
           </Button>
         }
       />
@@ -212,7 +232,7 @@ export function ContentCenter() {
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '10px 16px 12px', borderTop: '1px solid var(--color-border)' }}>
           {PLATFORM_FILTERS.map((p) => {
             const count = p.id === 'all' ? inTab.length
-              : p.id === 'seo' ? inTab.filter((c) => !c.targetPlatform && c.contentType === 'article').length
+              : p.id === 'seo' ? inTab.filter((c) => isWebsiteArticle(c)).length
               : inTab.filter((c) => c.targetPlatform === p.id).length;
             const active = platform === p.id;
             return (
@@ -248,7 +268,7 @@ export function ContentCenter() {
               <div style={{ fontSize: 13, fontWeight: 600 }}>{c.title}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                 <Badge tone={platformTone[c.targetPlatform ?? ''] ?? 'default'}>
-                  {c.targetPlatform ? (platformLabel[c.targetPlatform] ?? c.targetPlatform) : 'SEO'}
+                  {isWebsiteArticle(c) ? '官網' : (platformLabel[c.targetPlatform ?? ''] ?? c.targetPlatform ?? 'SEO')}
                 </Badge>
                 <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
                   v{latestVersion(c)?.versionNumber ?? '-'}
@@ -340,15 +360,46 @@ export function ContentCenter() {
 
                 {latestVersion(selected).seoMeta && (
                   <div style={{ marginBottom: 14, borderRadius: 12, border: '1px solid var(--color-border)', padding: 14 }}>
-                    <strong style={{ fontSize: 13 }}>SEO metadata</strong>
+                    <strong style={{ fontSize: 13 }}>官網 SEO</strong>
                     <div style={{ fontSize: 12.5, marginTop: 8, lineHeight: 1.6 }}>
-                      <div><strong>title:</strong> {latestVersion(selected).seoMeta?.title}</div>
-                      <div><strong>description:</strong> {latestVersion(selected).seoMeta?.description}</div>
+                      <div><strong>title:</strong> {latestVersion(selected).seoMeta?.seo_title || latestVersion(selected).seoMeta?.title}</div>
+                      <div><strong>description:</strong> {latestVersion(selected).seoMeta?.seo_description || latestVersion(selected).seoMeta?.description}</div>
                       <div><strong>slug:</strong> {latestVersion(selected).seoMeta?.slug}</div>
-                      {latestVersion(selected).seoMeta?.keywords?.length ? (
-                        <div><strong>keywords:</strong> {latestVersion(selected).seoMeta?.keywords?.join('、')}</div>
+                      {latestVersion(selected).seoMeta?.primary_keyword ? (
+                        <div><strong>主關鍵字:</strong> {latestVersion(selected).seoMeta?.primary_keyword}</div>
+                      ) : null}
+                      {(latestVersion(selected).seoMeta?.related_terms ?? latestVersion(selected).seoMeta?.keywords)?.length ? (
+                        <div><strong>相關詞:</strong> {(latestVersion(selected).seoMeta?.related_terms ?? latestVersion(selected).seoMeta?.keywords)?.join('、')}</div>
+                      ) : null}
+                      {latestVersion(selected).seoMeta?.category ? (
+                        <div><strong>分類:</strong> {latestVersion(selected).seoMeta?.category}{latestVersion(selected).seoMeta?.audience ? ` · ${latestVersion(selected).seoMeta?.audience}` : ''}</div>
+                      ) : null}
+                      {latestVersion(selected).seoMeta?.public_url ? (
+                        <div>
+                          <strong>已發佈連結:</strong>{' '}
+                          <a href={latestVersion(selected).seoMeta?.public_url} target="_blank" rel="noreferrer">
+                            {latestVersion(selected).seoMeta?.public_url}
+                          </a>
+                        </div>
                       ) : null}
                     </div>
+                    {latestVersion(selected).seoMeta?.answer_box && (
+                      <div style={{ marginTop: 10, background: 'var(--color-bg-soft)', borderRadius: 8, padding: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 4 }}>文首答案區</div>
+                        <p style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>{latestVersion(selected).seoMeta?.answer_box}</p>
+                      </div>
+                    )}
+                    {!!latestVersion(selected).seoMeta?.faq?.length && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 4 }}>FAQ</div>
+                        {latestVersion(selected).seoMeta?.faq?.map((f, i) => (
+                          <div key={i} style={{ fontSize: 12.5, marginBottom: 6 }}>
+                            <strong>{f.question || f.q}</strong>
+                            <div style={{ color: 'var(--color-text-muted)' }}>{f.answer || f.a}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -379,15 +430,27 @@ export function ContentCenter() {
                   <div style={{ marginBottom: 14, borderRadius: 12, background: 'var(--color-primary-soft)', padding: 14 }}>
                     <strong style={{ fontSize: 13 }}>發布</strong>
                     <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '4px 0 10px' }}>
-                      {API_PUBLISH_PLATFORMS.includes(selected.targetPlatform ?? '')
-                        ? `已連接 ${apiPublishLabel[selected.targetPlatform ?? '']} API 的品牌可一鍵發布;或複製文案手動貼文後標記已發布${selected.targetPlatform === 'instagram' ? '(IG 圖文需 JPEG,短影音走 Reels)' : ''}`
-                        : `複製文案與下載配圖後貼到 ${selected.targetPlatform},再回來標記已發布`}
+                      {isWebsiteArticle(selected)
+                        ? '批准後一鍵發到官網 /blog。對方 ingest 就緒才會立刻上架；更新再發一次同一篇，下架走下方按鈕。'
+                        : API_PUBLISH_PLATFORMS.includes(selected.targetPlatform ?? '')
+                          ? `已連接 ${apiPublishLabel[selected.targetPlatform ?? '']} API 的品牌可一鍵發布;或複製文案手動貼文後標記已發布${selected.targetPlatform === 'instagram' ? '(IG 圖文需 JPEG,短影音走 Reels)' : ''}`
+                          : `複製文案與下載配圖後貼到 ${selected.targetPlatform},再回來標記已發布`}
                     </p>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {API_PUBLISH_PLATFORMS.includes(selected.targetPlatform ?? '') && selected.status === 'approved' && (
+                      {(isWebsiteArticle(selected) || API_PUBLISH_PLATFORMS.includes(selected.targetPlatform ?? '')) && selected.status === 'approved' && (
                         <Button variant="primary" style={{ fontSize: 12, padding: '5px 12px' }} disabled={apiPublishing} onClick={() => void apiPublish()}>
-                          {apiPublishing ? '⏳ 發布中...' : `🚀 發布到 ${apiPublishLabel[selected.targetPlatform ?? '']}`}
+                          {apiPublishing ? '⏳ 發布中...' : `🚀 發布到 ${isWebsiteArticle(selected) ? '官網' : apiPublishLabel[selected.targetPlatform ?? '']}`}
                         </Button>
+                      )}
+                      {isWebsiteArticle(selected) && selected.status === 'published' && (
+                        <>
+                          <Button variant="primary" style={{ fontSize: 12, padding: '5px 12px' }} disabled={apiPublishing} onClick={() => void apiPublish()}>
+                            {apiPublishing ? '⏳ 發布中...' : '更新官網'}
+                          </Button>
+                          <Button variant="secondary" style={{ fontSize: 12, padding: '5px 12px' }} disabled={apiPublishing} onClick={() => void unpublishWebsite()}>
+                            {apiPublishing ? '⏳ 處理中...' : '從官網下架'}
+                          </Button>
+                        </>
                       )}
                       <Button variant="secondary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => void copyBody()}>📋 複製文案</Button>
                       {(latestVersion(selected).assets ?? []).filter((a) => a.assetType === 'image').map((a) => (
@@ -435,7 +498,7 @@ export function ContentCenter() {
               <p>此分類目前沒有內容可審閱</p>
               {platform === 'seo' && (
                 <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 8 }}>
-                  可按上方「產生 SEO 長文」,依簡報與搜尋詞寫一篇給業者看的官網長文,不必先有媒體報導。
+                  可按上方「產生官網長文」,依搜尋詞寫一篇給 Google / AI 收錄的長文。批准後再發到官網 /blog。
                 </p>
               )}
               {seoError && <p style={{ fontSize: 12.5, color: '#B85454', marginTop: 8 }}>{seoError}</p>}

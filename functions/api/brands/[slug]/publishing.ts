@@ -50,7 +50,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         LIMIT 1
       ) a ON true
       WHERE c.brand_id = ${brand.id}::uuid
-        AND c.target_platform IS NOT NULL
+        AND (
+          c.target_platform IS NOT NULL
+          OR (c.content_type = 'article' AND c.target_platform IS NULL)
+        )
         AND c.status IN ('draft', 'pending_review', 'approved', 'needs_revision', 'scheduled')
       ORDER BY c.created_at DESC
       LIMIT 90

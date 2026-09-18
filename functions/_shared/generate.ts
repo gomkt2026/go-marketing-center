@@ -8,7 +8,7 @@ import {
   buildImageInspiredPostPrompt,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
   defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
-  SEO_TOPIC_BANK, brandSeoFacts,
+  SEO_TOPIC_BANK, brandSeoFacts, type SeoTopicSeed,
   buildSocialImagePrompt, PHOTO_EDITORIAL_CONVERT_RULE, TASKGO_GRAPHIC_CONVERT_RULE,
   WASHGO_CUTE_CONVERT_RULE,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
@@ -21,6 +21,11 @@ import { frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
 import { X_TWEET_MAX_CHARS } from './x';
 import { burnPosterHeadline, POSTER_NO_GLYPHS_RULE } from './poster-text';
+import {
+  websiteCta, websiteCtaRule, websiteAuthor, normalizeWebsiteSeoMeta,
+  applyWebsiteArticleMigration, isMissingWebsiteArticleSchema,
+  type WebsiteSeoMeta,
+} from './website-articles';
 
 export type SocialPlatform = 'facebook' | 'instagram' | 'threads';
 
@@ -1042,20 +1047,25 @@ export async function saveEcosystemXContent(
 
 export interface SeoArticleResult {
   title: string;
+  description: string;
   body: string;
   outline: string[];
-  faq: { q: string; a: string }[];
+  faq: { q?: string; a?: string; question?: string; answer?: string }[];
   cta: string;
-  seoMeta: {
-    title: string;
-    description: string;
-    keywords: string[];
-    slug: string;
-    canonicalHint: string;
-  };
+  answer_box?: string;
+  related_terms?: string[];
+  primary_keyword?: string;
+  search_intent?: 'informational' | 'solution';
+  category?: WebsiteSeoMeta['category'];
+  audience?: WebsiteSeoMeta['audience'];
+  seoMeta: WebsiteSeoMeta;
 }
 
-/** 從主題、簡報事實、已核准報導或定稿新聞稿寫 SEO 長文;不可整段複製原文 */
+interface SeoArticleLlmShape extends Omit<SeoArticleResult, 'seoMeta'> {
+  seoMeta?: Partial<WebsiteSeoMeta> & { keywords?: string[]; title?: string; description?: string; slug?: string };
+}
+
+/** 從主題、簡報事實、已核准報導或定稿新聞稿寫官網 SEO 長文;GEO 順序固定 */
 export async function generateSeoArticle(
   env: Env,
   params: {
@@ -1063,23 +1073,36 @@ export async function generateSeoArticle(
     sourceTitle: string;
     sourceSummary: string;
     extraInstruction?: string;
+    topicSeed?: SeoTopicSeed;
+    marketSignalId?: string | null;
   },
 ): Promise<SeoArticleResult> {
-  const pitchFacts = brandSeoFacts(params.brandCtx.slug);
-  const article = await chatCompleteJson<SeoArticleResult>(env, {
+  const slug = params.brandCtx.slug;
+  const seed = params.topicSeed;
+  const audience = seed?.audience ?? (slug === 'washgo' ? 'consumer' : undefined);
+  const cta = websiteCta(slug, audience);
+  const pitchFacts = brandSeoFacts(slug);
+  const relatedHint = (seed?.relatedTerms ?? []).join('、');
+  const article = await chatCompleteJson<SeoArticleLlmShape>(env, {
     messages: [
       {
         role: 'system',
         content: [
           params.brandCtx.systemPrompt,
           '',
-          '你現在要寫一篇給官網/部落格的原創 SEO 長文,不是社群貼文。',
+          '你現在要寫一篇給官網/部落格的原創 SEO 長文,不是社群貼文,也不是 Threads / IG 短文拉長。',
           '必須改寫,不可整段複製媒體原文或新聞稿。引用媒體時只帶出處 + 一句事實 + 原文 URL。',
           '不可發明媒體名稱、專訪、轉載數量、客戶數、營收或未經驗證的數據。',
           '簡報或後台示意數字(例如每日 1,250 單)是畫面示範,不得當成真實業績。',
-          '繁體中文,800 到 1500 字,用 H2 小標分段,語氣像台灣產業顧問在跟店主講話,不是新聞稿複讀、不是廣告口號堆疊。',
-          '禁用「邁向數位化的未來就是現在」「告別繁瑣」「輕鬆數位化」這類空心句。',
-          `結尾 CTA 必須是:${SHARED_BRAND_CTA}`,
+          '繁體中文(台灣用語),正文 800 到 1800 字(不含答案區與 FAQ),至少 3 個 H2。',
+          '語氣專業但不生硬。開頭不要故事、不要先打廣告。',
+          '固定順序:1) answer_box 先直接回答主關鍵字(一句定義+三點結論,80-150字,整段可被 AI 摘走) 2) 接下來 2-3 段把 related_terms 寫進真實場景 3) H2/H3 展開 4) FAQ 3-5 題 5) 最後才品牌 CTA。',
+          '主關鍵字寫進 seo_title、seo_description、answer_box、一個 H2。相關詞自然出現,不要堆標題。',
+          'FAQ 問句接近搜尋原話,答案 2-4 句、可獨立被摘。禁止「歡迎詢問」「視情況而定」。',
+          'slug 只用小寫英文、數字、連字號,反映主關鍵字語意,不用中文、不用日期。',
+          websiteCtaRule(slug, audience),
+          `結尾 CTA 必須寫成:${cta}`,
+          slug === 'washgo' ? 'Washgo 是衣物洗滌/乾洗,不是洗車。品牌名寫 Washgo。不可寫 5,000+ 客戶、98% 滿意度、保證不縮水。' : '',
           pitchFacts ? `\n【可引用的產品/簡報事實(不可再發明)】\n${pitchFacts}` : '',
         ].filter(Boolean).join('\n'),
       },
@@ -1088,28 +1111,59 @@ export async function generateSeoArticle(
         content: [
           `題目來源:${params.sourceTitle}`,
           params.sourceSummary,
+          seed?.primaryKeyword ? `主關鍵字:${seed.primaryKeyword}` : '',
+          relatedHint ? `相關詞(必須自然寫進內文,6-12個):${relatedHint}` : '請自訂 6-12 個相關詞(長尾、同義、場景詞)。',
+          seed?.category ? `分類:${seed.category}` : '',
+          seed?.searchIntent ? `搜尋意圖:${seed.searchIntent}` : '',
+          audience ? `受眾:${audience}` : '',
           params.extraInstruction ?? '',
           '',
-          '回傳 JSON:{"title":"文章標題","body":"正文(可用 markdown ## 小標)","outline":["H2 1","H2 2"],"faq":[{"q":"","a":""}],"cta":"結尾行動呼籲","seoMeta":{"title":"50-60字內 title","description":"120-160字 description","keywords":["關鍵字"],"slug":"英文或拼音 slug","canonicalHint":"建議放在哪個官網路徑"}}',
+          '回傳 JSON:{"title":"12-60字 H1","description":"40-160字列表摘要","body":"800-1800字 markdown 正文,至少3個H2,不含答案區與FAQ","outline":["H2"],"answer_box":"80-150字","primary_keyword":"恰好1個","related_terms":["相關詞"],"search_intent":"informational或solution","category":"pain|product|policy|trust|talk","audience":"consumer或merchant","faq":[{"question":"","answer":""}],"cta":"文末行動","seoMeta":{"slug":"english-slug","seo_title":"含主關鍵字","seo_description":"70-160字"}}',
         ].filter(Boolean).join('\n'),
       },
     ],
     temperature: 0.6,
-    maxTokens: 3500,
+    maxTokens: 6000,
   });
   article.body = normalizeMultilineText(article.body);
-  article.cta = SHARED_BRAND_CTA;
-  article.seoMeta = {
-    title: article.seoMeta?.title || article.title,
-    description: article.seoMeta?.description || article.body.slice(0, 140),
-    keywords: article.seoMeta?.keywords ?? [],
-    slug: article.seoMeta?.slug || 'article',
-    canonicalHint: article.seoMeta?.canonicalHint || '',
+  article.cta = cta;
+  const related = article.related_terms?.length ? article.related_terms : seed?.relatedTerms ?? [];
+  const seoMeta = normalizeWebsiteSeoMeta({
+    ...(article.seoMeta ?? {}),
+    slug: article.seoMeta?.slug,
+    title: article.seoMeta?.seo_title || article.seoMeta?.title || article.title,
+    description: article.description || article.seoMeta?.seo_description || article.seoMeta?.description,
+    seo_title: article.seoMeta?.seo_title || article.seoMeta?.title || article.title,
+    seo_description: article.seoMeta?.seo_description || article.description || article.seoMeta?.description,
+    primary_keyword: article.primary_keyword || seed?.primaryKeyword,
+    related_terms: related,
+    search_intent: article.search_intent || seed?.searchIntent,
+    category: article.category || seed?.category,
+    audience,
+    answer_box: article.answer_box,
+    faq: article.faq,
+    author: websiteAuthor(slug),
+    market_signal_id: params.marketSignalId ?? null,
+    keywords: related,
+  }, slug);
+  return {
+    title: article.title,
+    description: seoMeta.description || article.description || '',
+    body: article.body,
+    outline: article.outline ?? [],
+    faq: article.faq ?? [],
+    cta,
+    answer_box: seoMeta.answer_box,
+    related_terms: seoMeta.related_terms,
+    primary_keyword: seoMeta.primary_keyword,
+    search_intent: seoMeta.search_intent,
+    category: seoMeta.category,
+    audience: seoMeta.audience,
+    seoMeta,
   };
-  return article;
 }
 
-export function pickSeoTopic(slug: string, usedTitles: string[] = []): { topic: string; angle: string } {
+export function pickSeoTopic(slug: string, usedTitles: string[] = []): SeoTopicSeed {
   const bank = SEO_TOPIC_BANK[slug] ?? SEO_TOPIC_BANK.washgo;
   const used = new Set(usedTitles.map((t) => t.replace(/\s+/g, '')));
   const unused = bank.filter((item) => !used.has(item.topic.replace(/\s+/g, '')));
@@ -1127,22 +1181,26 @@ export async function saveSeoArticle(
   },
 ): Promise<SavedContent> {
   const sql = getSql(env);
-  const faqBlock = params.article.faq?.length
-    ? `\n\n## FAQ\n${params.article.faq.map((f) => `**${f.q}**\n${f.a}`).join('\n\n')}`
-    : '';
-  const body = `${params.article.body}${faqBlock}`;
-
-  const contentRows = await sql`
+  const body = params.article.body;
+  const insert = () => sql`
     INSERT INTO contents (
       campaign_id, brand_id, content_type, target_platform, title, status,
       generated_by_agent_id, generation_prompt_meta
     ) VALUES (
-      NULL, ${params.brandCtx.brandId}::uuid, 'article', NULL,
+      NULL, ${params.brandCtx.brandId}::uuid, 'article', 'website',
       ${params.article.title}, 'pending_review',
       ${params.generatedByAgentId ?? null},
       ${JSON.stringify(params.promptMeta ?? { source: 'seo_article' })}
     ) RETURNING id
   `;
+  let contentRows;
+  try {
+    contentRows = await insert();
+  } catch (e) {
+    if (!isMissingWebsiteArticleSchema(e)) throw e;
+    await applyWebsiteArticleMigration(env);
+    contentRows = await insert();
+  }
   const contentId = (contentRows[0] as { id: string }).id;
 
   const versionRows = await sql`

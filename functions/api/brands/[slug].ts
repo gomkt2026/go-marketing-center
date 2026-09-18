@@ -5,6 +5,7 @@ import { getSql } from '../../_shared/db';
 import { getBrandBySlug, getBrandVersion, mapBrand } from '../../_shared/queries';
 import { json, error } from '../../_shared/response';
 import { applyBrandWebsiteMigration, isMissingWebsiteColumn } from '../../_shared/brand-profile';
+import { saveBrandWebsiteDestination } from '../../_shared/website-articles';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -29,6 +30,9 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   const body = await context.request.json().catch(() => ({})) as {
     websiteUrl?: string | null;
     websiteNote?: string | null;
+    blogBaseUrl?: string | null;
+    ingestBaseUrl?: string | null;
+    ingestKey?: string | null;
   };
 
   const websiteUrl = body.websiteUrl === undefined
@@ -40,6 +44,12 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
 
   if (websiteUrl && !/^https?:\/\//i.test(websiteUrl)) {
     return error('官方網站請填完整網址,例如 https://example.com', 400);
+  }
+  if (body.blogBaseUrl && !/^https?:\/\//i.test(body.blogBaseUrl.trim())) {
+    return error('SEO 文章網域請填完整網址,例如 https://washgo.com.tw', 400);
+  }
+  if (body.ingestBaseUrl && !/^https?:\/\//i.test(body.ingestBaseUrl.trim())) {
+    return error('ingest API 請填完整網址', 400);
   }
 
   const sql = getSql(context.env);
@@ -58,5 +68,14 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     rows = await run();
   }
 
-  return json({ brand: mapBrand(rows[0] as Record<string, unknown>) });
+  if (body.blogBaseUrl !== undefined || body.ingestBaseUrl !== undefined || body.ingestKey !== undefined) {
+    await saveBrandWebsiteDestination(context.env, brand.id, {
+      blogBaseUrl: body.blogBaseUrl,
+      ingestBaseUrl: body.ingestBaseUrl,
+      ingestKey: body.ingestKey,
+    });
+  }
+
+  const updated = await getBrandBySlug(context.env, slug);
+  return json({ brand: updated ?? mapBrand(rows[0] as Record<string, unknown>) });
 };

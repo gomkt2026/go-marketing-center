@@ -27,6 +27,9 @@ export interface Brand {
   logoUrl: string | null;
   websiteUrl?: string | null;
   websiteNote?: string | null;
+  blogBaseUrl?: string | null;
+  ingestBaseUrl?: string | null;
+  hasIngestKey?: boolean;
   currentVersionId: string;
   versionNumber?: number | null;
 }
@@ -78,7 +81,7 @@ export interface BrandPersona {
 
 export type PublishingPlatform =
   | 'instagram' | 'facebook' | 'threads' | 'line_oa'
-  | 'tiktok' | 'youtube' | 'linkedin' | 'x' | 'edm';
+  | 'tiktok' | 'youtube' | 'linkedin' | 'x' | 'edm' | 'website';
 
 export interface BrandChannel {
   id: string;
@@ -420,6 +423,18 @@ export interface ContentVersion {
     keywords?: string[];
     slug?: string;
     canonicalHint?: string;
+    seo_title?: string;
+    seo_description?: string;
+    primary_keyword?: string;
+    related_terms?: string[];
+    search_intent?: 'informational' | 'solution';
+    category?: 'pain' | 'product' | 'policy' | 'trust' | 'talk';
+    audience?: 'consumer' | 'merchant';
+    answer_box?: string;
+    faq?: { question?: string; answer?: string; q?: string; a?: string }[];
+    public_url?: string;
+    tags?: string[];
+    author?: string;
   } | null;
   createdAt: string;
   assets?: ContentAsset[];
@@ -584,7 +599,7 @@ export interface PublishingQueueItem {
   id: string;
   title: string;
   status: ContentStatus;
-  targetPlatform: PublishingPlatform;
+  targetPlatform?: PublishingPlatform | null;
   predictedEngagementScore?: number | null;
   genSource?: string | null;
   createdAt: string;

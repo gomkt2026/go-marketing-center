@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import { useMeta } from '@/context/MetaContext';
 import { useBrand } from '@/context/BrandContext';
+import { BrandMark } from '@/components/brand/BrandMark';
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -59,7 +60,9 @@ export function Dashboard() {
             <Badge tone="accent">{pendingContents.length}</Badge>
           </div>
           {pendingContents.map((c) => (
-            <div key={c.id} style={{ fontSize: 13, padding: '6px 0', borderTop: '1px solid var(--color-border)' }}>▪ {c.title}</div>
+            <div key={c.id} style={{ fontSize: 13, padding: '6px 0', borderTop: '1px solid var(--color-border)' }}>
+              ▪ {c.title}{c.targetPlatform === 'website' ? '（官網）' : ''}
+            </div>
           ))}
           <Link to={pendingContents[0] ? `/${brandById(pendingContents[0].brandId)?.slug}/contents` : '#'} style={{ fontSize: 12, color: 'var(--color-primary-dark)', fontWeight: 700, textDecoration: 'none' }}>去審閱 →</Link>
         </Card>
@@ -90,7 +93,7 @@ export function Dashboard() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: b.primaryColor, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800 }}>{b.logoInitial}</div>
+                  <BrandMark brand={b} size={22} />
                   <strong style={{ fontSize: 14 }}>{b.name}</strong>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'flex', gap: 12 }}>

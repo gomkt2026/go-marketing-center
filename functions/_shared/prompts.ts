@@ -1537,25 +1537,64 @@ export function buildEngagementEvalPrompt(params: { platform: string; body: stri
 export interface SeoTopicSeed {
   topic: string;
   angle: string;
+  primaryKeyword?: string;
+  relatedTerms?: string[];
+  category?: 'pain' | 'product' | 'policy' | 'trust' | 'talk';
+  searchIntent?: 'informational' | 'solution';
+  audience?: 'consumer' | 'merchant';
 }
 
-/** 不依賴媒體報導也能產 SEO 長文的主題庫;優先給 B 端搜尋詞 */
+/** 官網 SEO 長文主題庫。消費者搜尋題放前面,B 端題可繼續產。 */
 export const SEO_TOPIC_BANK: Record<string, SeoTopicSeed[]> = {
   washgo: [
-    { topic: '洗衣店系統怎麼選？手寫單改成雲端訂單的實務檢查表', angle: '對準店主搜「洗衣店系統」,用關店對帳、找不到單的場景,對照 Washgo 雲端訂單與電子簽名。' },
-    { topic: '送洗履歷是什麼？客人問衣服洗到哪,店主怎麼答', angle: '對準「送洗履歷」,講電話對單 vs LINE 節點追蹤,不發明客戶數。' },
-    { topic: '洗衣店多門市調撥與洗滌中心,怎麼不用 LINE 群考古', angle: '對準「門市調撥」,講門市與洗廠流轉、對帳與司機任務。' },
-    { topic: '洗衣店數位轉型不必下載 App：LINE + Web 後台怎麼導入', angle: '對準「洗衣店數位轉型」,強調客戶與員工都不必裝 App,零摩擦導入。' },
-    { topic: '洗衣店司機派遣與運費怎麼算才不會吵', angle: '對準到府收送物流黑洞,講任務清單、導航、電子簽收、運費結算。' },
-    { topic: '每日送洗報表給店主看什麼：衣物、寢具、鞋包一次對得攏', angle: '對準品牌分析報表/每日送洗報表,講店主關店後要看的欄位,不寫示意業績數字。' },
+    {
+      topic: '到府收送洗衣怎麼用？不用遷就洗衣店上班時間',
+      angle: '對準消費者搜「到府收送洗衣」。用洗衣店上班時間對不上、週末衣服山、LINE 下單與衣物追蹤。文首先答怎麼用,最後才 CTA。不可寫 5,000+ 客戶、98% 滿意度、洗車。',
+      primaryKeyword: '到府收送洗衣',
+      relatedTerms: ['到府收衣服', '洗衣店上班時間', 'LINE 下單', '衣物追蹤', '乾洗', '羽絨外套', '週末衣服山', '48 小時'],
+      category: 'pain',
+      searchIntent: 'solution',
+      audience: 'consumer',
+    },
+    {
+      topic: '羽絨外套怎麼洗？自己洗會怎樣、送洗要注意什麼',
+      angle: '對準「羽絨外套怎麼洗」。講縮水、保暖度、專業洗護與線上報價確認才洗。不可保證不縮水。',
+      primaryKeyword: '羽絨外套怎麼洗',
+      relatedTerms: ['羽絨衣', '乾洗', '縮水', '保暖', '洗標', '到府收送', '品管', '換季'],
+      category: 'talk',
+      searchIntent: 'informational',
+      audience: 'consumer',
+    },
+    { topic: '洗衣店系統怎麼選？手寫單改成雲端訂單的實務檢查表', angle: '對準店主搜「洗衣店系統」,用關店對帳、找不到單的場景,對照 Washgo 雲端訂單與電子簽名。', primaryKeyword: '洗衣店系統', relatedTerms: ['手寫單', '雲端訂單', '電子簽名', '對帳', '多門市', '品管', 'POS', '關店'], category: 'product', searchIntent: 'solution', audience: 'merchant' },
+    { topic: '送洗履歷是什麼？客人問衣服洗到哪,店主怎麼答', angle: '對準「送洗履歷」,講電話對單 vs LINE 節點追蹤,不發明客戶數。', primaryKeyword: '送洗履歷', relatedTerms: ['衣物追蹤', 'LINE 通知', '電話對單', '洗到哪', '品管', '取件', '節點', '透明'], category: 'product', searchIntent: 'informational', audience: 'merchant' },
+    { topic: '洗衣店多門市調撥與洗滌中心,怎麼不用 LINE 群考古', angle: '對準「門市調撥」,講門市與洗廠流轉、對帳與司機任務。', primaryKeyword: '門市調撥', relatedTerms: ['洗滌中心', '多門市', '司機', '回貨', '對帳', 'LINE 群', '調撥', '品管'], category: 'product', searchIntent: 'solution', audience: 'merchant' },
+    { topic: '洗衣店數位轉型不必下載 App：LINE + Web 後台怎麼導入', angle: '對準「洗衣店數位轉型」,強調客戶與員工都不必裝 App,零摩擦導入。', primaryKeyword: '洗衣店數位轉型', relatedTerms: ['LINE 下單', '後台', '零學習成本', '門市員工', '司機', '會員', '紙本', '導入'], category: 'product', searchIntent: 'solution', audience: 'merchant' },
+    { topic: '洗衣店司機派遣與運費怎麼算才不會吵', angle: '對準到府收送物流黑洞,講任務清單、導航、電子簽收、運費結算。', primaryKeyword: '洗衣店司機派遣', relatedTerms: ['到府收送', '運費', '電子簽收', '任務清單', '導航', '結算', '派車', '取件'], category: 'product', searchIntent: 'solution', audience: 'merchant' },
+    { topic: '每日送洗報表給店主看什麼：衣物、寢具、鞋包一次對得攏', angle: '對準品牌分析報表/每日送洗報表,講店主關店後要看的欄位,不寫示意業績數字。', primaryKeyword: '送洗報表', relatedTerms: ['品牌分析', '衣物', '寢具', '對帳', 'KPI', '關店', '訂單', '門市'], category: 'product', searchIntent: 'informational', audience: 'merchant' },
   ],
   homigo: [
-    { topic: '包租代管系統怎麼選？收租對帳與報修指揮中心', angle: '對準自管房東/代管搜「包租代管」,講散落在 LINE 與 Excel 的收租報修。' },
-    { topic: '房東報修沒下文？把修繕進度收回同一個地方', angle: '對準「房東報修」,講房客回報→案件→進度回流,不保證接案量。' },
+    {
+      topic: '房東收租怎麼管？催繳、逾期與對帳一次看懂',
+      angle: '對準房東搜「房東收租」。用催繳、逾期、繳租紀錄與 LINE 通知把場景講完。文首先答怎麼管,最後才加 @933pdush。不可保證收租率或市佔第一。',
+      primaryKeyword: '房東收租',
+      relatedTerms: ['催繳', '逾期', '對帳', '繳租紀錄', 'LINE 通知', '未付款', '收租率', '每月帳單'],
+      category: 'pain',
+      searchIntent: 'solution',
+    },
+    { topic: '包租代管系統怎麼選？收租對帳與報修指揮中心', angle: '對準自管房東/代管搜「包租代管」,講散落在 LINE 與 Excel 的收租報修。', primaryKeyword: '包租代管系統', relatedTerms: ['收租', '對帳', '報修', '房東', '房客', '合約', 'Excel', 'LINE 通知'], category: 'product', searchIntent: 'solution' },
+    { topic: '房東報修沒下文？把修繕進度收回同一個地方', angle: '對準「房東報修」,講房客回報→案件→進度回流,不保證接案量。', primaryKeyword: '房東報修', relatedTerms: ['修繕', '進度', '房客', '照片', '派工', '紀錄', '通知', '結案'], category: 'pain', searchIntent: 'solution' },
   ],
   taskgo: [
-    { topic: '派工系統怎麼幫工程行看今天做到哪', angle: '對準「派工系統」,講白板排班與 LINE 考古。' },
-    { topic: '工班管理：月底才知案子賠錢之前,現場要回報什麼', angle: '對準「工班管理」「現場回報」,講成本與進度。' },
+    {
+      topic: '工程派工怎麼排？打卡、排班與請款一次看懂',
+      angle: '對準工班搜「工程派工」。用打卡、排班、LINE 通知、施工回報與請款。語氣專業但接地氣,少用台語梗。文末才免費試用與 @taskgo。',
+      primaryKeyword: '工程派工',
+      relatedTerms: ['工地打卡', 'LINE 通知', '排班', '請款', '施工回報', '電子簽名', '出勤', '成本'],
+      category: 'pain',
+      searchIntent: 'solution',
+    },
+    { topic: '派工系統怎麼幫工程行看今天做到哪', angle: '對準「派工系統」,講白板排班與 LINE 考古。', primaryKeyword: '派工系統', relatedTerms: ['工程行', '白板', '打卡', '現場回報', '排班', 'LINE', '進度', '工地'], category: 'product', searchIntent: 'solution' },
+    { topic: '工班管理：月底才知案子賠錢之前,現場要回報什麼', angle: '對準「工班管理」「現場回報」,講成本與進度。', primaryKeyword: '工班管理', relatedTerms: ['現場回報', '成本', '出勤', '請款', '施工', '打卡', '電子簽名', '月底'], category: 'pain', searchIntent: 'solution' },
   ],
 };
 

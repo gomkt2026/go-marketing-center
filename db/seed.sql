@@ -158,17 +158,23 @@ BEGIN
   UPDATE brands SET
     logo_url = '/api/media/brand-assets/homigo/logo.png',
     website_url = 'https://cc.homigo.workers.dev',
-    website_note = 'Homigo 指揮中心；房客／房東主要走 LINE LIFF'
+    website_note = 'Homigo 指揮中心；房客／房東主要走 LINE LIFF',
+    blog_base_url = 'https://www.homigo.com.tw',
+    ingest_base_url = 'https://housego-api.homigo.workers.dev'
     WHERE id = b_homigo;
   UPDATE brands SET
     logo_url = '/api/media/brand-assets/taskgo/logo.png',
     website_url = 'https://app.taskgo.com.tw',
-    website_note = '產品入口與註冊頁,價格與方案以官網為準'
+    website_note = '產品入口與註冊頁,價格與方案以官網為準',
+    blog_base_url = 'https://dev.taskgo.com.tw',
+    ingest_base_url = 'https://api.dev.taskgo.com.tw'
     WHERE id = b_taskgo;
   UPDATE brands SET
     logo_url = '/api/media/brand-assets/washgo/logo.png',
     website_url = 'https://washgo.pages.dev',
-    website_note = 'Washgo 產品網站；門市與司機作業走 LINE LIFF（washgo-liff.pages.dev）'
+    website_note = 'Washgo 產品網站；門市與司機作業走 LINE LIFF（washgo-liff.pages.dev）',
+    blog_base_url = 'https://washgo.com.tw',
+    ingest_base_url = 'https://washgo-api.washgotaskgo.workers.dev'
     WHERE id = b_washgo;
   UPDATE brands SET logo_url = '/brands/fixercowork-logo.png' WHERE id = b_fixer;
 

@@ -4,6 +4,7 @@ import { requireAuth } from '../../_shared/auth';
 import { json, error } from '../../_shared/response';
 import { applyDocumentCollateralMigration } from '../../_shared/document-migrate';
 import { applyBrandWebsiteMigration } from '../../_shared/brand-profile';
+import { applyWebsiteArticleMigration } from '../../_shared/website-articles';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -14,6 +15,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const steps = [
       ...(await applyDocumentCollateralMigration(context.env)),
       ...(await applyBrandWebsiteMigration(context.env)),
+      ...(await applyWebsiteArticleMigration(context.env)),
     ];
     return json({ ok: true, steps });
   } catch (e) {

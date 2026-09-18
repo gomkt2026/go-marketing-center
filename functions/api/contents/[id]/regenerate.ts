@@ -4,7 +4,7 @@ import { requireAuth } from '../../../_shared/auth';
 import { getSql } from '../../../_shared/db';
 import { logActivity } from '../../../_shared/activity';
 import { json, error } from '../../../_shared/response';
-import { buildBrandContext, SHARED_BRAND_CTA } from '../../../_shared/prompts';
+import { buildBrandContext } from '../../../_shared/prompts';
 import { generatePlatformPost, generateSeoArticle, findBrandAgent, SUPPORTED_PLATFORMS, type SocialPlatform } from '../../../_shared/generate';
 
 // 真正呼叫 LLM 重新生成內容,寫入新的 content_version
@@ -25,7 +25,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     generation_prompt_meta?: { audienceLane?: 'b2b' | 'b2c'; audienceName?: string };
   };
 
-  const isSeo = !content.target_platform && content.content_type === 'article';
+  const isSeo = content.content_type === 'article'
+    && (content.target_platform === 'website' || !content.target_platform);
   const platform = (content.target_platform ?? 'facebook') as SocialPlatform;
   if (!isSeo && !SUPPORTED_PLATFORMS.includes(platform)) {
     return error(`此內容平台(${content.target_platform})尚不支援 AI 重新生成`, 400);
@@ -62,17 +63,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       brandCtx,
       sourceTitle: content.title ?? '同主題長文',
       sourceSummary: latest?.body?.slice(0, 2000) ?? '',
-      extraInstruction: extraInstruction || '請換一個業者會搜的切入點重寫,不可整段沿用上一版。',
+      extraInstruction: extraInstruction || '請換一個讀者會搜的切入點重寫,不可整段沿用上一版。開頭先給 answer_box。',
     });
     const nextVersion = (latest?.version_number ?? 0) + 1;
-    const faqBlock = article.faq?.length
-      ? `\n\n## FAQ\n${article.faq.map((f) => `**${f.q}**\n${f.a}`).join('\n\n')}`
-      : '';
     const versionRows = await sql`
       INSERT INTO content_versions (content_id, version_number, body, hashtags, cta, seo_meta, generated_by_agent_id)
       VALUES (
-        ${contentId}::uuid, ${nextVersion}, ${`${article.body}${faqBlock}`}, ${JSON.stringify([])},
-        ${article.cta || SHARED_BRAND_CTA}, ${JSON.stringify(article.seoMeta)}, ${agentId}
+        ${contentId}::uuid, ${nextVersion}, ${article.body}, ${JSON.stringify([])},
+        ${article.cta}, ${JSON.stringify(article.seoMeta)}, ${agentId}
       )
       RETURNING id
     `;

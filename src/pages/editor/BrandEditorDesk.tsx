@@ -82,6 +82,7 @@ function DeskInner({
   const sessionRef = useRef<string | null>(null);
   const pinRef = useRef<Pin | null>(null);
   const draftsRef = useRef<EditorDraftCard[]>([]);
+  const composingRef = useRef(false);
   sessionRef.current = sessionId;
   pinRef.current = pin;
   draftsRef.current = drafts;
@@ -218,7 +219,7 @@ function DeskInner({
       setSessionId(created.sessionId);
       sessionRef.current = created.sessionId;
       if (!created.conversationToken && !created.signedUrl) {
-        setVoiceError('尚未設定阿樂語音 Agent。請執行 scripts/setup-washgo-ale-agent.mjs，或先用文字對話。');
+        setVoiceError(`尚未設定${editor.nickname}語音 Agent。請執行 scripts/setup-editor-agents.mjs，或先用文字對話。`);
         return;
       }
       startSession({
@@ -356,14 +357,20 @@ function DeskInner({
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onCompositionStart={() => { composingRef.current = true; }}
+              onCompositionEnd={() => {
+                window.setTimeout(() => { composingRef.current = false; }, 80);
+              }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                const ime = composingRef.current || e.nativeEvent.isComposing || e.key === 'Process' || e.keyCode === 229;
+                if (ime) return;
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
                   void sendText();
                 }
               }}
               placeholder={voiceOn ? `跟${editor.nickname}說，或打字…` : `跟${editor.nickname}打字，例如：昨天媒體能不能拿來發文？`}
-              rows={2}
+              rows={3}
               style={{
                 flex: 1, resize: 'none', borderRadius: 10, border: '1px solid var(--color-border)',
                 padding: '8px 10px', fontSize: 14, fontFamily: 'inherit',
@@ -374,8 +381,8 @@ function DeskInner({
             </Button>
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 6 }}>
-            Enter 送出 · Shift+Enter 換行 · 語音與文字可並用
-            {!voiceEnabled ? ' · 尚未設定 Conversational Agent，先走文字；語音請跑 scripts/setup-washgo-ale-agent.mjs' : ''}
+            按「送出」或 Ctrl/⌘+Enter 才送出 · Enter 換行 · 注音選字不會誤送
+            {!voiceEnabled ? ' · 尚未設定語音 Agent，先走文字；語音請跑 scripts/setup-editor-agents.mjs' : ''}
           </div>
         </div>
       </Card>
@@ -498,7 +505,7 @@ export function BrandEditorDesk() {
         title={`跟${editor.nickname}聊`}
         subtitle={`${brand.name} 小編工作台：語音或打字，右側是新聞、素材與行程。`}
       />
-      <ConversationProvider>
+      <ConversationProvider key={brand.slug}>
         <DeskInner
           slug={brand.slug}
           brandName={brand.name}

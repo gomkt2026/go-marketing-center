@@ -18,7 +18,8 @@
     "network:apply": "node scripts/apply-network.mjs",
     "network:import": "node scripts/import-network.mjs",
     "editor:apply": "node scripts/apply-editor.mjs",
-    "editor:setup-ale": "node scripts/setup-washgo-ale-agent.mjs"
+    "editor:setup-ale": "node scripts/setup-editor-agents.mjs washgo",
+    "editor:setup-agents": "node scripts/setup-editor-agents.mjs"
   },
   "dependencies": {
     "@cf-wasm/photon": "^0.4.0",

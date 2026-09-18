@@ -49,6 +49,13 @@ export function toClientError(err: unknown, action: string): ClientFacingError {
   if (/OPENAI_API_KEY 尚未設定/.test(raw)) {
     return { status: 503, message: raw, retryable: false };
   }
+  if (/invalid input syntax for type uuid/i.test(blob)) {
+    return {
+      status: 400,
+      message: `${action}失敗:稿件編號不對,請再說一次「幫我排程」,不要重產`,
+      retryable: true,
+    };
+  }
   if (/too many subrequests/i.test(blob)) {
     return {
       status: 503,

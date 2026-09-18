@@ -14,6 +14,12 @@ import type {
 
 type Pin = { type: string; id: string; label: string };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function asUuid(value?: string): string | undefined {
+  return value && UUID_RE.test(value.trim()) ? value.trim() : undefined;
+}
+
 function formatWhen(iso?: string | null) {
   if (!iso) return '';
   return new Date(iso).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -75,8 +81,10 @@ function DeskInner({
   const threadRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<string | null>(null);
   const pinRef = useRef<Pin | null>(null);
+  const draftsRef = useRef<EditorDraftCard[]>([]);
   sessionRef.current = sessionId;
   pinRef.current = pin;
+  draftsRef.current = drafts;
 
   const conversation = useConversation({
     onMessage: (msg) => {
@@ -118,7 +126,12 @@ function DeskInner({
       },
       draft_post: async (parameters: { platform?: string; topic?: string; coverageId?: string; instruction?: string }) => {
         const sid = sessionRef.current;
-        const result = await api.editorTool(slug, { name: 'draft_post', sessionId: sid, ...parameters });
+        const result = await api.editorTool(slug, {
+          name: 'draft_post',
+          sessionId: sid,
+          ...parameters,
+          coverageId: asUuid(parameters.coverageId),
+        });
         applyToolResult(result, setContext, setDrafts);
         return result.summary;
       },
@@ -127,7 +140,16 @@ function DeskInner({
         contentVersionId?: string; scheduledAt?: string; mode?: string;
       }) => {
         const sid = sessionRef.current;
-        const result = await api.editorTool(slug, { name: 'schedule_post', sessionId: sid, ...parameters });
+        const last = draftsRef.current[0];
+        const result = await api.editorTool(slug, {
+          name: 'schedule_post',
+          sessionId: sid,
+          ...parameters,
+          coverageId: asUuid(parameters.coverageId),
+          contentId: asUuid(parameters.contentId) ?? last?.contentId,
+          contentVersionId: asUuid(parameters.contentVersionId) ?? last?.contentVersionId,
+          platform: parameters.platform || last?.platform,
+        });
         applyToolResult(result, setContext, setDrafts);
         setTab('schedule');
         return result.summary;

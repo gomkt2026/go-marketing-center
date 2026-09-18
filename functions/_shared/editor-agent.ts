@@ -175,7 +175,7 @@ export function buildEditorSystemPrompt(editor: EditorPersona, brandName: string
     '- 只處理自己品牌。不要假裝已經發出去。',
     '- 產稿後用一句口語覆誦重點,再問要不要發。',
     '- 對方只是要發文或排程時,不要呼叫 list_context / list_schedule。',
-    '- 對話裡已有草稿就直接 schedule_post,帶上 contentId 與 contentVersionId,不要重產。',
+    '- 對話裡已有草稿就直接 schedule_post。contentId / contentVersionId 只能是 UUID；不知道就留空,不要填 pending_review、標題或狀態。',
     ANTI_AI_RULES,
   ].filter(Boolean).join('\n');
 }
@@ -376,6 +376,15 @@ function parsePlatform(value: string | undefined): SocialPlatform {
   return 'threads';
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** 語音模型常把 status（如 pending_review）填進 contentId，必須先丟掉 */
+export function asUuid(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return UUID_RE.test(trimmed) ? trimmed : undefined;
+}
+
 export async function appendEditorMessage(
   env: Env,
   sessionId: string,
@@ -408,9 +417,10 @@ export interface EditorMessageRow {
 
 function draftFromPayload(payload: unknown): EditorDraftCard | null {
   const result = payload as EditorToolResult | null | undefined;
-  if (result?.draft?.contentId && result.draft.contentVersionId) return result.draft;
-  const first = result?.drafts?.[0];
-  if (first?.contentId && first.contentVersionId) return first;
+  const cards = [result?.draft, ...(result?.drafts ?? [])];
+  for (const card of cards) {
+    if (card && asUuid(card.contentId) && asUuid(card.contentVersionId)) return card;
+  }
   return null;
 }
 
@@ -482,6 +492,9 @@ export async function executeEditorTool(
 ): Promise<EditorToolResult> {
   const { brandId, slug, args } = params;
   const sql = getSql(env);
+  args.coverageId = asUuid(args.coverageId);
+  args.contentId = asUuid(args.contentId);
+  args.contentVersionId = asUuid(args.contentVersionId);
 
   if (args.name === 'list_context' || args.name === 'list_schedule') {
     const context = await loadEditorContext(env, brandId);
@@ -542,7 +555,7 @@ export async function executeEditorTool(
     return {
       ok: true,
       tool: 'draft_post',
-      summary: `已產 ${platform} 待審稿「${result.post.title}」。文案好了,配圖可之後在內容中心補。要我主動發文嗎？`,
+      summary: `已產 ${platform} 待審稿「${result.post.title}」。排程請用 contentId=${saved.contentId}。文案好了,配圖可之後在內容中心補。要我主動發文嗎？`,
       draft,
       drafts: [draft],
     };
@@ -675,7 +688,7 @@ export async function runEditorChatTurn(
   let reply = (plan.reply || '').trim() || '好的,我聽到了。';
   if (plan.tool?.name) {
     const toolArgs = { ...plan.tool };
-    if (toolArgs.name === 'schedule_post' && recentDraft && (!toolArgs.contentId || !toolArgs.contentVersionId)) {
+    if (toolArgs.name === 'schedule_post' && recentDraft && (!asUuid(toolArgs.contentId) || !asUuid(toolArgs.contentVersionId))) {
       toolArgs.contentId = recentDraft.contentId;
       toolArgs.contentVersionId = recentDraft.contentVersionId;
       toolArgs.platform = toolArgs.platform || recentDraft.platform;

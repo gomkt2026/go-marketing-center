@@ -196,6 +196,61 @@ export function zhCharCount(text: string): number {
   return (text || '').replace(/\s+/g, '').length;
 }
 
+export function clipZh(text: string, max: number): string {
+  const source = (text || '').replace(/\s+/g, ' ').trim();
+  if (zhCharCount(source) <= max) return source;
+  let out = '';
+  let count = 0;
+  for (const ch of source) {
+    if (/\s/.test(ch)) {
+      if (out) out += ch;
+      continue;
+    }
+    if (count >= max) break;
+    out += ch;
+    count += 1;
+  }
+  return out.trim();
+}
+
+export function ensureZhRange(text: string, min: number, max: number, extras: string[] = []): string {
+  let current = (text || '').replace(/\s+/g, ' ').trim();
+  if (zhCharCount(current) > max) return clipZh(current, max);
+  if (zhCharCount(current) >= min) return current;
+  for (const extra of extras) {
+    const piece = (extra || '').replace(/\s+/g, ' ').trim();
+    if (!piece) continue;
+    const needle = piece.slice(0, Math.min(16, piece.length));
+    if (needle && current.includes(needle)) continue;
+    const glue = !current ? '' : /[。！？、，；]$/.test(current) ? '' : '。';
+    current = `${current}${glue}${piece}`;
+    if (zhCharCount(current) >= min) return clipZh(current, max);
+  }
+  return clipZh(current, max);
+}
+
+export function ensureWebsiteSeoMetaLengths(meta: WebsiteSeoMeta, fallbackTitle = ''): WebsiteSeoMeta {
+  const titleHint = meta.seo_title || meta.title || fallbackTitle;
+  const extras = [meta.answer_box, titleHint, meta.primary_keyword, (meta.related_terms || []).join('、')];
+  const description = ensureZhRange(meta.description || meta.seo_description || '', 40, 160, extras);
+  const seo_description = ensureZhRange(
+    meta.seo_description || description,
+    70,
+    160,
+    [meta.answer_box, description, titleHint],
+  );
+  const answer_box = ensureZhRange(meta.answer_box, 80, 150, [description, titleHint, meta.primary_keyword]);
+  const seo_title = ensureZhRange(meta.seo_title || titleHint, 12, 60, [meta.primary_keyword, titleHint]);
+  return {
+    ...meta,
+    description,
+    seo_description,
+    answer_box,
+    title: meta.title || seo_title,
+    seo_title,
+  };
+}
+
 export function sanitizeSlug(raw: string, fallback: string): string {
   const fromRaw = (raw || '')
     .toLowerCase()
@@ -246,14 +301,15 @@ export function normalizeWebsiteSeoMeta(input: Partial<WebsiteSeoMeta> & Record<
   const faq = normalizeFaq(input.faq);
   const primary = String(input.primary_keyword || input.primaryKeyword || related[0] || '').trim() || '服務說明';
   const seoTitle = String(input.seo_title || input.seoTitle || input.title || '').trim();
-  const seoDesc = String(input.seo_description || input.seoDescription || input.description || '').trim();
+  const listDesc = String(input.description || '').trim();
+  const seoDesc = String(input.seo_description || input.seoDescription || '').trim();
   const articleSlug = sanitizeSlug(String(input.slug || ''), primary);
-  return {
+  return ensureWebsiteSeoMetaLengths({
     slug: articleSlug,
     title: seoTitle,
-    description: seoDesc,
+    description: listDesc || seoDesc,
     seo_title: seoTitle,
-    seo_description: seoDesc,
+    seo_description: seoDesc || listDesc,
     primary_keyword: primary.slice(0, 20),
     related_terms: related.slice(0, 12),
     search_intent: asIntent(input.search_intent || input.searchIntent),
@@ -271,7 +327,7 @@ export function normalizeWebsiteSeoMeta(input: Partial<WebsiteSeoMeta> & Record<
     public_url: input.public_url ? String(input.public_url) : (input.publicUrl ? String(input.publicUrl) : undefined),
     keywords: related.slice(0, 12),
     canonicalHint: input.canonicalHint ? String(input.canonicalHint) : `/blog/${articleSlug}`,
-  };
+  }, seoTitle);
 }
 
 export function validateWebsitePayload(params: {
@@ -285,12 +341,17 @@ export function validateWebsitePayload(params: {
   const errors: string[] = [];
   const { seoMeta, bodyMd, cta, title, description } = params;
   if (!SLUG_RE.test(seoMeta.slug)) errors.push('slug 須為 3–80 字元小寫英文、數字、連字號');
-  if (title.replace(/\s+/g, '').length < 12 || zhCharCount(title) > 60) errors.push('title 須 12–60 字');
-  if (zhCharCount(description) < 40 || zhCharCount(description) > 160) errors.push('description 須 40–160 字');
+  const titleLen = zhCharCount(title);
+  const descLen = zhCharCount(description);
+  const seoDescLen = zhCharCount(seoMeta.seo_description);
+  const answerLen = zhCharCount(seoMeta.answer_box);
+  if (titleLen < 12 || titleLen > 60) errors.push(`title 須 12–60 字（目前 ${titleLen}）`);
+  if (descLen < 40 || descLen > 160) errors.push(`description 須 40–160 字（目前 ${descLen}）`);
+  if (seoDescLen < 70 || seoDescLen > 160) errors.push(`seo_description 須 70–160 字（目前 ${seoDescLen}）`);
   if (!seoMeta.primary_keyword || seoMeta.primary_keyword.length < 2) errors.push('須有主關鍵字');
   if (seoMeta.related_terms.length < 6) errors.push('related_terms 至少 6 個');
-  if (zhCharCount(seoMeta.answer_box) < 80 || zhCharCount(seoMeta.answer_box) > 150) {
-    errors.push('answer_box 須 80–150 字');
+  if (answerLen < 80 || answerLen > 150) {
+    errors.push(`answer_box 須 80–150 字（目前 ${answerLen}）`);
   }
   const bodyLen = zhCharCount(bodyMd);
   if (bodyLen < 800) errors.push(`正文須至少 800 字（目前 ${bodyLen}）`);

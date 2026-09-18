@@ -55,6 +55,19 @@ function latestVersion(content: Content) {
   return content.versions[content.versions.length - 1];
 }
 
+function zhLen(text?: string | null) {
+  return (text || '').replace(/\s+/g, '').length;
+}
+
+function ZhCount({ n, min, max }: { n: number; min: number; max: number }) {
+  const ok = n >= min && n <= max;
+  return (
+    <span style={{ color: ok ? 'var(--color-text-muted)' : 'var(--color-danger)', marginLeft: 6, fontSize: 11 }}>
+      {n} 字（須 {min}–{max}）
+    </span>
+  );
+}
+
 export function ContentCenter() {
   const { brand: slug } = useParams();
   const { brandBySlug, brandsLoading } = useBrand();
@@ -362,8 +375,18 @@ export function ContentCenter() {
                   <div style={{ marginBottom: 14, borderRadius: 12, border: '1px solid var(--color-border)', padding: 14 }}>
                     <strong style={{ fontSize: 13 }}>官網 SEO</strong>
                     <div style={{ fontSize: 12.5, marginTop: 8, lineHeight: 1.6 }}>
-                      <div><strong>title:</strong> {latestVersion(selected).seoMeta?.seo_title || latestVersion(selected).seoMeta?.title}</div>
-                      <div><strong>description:</strong> {latestVersion(selected).seoMeta?.seo_description || latestVersion(selected).seoMeta?.description}</div>
+                      <div>
+                        <strong>title:</strong> {latestVersion(selected).seoMeta?.seo_title || latestVersion(selected).seoMeta?.title}
+                        <ZhCount n={zhLen(latestVersion(selected).seoMeta?.seo_title || latestVersion(selected).seoMeta?.title)} min={12} max={60} />
+                      </div>
+                      <div>
+                        <strong>description:</strong> {latestVersion(selected).seoMeta?.description || latestVersion(selected).seoMeta?.seo_description}
+                        <ZhCount n={zhLen(latestVersion(selected).seoMeta?.description || latestVersion(selected).seoMeta?.seo_description)} min={40} max={160} />
+                      </div>
+                      <div>
+                        <strong>seo_description:</strong> {latestVersion(selected).seoMeta?.seo_description || latestVersion(selected).seoMeta?.description}
+                        <ZhCount n={zhLen(latestVersion(selected).seoMeta?.seo_description || latestVersion(selected).seoMeta?.description)} min={70} max={160} />
+                      </div>
                       <div><strong>slug:</strong> {latestVersion(selected).seoMeta?.slug}</div>
                       {latestVersion(selected).seoMeta?.primary_keyword ? (
                         <div><strong>主關鍵字:</strong> {latestVersion(selected).seoMeta?.primary_keyword}</div>
@@ -385,7 +408,10 @@ export function ContentCenter() {
                     </div>
                     {latestVersion(selected).seoMeta?.answer_box && (
                       <div style={{ marginTop: 10, background: 'var(--color-bg-soft)', borderRadius: 8, padding: 10 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 4 }}>文首答案區</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                          文首答案區
+                          <ZhCount n={zhLen(latestVersion(selected).seoMeta?.answer_box)} min={80} max={150} />
+                        </div>
                         <p style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>{latestVersion(selected).seoMeta?.answer_box}</p>
                       </div>
                     )}
@@ -431,7 +457,7 @@ export function ContentCenter() {
                     <strong style={{ fontSize: 13 }}>發布</strong>
                     <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '4px 0 10px' }}>
                       {isWebsiteArticle(selected)
-                        ? '批准後一鍵發到官網 /blog。對方 ingest 就緒才會立刻上架；更新再發一次同一篇，下架走下方按鈕。'
+                        ? '批准後一鍵發到官網 /blog。摘要若差幾個字，發布時會用答案區補齊。更新再發一次同一篇，下架走下方按鈕。'
                         : API_PUBLISH_PLATFORMS.includes(selected.targetPlatform ?? '')
                           ? `已連接 ${apiPublishLabel[selected.targetPlatform ?? '']} API 的品牌可一鍵發布;或複製文案手動貼文後標記已發布${selected.targetPlatform === 'instagram' ? '(IG 圖文需 JPEG,短影音走 Reels)' : ''}`
                           : `複製文案與下載配圖後貼到 ${selected.targetPlatform},再回來標記已發布`}

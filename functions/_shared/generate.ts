@@ -1141,7 +1141,7 @@ export async function generateSeoArticle(
     category: article.category || seed?.category,
     audience,
     answer_box: article.answer_box,
-    faq: article.faq,
+    faq: article.faq as unknown as WebsiteSeoMeta['faq'],
     author: websiteAuthor(slug),
     market_signal_id: params.marketSignalId ?? null,
     keywords: related,

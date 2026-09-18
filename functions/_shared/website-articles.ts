@@ -503,7 +503,7 @@ export async function saveBrandWebsiteDestination(
   const ingest = body.ingestBaseUrl === undefined ? undefined : (body.ingestBaseUrl?.trim() || null);
   let keyEnc: string | null | undefined;
   if (body.ingestKey !== undefined) {
-    keyEnc = body.ingestKey.trim() ? await encryptToken(env, body.ingestKey.trim()) : null;
+    keyEnc = body.ingestKey?.trim() ? await encryptToken(env, body.ingestKey.trim()) : null;
   }
 
   const run = async () => {

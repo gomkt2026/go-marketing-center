@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams, Navigate, Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -462,6 +462,13 @@ export function ContentCenter() {
                           ? `已連接 ${apiPublishLabel[selected.targetPlatform ?? '']} API 的品牌可一鍵發布;或複製文案手動貼文後標記已發布${selected.targetPlatform === 'instagram' ? '(IG 圖文需 JPEG,短影音走 Reels)' : ''}`
                           : `複製文案與下載配圖後貼到 ${selected.targetPlatform},再回來標記已發布`}
                     </p>
+                    {isWebsiteArticle(selected) && !brand.hasIngestKey && (
+                      <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: '0 0 10px' }}>
+                        尚未填入官網 ingest 金鑰，發布會失敗。請到{' '}
+                        <Link to={`/${slug}/intelligence`}>品牌智慧</Link>
+                        {' '}貼上對方提供的 X-Go-Marketing-Key 後再發。
+                      </p>
+                    )}
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       {(isWebsiteArticle(selected) || API_PUBLISH_PLATFORMS.includes(selected.targetPlatform ?? '')) && selected.status === 'approved' && (
                         <Button variant="primary" style={{ fontSize: 12, padding: '5px 12px' }} disabled={apiPublishing} onClick={() => void apiPublish()}>

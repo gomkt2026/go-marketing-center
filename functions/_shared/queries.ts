@@ -2,7 +2,7 @@ import type { Env } from './env';
 import { getSql } from './db';
 import { rowsToCamel, rowToCamel } from './case';
 import { applyBrandWebsiteMigration, isMissingWebsiteColumn } from './brand-profile';
-import { applyWebsiteArticleMigration, isMissingWebsiteArticleSchema } from './website-articles';
+import { applyWebsiteArticleMigration, isMissingWebsiteArticleSchema, ingestKeyFromEnv, defaultWebsiteDestination } from './website-articles';
 
 export interface DbBrand {
   id: string;
@@ -27,17 +27,18 @@ const FALLBACK_LOGOS: Record<string, string> = {
   fixercowork: '/brands/fixercowork-logo.png',
 };
 
-export function mapBrand(row: Record<string, unknown>): DbBrand & { logoInitial: string; slug: string } {
+export function mapBrand(row: Record<string, unknown>, env?: Env): DbBrand & { logoInitial: string; slug: string } {
   const b = rowToCamel<DbBrand>(row);
+  const fallback = defaultWebsiteDestination(b.slug);
   return {
     ...b,
     tagline: b.tagline ?? '',
     primaryColor: b.primaryColor ?? '#888',
     websiteUrl: b.websiteUrl ?? null,
     websiteNote: b.websiteNote ?? null,
-    blogBaseUrl: b.blogBaseUrl ?? null,
-    ingestBaseUrl: b.ingestBaseUrl ?? null,
-    hasIngestKey: Boolean(b.hasIngestKey),
+    blogBaseUrl: b.blogBaseUrl || fallback?.blogBaseUrl || null,
+    ingestBaseUrl: b.ingestBaseUrl || fallback?.ingestBaseUrl || null,
+    hasIngestKey: Boolean(b.hasIngestKey) || Boolean(env && ingestKeyFromEnv(env, b.slug)),
     logoUrl: b.logoUrl || FALLBACK_LOGOS[b.slug] || null,
     logoInitial: b.name.charAt(0).toUpperCase(),
   };
@@ -47,7 +48,9 @@ async function selectActiveBrands(env: Env) {
   const sql = getSql(env);
   return sql`
     SELECT b.id, b.slug, b.name, b.tagline, b.primary_color, b.logo_url,
-           b.website_url, b.website_note, b.current_version_id, v.version_number
+           b.website_url, b.website_note, b.current_version_id, v.version_number,
+           b.blog_base_url, b.ingest_base_url,
+           (b.ingest_key_enc IS NOT NULL AND b.ingest_key_enc <> '') AS has_ingest_key
     FROM brands b
     LEFT JOIN brand_versions v ON v.id = b.current_version_id
     WHERE b.is_active = true
@@ -57,11 +60,12 @@ async function selectActiveBrands(env: Env) {
 
 export async function getAllBrands(env: Env) {
   try {
-    return ((await selectActiveBrands(env)) as Record<string, unknown>[]).map(mapBrand);
+    return ((await selectActiveBrands(env)) as Record<string, unknown>[]).map((row) => mapBrand(row, env));
   } catch (e) {
-    if (!isMissingWebsiteColumn(e)) throw e;
-    await applyBrandWebsiteMigration(env);
-    return ((await selectActiveBrands(env)) as Record<string, unknown>[]).map(mapBrand);
+    if (!isMissingWebsiteColumn(e) && !isMissingWebsiteArticleSchema(e)) throw e;
+    if (isMissingWebsiteArticleSchema(e)) await applyWebsiteArticleMigration(env);
+    if (isMissingWebsiteColumn(e)) await applyBrandWebsiteMigration(env);
+    return ((await selectActiveBrands(env)) as Record<string, unknown>[]).map((row) => mapBrand(row, env));
   }
 }
 
@@ -102,7 +106,7 @@ export async function getBrandBySlug(env: Env, slug: string) {
     }
   }
   if (!rows.length) return null;
-  return mapBrand(rows[0] as Record<string, unknown>);
+  return mapBrand(rows[0] as Record<string, unknown>, env);
 }
 
 export async function getBrandVersion(env: Env, brandId: string) {

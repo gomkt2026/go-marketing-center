@@ -26,6 +26,10 @@ export interface Env {
   ELEVENLABS_TOOL_SECRET?: string;
   /** 選填:社群 token 加密金鑰,未設定則以 SESSION_SECRET 衍生 */
   TOKEN_ENCRYPTION_KEY?: string;
+  /** 官網 ingest 金鑰備援（品牌智慧未填時仍可發布） */
+  HOMIGO_INGEST_KEY?: string;
+  TASKGO_INGEST_KEY?: string;
+  WASHGO_INGEST_KEY?: string;
   /** X(Twitter) OAuth2 App 的 Client ID / Client Secret(Go 生態系共用帳號 token 續期用) */
   X_CLIENT_ID?: string;
   X_CLIENT_SECRET?: string;

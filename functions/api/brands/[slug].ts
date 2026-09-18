@@ -77,5 +77,5 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   }
 
   const updated = await getBrandBySlug(context.env, slug);
-  return json({ brand: updated ?? mapBrand(rows[0] as Record<string, unknown>) });
+  return json({ brand: updated ?? mapBrand(rows[0] as Record<string, unknown>, context.env) });
 };

@@ -181,6 +181,24 @@ export function websiteAuthor(slug: string): string {
   return slug;
 }
 
+export function defaultWebsiteDestination(slug: string): { blogBaseUrl: string; ingestBaseUrl: string } | undefined {
+  return DEFAULT_DESTINATIONS[slug];
+}
+
+export function ingestKeyFromEnv(env: Env, slug: string): string | undefined {
+  if (slug === 'homigo') return env.HOMIGO_INGEST_KEY?.trim() || undefined;
+  if (slug === 'taskgo') return env.TASKGO_INGEST_KEY?.trim() || undefined;
+  if (slug === 'washgo') return env.WASHGO_INGEST_KEY?.trim() || undefined;
+  return undefined;
+}
+
+async function resolveIngestKey(env: Env, dest: WebsiteDestination): Promise<string> {
+  if (dest.ingestKeyEnc) return decryptToken(env, dest.ingestKeyEnc);
+  const fromEnv = ingestKeyFromEnv(env, dest.slug);
+  if (fromEnv) return fromEnv;
+  throw new Error('尚未填入官網 ingest 金鑰（品牌智慧 → 官網長文目的地）');
+}
+
 export function ingestPutPath(slug: string): string {
   return slug === 'washgo'
     ? '/v1/integrations/gomarketing/articles'
@@ -405,7 +423,7 @@ export async function loadWebsiteDestination(env: Env, brandId: string): Promise
     slug: row.slug,
     blogBaseUrl: (row.blog_base_url || fallback?.blogBaseUrl || '').replace(/\/$/, ''),
     ingestBaseUrl: (row.ingest_base_url || fallback?.ingestBaseUrl || '').replace(/\/$/, ''),
-    hasIngestKey: Boolean(row.ingest_key_enc),
+    hasIngestKey: Boolean(row.ingest_key_enc) || Boolean(ingestKeyFromEnv(env, row.slug)),
     ingestKeyEnc: row.ingest_key_enc,
   };
 }
@@ -423,7 +441,7 @@ export function buildWebsitePayload(params: {
   publishedAt?: string;
 }): WebsiteArticlePayload {
   const meta = params.seoMeta;
-  return {
+  const payload: WebsiteArticlePayload = {
     external_id: params.contentId,
     slug: meta.slug,
     title: params.title,
@@ -434,21 +452,24 @@ export function buildWebsitePayload(params: {
     related_terms: meta.related_terms,
     search_intent: meta.search_intent,
     category: meta.category,
-    audience: meta.audience,
     answer_box: meta.answer_box,
     body_md: params.bodyMd,
     faq: meta.faq,
     cta: params.cta,
     status: 'published',
     published_at: params.publishedAt || new Date().toISOString(),
-    cover_image_url: meta.cover_image_url || null,
-    og_image_url: meta.og_image_url || meta.cover_image_url || null,
-    tags: meta.tags,
-    author: meta.author,
-    market_signal_id: meta.market_signal_id || null,
-    brand_version_id: meta.brand_version_id,
-    pillar: meta.pillar,
   };
+  if (meta.author) payload.author = meta.author;
+  if (meta.audience) payload.audience = meta.audience;
+  if (meta.cover_image_url) payload.cover_image_url = meta.cover_image_url;
+  if (meta.og_image_url || meta.cover_image_url) {
+    payload.og_image_url = meta.og_image_url || meta.cover_image_url || undefined;
+  }
+  if (meta.tags?.length) payload.tags = meta.tags;
+  if (meta.market_signal_id) payload.market_signal_id = meta.market_signal_id;
+  if (meta.brand_version_id) payload.brand_version_id = meta.brand_version_id;
+  if (meta.pillar) payload.pillar = meta.pillar;
+  return payload;
 }
 
 interface IngestOk {
@@ -484,8 +505,7 @@ export async function publishWebsiteArticle(
   payload: WebsiteArticlePayload,
 ): Promise<IngestOk> {
   if (!dest.ingestBaseUrl) throw new Error('尚未設定官網 ingest 網址');
-  if (!dest.ingestKeyEnc) throw new Error('尚未填入官網 ingest 金鑰（品牌智慧 → 官方網站）');
-  const key = await decryptToken(env, dest.ingestKeyEnc);
+  const key = await resolveIngestKey(env, dest);
   const { status, json } = await ingestFetch({
     dest,
     key,
@@ -517,8 +537,7 @@ export async function unpublishWebsiteArticle(
   dest: WebsiteDestination,
   externalId: string,
 ): Promise<void> {
-  if (!dest.ingestKeyEnc) throw new Error('尚未填入官網 ingest 金鑰');
-  const key = await decryptToken(env, dest.ingestKeyEnc);
+  const key = await resolveIngestKey(env, dest);
   const { status, json } = await ingestFetch({
     dest,
     key,
@@ -532,8 +551,12 @@ export async function unpublishWebsiteArticle(
 
 export async function testWebsiteIngest(env: Env, dest: WebsiteDestination): Promise<{ ok: boolean; message: string }> {
   if (!dest.ingestBaseUrl) return { ok: false, message: '尚未設定 ingest 網址' };
-  if (!dest.ingestKeyEnc) return { ok: false, message: '尚未填入 ingest 金鑰' };
-  const key = await decryptToken(env, dest.ingestKeyEnc);
+  let key: string;
+  try {
+    key = await resolveIngestKey(env, dest);
+  } catch {
+    return { ok: false, message: '尚未填入 ingest 金鑰' };
+  }
   try {
     const { status, json } = await ingestFetch({
       dest,
@@ -560,12 +583,11 @@ export async function saveBrandWebsiteDestination(
   },
 ): Promise<void> {
   const sql = getSql(env);
-  const blog = body.blogBaseUrl === undefined ? undefined : (body.blogBaseUrl?.trim() || null);
-  const ingest = body.ingestBaseUrl === undefined ? undefined : (body.ingestBaseUrl?.trim() || null);
-  let keyEnc: string | null | undefined;
-  if (body.ingestKey !== undefined) {
-    keyEnc = body.ingestKey?.trim() ? await encryptToken(env, body.ingestKey.trim()) : null;
-  }
+  const blog = body.blogBaseUrl?.trim() || undefined;
+  const ingest = body.ingestBaseUrl?.trim() || undefined;
+  const keyEnc = body.ingestKey?.trim()
+    ? await encryptToken(env, body.ingestKey.trim())
+    : undefined;
 
   const run = async () => {
     if (blog !== undefined && ingest !== undefined && keyEnc !== undefined) {

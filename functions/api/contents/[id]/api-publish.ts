@@ -11,6 +11,7 @@ import {
   loadWebsiteDestination, normalizeWebsiteSeoMeta, validateWebsitePayload,
   buildWebsitePayload, publishWebsiteArticle, isWebsiteSeoContent,
   applyWebsiteArticleMigration, isMissingWebsiteArticleSchema, websiteCta,
+  ensureWebsiteSeoMetaLengths,
 } from '../../../_shared/website-articles';
 
 const PLATFORM_LABELS: Record<string, string> = { threads: 'Threads', facebook: 'Facebook', instagram: 'Instagram', website: '官網' };
@@ -56,12 +57,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (isWebsite) {
     const dest = await loadWebsiteDestination(context.env, content.brand_id);
     if (!dest) return error('找不到品牌目的地', 404);
-    const seoMeta = normalizeWebsiteSeoMeta({
+    const seoMeta = ensureWebsiteSeoMetaLengths(normalizeWebsiteSeoMeta({
       ...(version.seo_meta ?? {}),
       title: (version.seo_meta as { seo_title?: string; title?: string } | null)?.seo_title
         || (version.seo_meta as { title?: string } | null)?.title
         || content.title,
-    }, dest.slug);
+    }, dest.slug), content.title, version.body || '', dest.slug);
     const cta = websiteCta(dest.slug, seoMeta.audience);
     const payloadErrors = validateWebsitePayload({
       slug: dest.slug,

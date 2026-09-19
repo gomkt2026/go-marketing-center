@@ -235,11 +235,15 @@ export function ensureZhRange(text: string, min: number, max: number, extras: st
   let current = (text || '').replace(/\s+/g, ' ').trim();
   if (zhCharCount(current) > max) return clipZh(current, max);
   if (zhCharCount(current) >= min) return current;
-  for (const extra of extras) {
+  const FILLERS = [
+    '做得到的做法有三：把該看的紀錄留在同一處、逾期或未完成自動提醒、對帳時項目對得上。',
+    '少用人追、少用試算表重抄，每天只要看一眼有沒有還沒做完的事。',
+    '流程寫下來、每次留時間與內容，才不會口頭對口頭。',
+  ];
+  for (const extra of [...extras, ...FILLERS]) {
     const piece = (extra || '').replace(/\s+/g, ' ').trim();
     if (!piece) continue;
-    const needle = piece.slice(0, Math.min(16, piece.length));
-    if (needle && current.includes(needle)) continue;
+    if (current.includes(piece)) continue;
     const glue = !current ? '' : /[。！？、，；]$/.test(current) ? '' : '。';
     current = `${current}${glue}${piece}`;
     if (zhCharCount(current) >= min) return clipZh(current, max);
@@ -247,23 +251,133 @@ export function ensureZhRange(text: string, min: number, max: number, extras: st
   return clipZh(current, max);
 }
 
-export function ensureWebsiteSeoMetaLengths(meta: WebsiteSeoMeta, fallbackTitle = ''): WebsiteSeoMeta {
-  const titleHint = meta.seo_title || meta.title || fallbackTitle;
-  const extras = [meta.answer_box, titleHint, meta.primary_keyword, (meta.related_terms || []).join('、')];
+function bodySentences(bodyMd: string): string[] {
+  return (bodyMd || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[#>*`]/g, ' ')
+    .split(/[。！？\n]+/)
+    .map((s) => s.replace(/\s+/g, ' ').trim())
+    .filter((s) => zhCharCount(s) >= 12 && !/^faq$/i.test(s));
+}
+
+function extractFaqFromMarkdown(bodyMd: string): WebsiteFaq[] {
+  const text = bodyMd || '';
+  const out: WebsiteFaq[] = [];
+  const bold = /\*\*([^*]{6,80}[？?])\*\*\s*\n+([^#*]+?)(?=\n\s*\*\*|\n\s*##|$)/g;
+  let match: RegExpExecArray | null;
+  while ((match = bold.exec(text)) && out.length < 5) {
+    const question = match[1].trim();
+    const answer = match[2].replace(/\s+/g, ' ').trim();
+    if (question && answer) out.push({ question, answer });
+  }
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length && out.length < 5; i += 1) {
+    const hm = lines[i].match(/^#{2,3}\s+(.{6,80}[？?])\s*$/);
+    if (!hm) continue;
+    const question = hm[1].trim();
+    const buf: string[] = [];
+    for (let j = i + 1; j < lines.length; j += 1) {
+      if (/^#{2,3}\s+/.test(lines[j])) break;
+      const line = lines[j].replace(/^[-*]\s+/, '').trim();
+      if (line) buf.push(line);
+      if (buf.join('').length > 80) break;
+    }
+    const answer = buf.join(' ').replace(/\s+/g, ' ').trim();
+    if (question && answer && !out.some((f) => f.question === question)) {
+      out.push({ question, answer });
+    }
+  }
+  return out.slice(0, 5);
+}
+
+const RELATED_FALLBACK: Record<string, string[]> = {
+  homigo: ['收租', '對帳', '報修', '催繳', '逾期', 'LINE 通知', '房東', '房客', '合約', 'Excel'],
+  taskgo: ['派工', '打卡', '排班', '請款', '工班', '案場', 'LINE 通知', '施工回報'],
+  washgo: ['到府收送', '衣物追蹤', 'LINE 下單', '乾洗', '報價', '取件', '品管', '送洗履歷'],
+};
+
+function ensureRelatedTerms(existing: string[], slug: string, extras: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (raw: string) => {
+    const term = raw.replace(/\s+/g, ' ').trim();
+    const key = term.replace(/\s+/g, '');
+    if (key.length < 2 || key.length > 20 || seen.has(key)) return;
+    seen.add(key);
+    out.push(term);
+  };
+  existing.forEach(add);
+  extras.forEach(add);
+  (RELATED_FALLBACK[slug] ?? RELATED_FALLBACK.homigo).forEach(add);
+  return out.slice(0, 12);
+}
+
+function ensureFaq(faq: WebsiteFaq[], bodyMd: string, primary: string, description: string): WebsiteFaq[] {
+  const merged: WebsiteFaq[] = [];
+  const seen = new Set<string>();
+  const add = (item: WebsiteFaq) => {
+    const question = item.question.trim();
+    const answer = item.answer.trim();
+    if (!question || !answer) return;
+    const key = question.replace(/\s+/g, '');
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push({ question, answer });
+  };
+  faq.forEach(add);
+  extractFaqFromMarkdown(bodyMd).forEach(add);
+  const templates: WebsiteFaq[] = [
+    { question: `${primary}是什麼？`, answer: description || `${primary}是把日常流程留在同一處，讓催辦、對帳與進度可以回查。` },
+    { question: `${primary}適合誰用？`, answer: '適合不想再用試算表或聊天室追進度的人。先把紀錄留在同一處，再決定要不要換工具。' },
+    { question: `${primary}要怎麼開始？`, answer: '先看現在散落在哪：帳單、報修、通知。對得上之後，再把提醒改成同一管道。' },
+  ];
+  templates.forEach(add);
+  return merged.slice(0, 5);
+}
+
+export function ensureWebsiteSeoMetaLengths(meta: WebsiteSeoMeta, fallbackTitle = '', bodyMd = '', slug = ''): WebsiteSeoMeta {
+  const titleHint = fallbackTitle || meta.seo_title || meta.title || '';
+  const sentences = bodySentences(bodyMd);
+  const extras = [
+    meta.answer_box,
+    titleHint,
+    meta.primary_keyword,
+    (meta.related_terms || []).join('、'),
+    ...sentences,
+  ];
   const description = ensureZhRange(meta.description || meta.seo_description || '', 40, 160, extras);
   const seo_description = ensureZhRange(
     meta.seo_description || description,
     70,
     160,
-    [meta.answer_box, description, titleHint],
+    [description, meta.answer_box, titleHint, ...sentences],
   );
-  const answer_box = ensureZhRange(meta.answer_box, 80, 150, [description, titleHint, meta.primary_keyword]);
-  const seo_title = ensureZhRange(meta.seo_title || titleHint, 12, 60, [meta.primary_keyword, titleHint]);
+  const answer_box = ensureZhRange(
+    meta.answer_box || description,
+    80,
+    150,
+    [description, titleHint, meta.primary_keyword, ...sentences],
+  );
+  const seo_title = ensureZhRange(
+    meta.seo_title || titleHint,
+    12,
+    60,
+    [titleHint, meta.primary_keyword, '怎麼選、怎麼用一次看懂'],
+  );
+  const related_terms = ensureRelatedTerms(
+    meta.related_terms || [],
+    slug,
+    [meta.primary_keyword, titleHint, ...sentences.slice(0, 4)],
+  );
+  const faq = ensureFaq(meta.faq || [], bodyMd, meta.primary_keyword || '這項服務', description);
   return {
     ...meta,
     description,
     seo_description,
     answer_box,
+    related_terms,
+    keywords: related_terms,
+    faq,
     title: meta.title || seo_title,
     seo_title,
   };
@@ -345,7 +459,7 @@ export function normalizeWebsiteSeoMeta(input: Partial<WebsiteSeoMeta> & Record<
     public_url: input.public_url ? String(input.public_url) : (input.publicUrl ? String(input.publicUrl) : undefined),
     keywords: related.slice(0, 12),
     canonicalHint: input.canonicalHint ? String(input.canonicalHint) : `/blog/${articleSlug}`,
-  }, seoTitle);
+  }, seoTitle, '', slug);
 }
 
 export function validateWebsitePayload(params: {

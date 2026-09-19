@@ -23,6 +23,7 @@ import { X_TWEET_MAX_CHARS } from './x';
 import { burnPosterHeadline, POSTER_NO_GLYPHS_RULE } from './poster-text';
 import {
   websiteCta, websiteCtaRule, websiteAuthor, normalizeWebsiteSeoMeta,
+  ensureWebsiteSeoMetaLengths,
   applyWebsiteArticleMigration, isMissingWebsiteArticleSchema,
   type WebsiteSeoMeta,
 } from './website-articles';
@@ -1127,8 +1128,9 @@ export async function generateSeoArticle(
   });
   article.body = normalizeMultilineText(article.body);
   article.cta = cta;
-  const related = article.related_terms?.length ? article.related_terms : seed?.relatedTerms ?? [];
-  const seoMeta = normalizeWebsiteSeoMeta({
+  const relatedRaw = article.related_terms?.length ? article.related_terms : [];
+  const related = [...relatedRaw, ...(seed?.relatedTerms ?? [])];
+  const seoMeta = ensureWebsiteSeoMetaLengths(normalizeWebsiteSeoMeta({
     ...(article.seoMeta ?? {}),
     slug: article.seoMeta?.slug,
     title: article.seoMeta?.seo_title || article.seoMeta?.title || article.title,
@@ -1145,13 +1147,13 @@ export async function generateSeoArticle(
     author: websiteAuthor(slug),
     market_signal_id: params.marketSignalId ?? null,
     keywords: related,
-  }, slug);
+  }, slug), article.title, article.body, slug);
   return {
     title: article.title,
     description: seoMeta.description || article.description || '',
     body: article.body,
     outline: article.outline ?? [],
-    faq: article.faq ?? [],
+    faq: seoMeta.faq ?? [],
     cta,
     answer_box: seoMeta.answer_box,
     related_terms: seoMeta.related_terms,

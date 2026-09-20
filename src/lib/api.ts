@@ -313,6 +313,21 @@ export const api = {
   marketSignals: (slug: string) =>
     request<{ signals: import('@/types').MarketSignal[] }>(`/api/brands/${slug}/market-signals`),
 
+  refreshMarketSignals: (slug: string) =>
+    request<{ inserted: number; message: string }>(`/api/brands/${slug}/market-signals`, { method: 'POST' }),
+
+  globeConfig: () =>
+    request<{ cesiumIonToken: string; hasCesium: boolean; provider: string }>('/api/geo/globe-config'),
+
+  nearbyPlaces: (lat: number, lng: number) =>
+    request<{
+      pois: import('@/types').NearbyPoi[];
+      source: string;
+      radiusM: number;
+      disclaimer: string;
+      error?: string;
+    }>(`/api/geo/nearby?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`),
+
   campaigns: (slug: string) =>
     request<{ campaigns: import('@/types').Campaign[] }>(`/api/brands/${slug}/campaigns`),
 
@@ -333,6 +348,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body ?? {}),
     }),
+
+  seoReport: (slug: string) =>
+    request<import('@/types').SeoReportPayload>(`/api/brands/${slug}/seo`),
+
+  runSeoAudit: (slug: string) =>
+    request<import('@/types').SeoReportPayload>(`/api/brands/${slug}/seo`, { method: 'POST' }),
 
   reviewContent: (contentId: string, body: { action: string; comment?: string; contentVersionId?: string }) =>
     request<{ ok: boolean; status: string }>(`/api/contents/${contentId}/review`, {
@@ -404,7 +425,14 @@ export const api = {
       marketSignals: import('@/types').MarketSignal[];
       recentActivity: import('@/types').ActivityLog[];
       actionLabels: Record<string, string>;
-      brandStats: { brandId: string; activeCampaigns: number; pendingContents: number }[];
+      brandStats: {
+        brandId: string;
+        activeCampaigns: number;
+        pendingContents: number;
+        seoScore: number | null;
+        seoAuditedAt: string | null;
+        seoP0: number;
+      }[];
     }>('/api/dashboard'),
 
   proposals: () =>
@@ -1104,6 +1132,26 @@ export const api = {
         appliesToThisBrand: boolean;
       };
     }>(`/api/brands/${slug}/network/status`),
+
+  brandPlaces: (slug: string) =>
+    request<{
+      places: import('@/types').BrandPlace[];
+      disclaimer: string;
+      fallback?: boolean;
+    }>(`/api/brands/${slug}/places`),
+
+  createBrandPlace: (slug: string, body: {
+    kind?: import('@/types').BrandPlaceKind;
+    name: string;
+    address?: string;
+    lat?: number;
+    lng?: number;
+    note?: string;
+  }) =>
+    request<{ place: import('@/types').BrandPlace }>(`/api/brands/${slug}/places`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };
 
 // -- 活動報名(公開端,無需登入) ----------------------------------------------

@@ -26,7 +26,9 @@ const groups: MenuGroup[] = [
       { label: '品牌智慧', path: '/intelligence', brandScoped: true },
       { label: '品牌客服資料庫', path: '/help', brandScoped: true },
       { label: '人脈資料庫', path: '/network', brandScoped: true },
+      { label: '場域地圖', path: '/geo', brandScoped: true },
       { label: '市場情報', path: '/market', brandScoped: true },
+      { label: '官網 SEO', path: '/seo', brandScoped: true },
       { label: '即時熱門', path: '/trending' },
     ],
   },
@@ -158,7 +160,7 @@ export function Sidebar() {
               <Avatar label={user.displayName} color="var(--color-secondary)" size={36} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{user.displayName}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>上帝視角 · {user.role}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{user.role}</div>
               </div>
             </div>
             <Button

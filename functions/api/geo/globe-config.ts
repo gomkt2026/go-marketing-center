@@ -1,0 +1,16 @@
+import type { PagesFunction } from '@cloudflare/workers-types';
+import type { Env } from '../../_shared/env';
+import { requireAuth } from '../../_shared/auth';
+import { json } from '../../_shared/response';
+
+export const onRequestGet: PagesFunction<Env> = async (context) => {
+  const auth = await requireAuth(context.request, context.env);
+  if (auth instanceof Response) return auth;
+
+  const token = context.env.CESIUM_ION_TOKEN?.trim() || '';
+  return json({
+    cesiumIonToken: token,
+    hasCesium: Boolean(token),
+    provider: token ? 'cesium-ion' : 'openstreetmap',
+  });
+};

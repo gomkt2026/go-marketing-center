@@ -84,23 +84,34 @@ export function Dashboard() {
           {(data.brands.length ? data.brands : brands).map((b) => {
             const stats = data.brandStats.find((s) => s.brandId === b.id);
             return (
-              <Link
+              <div
                 key={b.id}
-                to={`/${b.slug}/workspace`}
                 style={{
-                  border: '1px solid var(--color-border)', borderRadius: 12, padding: 14, textDecoration: 'none',
-                  color: 'var(--color-text)', display: 'block',
+                  border: '1px solid var(--color-border)', borderRadius: 12, padding: 14,
+                  color: 'var(--color-text)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <BrandMark brand={b} size={22} />
-                  <strong style={{ fontSize: 14 }}>{b.name}</strong>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'flex', gap: 12 }}>
+                <Link to={`/${b.slug}/workspace`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <BrandMark brand={b} size={22} />
+                    <strong style={{ fontSize: 14 }}>{b.name}</strong>
+                  </div>
+                </Link>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <span>進行中活動 {stats?.activeCampaigns ?? 0}</span>
                   <span>待審閱 {stats?.pendingContents ?? 0}</span>
+                  <span>
+                    SEO {stats?.seoScore != null ? `${stats.seoScore} 分` : '尚未健檢'}
+                    {stats?.seoP0 ? ` · P0 ${stats.seoP0}` : ''}
+                  </span>
                 </div>
-              </Link>
+                <Link
+                  to={`/${b.slug}/seo`}
+                  style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 700, color: 'var(--color-primary-dark)', textDecoration: 'none' }}
+                >
+                  看 SEO 報告 →
+                </Link>
+              </div>
             );
           })}
         </div>

@@ -6,13 +6,14 @@ import { getBrandsForUser } from '../_shared/queries';
 import { rowsToCamel } from '../_shared/case';
 import { json } from '../_shared/response';
 import { ACTION_LABELS } from '../_shared/activity';
+import { latestSeoAuditsByBrand } from '../_shared/seo-audit';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
 
   const sql = getSql(context.env);
-  const [brands, pendingProposals, pendingContents, marketSignals, activityRows, campaignStats] = await Promise.all([
+  const [brands, pendingProposals, pendingContents, marketSignals, activityRows, campaignStats, seoAudits] = await Promise.all([
     getBrandsForUser(context.env, auth),
     sql`SELECT id, title, brand_id, collaboration_id, status FROM proposals WHERE status = 'pending_decision' ORDER BY created_at DESC`,
     sql`SELECT id, title, brand_id, status, target_platform FROM contents WHERE status = 'pending_review' ORDER BY updated_at DESC`,
@@ -25,6 +26,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       WHERE c.status = 'active'
       GROUP BY cb.brand_id
     `,
+    latestSeoAuditsByBrand(context.env).catch(() => []),
   ]);
 
   const activeByBrand = (campaignStats as { brand_id: string; active_count: number }[]).reduce<Record<string, number>>(
@@ -43,6 +45,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const scoped = <T extends { brandId?: string }>(rows: T[]) =>
     (isSuperAdmin(auth) ? rows : rows.filter((r) => r.brandId && allowed.has(r.brandId)));
 
+  const seoByBrand = Object.fromEntries(
+    seoAudits.map((audit) => [audit.brandId, audit]),
+  );
+
   return json({
     brands,
     pendingProposals: scoped(rowsToCamel(pendingProposals as Record<string, unknown>[]) as { brandId?: string }[]),
@@ -50,10 +56,17 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     marketSignals: scoped(rowsToCamel(marketSignals as Record<string, unknown>[]) as { brandId?: string }[]),
     recentActivity: scoped(rowsToCamel(activityRows as Record<string, unknown>[]) as { brandId?: string }[]),
     actionLabels: ACTION_LABELS,
-    brandStats: brands.map((b) => ({
-      brandId: b.id,
-      activeCampaigns: activeByBrand[b.id] ?? 0,
-      pendingContents: pendingByBrand[b.id] ?? 0,
-    })),
+    brandStats: brands.map((b) => {
+      const seo = seoByBrand[b.id];
+      const p0 = Array.isArray(seo?.findings) ? seo.findings.filter((f) => f.priority === 'P0').length : 0;
+      return {
+        brandId: b.id,
+        activeCampaigns: activeByBrand[b.id] ?? 0,
+        pendingContents: pendingByBrand[b.id] ?? 0,
+        seoScore: seo?.healthScore ?? null,
+        seoAuditedAt: seo?.createdAt ?? null,
+        seoP0: p0,
+      };
+    }),
   });
 };

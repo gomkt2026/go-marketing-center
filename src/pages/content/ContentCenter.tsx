@@ -228,9 +228,14 @@ export function ContentCenter() {
         title={`${brand.name} 內容中心`}
         subtitle="所有內容必須人工審閱:批准、修改、退回、重新生成、延期、否決"
         actions={
-          <Button variant="primary" disabled={seoGenerating} onClick={() => void generateSeo()}>
-            {seoGenerating ? '⏳ 產生官網長文中...' : '產生官網長文'}
-          </Button>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button variant="primary" disabled={seoGenerating} onClick={() => void generateSeo()}>
+              {seoGenerating ? '⏳ 產生官網長文中...' : '產生官網長文'}
+            </Button>
+            <Link to={`/${brand.slug}/seo`} style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary-dark)', textDecoration: 'none' }}>
+              官網 SEO 報告 →
+            </Link>
+          </div>
         }
       />
 
@@ -423,6 +428,30 @@ export function ContentCenter() {
                             <strong>{f.question || f.q}</strong>
                             <div style={{ color: 'var(--color-text-muted)' }}>{f.answer || f.a}</div>
                           </div>
+                        ))}
+                      </div>
+                    )}
+                    {!!latestVersion(selected).seoMeta?.schema_recommendation?.length && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 4 }}>建議 JSON-LD</div>
+                        <p style={{ fontSize: 12.5 }}>{latestVersion(selected).seoMeta?.schema_recommendation?.join('、')}</p>
+                      </div>
+                    )}
+                    {!!latestVersion(selected).seoMeta?.internal_links?.length && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 4 }}>建議內部連結</div>
+                        {latestVersion(selected).seoMeta?.internal_links?.map((link) => (
+                          <div key={`${link.anchor}-${link.href}`} style={{ fontSize: 12.5 }}>
+                            {link.anchor} → {link.href}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {!!latestVersion(selected).seoMeta?.editorial_qa?.length && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 4 }}>發布前核對</div>
+                        {latestVersion(selected).seoMeta?.editorial_qa?.map((item) => (
+                          <div key={item} style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>▪ {item}</div>
                         ))}
                       </div>
                     )}

@@ -1053,6 +1053,27 @@ CREATE TABLE network_match_logs (
 CREATE INDEX idx_network_match_logs_brand ON network_match_logs(brand_id, created_at DESC);
 
 -- ============================================================================
+-- 官網 SEO 健檢（顧問模式報告，唯讀爬公開頁）
+-- ============================================================================
+
+CREATE TABLE seo_audits (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id          UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  site_url          TEXT NOT NULL,
+  health_score      INTEGER NOT NULL,
+  summary           TEXT NOT NULL DEFAULT '',
+  beginner_report   TEXT NOT NULL DEFAULT '',
+  pages             JSONB NOT NULL DEFAULT '[]',
+  findings          JSONB NOT NULL DEFAULT '[]',
+  content_gaps      JSONB NOT NULL DEFAULT '[]',
+  recommendations   JSONB NOT NULL DEFAULT '[]',
+  score_breakdown   JSONB NOT NULL DEFAULT '{}',
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT seo_audits_score_check CHECK (health_score BETWEEN 0 AND 100)
+);
+CREATE INDEX idx_seo_audits_brand ON seo_audits(brand_id, created_at DESC);
+
+-- ============================================================================
 -- 結尾:agent_roles 種子(角色本身不含品牌別,實際 Agent 於 seed.sql 建立)
 -- ============================================================================
 

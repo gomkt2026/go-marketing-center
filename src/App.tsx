@@ -40,6 +40,8 @@ import { PrivacyPolicy } from '@/pages/public/PrivacyPolicy';
 import { BrandCsKnowledge } from '@/pages/help/BrandCsKnowledge';
 import { BrandNetwork } from '@/pages/network/BrandNetwork';
 import { BrandEditorDesk } from '@/pages/editor/BrandEditorDesk';
+import { BrandGeo } from '@/pages/geo/BrandGeo';
+import { BrandSeo } from '@/pages/seo/BrandSeo';
 
 export default function App() {
   return (
@@ -77,6 +79,8 @@ export default function App() {
                         <Route path="/:brand/intelligence" element={<BrandIntelligence />} />
                         <Route path="/:brand/help" element={<BrandCsKnowledge />} />
                         <Route path="/:brand/network" element={<BrandNetwork />} />
+                        <Route path="/:brand/geo" element={<BrandGeo />} />
+                        <Route path="/:brand/seo" element={<BrandSeo />} />
                         <Route path="/:brand/market" element={<MarketIntelligence />} />
                         <Route path="/:brand/campaigns" element={<Campaigns />} />
                         <Route path="/:brand/events" element={<EventList />} />

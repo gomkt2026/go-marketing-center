@@ -34,6 +34,9 @@ export interface WebsiteSeoMeta {
   public_url?: string;
   keywords?: string[];
   canonicalHint?: string;
+  schema_recommendation?: string[];
+  internal_links?: { anchor: string; href: string }[];
+  editorial_qa?: string[];
 }
 
 export interface WebsiteArticlePayload {
@@ -459,6 +462,18 @@ export function normalizeWebsiteSeoMeta(input: Partial<WebsiteSeoMeta> & Record<
     public_url: input.public_url ? String(input.public_url) : (input.publicUrl ? String(input.publicUrl) : undefined),
     keywords: related.slice(0, 12),
     canonicalHint: input.canonicalHint ? String(input.canonicalHint) : `/blog/${articleSlug}`,
+    schema_recommendation: Array.isArray(input.schema_recommendation)
+      ? input.schema_recommendation.map((t) => String(t)).slice(0, 6)
+      : ['Article', 'FAQPage'],
+    internal_links: Array.isArray(input.internal_links)
+      ? (input.internal_links as { anchor?: string; href?: string }[])
+        .map((l) => ({ anchor: String(l.anchor || '').trim(), href: String(l.href || '').trim() }))
+        .filter((l) => l.anchor && l.href)
+        .slice(0, 6)
+      : undefined,
+    editorial_qa: Array.isArray(input.editorial_qa)
+      ? input.editorial_qa.map((t) => String(t)).filter(Boolean).slice(0, 8)
+      : undefined,
   }, seoTitle, '', slug);
 }
 

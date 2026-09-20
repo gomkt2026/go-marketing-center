@@ -1064,6 +1064,7 @@ export interface SeoArticleResult {
 
 interface SeoArticleLlmShape extends Omit<SeoArticleResult, 'seoMeta'> {
   seoMeta?: Partial<WebsiteSeoMeta> & { keywords?: string[]; title?: string; description?: string; slug?: string };
+  editorial_qa?: string[];
 }
 
 /** 從主題、簡報事實、已核准報導或定稿新聞稿寫官網 SEO 長文;GEO 順序固定 */
@@ -1091,15 +1092,21 @@ export async function generateSeoArticle(
         content: [
           params.brandCtx.systemPrompt,
           '',
-          '你現在要寫一篇給官網/部落格的原創 SEO 長文,不是社群貼文,也不是 Threads / IG 短文拉長。',
+          '你現在要寫一篇給官網/部落格的原創 SEO／AEO 長文,不是社群貼文,也不是 Threads / IG 短文拉長。',
           '必須改寫,不可整段複製媒體原文或新聞稿。引用媒體時只帶出處 + 一句事實 + 原文 URL。',
           '不可發明媒體名稱、專訪、轉載數量、客戶數、營收或未經驗證的數據。',
           '簡報或後台示意數字(例如每日 1,250 單)是畫面示範,不得當成真實業績。',
           '繁體中文(台灣用語),正文 800 到 1800 字(不含答案區與 FAQ),至少 3 個 H2。',
           '語氣專業但不生硬。開頭不要故事、不要先打廣告。',
-          '固定順序:1) answer_box 先直接回答主關鍵字(一句定義+三點結論,80-150字,整段可被 AI 摘走) 2) 接下來 2-3 段把 related_terms 寫進真實場景 3) H2/H3 展開 4) FAQ 3-5 題 5) 最後才品牌 CTA。',
+          '寫作原則(Open SEO Advisor 文章寫手模式):',
+          '1. 先對準搜尋意圖,為讀者要完成的任務而寫,不為字數灌水。',
+          '2. 展示 E-E-A-T:用真實產品能力與可核實流程,不寫假案例、假數據、假得獎。',
+          '3. Trust 優先。不確定就不要寫成事實。YMYL(租屋契約、請款、金流)只寫產品怎麼協助,不給法律結論。',
+          '4. 避免空泛開場、重複段落、關鍵字堆砌、可套用任何產業的建議。',
+          '5. 全文一個 H1;H2/H3 對應子問題。結構化資料只能標記頁面上讀者看得到的內容。',
+          '固定順序:1) answer_box 先直接回答主關鍵字(一句定義+三點結論,80-150字,整段可被 AI 摘走) 2) 接下來 2-3 段把 related_terms 寫進真實場景 3) H2/H3 展開,適時用步驟或對照表 4) FAQ 3-5 題 5) 最後才品牌 CTA。',
           '主關鍵字寫進 seo_title、seo_description、answer_box、一個 H2。相關詞自然出現,不要堆標題。',
-          'FAQ 問句接近搜尋原話,答案 2-4 句、可獨立被摘。禁止「歡迎詢問」「視情況而定」。',
+          'FAQ 問句接近搜尋原話,答案 2-4 句、可獨立被摘。禁止「歡迎詢問」「視情況而定」。Google 已不再用 FAQ rich result,FAQ 仍要寫成讀者可見內容。',
           'slug 只用小寫英文、數字、連字號,反映主關鍵字語意,不用中文、不用日期。',
           websiteCtaRule(slug, audience),
           `結尾 CTA 必須寫成:${cta}`,
@@ -1119,7 +1126,7 @@ export async function generateSeoArticle(
           audience ? `受眾:${audience}` : '',
           params.extraInstruction ?? '',
           '',
-          '回傳 JSON:{"title":"12-60字 H1","description":"40-160字列表摘要不含空白至少40字","body":"800-1800字 markdown 正文,至少3個H2,不含答案區與FAQ","outline":["H2"],"answer_box":"80-150字","primary_keyword":"恰好1個","related_terms":["相關詞"],"search_intent":"informational或solution","category":"pain|product|policy|trust|talk","audience":"consumer或merchant","faq":[{"question":"","answer":""}],"cta":"文末行動","seoMeta":{"slug":"english-slug","seo_title":"含主關鍵字","seo_description":"70-160字 meta 摘要,不可少於70字"}}',
+          '回傳 JSON:{"title":"12-60字 H1","description":"40-160字列表摘要不含空白至少40字","body":"800-1800字 markdown 正文,至少3個H2,不含答案區與FAQ","outline":["H2"],"answer_box":"80-150字","primary_keyword":"恰好1個","related_terms":["相關詞"],"search_intent":"informational或solution","category":"pain|product|policy|trust|talk","audience":"consumer或merchant","faq":[{"question":"","answer":""}],"cta":"文末行動","editorial_qa":["需人工核實的點"],"seoMeta":{"slug":"english-slug","seo_title":"含主關鍵字","seo_description":"70-160字 meta 摘要,不可少於70字","schema_recommendation":["Article","FAQPage"]}}',
         ].filter(Boolean).join('\n'),
       },
     ],
@@ -1147,6 +1154,13 @@ export async function generateSeoArticle(
     author: websiteAuthor(slug),
     market_signal_id: params.marketSignalId ?? null,
     keywords: related,
+    schema_recommendation: article.seoMeta?.schema_recommendation?.length
+      ? article.seoMeta.schema_recommendation
+      : ['Article', 'FAQPage'],
+    internal_links: suggestSeoInternalLinks(slug, seed?.topic || params.sourceTitle),
+    editorial_qa: article.editorial_qa?.length
+      ? article.editorial_qa
+      : ['核實文中產品步驟是否與現況一致', '確認沒有發明客戶數、滿意度或保證效果'],
   }, slug), article.title, article.body, slug);
   return {
     title: article.title,
@@ -1171,6 +1185,26 @@ export function pickSeoTopic(slug: string, usedTitles: string[] = []): SeoTopicS
   const unused = bank.filter((item) => !used.has(item.topic.replace(/\s+/g, '')));
   const pool = unused.length ? unused : bank;
   return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function seoTopicSlug(text: string): string {
+  const ascii = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40);
+  return ascii || 'guide';
+}
+
+export function suggestSeoInternalLinks(slug: string, currentTopic: string): { anchor: string; href: string }[] {
+  const current = currentTopic.replace(/\s+/g, '');
+  return (SEO_TOPIC_BANK[slug] ?? [])
+    .filter((item) => item.topic.replace(/\s+/g, '') !== current)
+    .slice(0, 4)
+    .map((item) => ({
+      anchor: item.primaryKeyword || item.topic,
+      href: `/blog/${seoTopicSlug(item.primaryKeyword || item.topic)}`,
+    }));
 }
 
 export async function saveSeoArticle(

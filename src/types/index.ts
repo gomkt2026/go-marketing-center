@@ -432,6 +432,9 @@ export interface ContentVersion {
     audience?: 'consumer' | 'merchant';
     answer_box?: string;
     faq?: { question?: string; answer?: string; q?: string; a?: string }[];
+    editorial_qa?: string[];
+    schema_recommendation?: string[];
+    internal_links?: { anchor?: string; href?: string }[];
     public_url?: string;
     tags?: string[];
     author?: string;
@@ -1082,6 +1085,45 @@ export interface PodcastGuest {
 export type NetworkContactSource = 'event' | 'business_card' | 'line_chat' | 'manual' | 'csv';
 export type NetworkContactStatus = 'pending_review' | 'verified' | 'archived';
 
+export type BrandPlaceKind = 'property' | 'site' | 'store' | 'event' | 'contact';
+
+export interface BrandPlace {
+  id: string;
+  brandId: string;
+  kind: BrandPlaceKind;
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  externalRef: string | null;
+  source: string;
+  note: string | null;
+  meta: Record<string, unknown>;
+  geocodeStatus: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type NearbyKind =
+  | 'convenience'
+  | 'bus'
+  | 'transit'
+  | 'landmark'
+  | 'school'
+  | 'health'
+  | 'park'
+  | 'daily';
+
+export interface NearbyPoi {
+  id: string;
+  kind: NearbyKind;
+  name: string;
+  lat: number;
+  lng: number;
+  distanceM: number;
+  extra?: string;
+}
+
 export interface NetworkContact {
   id: string;
   brandId: string;
@@ -1195,4 +1237,97 @@ export interface EditorDeskPayload {
   firstMessage: string;
   voiceEnabled: boolean;
   convaiConfigured: boolean;
+}
+
+export type SeoPriority = 'P0' | 'P1' | 'P2' | 'P3';
+export type SeoFindingCategory =
+  | 'indexability'
+  | 'on_page'
+  | 'content'
+  | 'structured_data'
+  | 'aeo'
+  | 'trust'
+  | 'internal_linking';
+
+export interface SeoPageSnapshot {
+  url: string;
+  status: number | null;
+  finalUrl: string | null;
+  title: string | null;
+  titleLength: number;
+  metaDescription: string | null;
+  metaLength: number;
+  h1: string[];
+  canonical: string | null;
+  robotsMeta: string | null;
+  ogTitle: string | null;
+  ogImage: string | null;
+  jsonLdTypes: string[];
+  wordCount: number;
+  hasNoindex: boolean;
+  error?: string;
+}
+
+export interface SeoFinding {
+  id: string;
+  category: SeoFindingCategory;
+  priority: SeoPriority;
+  title: string;
+  impact: string;
+  evidence: string;
+  recommendation: string;
+  url?: string;
+  contentTopic?: string;
+}
+
+export interface SeoContentGap {
+  topic: string;
+  angle: string;
+  primaryKeyword?: string;
+  relatedTerms?: string[];
+  category?: 'pain' | 'product' | 'policy' | 'trust' | 'talk';
+  searchIntent?: 'informational' | 'solution';
+  audience?: 'consumer' | 'merchant';
+  reason: string;
+  priority: SeoPriority;
+}
+
+export interface SeoRecommendation {
+  title: string;
+  detail: string;
+  owner: 'engineering' | 'content' | 'brand';
+  priority: SeoPriority;
+}
+
+export interface SeoAudit {
+  id: string;
+  brandId: string;
+  siteUrl: string;
+  healthScore: number;
+  summary: string;
+  beginnerReport: string;
+  pages: SeoPageSnapshot[];
+  findings: SeoFinding[];
+  contentGaps: SeoContentGap[];
+  recommendations: SeoRecommendation[];
+  scoreBreakdown: Record<string, number>;
+  createdAt: string;
+}
+
+export interface SeoTopic {
+  topic: string;
+  angle: string;
+  primaryKeyword?: string;
+  relatedTerms?: string[];
+  category?: string;
+  searchIntent?: string;
+  audience?: string;
+}
+
+export interface SeoReportPayload {
+  siteUrl: string | null;
+  productUrl?: string | null;
+  topics: SeoTopic[];
+  audit: SeoAudit | null;
+  history: SeoAudit[];
 }

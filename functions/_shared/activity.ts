@@ -112,4 +112,5 @@ export const ACTION_LABELS: Record<string, string> = {
   'network.contact.updated': '更新人脈',
   'network.contact.imported': '匯入人脈',
   'network.card.ocr': '名片 OCR',
+  'seo.audit': '執行官網 SEO 健檢',
 };

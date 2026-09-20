@@ -1583,6 +1583,10 @@ export const SEO_TOPIC_BANK: Record<string, SeoTopicSeed[]> = {
     },
     { topic: '包租代管系統怎麼選？收租對帳與報修指揮中心', angle: '對準自管房東/代管搜「包租代管」,講散落在 LINE 與 Excel 的收租報修。', primaryKeyword: '包租代管系統', relatedTerms: ['收租', '對帳', '報修', '房東', '房客', '合約', 'Excel', 'LINE 通知'], category: 'product', searchIntent: 'solution' },
     { topic: '房東報修沒下文？把修繕進度收回同一個地方', angle: '對準「房東報修」,講房客回報→案件→進度回流,不保證接案量。', primaryKeyword: '房東報修', relatedTerms: ['修繕', '進度', '房客', '照片', '派工', '紀錄', '通知', '結案'], category: 'pain', searchIntent: 'solution' },
+    { topic: '租屋合約電子簽名怎麼走？房東房客不用再跑一趟', angle: '對準「租屋合約電子簽名」。講線上看約、簽署存檔與到期提醒,不給法律效力保證。', primaryKeyword: '租屋合約電子簽名', relatedTerms: ['數位合約', 'LINE 簽約', '到期提醒', '押金', '附件', '存檔', '房東', '房客'], category: 'product', searchIntent: 'solution' },
+    { topic: '房客繳租查詢與逾期催繳,LINE 通知怎麼設才不洗版', angle: '對準「繳租查詢」「逾期催繳」。講帳單、紀錄與只通知重要事項,不保證收租率。', primaryKeyword: '繳租查詢', relatedTerms: ['逾期催繳', 'LINE 通知', '帳單', '收租紀錄', '每日摘要', '未付款', '房東', '房客'], category: 'product', searchIntent: 'informational' },
+    { topic: '入住退租點交拍照存證,之後怎麼對？', angle: '對準「點交拍照」。講入住／退租照片、狀態紀錄,避免口頭爭執。', primaryKeyword: '租屋點交', relatedTerms: ['點交照片', '退租', '押金', '損壞', '存證', 'LINE', '入住', '糾紛'], category: 'trust', searchIntent: 'solution' },
+    { topic: '自己管還是包租代管？收租報修先決定放哪', angle: '對準自管房東搜「包租代管」。對照 Excel／LINE 群與指揮中心,不貶低代管業者。', primaryKeyword: '自己管還是包租代管', relatedTerms: ['自管房東', '代管', '收租', '報修', 'Excel', 'LINE 群', '合約', '物件管理'], category: 'talk', searchIntent: 'informational' },
   ],
   taskgo: [
     {
@@ -1595,6 +1599,11 @@ export const SEO_TOPIC_BANK: Record<string, SeoTopicSeed[]> = {
     },
     { topic: '派工系統怎麼幫工程行看今天做到哪', angle: '對準「派工系統」,講白板排班與 LINE 考古。', primaryKeyword: '派工系統', relatedTerms: ['工程行', '白板', '打卡', '現場回報', '排班', 'LINE', '進度', '工地'], category: 'product', searchIntent: 'solution' },
     { topic: '工班管理：月底才知案子賠錢之前,現場要回報什麼', angle: '對準「工班管理」「現場回報」,講成本與進度。', primaryKeyword: '工班管理', relatedTerms: ['現場回報', '成本', '出勤', '請款', '施工', '打卡', '電子簽名', '月底'], category: 'pain', searchIntent: 'solution' },
+    { topic: '工地打卡系統怎麼選？定位、照片與出勤對得攏', angle: '對準「工地打卡」。講現場簽到、定位與出勤紀錄,不寫監控員工。', primaryKeyword: '工地打卡', relatedTerms: ['出勤', '定位', '施工照片', 'LINE Bot', '報工', '排班', '電子簽名', '工地'], category: 'product', searchIntent: 'solution' },
+    { topic: '施工回報要拍什麼？浮水印照片與簽名才算數', angle: '對準「施工回報」。講現場照片、簽名與之後對帳,不保證驗收通過。', primaryKeyword: '施工回報', relatedTerms: ['浮水印照片', '電子簽名', '現場', '進度', '請款', 'LINE', '工班', '紀錄'], category: 'talk', searchIntent: 'informational' },
+    { topic: '工程請款對不到現場？把打卡、回報與成本放同一處', angle: '對準「工程請款」。講月底對帳痛點與現場資料回流,不保證回款天數。', primaryKeyword: '工程請款', relatedTerms: ['對帳', '成本', '出勤', '施工回報', '電子簽名', '報表', '工班', '專案'], category: 'pain', searchIntent: 'solution' },
+    { topic: '點工怎麼找？看作品、看評價再派工留紀錄', angle: '對準「點工媒合」。講地圖找師傅與派工後用 TaskGo 留施工紀錄,不保證找得到人。', primaryKeyword: '點工媒合', relatedTerms: ['點工', '師傅', '評價', '作品', '派工', '施工紀錄', '地圖', '工種'], category: 'product', searchIntent: 'solution' },
+    { topic: '修繕從報修到請款怎麼走？場勘、報價、驗收一條龍', angle: '對準「修繕管理」。講公開報修、場勘、報價簽名、派工驗收,不發明案量。', primaryKeyword: '修繕管理', relatedTerms: ['報修', '場勘', '報價', '驗收', '請款', '漏水', '派工', '簽名'], category: 'product', searchIntent: 'informational' },
   ],
 };
 

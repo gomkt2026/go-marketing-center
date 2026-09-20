@@ -3,31 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBrand } from '@/context/BrandContext';
 import { useAuth } from '@/context/AuthContext';
-import { BRAND_SCOPED_PREFIXES } from '@/lib/constants';
-
-/** 品牌小圖標:有官方 logo 用 logo(白底 contain),沒有就退回色塊字首 */
-function BrandMark({ brand, size }: { brand: { primaryColor: string; logoInitial: string; logoUrl?: string | null; name: string }; size: number }) {
-  if (brand.logoUrl) {
-    return (
-      <div style={{
-        width: size, height: size, borderRadius: size * 0.27, background: '#fff',
-        border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-      }}
-      >
-        <img src={brand.logoUrl} alt={brand.name} style={{ maxWidth: '86%', maxHeight: '86%', objectFit: 'contain' }} />
-      </div>
-    );
-  }
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: size * 0.27, background: brand.primaryColor,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: size * 0.5,
-    }}
-    >
-      {brand.logoInitial}
-    </div>
-  );
-}
+import { BrandMark } from '@/components/brand/BrandMark';
+import { BRAND_SCOPED_PREFIXES, RESERVED_APP_PATHS } from '@/lib/constants';
 
 export function BrandSwitcher() {
   const { currentBrand, brands, setBrandBySlug, isAllBrands } = useBrand();
@@ -50,15 +27,18 @@ export function BrandSwitcher() {
     setBrandBySlug(slug);
     setOpen(false);
     const parts = location.pathname.split('/').filter(Boolean);
-    const rest = parts.length > 1 ? parts.slice(1).join('/') : '';
-    const isScoped = rest && BRAND_SCOPED_PREFIXES.includes(rest.split('/')[0]);
+    const page = parts[1];
+    const onBrandSubpage = Boolean(
+      parts[0]
+      && brands.some((b) => b.slug === parts[0])
+      && page
+      && (BRAND_SCOPED_PREFIXES.includes(page) || !RESERVED_APP_PATHS.has(page)),
+    );
     if (slug) {
-      if (isScoped) {
-        // 品牌 scoped 頁面:切到同頁的新品牌路徑(去掉詳情 id,只保留第一層)
-        navigate(`/${slug}/${rest.split('/')[0]}`);
+      if (onBrandSubpage) {
+        navigate(`/${slug}/${page}`);
       }
-    } else if (isScoped) {
-      // 切到「全部品牌」時,品牌 scoped 頁面無對應檢視,導回總覽
+    } else if (onBrandSubpage) {
       navigate('/');
     }
   }

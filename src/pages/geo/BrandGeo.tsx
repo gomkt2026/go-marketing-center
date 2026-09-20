@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -48,6 +48,12 @@ export function BrandGeo() {
     () => (slug ? api.brandPlaces(slug) : Promise.reject(new Error('no slug'))),
     [slug],
   );
+
+  useEffect(() => {
+    setSelectedId(null);
+    setNotice('');
+    setForm({ name: '', address: '', lat: '', lng: '', kind: defaultKind(slug) });
+  }, [slug]);
 
   const places = query.data?.places ?? [];
   const selected = useMemo(
@@ -165,6 +171,7 @@ export function BrandGeo() {
         <Card delay={0} style={{ padding: 0, overflow: 'hidden', minHeight: 720 }}>
           {selected?.lat != null && selected?.lng != null ? (
             <PlaceGlobe
+              key={slug}
               lat={mapLat}
               lng={mapLng}
               place={{

@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -7,7 +7,12 @@ import { Button } from '@/components/ui/Button';
 import { useBrand } from '@/context/BrandContext';
 import { api, ApiError } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
-import type { SeoFinding, SeoPriority, SeoFindingCategory } from '@/types';
+import {
+  buildSeoDeveloperMarkdown,
+  downloadTextFile,
+  seoBriefFilename,
+} from '@/lib/seo-brief';
+import type { SeoFinding, SeoPriority, SeoFindingCategory, SeoAudit } from '@/types';
 
 const PRIORITY_TONE: Record<SeoPriority, BadgeTone> = {
   P0: 'danger',
@@ -68,6 +73,13 @@ export function BrandSeo() {
     [slug],
   );
 
+  useEffect(() => {
+    setNotice(null);
+    setContentId(null);
+    setRunning(false);
+    setGenerating(null);
+  }, [slug]);
+
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (query.loading) return <LoadingState />;
   if (query.error || !query.data) return <ErrorState message={query.error ?? '載入失敗'} onRetry={query.reload} />;
@@ -90,6 +102,31 @@ export function BrandSeo() {
     } finally {
       setRunning(false);
     }
+  }
+
+  function briefInput(target: { name: string; slug: string; siteUrl: string | null; productUrl?: string | null; audit: SeoAudit }) {
+    return {
+      brandName: target.name,
+      brandSlug: target.slug,
+      siteUrl: target.siteUrl,
+      productUrl: target.productUrl,
+      audit: target.audit,
+    };
+  }
+
+  function downloadCurrentMarkdown() {
+    if (!audit || !slug || !brand) return;
+    downloadTextFile(
+      seoBriefFilename(slug, audit.createdAt),
+      buildSeoDeveloperMarkdown(briefInput({
+        name: brand.name,
+        slug,
+        siteUrl: data.siteUrl,
+        productUrl: data.productUrl,
+        audit,
+      })),
+    );
+    setNotice(`已下載 ${brand.name} 優化清單 Markdown，可直接寄給官網開發者。`);
   }
 
   async function generateFromGap(topic: string) {
@@ -116,9 +153,14 @@ export function BrandSeo() {
         title={`${brand.name} 官網 SEO`}
         subtitle="顧問模式健檢技術 SEO／AEO，內容缺口可直接產官網長文。預設只分析、不改站。"
         actions={
-          <Button variant="primary" disabled={running} onClick={() => void runAudit()}>
-            {running ? '健檢中…' : audit ? '重新健檢' : '執行官網健檢'}
-          </Button>
+          <>
+            {audit && (
+              <Button variant="ghost" onClick={downloadCurrentMarkdown}>下載 Markdown</Button>
+            )}
+            <Button variant="primary" disabled={running} onClick={() => void runAudit()}>
+              {running ? '健檢中…' : audit ? '重新健檢' : '執行官網健檢'}
+            </Button>
+          </>
         }
       />
 
@@ -206,7 +248,14 @@ export function BrandSeo() {
           </Card>
 
           <Card style={{ marginBottom: 12 }}>
-            <strong style={{ display: 'block', marginBottom: 10 }}>優化待辦</strong>
+            <div className="card-row" style={{ alignItems: 'center', marginBottom: 10 }}>
+              <strong>優化待辦</strong>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Button variant="ghost" style={{ fontSize: 12, padding: '4px 12px' }} onClick={downloadCurrentMarkdown}>
+                  下載 Markdown
+                </Button>
+              </div>
+            </div>
             <div style={{ display: 'grid', gap: 8 }}>
               {audit.recommendations.map((rec) => (
                 <div key={rec.title} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12 }}>

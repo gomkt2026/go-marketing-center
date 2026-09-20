@@ -75,6 +75,10 @@ export interface WebsiteDestination {
   ingestKeyEnc: string | null;
 }
 
+/** 官網 SEO 長文正文（不含答案區與 FAQ）。500 字以上即可發布。 */
+export const WEBSITE_BODY_MIN_CHARS = 500;
+export const WEBSITE_BODY_MAX_CHARS = 1800;
+
 const DEFAULT_DESTINATIONS: Record<string, { blogBaseUrl: string; ingestBaseUrl: string }> = {
   homigo: {
     blogBaseUrl: 'https://www.homigo.com.tw',
@@ -501,8 +505,8 @@ export function validateWebsitePayload(params: {
     errors.push(`answer_box 須 80–150 字（目前 ${answerLen}）`);
   }
   const bodyLen = zhCharCount(bodyMd);
-  if (bodyLen < 800) errors.push(`正文須至少 800 字（目前 ${bodyLen}）`);
-  if (bodyLen > 1800) errors.push(`正文勿超過 1800 字（目前 ${bodyLen}）`);
+  if (bodyLen < WEBSITE_BODY_MIN_CHARS) errors.push(`正文須至少 ${WEBSITE_BODY_MIN_CHARS} 字（目前 ${bodyLen}）`);
+  if (bodyLen > WEBSITE_BODY_MAX_CHARS) errors.push(`正文勿超過 ${WEBSITE_BODY_MAX_CHARS} 字（目前 ${bodyLen}）`);
   if (new TextEncoder().encode(bodyMd).length > 50 * 1024) errors.push('body_md 過長');
   if (seoMeta.faq.length < 3) errors.push('FAQ 至少 3 題');
   if (seoMeta.category === 'policy' && !seoMeta.market_signal_id) {

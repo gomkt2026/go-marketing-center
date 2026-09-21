@@ -57,8 +57,91 @@ export function isMetaTokenInvalid(message: string): boolean {
   return /Error validating access token|Session has expired|session is invalid|has been invalidated/i.test(message);
 }
 
-export const META_TOKEN_INVALID_NOTE =
-  'Facebook／Instagram 粉專權杖已失效（Error validating access token）。請到 Graph API 探索工具重新取得「粉絲專頁存取權杖」（不要用個人 User Token），延伸成長期權杖後，Facebook 與 Instagram 都貼同一把並測試連線。Threads 權杖是另一把，不受影響。';
+const SHORT_LIVED_MS = 48 * 60 * 60 * 1000;
+
+function formatTaipei(date: Date): string {
+  return date.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+}
+
+/** Graph 190 訊息裡的「Session has expired on Wednesday, 16-Sep-26 02:00:00 PDT」 */
+export function parseMetaSessionExpiry(message: string): Date | null {
+  const m = message.match(/Session has expired on ([A-Za-z]+, \d{1,2}-[A-Za-z]{3}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+)/i);
+  if (!m) return null;
+  const normalized = m[1].replace(/-(\d{2}) /, '-20$1 ');
+  const parsed = Date.parse(normalized);
+  return Number.isNaN(parsed) ? null : new Date(parsed);
+}
+
+export function metaTokenInvalidNote(expiredAt?: Date | null): string {
+  const when = expiredAt
+    ? `資料庫這把權杖已於 ${formatTaipei(expiredAt)}（台北）到期。`
+    : '資料庫這把 Facebook／Instagram 權杖已失效。';
+  return `${when}Graph API 探索工具裡剛延伸過的是「另一把」字串，後台不會自動替換。請把延伸後的粉絲專頁存取權杖重新貼到 Facebook 與 Instagram、儲存後再測連線。Threads 權杖是另一把，不受影響。`;
+}
+
+export const META_TOKEN_INVALID_NOTE = metaTokenInvalidNote(null);
+
+export function metaTokenInvalidNoteFromMessage(message: string): string {
+  return metaTokenInvalidNote(parseMetaSessionExpiry(message));
+}
+
+const META_SHORT_LIVED_NOTE =
+  '這把是短效權杖（Graph API 探索工具剛產生的通常 1–2 小時就到期）。請先到「存取權杖偵錯」按「延伸存取權杖」，把延伸後的那一把重新貼到 Facebook 與 Instagram 再測。只在 Explorer 測通、沒重新貼進後台，晚上發文仍會 190。';
+
+export interface MetaTokenInspection {
+  valid: boolean;
+  type: string | null;
+  expiresAt: Date | null;
+  neverExpires: boolean;
+  shortLived: boolean;
+  appId: string | null;
+  errorMessage: string | null;
+}
+
+/** 用 debug_token 自查效期；過期權杖會回 190，從訊息抽出到期時間 */
+export async function inspectMetaAccessToken(token: string): Promise<MetaTokenInspection> {
+  const url = `${GRAPH_API}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(token)}`;
+  try {
+    const res = await fetch(url);
+    const body = await res.json().catch(() => ({})) as {
+      data?: {
+        is_valid?: boolean; type?: string; expires_at?: number; app_id?: string;
+        error?: { message?: string };
+      };
+      error?: { message?: string };
+    };
+    const msg = body.error?.message ?? body.data?.error?.message ?? null;
+    if (!res.ok || body.error) {
+      return {
+        valid: false,
+        type: null,
+        expiresAt: msg ? parseMetaSessionExpiry(msg) : null,
+        neverExpires: false,
+        shortLived: false,
+        appId: null,
+        errorMessage: msg,
+      };
+    }
+    const exp = body.data?.expires_at ?? 0;
+    const neverExpires = exp === 0;
+    const expiresAt = neverExpires ? null : new Date(exp * 1000);
+    const shortLived = !neverExpires && !!expiresAt && (expiresAt.getTime() - Date.now()) < SHORT_LIVED_MS;
+    return {
+      valid: body.data?.is_valid !== false,
+      type: body.data?.type ?? null,
+      expiresAt,
+      neverExpires,
+      shortLived,
+      appId: body.data?.app_id ?? null,
+      errorMessage: null,
+    };
+  } catch (e) {
+    return {
+      valid: false, type: null, expiresAt: null, neverExpires: false, shortLived: false, appId: null,
+      errorMessage: e instanceof Error ? e.message : 'debug_token 失敗',
+    };
+  }
+}
 
 function formatGraphApiError(status: number, body: string): string {
   try {
@@ -68,7 +151,7 @@ function formatGraphApiError(status: number, body: string): string {
     const e = parsed.error;
     if (e) {
       const msg = e.error_user_msg || e.message || body;
-      const hint = isMetaTokenInvalid(msg) ? ` ${META_TOKEN_INVALID_NOTE}` : '';
+      const hint = isMetaTokenInvalid(msg) ? ` ${metaTokenInvalidNoteFromMessage(msg)}` : '';
       return `${status}${e.code != null ? `/${e.code}` : ''}: ${msg}${hint}`;
     }
   } catch { /* 不是 JSON */ }
@@ -88,17 +171,48 @@ async function graphPost(url: string, params: Record<string, string>): Promise<R
   return await res.json() as Record<string, unknown>;
 }
 
-/** 確認粉專／IG 權杖還能讀到目標帳號（比只打 /me 準，User Token 過期或錯粉專會在這裡現形） */
+export interface MetaProbeResult {
+  ok: boolean;
+  detail: string;
+  fetchedId: string | null;
+  expiresAt: string | null;
+  neverExpires: boolean;
+}
+
+/** 確認粉專／IG 權杖還能讀到目標帳號，並拒絕短效 Explorer token（避免測通後幾小時就 190） */
 export async function probeMetaPublishAccess(
   token: string,
   platform: 'facebook' | 'instagram',
   externalId: string | null,
-): Promise<{ ok: boolean; detail: string; fetchedId: string | null }> {
+): Promise<MetaProbeResult> {
+  const inspection = await inspectMetaAccessToken(token);
+  const expiresAt = inspection.expiresAt?.toISOString() ?? null;
+  if (!inspection.valid) {
+    const msg = inspection.errorMessage ?? '';
+    return {
+      ok: false,
+      detail: isMetaTokenInvalid(msg) ? metaTokenInvalidNote(inspection.expiresAt) : `平台回應錯誤:${msg || '權杖無效'}`,
+      fetchedId: null,
+      expiresAt,
+      neverExpires: false,
+    };
+  }
+  if (inspection.shortLived) {
+    const until = inspection.expiresAt ? formatTaipei(inspection.expiresAt) : '數小時內';
+    return {
+      ok: false,
+      detail: `${META_SHORT_LIVED_NOTE}目前效期至 ${until}。`,
+      fetchedId: null,
+      expiresAt,
+      neverExpires: false,
+    };
+  }
+
   const id = externalId?.trim();
   const url = platform === 'instagram' && id
     ? `${GRAPH_API}/${encodeURIComponent(id)}?fields=id,username&access_token=${encodeURIComponent(token)}`
     : id
-      ? `${GRAPH_API}/${encodeURIComponent(id)}?fields=id,name,access_token&access_token=${encodeURIComponent(token)}`
+      ? `${GRAPH_API}/${encodeURIComponent(id)}?fields=id,name&access_token=${encodeURIComponent(token)}`
       : `${GRAPH_API}/me?fields=id,name&access_token=${encodeURIComponent(token)}`;
   try {
     const res = await fetch(url);
@@ -109,21 +223,36 @@ export async function probeMetaPublishAccess(
       const msg = data.error?.message ?? res.statusText;
       return {
         ok: false,
-        detail: isMetaTokenInvalid(msg) ? META_TOKEN_INVALID_NOTE : `平台回應錯誤:${msg}`,
+        detail: isMetaTokenInvalid(msg) ? metaTokenInvalidNote(parseMetaSessionExpiry(msg)) : `平台回應錯誤:${msg}`,
         fetchedId: null,
+        expiresAt,
+        neverExpires: inspection.neverExpires,
       };
     }
     const label = data.name ?? data.username ?? data.id;
     if (platform === 'facebook' && !id) {
       return {
         ok: false,
-        detail: `權杖有效,但沒有填粉專 Page ID。目前 /me 是「${label}」,請填 TaskGo 粉專 ID 再測一次,不要留空。`,
+        detail: `權杖有效,但沒有填粉專 Page ID。目前 /me 是「${label}」,請填這個品牌的粉專 ID 再測一次,不要留空。`,
         fetchedId: data.id ?? null,
+        expiresAt,
+        neverExpires: inspection.neverExpires,
       };
     }
-    return { ok: true, detail: `連線成功:${label}`, fetchedId: data.id ?? null };
+    const life = inspection.neverExpires
+      ? '權杖不過期'
+      : inspection.expiresAt
+        ? `效期至 ${formatTaipei(inspection.expiresAt)}`
+        : '效期已確認';
+    return { ok: true, detail: `連線成功:${label}（${life}）`, fetchedId: data.id ?? null, expiresAt, neverExpires: inspection.neverExpires };
   } catch (e) {
-    return { ok: false, detail: `連線失敗:${e instanceof Error ? e.message : '未知錯誤'}`, fetchedId: null };
+    return {
+      ok: false,
+      detail: `連線失敗:${e instanceof Error ? e.message : '未知錯誤'}`,
+      fetchedId: null,
+      expiresAt,
+      neverExpires: inspection.neverExpires,
+    };
   }
 }
 

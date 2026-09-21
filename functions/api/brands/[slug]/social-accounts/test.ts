@@ -58,6 +58,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       SET status = ${probe.ok ? 'connected' : 'error'},
           connected_at = ${probe.ok ? new Date().toISOString() : null},
           notes = ${probe.detail},
+          token_expires_at = ${probe.expiresAt},
           external_id = COALESCE(external_id, ${probe.fetchedId})
       WHERE id = ${account.id}::uuid
     `;

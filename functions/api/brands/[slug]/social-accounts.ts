@@ -6,6 +6,7 @@ import { getBrandBySlug } from '../../../_shared/queries';
 import { rowsToCamel, rowToCamel } from '../../../_shared/case';
 import { json, error } from '../../../_shared/response';
 import { encryptToken, decryptToken, maskToken } from '../../../_shared/crypto';
+import { probeMetaPublishAccess } from '../../../_shared/meta';
 import { logActivity } from '../../../_shared/activity';
 import { clampReplyDailyCap, clampReplyHourlyCap } from '../../../_shared/threads-replies';
 
@@ -83,17 +84,27 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
   let tokenExpiresAt: string | null = existing.length
     ? ((existing[0] as { token_expires_at: string | null }).token_expires_at)
     : null;
+  let notes = body.notes ?? (existing.length ? (existing[0] as { notes: string | null }).notes : null);
+  const newToken = body.accessToken?.trim() || null;
   if (body.clearToken) {
     tokenEnc = null;
     tokenExpiresAt = null;
-  } else if (body.accessToken?.trim()) {
-    tokenEnc = await encryptToken(context.env, body.accessToken.trim());
-    // 換了新 token,舊的到期時間不再有效;24 小時後排程會自動確認新 token 效期並續期
+  } else if (newToken) {
+    tokenEnc = await encryptToken(context.env, newToken);
     tokenExpiresAt = null;
   }
 
-  // 有 token 即進入手動發布模式(connected 需通過連線測試)
-  const status = tokenEnc ? 'manual' : (body.accountName?.trim() ? 'manual' : 'disconnected');
+  // 有 token 即進入手動發布模式(connected 需通過連線測試);FB/IG 貼新權杖時立刻檢查效期,擋短效 Explorer token
+  let status = tokenEnc ? 'manual' : (body.accountName?.trim() ? 'manual' : 'disconnected');
+  let connectedAt: string | null = tokenEnc ? new Date().toISOString() : null;
+  if (newToken && (body.platform === 'facebook' || body.platform === 'instagram')) {
+    const probeId = body.externalId ?? (existing.length ? (existing[0] as { external_id: string | null }).external_id : null);
+    const probe = await probeMetaPublishAccess(newToken, body.platform, probeId);
+    tokenExpiresAt = probe.expiresAt;
+    status = probe.ok ? 'connected' : 'error';
+    notes = probe.detail;
+    connectedAt = probe.ok ? new Date().toISOString() : null;
+  }
   const prev = existing.length ? existing[0] as {
     auto_publish: boolean; auto_reply: boolean; reply_daily_cap: number; reply_hourly_cap: number;
   } : null;
@@ -105,7 +116,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
   const rows = await sql`
     INSERT INTO brand_social_accounts (brand_id, platform, account_name, external_id, access_token_enc, token_expires_at, status, notes, auto_publish, auto_reply, reply_daily_cap, reply_hourly_cap, connected_at)
     VALUES (${brand.id}::uuid, ${body.platform}, ${body.accountName ?? null}, ${body.externalId ?? null},
-            ${tokenEnc}, ${tokenExpiresAt}, ${status}, ${body.notes ?? null}, ${autoPublish}, ${autoReply}, ${replyDailyCap}, ${replyHourlyCap}, ${tokenEnc ? new Date().toISOString() : null})
+            ${tokenEnc}, ${tokenExpiresAt}, ${status}, ${notes}, ${autoPublish}, ${autoReply}, ${replyDailyCap}, ${replyHourlyCap}, ${connectedAt})
     ON CONFLICT (brand_id, platform) DO UPDATE SET
       account_name = EXCLUDED.account_name,
       external_id = EXCLUDED.external_id,

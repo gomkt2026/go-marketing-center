@@ -22,12 +22,26 @@ const statusLabel: Record<SocialAccountStatus, string> = {
   disconnected: '未設定', manual: '手動發布模式', connected: 'API 已連線', error: '連線異常',
 };
 
-function tokenExpiryLabel(expiresAt?: string | null): string {
-  if (!expiresAt) return '⏳ Token 效期確認中(24 小時內系統會自動確認並續期)';
-  const days = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000);
-  if (days < 0) return `⚠️ Token 已過期(${expiresAt.slice(0, 10)}),請重新產生長效 token`;
-  if (days <= 10) return `⚠️ Token 將於 ${days} 天內到期(${expiresAt.slice(0, 10)}),系統會自動續期`;
-  return `✅ Token 效期至 ${expiresAt.slice(0, 10)}(自動續期中,剩 ${days} 天)`;
+function tokenExpiryLabel(expiresAt?: string | null, platform?: string, status?: SocialAccountStatus): string {
+  if (platform === 'threads') {
+    if (!expiresAt) return '⏳ Token 效期確認中(24 小時內系統會自動確認並續期)';
+    const days = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000);
+    if (days < 0) return `⚠️ Token 已過期(${expiresAt.slice(0, 10)}),請重新產生長效 token`;
+    if (days <= 10) return `⚠️ Token 將於 ${days} 天內到期(${expiresAt.slice(0, 10)}),系統會自動續期`;
+    return `✅ Token 效期至 ${expiresAt.slice(0, 10)}(自動續期中,剩 ${days} 天)`;
+  }
+  if (!expiresAt) {
+    if (status === 'connected') return '✅ 粉專權杖不過期（System User / 已延長的 Page Token）';
+    return '';
+  }
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms < 0) return `⚠️ 資料庫這把權杖已於 ${expiresAt.slice(0, 16).replace('T', ' ')} 到期。Explorer 裡延伸過的是另一把，請重新貼上並儲存`;
+  if (ms < 48 * 3600 * 1000) {
+    const hours = Math.max(1, Math.round(ms / 3600000));
+    return `⚠️ 短效權杖，約 ${hours} 小時後到期。請延伸後把新字串貼回本頁，不要只用 Explorer 測通`;
+  }
+  const days = Math.ceil(ms / 86400000);
+  return `✅ Token 效期至 ${expiresAt.slice(0, 10)}（剩 ${days} 天；粉專權杖不會像 Threads 自動續期）`;
 }
 function tokenExpiryTone(expiresAt?: string | null): string {
   if (!expiresAt) return 'var(--color-text-muted)';
@@ -45,10 +59,17 @@ interface FormState {
   replyHourlyCap: number;
 }
 
-function TokenHowTo({ brandName }: { brandName: string }) {
+function brandMetaApp(slug: string): { app: string; page: string } {
+  if (slug === 'homigo') return { app: 'Homigo_POST', page: 'Homigo 粉專（Homigo-好米租屋管理）' };
+  if (slug === 'washgo') return { app: 'WashgoMarketing', page: 'Washgo 粉專' };
+  return { app: 'Taskgo_marketing_post', page: 'TaskGo 粉專' };
+}
+
+function TokenHowTo({ brandName, brandSlug }: { brandName: string; brandSlug: string }) {
   const [open, setOpen] = useState<'fb' | 'threads' | null>('fb');
   const linkStyle: CSSProperties = { color: 'var(--color-primary)', wordBreak: 'break-all' };
   const listStyle: CSSProperties = { fontSize: 13, lineHeight: 1.85, paddingLeft: 18, margin: '8px 0 0' };
+  const { app, page } = brandMetaApp(brandSlug);
 
   return (
     <Card style={{ marginBottom: 14, borderLeft: '4px solid var(--color-primary)' }}>
@@ -56,6 +77,10 @@ function TokenHowTo({ brandName }: { brandName: string }) {
       <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 6 }}>
         Meta「主控板」沒有產生按鈕。請看該頁<strong>最上方</strong>選單的「工具」，不要找左側欄。
         {brandName} 的 Facebook / Instagram 用同一把粉專權杖；Threads 是另一把。
+      </p>
+      <p style={{ fontSize: 12.5, color: 'var(--color-danger, #b42318)', marginTop: 8, lineHeight: 1.7 }}>
+        「延伸存取權杖」會產生<strong>新的一串字</strong>。一定要複製延伸後的那一把貼回本頁並按儲存。
+        只在 Graph API 探索工具測通、沒重新貼，後台仍是舊的短效權杖，晚上發文就會 190。
       </p>
 
       <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
@@ -77,10 +102,10 @@ function TokenHowTo({ brandName }: { brandName: string }) {
             <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" style={linkStyle}>
               developers.facebook.com/tools/explorer
             </a>
-            ，右上角應用程式選 <code>Taskgo_marketing_post</code>。
+            ，右上角應用程式選 <code>{app}</code>（不要混用其他品牌的 App）。
           </li>
           <li>
-            「用戶或粉絲專頁」選<strong>取得粉絲專頁存取權杖</strong>，勾 TaskGo 粉專。權限至少：
+            「用戶或粉絲專頁」選<strong>取得粉絲專頁存取權杖</strong>，勾 {page}。權限至少：
             <code> pages_show_list</code>、<code>pages_manage_posts</code>、<code>instagram_basic</code>、
             <code>instagram_content_publish</code>。要回收成效再加 <code>pages_read_engagement</code>、
             <code>instagram_manage_insights</code>。
@@ -97,7 +122,7 @@ function TokenHowTo({ brandName }: { brandName: string }) {
             回到本頁，Facebook 與 Instagram 都按「編輯」，貼<strong>同一把 Page Token</strong>，儲存後按「測試連線」。兩邊都要變成「API 已連線」，並勾「排程自動發布」。
           </li>
           <li>
-            TaskGo 必須勾 <strong>TaskGo 粉專</strong>，不要沿用 Washgo／Homigo 的權杖。行程表若出現 <code>Error validating access token</code>，就是這把粉專權杖過期或被撤銷，Threads 能發不代表 FB／IG 還能發。
+            {brandName} 必須勾 <strong>{page}</strong>，不要沿用其他品牌的權杖。行程表若出現 <code>Error validating access token</code>，就是後台這把粉專權杖過期或被撤銷；Threads 能發不代表 FB／IG 還能發。Explorer 裡延伸過，也一定要把新字串貼回來。
           </li>
         </ol>
       )}
@@ -180,7 +205,7 @@ export function SocialAccounts() {
     setBusy(true);
     setMessage(null);
     try {
-      await api.saveSocialAccount(slug, {
+      const saved = await api.saveSocialAccount(slug, {
         platform,
         accountName: form.accountName || undefined,
         externalId: form.externalId || undefined,
@@ -191,7 +216,7 @@ export function SocialAccounts() {
         replyHourlyCap: form.replyHourlyCap,
       });
       setEditing(null);
-      setMessage('已儲存設定');
+      setMessage(form.accessToken && saved.account.notes ? saved.account.notes : '已儲存設定');
       reload();
     } catch (e) {
       setMessage(`儲存失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
@@ -242,7 +267,7 @@ export function SocialAccounts() {
         </div>
       </Card>
 
-      <TokenHowTo brandName={brand.name} />
+      <TokenHowTo brandName={brand.name} brandSlug={brand.slug} />
 
       {message && (
         <Card style={{ marginBottom: 12, borderLeft: '4px solid var(--color-primary)' }}>
@@ -269,9 +294,9 @@ export function SocialAccounts() {
                       {acc.accountName && <div>帳號名稱:{acc.accountName}</div>}
                       {acc.externalId && <div>平台 ID:{acc.externalId}</div>}
                       {acc.hasToken && <div>Token:{acc.tokenMasked}</div>}
-                      {acc.hasToken && p.id === 'threads' && (
+                      {acc.hasToken && tokenExpiryLabel(acc.tokenExpiresAt, p.id, status) && (
                         <div style={{ color: tokenExpiryTone(acc.tokenExpiresAt) }}>
-                          {tokenExpiryLabel(acc.tokenExpiresAt)}
+                          {tokenExpiryLabel(acc.tokenExpiresAt, p.id, status)}
                         </div>
                       )}
                       {acc.autoPublish && (

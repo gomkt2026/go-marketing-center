@@ -135,7 +135,7 @@ export function ThreadsDesk() {
               {' · '}回覆 {data.replied1h}/{data.replyHourlyCap}（本小時） {data.replied24h}/{data.replyDailyCap}（近 24 時）
             </p>
             <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 4 }}>
-              每天 00/06/12/18 熱議跟風、09 生活哏文、21 愛情散文。勾選「到期安全網」後,沒人批准到點仍會發。
+              每檔主題在「發文時段」自訂：熱議跟風、生活梗文、感情散文、天氣季節、娛樂影視、行業現場、互動提問、實績畫面。勾選「到期安全網」後,沒人批准到點仍會發。
             </p>
             {data.blockReason && (
               <p style={{ fontSize: 12.5, color: '#B85454', marginTop: 6 }}>{data.blockReason}</p>

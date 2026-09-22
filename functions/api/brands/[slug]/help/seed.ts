@@ -5,24 +5,30 @@ import { getBrandBySlug } from '../../../../_shared/queries';
 import { json, error } from '../../../../_shared/response';
 import { applyTaskgoHelpSeed } from '../../../../_shared/taskgo-help-migrate';
 import { applyHomigoHelpSeed } from '../../../../_shared/homigo-help-migrate';
+import { applyWashgoHelpSeed } from '../../../../_shared/washgo-help-migrate';
 import { logActivity } from '../../../../_shared/activity';
+
+const SEEDERS = {
+  taskgo: applyTaskgoHelpSeed,
+  homigo: applyHomigoHelpSeed,
+  washgo: applyWashgoHelpSeed,
+} as const;
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
 
   const slug = context.params.slug as string;
-  if (slug !== 'taskgo' && slug !== 'homigo') {
-    return error('目前只有 TaskGo、Homigo 提供官方操作文件同步', 400);
+  const seeder = SEEDERS[slug as keyof typeof SEEDERS];
+  if (!seeder) {
+    return error('目前只有 TaskGo、Homigo、Washgo 提供官方操作文件同步', 400);
   }
 
   const brand = await getBrandBySlug(context.env, slug);
   if (!brand) return error('Brand not found', 404);
 
   try {
-    const result = slug === 'homigo'
-      ? await applyHomigoHelpSeed(context.env, auth.id)
-      : await applyTaskgoHelpSeed(context.env, auth.id);
+    const result = await seeder(context.env, auth.id);
     await logActivity(context.env, {
       brandId: brand.id,
       actorType: 'user',

@@ -2,6 +2,7 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../../_shared/env';
 import { requireAuth } from '../../../_shared/auth';
 import { json, error } from '../../../_shared/response';
+import { toClientError } from '../../../_shared/openai';
 import { concludeMeeting } from '../../../_shared/meeting-ai';
 import { logActivity } from '../../../_shared/activity';
 import { getSql } from '../../../_shared/db';
@@ -12,7 +13,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const meetingId = context.params.id as string;
-  const conclusion = await concludeMeeting(context.env, meetingId);
+  let conclusion;
+  try {
+    conclusion = await concludeMeeting(context.env, meetingId);
+  } catch (e) {
+    const mapped = toClientError(e, '產生結論');
+    return error(mapped.message, mapped.status);
+  }
   if (!conclusion) return error('會議不存在或尚無對話內容', 400);
 
   const sql = getSql(context.env);

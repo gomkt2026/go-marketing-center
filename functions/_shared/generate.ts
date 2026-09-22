@@ -3,14 +3,14 @@ import { getSql } from './db';
 import { chatCompleteJson, generateImage, generateImageWithReference } from './openai';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
-  HOMIGO_TEXT_MARK_RULE, BRAND_DESIGN_IMAGE_STYLE, SYSTEM_SCREENSHOT_POSTER_RULE,
+  HOMIGO_TEXT_MARK_RULE, SYSTEM_SCREENSHOT_POSTER_RULE,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
   buildImageInspiredPostPrompt,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
   defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
   SEO_TOPIC_BANK, brandSeoFacts, type SeoTopicSeed,
-  buildSocialImagePrompt, PHOTO_EDITORIAL_CONVERT_RULE, TASKGO_GRAPHIC_CONVERT_RULE,
-  WASHGO_CUTE_CONVERT_RULE,
+  buildSocialImagePrompt, PHOTO_EDITORIAL_CONVERT_RULE, HOMIGO_CONVERT_RULE, TASKGO_GRAPHIC_CONVERT_RULE,
+  WASHGO_CUTE_CONVERT_RULE, defaultDesignImageStyle,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
   type GeneratedXPost, type EcosystemXAngle,
   type AudienceLane, type ImageStyleId,
@@ -21,6 +21,7 @@ import { frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
 import { X_TWEET_MAX_CHARS } from './x';
 import { burnPosterHeadline, POSTER_NO_GLYPHS_RULE } from './poster-text';
+import { loadBrandImagePromptPack } from './image-prompts';
 import {
   websiteCta, websiteCtaRule, websiteAuthor, normalizeWebsiteSeoMeta,
   ensureWebsiteSeoMetaLengths,
@@ -169,6 +170,9 @@ async function finishPosterImage(
     logoPosition: 'bottom-left' | 'bottom-right';
   },
 ): Promise<Uint8Array> {
+  const logoOpts = params.brandSlug === 'homigo'
+    ? { position: params.logoPosition, marginX: 80, marginY: 120 }
+    : { position: params.logoPosition };
   try {
     bytes = await burnPosterHeadline(env, bytes, {
       brandSlug: params.brandSlug,
@@ -184,7 +188,7 @@ async function finishPosterImage(
   }
   if (params.logo) {
     try {
-      bytes = await compositeLogo(bytes, params.logo, { position: params.logoPosition });
+      bytes = await compositeLogo(bytes, params.logo, logoOpts);
     } catch (e) {
       console.error('[generate] logo 合成失敗,改用無 logo 原圖', e);
     }
@@ -212,7 +216,8 @@ async function generateSystemScreenshotPoster(
     if (!ref) return null;
     const isFb = params.platform === 'facebook';
     const isIg = params.platform === 'instagram';
-    const designSpec = BRAND_DESIGN_IMAGE_STYLE[params.brandSlug] ?? BRAND_DESIGN_IMAGE_STYLE.homigo;
+    const pack = await loadBrandImagePromptPack(env, '', params.brandSlug).catch(() => null);
+    const designSpec = pack?.designStyle || defaultDesignImageStyle(params.brandSlug);
     const logo = await getBrandLogo(env, params.brandSlug);
     const headlineHint = params.imagePrompt?.trim()
       || 'B2B pain-point poster. Leave an empty banner for typography. No letters or glyphs.';
@@ -251,7 +256,7 @@ async function generateSystemScreenshotPoster(
   }
 }
 
-/** 把實拍轉成品牌編輯海報(Homigo 紙本;Washgo 可愛插畫;TaskGo 平面);失敗回 null 沿用原圖 */
+/** 把實拍轉成品牌編輯海報(Homigo 米白深藍;Washgo 可愛插畫;TaskGo 平面);失敗回 null 沿用原圖 */
 async function generatePhotoEditorialPoster(
   env: Env,
   params: {
@@ -276,7 +281,10 @@ async function generatePhotoEditorialPoster(
       ? TASKGO_GRAPHIC_CONVERT_RULE
       : params.brandSlug === 'washgo'
         ? WASHGO_CUTE_CONVERT_RULE
-        : PHOTO_EDITORIAL_CONVERT_RULE;
+        : params.brandSlug === 'homigo'
+          ? HOMIGO_CONVERT_RULE
+          : PHOTO_EDITORIAL_CONVERT_RULE;
+    const pack = await loadBrandImagePromptPack(env, '', params.brandSlug).catch(() => null);
     const prompt = buildSocialImagePrompt({
       brandSlug: params.brandSlug,
       scene: [params.imagePrompt?.trim() || 'Redraw this photograph as a brand editorial poster.', convertRule].join('\n\n'),
@@ -284,6 +292,8 @@ async function generatePhotoEditorialPoster(
       landscape: isFb,
       hasLogo: !!logo,
       emptyBanner: true,
+      designStyle: pack?.designStyle,
+      photoStyle: pack?.photoStyle,
     });
     const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
     let bytes = await generateImageWithReference(env, {
@@ -391,6 +401,11 @@ export async function generatePlatformPost(
   },
 ): Promise<GenerationResult> {
   const { brandCtx, platform } = params;
+  const imagePack = await loadBrandImagePromptPack(env, brandCtx.brandId, brandCtx.slug).catch(() => ({
+    designStyle: defaultDesignImageStyle(brandCtx.slug),
+    photoStyle: '',
+    copySpec: '',
+  }));
   const lane = params.audienceLane ?? defaultAudienceLane(platform);
   const audience = params.audienceName
     ? { name: params.audienceName, lane, painPoints: [], appealAngle: null }
@@ -437,6 +452,7 @@ export async function generatePlatformPost(
     skipImagePrompt: false,
     screenshotPoster,
     convertPhotoPoster,
+    copySpecOverride: imagePack.copySpec,
   });
   const systemPrompt = params.collaborationContext
     ? `${brandCtx.systemPrompt}\n\n${audienceLaneInstruction(brandCtx.slug, lane)}\n\n${params.collaborationContext}`
@@ -581,6 +597,8 @@ export async function generatePlatformPost(
         landscape: isFb,
         hasLogo: !!logo,
         emptyBanner: isFb || isIg,
+        designStyle: imagePack.designStyle,
+        photoStyle: imagePack.photoStyle,
       });
       const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
       const quality = style === 'design' || isFb || isIg || brandCtx.slug === 'washgo' ? 'high' as const : 'medium' as const;
@@ -1179,12 +1197,18 @@ export async function generateSeoArticle(
   };
 }
 
-export function pickSeoTopic(slug: string, usedTitles: string[] = []): SeoTopicSeed {
-  const bank = SEO_TOPIC_BANK[slug] ?? SEO_TOPIC_BANK.washgo;
+export function pickSeoTopicFromList(bank: SeoTopicSeed[], usedTitles: string[] = []): SeoTopicSeed {
   const used = new Set(usedTitles.map((t) => t.replace(/\s+/g, '')));
   const unused = bank.filter((item) => !used.has(item.topic.replace(/\s+/g, '')));
   const pool = unused.length ? unused : bank;
+  if (!pool.length) {
+    return { topic: '這個品牌是做什麼的？', angle: '依品牌事實寫給第一次搜這個名字的人。' };
+  }
   return pool[Math.floor(Math.random() * pool.length)];
+}
+
+export function pickSeoTopic(slug: string, usedTitles: string[] = []): SeoTopicSeed {
+  return pickSeoTopicFromList(SEO_TOPIC_BANK[slug] ?? SEO_TOPIC_BANK.washgo, usedTitles);
 }
 
 function seoTopicSlug(text: string): string {

@@ -168,7 +168,11 @@ export async function applyProductHelpMigration(env: Env): Promise<string[]> {
     SELECT b.id, o.origin
     FROM brands b
     CROSS JOIN (VALUES
-      ('https://liff.line.me')
+      ('https://washgo.pages.dev'),
+      ('https://washgo-liff.pages.dev'),
+      ('https://liff.line.me'),
+      ('http://localhost:3000'),
+      ('http://localhost:3001')
     ) AS o(origin)
     WHERE b.slug = 'washgo'
     ON CONFLICT (brand_id, origin) DO NOTHING

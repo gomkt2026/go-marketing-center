@@ -72,6 +72,11 @@ export function buildNetworkCardKey(brandSlug: string, ext = 'jpg'): string {
   return `network-cards/${brandSlug}/${crypto.randomUUID()}.${ext.replace(/^\./, '')}`;
 }
 
+/** 人脈 Bot 小咪語音回覆。不受 generated/ 31 天清理。 */
+export function buildNetworkVoiceKey(brandSlug: string, ext = 'mp3'): string {
+  return `network-voice/${brandSlug}/${crypto.randomUUID()}.${ext.replace(/^\./, '')}`;
+}
+
 export async function putMedia(env: Env, key: string, bytes: Uint8Array, contentType = 'image/png'): Promise<string> {
   if (!env.MEDIA) {
     throw new Error('R2 bucket MEDIA 尚未綁定,請先建立 bucket 並在 wrangler.toml 設定 r2_buckets');

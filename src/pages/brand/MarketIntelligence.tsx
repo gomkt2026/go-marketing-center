@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useBrand } from '@/context/BrandContext';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { MarketSignalStatus, MarketSignalType } from '@/types';
 
@@ -27,16 +27,31 @@ export function MarketIntelligence() {
   const navigate = useNavigate();
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [genMessage, setGenMessage] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshNote, setRefreshNote] = useState<string | null>(null);
   const { data, loading, error, reload } = useAsyncData(
     () => slug ? api.marketSignals(slug) : Promise.reject(new Error('no slug')),
     [slug],
   );
 
+  useEffect(() => {
+    if (!slug) return undefined;
+    const timer = window.setInterval(() => {
+      void reload();
+    }, 90_000);
+    return () => window.clearInterval(timer);
+  }, [slug, reload]);
+
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
-  if (loading) return <LoadingState />;
-  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+  if (!data) {
+    if (loading) return <LoadingState />;
+    return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+  }
 
   const signals = data.signals;
+  const latest = signals[0]?.discoveredAt
+    ? new Date(signals[0].discoveredAt).toLocaleString('zh-TW')
+    : '尚無';
 
   async function updateStatus(id: string, status: MarketSignalStatus) {
     await api.updateMarketSignal(id, status);
@@ -45,7 +60,7 @@ export function MarketIntelligence() {
 
   async function generatePosts(signalId: string) {
     setGeneratingId(signalId);
-    setGenMessage('⏳ AI 正在為 FB / IG / Threads 並行生成貼文與配圖(約 30 秒),請留在此頁等待完成…');
+    setGenMessage('⏳ AI 正在依序為 FB / IG / Threads 生成貼文與配圖,請留在此頁等待完成…');
     try {
       const res = await api.generateFromSignal(signalId);
       const okCount = res.created.length;
@@ -61,12 +76,38 @@ export function MarketIntelligence() {
     }
   }
 
+  async function refreshNow() {
+    if (!slug) return;
+    setRefreshing(true);
+    setRefreshNote('正在從新聞／PTT／Dcard／Google Trends 蒐集…');
+    try {
+      const res = await api.refreshMarketSignals(slug);
+      setRefreshNote(res.message);
+      reload();
+    } catch (e) {
+      setRefreshNote(e instanceof ApiError ? e.message : '更新失敗');
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title={`${brand.name} 市場情報`}
-        subtitle="AI 定時依品牌定位、客群、關鍵字蒐集新聞/政策/時事/熱門話題;可一鍵生成 FB/IG/Threads 差異化貼文"
+        subtitle="排程每 3 小時自動蒐集；也可立即更新。依品牌定位篩新聞／政策／時事，可一鍵生成 FB／IG／Threads 貼文"
+        actions={
+          <Button variant="primary" disabled={refreshing} onClick={() => void refreshNow()}>
+            {refreshing ? '蒐集中…' : '立即更新情報'}
+          </Button>
+        }
       />
+      <Card style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+          自動排程：每 3 小時蒐集一次。最新一則：{latest}。此頁每 90 秒會自動重整列表。
+          {refreshNote ? ` ${refreshNote}` : ''}
+        </div>
+      </Card>
       {genMessage && (
         <Card style={{ marginBottom: 12, borderLeft: '4px solid var(--color-primary)' }}>
           <div className="card-row" style={{ alignItems: 'center' }}>
@@ -119,7 +160,9 @@ export function MarketIntelligence() {
           </Card>
         ))}
         {signals.length === 0 && (
-          <Card><p>目前尚無市場情報。排程 Worker 會定時蒐集熱門議題,也可等待下一輪自動蒐集。</p></Card>
+          <Card>
+            <p>目前尚無市場情報。可按上方「立即更新情報」，或等待每 3 小時的自動蒐集。</p>
+          </Card>
         )}
       </div>
     </div>

@@ -11,6 +11,18 @@ import type { CsKnowledgeDocument, HelpChatResult, HelpRoleOption, HelpTicket, H
 
 type Tab = 'docs' | 'try' | 'tickets' | 'embed';
 
+function officialSyncLabel(slug: string): string {
+  if (slug === 'homigo') return '同步官方操作文件（21 份）';
+  if (slug === 'washgo') return '同步官方操作文件（19 份）';
+  return '同步官方操作文件（32 份）';
+}
+
+function officialSyncHint(slug: string): string {
+  if (slug === 'homigo') return '依檔名或標題覆蓋房東／房客／代管說明，並直接發布。來源：docs/help/homigo。';
+  if (slug === 'washgo') return '依檔名或標題覆蓋送洗客戶／門市員工／司機說明，並直接發布。來源：docs/help/washgo。';
+  return '依檔名或標題覆蓋後勤／工班／業主說明，並直接發布。來源：docs/help/taskgo。';
+}
+
 const TABS: { id: Tab; label: string }[] = [
   { id: 'docs', label: '客服文件' },
   { id: 'try', label: '試問' },
@@ -195,19 +207,17 @@ function DocsTab({ slug, roles, documents, onChanged }: {
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
           接受 MD／TXT／PDF／Word（.docx）。抽出的是操作正文，不會進品牌行銷知識庫。發布後該角色的小幫手才能引用。
         </p>
-        {(slug === 'taskgo' || slug === 'homigo') && (
+        {(slug === 'taskgo' || slug === 'homigo' || slug === 'washgo') && (
           <div style={{ marginBottom: 12 }}>
             <Button
               variant="secondary"
               disabled={busy}
               onClick={() => void syncOfficial()}
             >
-              {busy ? '同步中…' : slug === 'homigo' ? '同步官方操作文件（21 份）' : '同步官方操作文件（32 份）'}
+              {busy ? '同步中…' : officialSyncLabel(slug)}
             </Button>
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0 0' }}>
-              {slug === 'homigo'
-                ? '依檔名或標題覆蓋房東／房客／代管說明，並直接發布。來源：docs/help/homigo。'
-                : '依檔名或標題覆蓋後勤／工班／業主說明，並直接發布。來源：docs/help/taskgo。'}
+              {officialSyncHint(slug)}
             </p>
           </div>
         )}

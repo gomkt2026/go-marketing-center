@@ -18,8 +18,29 @@ const PLATFORMS: Array<{ id: 'facebook' | 'instagram' | 'threads'; label: string
 const KIND_LABEL: Record<PostingSlotKind, string> = {
   daily_theme: '每日主題',
   threads_hourly: '熱議跟風',
-  threads_offtopic: '生活哏文',
+  threads_offtopic: '生活梗文',
+  threads_love: '感情散文',
+  threads_weather: '天氣季節',
+  threads_entertainment: '娛樂影視',
+  threads_sports: '運動賽事',
+  threads_emotion: '人際視角',
+  threads_workplace: '行業現場',
+  threads_qa: '互動提問',
+  threads_image: '實績畫面',
 };
+
+const THREADS_KIND_OPTIONS: Array<{ value: PostingSlotKind; label: string; group: string; hint: string }> = [
+  { value: 'threads_hourly', label: '熱議跟風', group: '話題', hint: '跟當下熱搜、PTT／Dcard 自然掛勾' },
+  { value: 'threads_weather', label: '天氣季節', group: '話題', hint: '梅雨、颱風、換季等台灣天氣' },
+  { value: 'threads_entertainment', label: '娛樂影視', group: '話題', hint: '影劇、綜藝、明星、動漫話題' },
+  { value: 'threads_sports', label: '運動賽事', group: '話題', hint: '棒球、籃球、路跑、健身風潮' },
+  { value: 'threads_offtopic', label: '生活梗文', group: '生活', hint: '不提品牌的生活觀察與幹話' },
+  { value: 'threads_love', label: '感情散文', group: '生活', hint: '品牌世界當場景的感情長文' },
+  { value: 'threads_emotion', label: '人際視角', group: '生活', hint: '房東房客、工班、洗衣店的人際現場' },
+  { value: 'threads_workplace', label: '行業現場', group: '品牌', hint: '第一線具體畫面與真實對話' },
+  { value: 'threads_qa', label: '互動提問', group: '品牌', hint: '丟一個好回的問題，邀留言' },
+  { value: 'threads_image', label: '實績畫面', group: '品牌', hint: '用素材庫圖片當話題' },
+];
 
 type DraftSlot = {
   key: string;
@@ -105,7 +126,7 @@ export function PostingTimes() {
     <div>
       <PageHeader
         title={`${brand.name} 發文時段`}
-        subtitle="每個平台可設多個台灣時間整點。產稿會提前 1 小時；單篇仍可在行程表改實際發文時間。"
+        subtitle="每個平台可設多個台灣時間整點。Threads 每檔可選主題，產稿會照那個角度寫。產稿提前 1 小時；單篇仍可在行程表改實際發文時間。"
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
             <Link to={`/${brand.slug}/schedule`} style={{ textDecoration: 'none' }}>
@@ -163,11 +184,17 @@ export function PostingTimes() {
                   {group.id === 'threads' ? (
                     <select
                       value={slot.slotKind}
+                      title={THREADS_KIND_OPTIONS.find((o) => o.value === slot.slotKind)?.hint}
                       onChange={(e) => setDraft((prev) => prev.map((s) => s.key === slot.key ? { ...s, slotKind: e.target.value as PostingSlotKind } : s))}
                       style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13 }}
                     >
-                      <option value="threads_hourly">熱議跟風</option>
-                      <option value="threads_offtopic">生活哏文</option>
+                      {['話題', '生活', '品牌'].map((group) => (
+                        <optgroup key={group} label={group}>
+                          {THREADS_KIND_OPTIONS.filter((o) => o.group === group).map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </optgroup>
+                      ))}
                     </select>
                   ) : (
                     <Badge tone="secondary">{KIND_LABEL[slot.slotKind]}</Badge>
@@ -190,6 +217,12 @@ export function PostingTimes() {
                 </div>
               ))}
             </div>
+            {group.id === 'threads' && (
+              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 12, lineHeight: 1.6 }}>
+                每檔選一個主題，產稿會鎖那個角度，不要六檔都用熱議跟風。
+                話題：熱議／天氣／娛樂／運動。生活：梗文、感情散文、人際視角。品牌：現場、提問、實績畫面。
+              </p>
+            )}
           </Card>
         ))}
       </div>

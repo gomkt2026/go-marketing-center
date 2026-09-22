@@ -6,7 +6,7 @@ import { logActivity } from '../../../_shared/activity';
 import { json, error } from '../../../_shared/response';
 import { buildBrandContext } from '../../../_shared/prompts';
 import {
-  generatePlatformPost, saveGeneratedContent, findBrandAgent,
+  generatePlatformPost, saveGeneratedContent, findBrandAgent, runPlatformJobs,
   SUPPORTED_PLATFORMS, type SocialPlatform,
 } from '../../../_shared/generate';
 
@@ -30,14 +30,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const brandCtx = await buildBrandContext(context.env, signal.brand_id);
   const agentId = await findBrandAgent(context.env, signal.brand_id);
 
-  // 三平台並行生成,並用 waitUntil 保護:即使使用者中途離開頁面(連線中斷),
-  // 生成工作仍會在背景完成寫入資料庫,稍後可在內容中心看到
-  const work = (async () => {
-  const created: { contentId: string; platform: SocialPlatform; score: number; imageUrl: string | null; imageError: string | null }[] = [];
-  const failures: { platform: SocialPlatform; error: string }[] = [];
-
-  const results = await Promise.all(platforms.map(async (platform) => {
-    try {
+  // 三平台依序生成,避免單次 Worker 超過 subrequest 上限。
+  // waitUntil 保護:即使使用者中途離開頁面,進行中的那一平台仍會寫完。
+  const pending = (async () => {
+    const { created, failures } = await runPlatformJobs(platforms, async (platform) => {
       const result = await generatePlatformPost(context.env, {
         brandCtx,
         platform,
@@ -63,25 +59,16 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         entityId: contentId,
         afterState: { platform, fromSignal: signalId },
       });
-      return { ok: true as const, item: { contentId, platform, score: result.prediction.score, imageUrl: result.imageUrl, imageError: result.imageError } };
-    } catch (e) {
-      return { ok: false as const, platform, error: e instanceof Error ? e.message : '生成失敗' };
+      return { contentId, platform, score: result.prediction.score, imageUrl: result.imageUrl, imageError: result.imageError };
+    });
+    if (created.length) {
+      await sql`UPDATE market_signals SET status = 'used' WHERE id = ${signalId}::uuid AND status IN ('new', 'discussed')`;
     }
-  }));
-
-  for (const r of results) {
-    if (r.ok) created.push(r.item);
-    else failures.push({ platform: r.platform, error: r.error });
-  }
-
-  if (created.length) {
-    await sql`UPDATE market_signals SET status = 'used' WHERE id = ${signalId}::uuid AND status IN ('new', 'discussed')`;
-  }
-  return { created, failures };
+    return { created, failures };
   })();
 
-  context.waitUntil(work.then(() => undefined, () => undefined));
-  const { created, failures } = await work;
+  context.waitUntil(pending.then(() => undefined, () => undefined));
+  const { created, failures } = await pending;
 
   if (!created.length) {
     return error(`全部平台生成失敗:${failures.map((f) => `${f.platform}: ${f.error}`).join(';')}`, 502);

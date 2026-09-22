@@ -268,6 +268,12 @@ a {
 .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .grid-split { grid-template-columns: 260px minmax(0, 1fr); }
+.geo-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
 .grid-auto { grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; }
 
 .tabs-bar {
@@ -420,7 +426,9 @@ a {
   .grid-2,
   .grid-3,
   .grid-4,
-  .grid-5 {
+  .grid-5,
+  .geo-layout,
+  .grid-split {
     grid-template-columns: 1fr;
   }
 }

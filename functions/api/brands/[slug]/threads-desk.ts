@@ -25,8 +25,12 @@ const GEN_CATEGORY_LABEL: Record<string, string> = {
   entertainment: '娛樂話題',
   sports: '運動話題',
   image_inspired: '圖片靈感',
+  workplace: '行業現場',
+  qa: '互動提問',
   love_story: '愛情散文',
-  life_gag: '生活哏文',
+  life_gag: '生活梗文',
+  reflection: '生活省思',
+  love_view: '感情觀點',
   daily_pain: '日常痛點',
 };
 
@@ -109,7 +113,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     ) lg ON true
     WHERE c.brand_id = ${brand.id}::uuid
       AND c.target_platform = 'threads'
-      AND c.generation_prompt_meta->>'source' IN ('threads_hourly', 'threads_offtopic')
+      AND c.generation_prompt_meta->>'source' LIKE 'threads_%'
       AND (c.generation_prompt_meta->>'slotAt')::timestamptz >= ${dayStart.toISOString()}::timestamptz
       AND (c.generation_prompt_meta->>'slotAt')::timestamptz < ${dayEnd.toISOString()}::timestamptz
     ORDER BY (c.generation_prompt_meta->>'slotAt')::timestamptz ASC, c.created_at DESC
@@ -128,7 +132,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const slots = [];
   for (const hour of deskHours) {
     const kind = await sourceForBrandHour(context.env, brand.id, hour);
-    const source = kind === 'threads_offtopic' ? 'threads_offtopic' as const : 'threads_hourly' as const;
+    const source = kind;
     const slotAt = slotAtToday(hour).toISOString();
     const row = byHour.get(hour);
     if (!row) {

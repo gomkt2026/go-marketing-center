@@ -2,7 +2,83 @@ import type { Env } from './env';
 import { getSql } from './db';
 
 export type PostingSlotPlatform = 'facebook' | 'instagram' | 'threads';
-export type PostingSlotKind = 'daily_theme' | 'threads_hourly' | 'threads_offtopic';
+export type PostingSlotKind =
+  | 'daily_theme'
+  | 'threads_hourly'
+  | 'threads_offtopic'
+  | 'threads_love'
+  | 'threads_weather'
+  | 'threads_entertainment'
+  | 'threads_sports'
+  | 'threads_emotion'
+  | 'threads_workplace'
+  | 'threads_qa'
+  | 'threads_image';
+
+export const THREADS_SLOT_KINDS: PostingSlotKind[] = [
+  'threads_hourly',
+  'threads_offtopic',
+  'threads_love',
+  'threads_weather',
+  'threads_entertainment',
+  'threads_sports',
+  'threads_emotion',
+  'threads_workplace',
+  'threads_qa',
+  'threads_image',
+];
+
+export const THREADS_HOURLY_FAMILY: PostingSlotKind[] = [
+  'threads_hourly', 'threads_weather', 'threads_entertainment',
+  'threads_sports', 'threads_emotion',
+  'threads_workplace', 'threads_qa', 'threads_image',
+];
+
+export const THREADS_OFFTOPIC_FAMILY: PostingSlotKind[] = [
+  'threads_offtopic', 'threads_love',
+];
+
+export const THREADS_KIND_LABEL: Record<PostingSlotKind, string> = {
+  daily_theme: '每日主題',
+  threads_hourly: '熱議跟風',
+  threads_offtopic: '生活梗文',
+  threads_love: '感情散文',
+  threads_weather: '天氣季節',
+  threads_entertainment: '娛樂影視',
+  threads_sports: '運動賽事',
+  threads_emotion: '人際視角',
+  threads_workplace: '行業現場',
+  threads_qa: '互動提問',
+  threads_image: '實績畫面',
+};
+
+const THREADS_KIND_ERROR =
+  'Threads 請選熱議跟風、天氣季節、娛樂影視、運動賽事、生活梗文、感情散文、人際視角、行業現場、互動提問或實績畫面';
+
+let postingOpsEnsured = false;
+
+export function isThreadsSlotKind(kind: string): kind is PostingSlotKind {
+  return THREADS_SLOT_KINDS.includes(kind as PostingSlotKind);
+}
+
+export function isHourlyFamily(kind: string): boolean {
+  return THREADS_HOURLY_FAMILY.includes(kind as PostingSlotKind);
+}
+
+export function isOfftopicFamily(kind: string): boolean {
+  return THREADS_OFFTOPIC_FAMILY.includes(kind as PostingSlotKind);
+}
+
+export function hourlyCategoryForKind(kind: PostingSlotKind): string | null {
+  if (kind === 'threads_weather') return 'weather';
+  if (kind === 'threads_entertainment') return 'entertainment';
+  if (kind === 'threads_sports') return 'sports';
+  if (kind === 'threads_emotion') return 'emotion';
+  if (kind === 'threads_workplace') return 'workplace';
+  if (kind === 'threads_qa') return 'qa';
+  if (kind === 'threads_image') return 'image_inspired';
+  return null;
+}
 
 export interface PostingSlot {
   id: string;
@@ -30,9 +106,7 @@ export const DEFAULT_SLOT_DEFS: Array<{
 ];
 
 export function slotKindLabel(kind: PostingSlotKind): string {
-  if (kind === 'threads_hourly') return '熱議跟風';
-  if (kind === 'threads_offtopic') return '生活哏文';
-  return '每日主題';
+  return THREADS_KIND_LABEL[kind] ?? kind;
 }
 
 export function formatHourTw(hour: number): string {
@@ -48,16 +122,34 @@ export function summarizeFrequency(slots: PostingSlot[]): Record<PostingSlotPlat
       .sort();
   const fb = hours('facebook');
   const ig = hours('instagram');
-  const hourly = hours('threads', 'threads_hourly');
-  const offtopic = hours('threads', 'threads_offtopic');
+  const threads = enabled
+    .filter((s) => s.platform === 'threads')
+    .sort((a, b) => a.hourTw - b.hourTw)
+    .map((s) => `${formatHourTw(s.hourTw)} ${slotKindLabel(s.slotKind)}`);
   return {
     facebook: fb.length ? `每天台灣 ${fb.join('、')} 業者主題` : '未設定時段',
     instagram: ig.length ? `每天台灣 ${ig.join('、')} 業者主題` : '未設定時段',
-    threads: [
-      hourly.length ? `${hourly.join('/')} 熱議跟風` : '',
-      offtopic.length ? `${offtopic.join('/')} 生活哏文` : '',
-    ].filter(Boolean).join(' + ') || '未設定時段',
+    threads: threads.length ? threads.join('、') : '未設定時段',
   };
+}
+
+function isSlotKindCheck(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /brand_posting_slots_kind_check|violates check constraint/i.test(msg);
+}
+
+export async function ensureSlotKindConstraint(env: Env): Promise<void> {
+  const sql = getSql(env);
+  await sql`ALTER TABLE brand_posting_slots DROP CONSTRAINT IF EXISTS brand_posting_slots_kind_check`;
+  await sql`
+    ALTER TABLE brand_posting_slots
+    ADD CONSTRAINT brand_posting_slots_kind_check CHECK (slot_kind IN (
+      'daily_theme', 'threads_hourly', 'threads_offtopic',
+      'threads_love', 'threads_weather', 'threads_entertainment',
+      'threads_sports', 'threads_emotion',
+      'threads_workplace', 'threads_qa', 'threads_image'
+    ))
+  `;
 }
 
 function isMissingSlots(err: unknown): boolean {
@@ -66,6 +158,7 @@ function isMissingSlots(err: unknown): boolean {
 }
 
 export async function ensurePostingOpsTables(env: Env): Promise<void> {
+  if (postingOpsEnsured) return;
   const sql = getSql(env);
   await sql`
     CREATE TABLE IF NOT EXISTS brand_posting_slots (
@@ -78,7 +171,12 @@ export async function ensurePostingOpsTables(env: Env): Promise<void> {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
       CONSTRAINT brand_posting_slots_hour_check CHECK (hour_tw >= 0 AND hour_tw <= 23),
-      CONSTRAINT brand_posting_slots_kind_check CHECK (slot_kind IN ('daily_theme', 'threads_hourly', 'threads_offtopic')),
+      CONSTRAINT brand_posting_slots_kind_check CHECK (slot_kind IN (
+        'daily_theme', 'threads_hourly', 'threads_offtopic',
+        'threads_love', 'threads_weather', 'threads_entertainment',
+        'threads_sports', 'threads_emotion',
+        'threads_workplace', 'threads_qa', 'threads_image'
+      )),
       CONSTRAINT brand_posting_slots_platform_check CHECK (platform IN ('facebook', 'instagram', 'threads')),
       UNIQUE (brand_id, platform, hour_tw, slot_kind)
     )
@@ -90,15 +188,24 @@ export async function ensurePostingOpsTables(env: Env): Promise<void> {
     FOR EACH ROW EXECUTE FUNCTION set_updated_at()
   `;
 
-  for (const def of DEFAULT_SLOT_DEFS) {
-    await sql`
-      INSERT INTO brand_posting_slots (brand_id, platform, hour_tw, slot_kind, enabled)
-      SELECT b.id, ${def.platform}::publishing_platform, ${def.hourTw}, ${def.slotKind}, true
-      FROM brands b
-      WHERE b.slug IN ('homigo', 'taskgo', 'washgo')
-      ON CONFLICT (brand_id, platform, hour_tw, slot_kind) DO NOTHING
-    `;
-  }
+  const seedPlatforms = DEFAULT_SLOT_DEFS.map((d) => d.platform);
+  const seedHours = DEFAULT_SLOT_DEFS.map((d) => d.hourTw);
+  const seedKinds = DEFAULT_SLOT_DEFS.map((d) => d.slotKind);
+  await sql`
+    INSERT INTO brand_posting_slots (brand_id, platform, hour_tw, slot_kind, enabled)
+    SELECT b.id, t.platform::publishing_platform, t.hour_tw, t.slot_kind, true
+    FROM brands b
+    CROSS JOIN unnest(
+      ${seedPlatforms}::text[],
+      ${seedHours}::int[],
+      ${seedKinds}::text[]
+    ) AS t(platform, hour_tw, slot_kind)
+    WHERE b.is_active = true
+      AND NOT EXISTS (
+        SELECT 1 FROM brand_posting_slots s WHERE s.brand_id = b.id
+      )
+    ON CONFLICT (brand_id, platform, hour_tw, slot_kind) DO NOTHING
+  `;
 
   await sql`
     CREATE TABLE IF NOT EXISTS user_line_bindings (
@@ -137,6 +244,7 @@ export async function ensurePostingOpsTables(env: Env): Promise<void> {
       last_notified_at   TIMESTAMPTZ
     )
   `;
+  postingOpsEnsured = true;
 }
 
 function mapSlotRow(row: Record<string, unknown>): PostingSlot {
@@ -172,7 +280,6 @@ function fallbackSlots(brands: Array<{ id: string; slug: string }>): PostingSlot
 export async function listAllPostingSlots(env: Env, opts?: { enabledOnly?: boolean }): Promise<PostingSlot[]> {
   const sql = getSql(env);
   try {
-    await ensurePostingOpsTables(env);
     const rows = opts?.enabledOnly
       ? await sql`
           SELECT s.id, s.brand_id, b.slug AS brand_slug, s.platform, s.hour_tw, s.slot_kind, s.enabled
@@ -191,14 +298,37 @@ export async function listAllPostingSlots(env: Env, opts?: { enabledOnly?: boole
     return (rows as Record<string, unknown>[]).map(mapSlotRow);
   } catch (e) {
     if (!isMissingSlots(e)) throw e;
-    const brands = await sql`SELECT id, slug FROM brands WHERE slug IN ('homigo', 'taskgo', 'washgo') AND is_active = true`;
-    return fallbackSlots(brands as Array<{ id: string; slug: string }>);
+    try {
+      await ensurePostingOpsTables(env);
+      return listAllPostingSlots(env, opts);
+    } catch {
+      const brands = await sql`SELECT id, slug FROM brands WHERE is_active = true`;
+      return fallbackSlots(brands as Array<{ id: string; slug: string }>);
+    }
   }
 }
 
 export async function listBrandPostingSlots(env: Env, brandId: string): Promise<PostingSlot[]> {
-  const all = await listAllPostingSlots(env);
-  return all.filter((s) => s.brandId === brandId);
+  const sql = getSql(env);
+  try {
+    const rows = await sql`
+      SELECT s.id, s.brand_id, b.slug AS brand_slug, s.platform, s.hour_tw, s.slot_kind, s.enabled
+      FROM brand_posting_slots s
+      JOIN brands b ON b.id = s.brand_id
+      WHERE s.brand_id = ${brandId}::uuid
+      ORDER BY s.platform, s.hour_tw
+    `;
+    return (rows as Record<string, unknown>[]).map(mapSlotRow);
+  } catch (e) {
+    if (!isMissingSlots(e)) throw e;
+    try {
+      await ensurePostingOpsTables(env);
+      return listBrandPostingSlots(env, brandId);
+    } catch {
+      const brands = await sql`SELECT id, slug FROM brands WHERE id = ${brandId}::uuid`;
+      return fallbackSlots(brands as Array<{ id: string; slug: string }>);
+    }
+  }
 }
 
 export async function listEnabledSlotsAtHour(
@@ -231,15 +361,45 @@ export async function sourceForBrandHour(
 export async function countSlotsByBrand(
   env: Env,
   platform: PostingSlotPlatform,
-  kind: PostingSlotKind,
+  kind?: PostingSlotKind | PostingSlotKind[],
 ): Promise<Record<string, number>> {
   const slots = await listAllPostingSlots(env, { enabledOnly: true });
+  const kinds = kind == null ? null : Array.isArray(kind) ? kind : [kind];
   const out: Record<string, number> = {};
   for (const s of slots) {
-    if (s.platform !== platform || s.slotKind !== kind) continue;
+    if (s.platform !== platform) continue;
+    if (kinds && !kinds.includes(s.slotKind)) continue;
     out[s.brandId] = (out[s.brandId] ?? 0) + 1;
   }
   return out;
+}
+
+async function insertBrandSlots(
+  env: Env,
+  brandId: string,
+  incoming: Array<{ platform: PostingSlotPlatform; hourTw: number; slotKind: PostingSlotKind; enabled?: boolean }>,
+): Promise<void> {
+  const sql = getSql(env);
+  await sql`DELETE FROM brand_posting_slots WHERE brand_id = ${brandId}::uuid`;
+  if (!incoming.length) return;
+  const platforms = incoming.map((i) => i.platform);
+  const hours = incoming.map((i) => i.hourTw);
+  const kinds = incoming.map((i) => i.slotKind);
+  const enableds = incoming.map((i) => i.enabled !== false);
+  await sql`
+    INSERT INTO brand_posting_slots (brand_id, platform, hour_tw, slot_kind, enabled)
+    SELECT ${brandId}::uuid,
+           t.platform::publishing_platform,
+           t.hour_tw,
+           t.slot_kind,
+           t.enabled
+    FROM unnest(
+      ${platforms}::text[],
+      ${hours}::int[],
+      ${kinds}::text[],
+      ${enableds}::bool[]
+    ) AS t(platform, hour_tw, slot_kind, enabled)
+  `;
 }
 
 export async function replaceBrandPostingSlots(
@@ -247,9 +407,8 @@ export async function replaceBrandPostingSlots(
   brandId: string,
   incoming: Array<{ platform: PostingSlotPlatform; hourTw: number; slotKind: PostingSlotKind; enabled?: boolean }>,
 ): Promise<PostingSlot[]> {
-  await ensurePostingOpsTables(env);
   const sql = getSql(env);
-  const seen = new Set<string>();
+  const seenHour = new Set<string>();
   for (const item of incoming) {
     if (!['facebook', 'instagram', 'threads'].includes(item.platform)) {
       throw new Error(`不支援的平台:${item.platform}`);
@@ -258,40 +417,44 @@ export async function replaceBrandPostingSlots(
       throw new Error('時段必須是 0-23 的整點');
     }
     if (item.platform === 'threads') {
-      if (item.slotKind !== 'threads_hourly' && item.slotKind !== 'threads_offtopic') {
-        throw new Error('Threads 時段種類必須是熱議跟風或生活哏文');
-      }
+      if (!isThreadsSlotKind(item.slotKind)) throw new Error(THREADS_KIND_ERROR);
     } else if (item.slotKind !== 'daily_theme') {
       throw new Error('Facebook / Instagram 時段種類必須是每日主題');
     }
-    const key = `${item.platform}|${item.hourTw}|${item.slotKind}`;
-    if (seen.has(key)) throw new Error(`重複時段:${item.platform} ${formatHourTw(item.hourTw)}`);
-    seen.add(key);
+    const hourKey = `${item.platform}|${item.hourTw}`;
+    if (seenHour.has(hourKey)) {
+      throw new Error(`同一整點只能選一個主題:${item.platform} ${formatHourTw(item.hourTw)}`);
+    }
+    seenHour.add(hourKey);
   }
 
-  await sql`DELETE FROM brand_posting_slots WHERE brand_id = ${brandId}::uuid`;
-  for (const item of incoming) {
-    await sql`
-      INSERT INTO brand_posting_slots (brand_id, platform, hour_tw, slot_kind, enabled)
-      VALUES (
-        ${brandId}::uuid,
-        ${item.platform}::publishing_platform,
-        ${item.hourTw},
-        ${item.slotKind},
-        ${item.enabled !== false}
-      )
-    `;
+  try {
+    await insertBrandSlots(env, brandId, incoming);
+  } catch (e) {
+    if (isMissingSlots(e)) {
+      await ensurePostingOpsTables(env);
+      await insertBrandSlots(env, brandId, incoming);
+    } else if (isSlotKindCheck(e)) {
+      await ensureSlotKindConstraint(env);
+      await insertBrandSlots(env, brandId, incoming);
+    } else {
+      throw e;
+    }
   }
 
   const slots = await listBrandPostingSlots(env, brandId);
   const summary = summarizeFrequency(slots);
-  for (const [platform, text] of Object.entries(summary)) {
-    await sql`
-      UPDATE brand_channels
-      SET posting_frequency = ${text}, updated_at = now()
-      WHERE brand_id = ${brandId}::uuid AND platform = ${platform}::publishing_platform
-    `;
-  }
+  await sql`
+    UPDATE brand_channels
+    SET posting_frequency = CASE platform
+      WHEN 'facebook' THEN ${summary.facebook}
+      WHEN 'instagram' THEN ${summary.instagram}
+      WHEN 'threads' THEN ${summary.threads}
+    END,
+    updated_at = now()
+    WHERE brand_id = ${brandId}::uuid
+      AND platform IN ('facebook', 'instagram', 'threads')
+  `;
   return slots;
 }
 

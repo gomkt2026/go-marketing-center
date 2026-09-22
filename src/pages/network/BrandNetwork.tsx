@@ -184,7 +184,7 @@ export function BrandNetwork() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, marginTop: 10 }}>
           <input
             style={inputStyle}
-            placeholder="試跑 Bot：例如「前金有人做排煙管嗎？」"
+            placeholder="試跑 Bot：例如「修馬桶的人」「牆壁壁癌」「前金有人做排煙管嗎？」"
             value={matchText}
             onChange={(e) => setMatchText(e.target.value)}
           />

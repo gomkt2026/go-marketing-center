@@ -57,7 +57,7 @@ export function Settings() {
     { id: 'agents', label: 'AI Agents' },
     { id: 'line', label: 'Line 通知' },
     { id: 'permissions', label: '權限管理' },
-    ...(isAdmin ? [{ id: 'accounts', label: '品牌帳號' }] : []),
+    ...(isAdmin ? [{ id: 'brands', label: '品牌' }, { id: 'accounts', label: '品牌帳號' }] : []),
   ];
   const [tab, setTab] = useState('agents');
   const { brandById } = useBrand();
@@ -65,7 +65,7 @@ export function Settings() {
 
   return (
     <div>
-      <PageHeader title="設定" subtitle="AI Agents 管理、權限架構與品牌登入帳號" />
+      <PageHeader title="設定" subtitle="AI Agents、權限、新增品牌與品牌登入帳號" />
       <Card style={{ marginBottom: 16, borderLeft: '4px solid var(--color-primary)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
@@ -148,6 +148,7 @@ export function Settings() {
       )}
 
       {tab === 'line' && <LineNotifyPanel />}
+      {tab === 'brands' && isAdmin && <BrandsOnboardPanel />}
       {tab === 'accounts' && isAdmin && <BrandAccountsPanel />}
     </div>
   );
@@ -198,9 +199,8 @@ function LineNotifyPanel() {
     <Card>
       <strong style={{ display: 'block', marginBottom: 8 }}>管理者 Line 綁定</strong>
       <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12 }}>
-        用 GO 行銷中心官方帳推待審匯總與發文失敗，也可在 Line 回「成效」「失敗」「待審」。
-        先把 Messaging API webhook 設成 <code>/api/webhooks/line/ops</code>，並設定
-        LINE_OPS_CHANNEL_SECRET / LINE_OPS_CHANNEL_ACCESS_TOKEN。
+        加好友後會收到三個品牌近 7 天發文與成效卡片。之後用問答查「成效」「Homigo成效」「失敗」「待審」，
+        不會主動推發文通知。Messaging API webhook 設成 <code>/api/webhooks/line/ops</code>。
       </p>
       {!data.configured && (
         <p style={{ fontSize: 13, color: 'var(--color-danger)', marginBottom: 12 }}>伺服器尚未設定 Line 行銷 Bot 密鑰。</p>
@@ -228,27 +228,172 @@ function LineNotifyPanel() {
         </p>
       )}
       {data.bound && (
-        <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
-          <label>
-            <input
-              type="checkbox"
-              checked={data.notifyReview}
-              disabled={busy}
-              onChange={(e) => savePrefs({ notifyReview: e.target.checked })}
-            /> 待審閱匯總通知
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={data.notifyFailed}
-              disabled={busy}
-              onChange={(e) => savePrefs({ notifyFailed: e.target.checked })}
-            /> 發文失敗立即通知
-          </label>
-        </div>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+          已改成問答模式：傳「成效」或點卡片按鈕即可，系統不會主動推發文或待審訊息。
+        </p>
       )}
       {message && <p style={{ fontSize: 13, marginTop: 10 }}>{message}</p>}
     </Card>
+  );
+}
+
+function BrandsOnboardPanel() {
+  const { brands, reloadBrands } = useBrand();
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [tagline, setTagline] = useState('');
+  const [primaryColor, setPrimaryColor] = useState('#3A5A7C');
+  const [industry, setIndustry] = useState('');
+  const [audience, setAudience] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [blogBaseUrl, setBlogBaseUrl] = useState('');
+  const [cta, setCta] = useState('');
+  const [editorNickname, setEditorNickname] = useState('小編');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [createdSlug, setCreatedSlug] = useState<string | null>(null);
+  const [seoTopicCount, setSeoTopicCount] = useState(0);
+
+  function guessSlug(value: string) {
+    return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32);
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      const res = await api.createBrand({
+        name,
+        slug: slug || guessSlug(name),
+        tagline: tagline || undefined,
+        primaryColor,
+        industry,
+        audience: audience || undefined,
+        websiteUrl: websiteUrl || undefined,
+        blogBaseUrl: blogBaseUrl || websiteUrl || undefined,
+        cta: cta || undefined,
+        editorNickname: editorNickname || undefined,
+      });
+      setCreatedSlug(res.slug);
+      setSeoTopicCount(res.seoTopicCount);
+      setName('');
+      setSlug('');
+      setTagline('');
+      setIndustry('');
+      setAudience('');
+      setWebsiteUrl('');
+      setBlogBaseUrl('');
+      setCta('');
+      await reloadBrands();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '新增品牌失敗');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <Card>
+        <h3 style={{ fontSize: 15, marginBottom: 6 }}>新增品牌</h3>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14, lineHeight: 1.7 }}>
+          建完會自動帶 FB／IG／Threads 發文時段、小編 Agent 與 SEO 主題庫，之後排程會跟 Homigo／TaskGo／Washgo 一樣產社群稿。
+          官網長文可到該品牌「官網 SEO」從主題庫產文。品牌智慧補完後，口吻會更準。
+        </p>
+        <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'grid', gap: 12, maxWidth: 640 }}>
+          <div className="grid-2" style={{ gap: 12 }}>
+            <label style={labelStyle}>
+              <span>品牌名稱 *</span>
+              <input required value={name} onChange={(e) => {
+                setName(e.target.value);
+                if (!slug) setSlug(guessSlug(e.target.value));
+              }} style={inputStyle} placeholder="例如 GoClean" />
+            </label>
+            <label style={labelStyle}>
+              <span>網址代碼 *</span>
+              <input required value={slug} onChange={(e) => setSlug(guessSlug(e.target.value))} style={inputStyle} placeholder="goclean" />
+            </label>
+          </div>
+          <label style={labelStyle}>
+            <span>一句定位</span>
+            <input value={tagline} onChange={(e) => setTagline(e.target.value)} style={inputStyle} placeholder="把日常作業收回同一個地方" />
+          </label>
+          <label style={labelStyle}>
+            <span>產業與產品 *</span>
+            <textarea
+              required
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              style={{ ...inputStyle, minHeight: 88, resize: 'vertical' }}
+              placeholder="用幾句話說明做什麼、給誰用、現場最痛的事。這段會寫進品牌智慧與 SEO 題庫。"
+            />
+          </label>
+          <label style={labelStyle}>
+            <span>主要受眾</span>
+            <input value={audience} onChange={(e) => setAudience(e.target.value)} style={inputStyle} placeholder="例如店主、工程行、房東" />
+          </label>
+          <div className="grid-2" style={{ gap: 12 }}>
+            <label style={labelStyle}>
+              <span>官網</span>
+              <input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} style={inputStyle} placeholder="https://" />
+            </label>
+            <label style={labelStyle}>
+              <span>部落格網域（SEO）</span>
+              <input value={blogBaseUrl} onChange={(e) => setBlogBaseUrl(e.target.value)} style={inputStyle} placeholder="空白則用官網" />
+            </label>
+          </div>
+          <div className="grid-2" style={{ gap: 12 }}>
+            <label style={labelStyle}>
+              <span>主色</span>
+              <input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} style={inputStyle} />
+            </label>
+            <label style={labelStyle}>
+              <span>小編暱稱</span>
+              <input value={editorNickname} onChange={(e) => setEditorNickname(e.target.value)} style={inputStyle} />
+            </label>
+          </div>
+          <label style={labelStyle}>
+            <span>官網長文文末 CTA</span>
+            <input value={cta} onChange={(e) => setCta(e.target.value)} style={inputStyle} placeholder="空白則用匠管信箱與電話" />
+          </label>
+          {error && (
+            <div style={{ fontSize: 13, color: '#B85454', background: '#FDF0F0', padding: '8px 12px', borderRadius: 8 }}>
+              {error}
+            </div>
+          )}
+          {createdSlug && (
+            <div style={{ fontSize: 13, lineHeight: 1.7, background: 'var(--color-bg-soft)', padding: '10px 12px', borderRadius: 8 }}>
+              已建立，並產出 {seoTopicCount} 則 SEO 主題。接著補：
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+                <Link to={`/${createdSlug}/intelligence`}>品牌智慧</Link>
+                <Link to={`/${createdSlug}/posting-times`}>發文時段</Link>
+                <Link to={`/${createdSlug}/seo`}>官網 SEO</Link>
+                <Link to={`/${createdSlug}/social`}>社群帳號</Link>
+              </div>
+            </div>
+          )}
+          <Button type="submit" variant="primary" disabled={saving}>{saving ? '建立中…' : '建立品牌'}</Button>
+        </form>
+      </Card>
+
+      <Card>
+        <h3 style={{ fontSize: 15, marginBottom: 12 }}>現有品牌</h3>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {brands.map((b) => (
+            <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--color-bg-soft)' }}>
+              <Avatar label={b.name} color={b.primaryColor} size={32} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{b.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{b.slug} · {b.tagline || '尚無定位'}</div>
+              </div>
+              <Link to={`/${b.slug}/workspace`} style={{ fontSize: 12 }}>工作台</Link>
+              <Link to={`/${b.slug}/seo`} style={{ fontSize: 12 }}>SEO</Link>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
   );
 }
 

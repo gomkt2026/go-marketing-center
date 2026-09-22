@@ -48,14 +48,18 @@ const contentStatusTone: Partial<Record<ContentStatus, BadgeTone>> = {
   draft: 'default', pending_review: 'accent', approved: 'primary', needs_revision: 'danger', scheduled: 'accent',
 };
 const genSourceLabel: Record<string, string> = {
-  threads_30min: '30分熱議', threads_hourly: '熱議跟風', threads_offtopic: '生活哏文', daily_theme: '每日主題',
+  threads_30min: '30分熱議', threads_hourly: '熱議跟風', threads_offtopic: '生活梗文',
+  threads_love: '感情散文', threads_weather: '天氣季節', threads_entertainment: '娛樂影視',
+  threads_sports: '運動賽事', threads_emotion: '人際視角',
+  threads_workplace: '行業現場', threads_qa: '互動提問', threads_image: '實績畫面',
+  daily_theme: '每日主題',
   auto_signal: '情報自動', market_signal: '市場情報', meeting_plan: '會議計畫',
 };
 
 const PLATFORM_COLUMNS: { id: 'facebook' | 'instagram' | 'threads' | 'website'; label: string; note: string }[] = [
   { id: 'facebook', label: 'Facebook', note: '每天台灣 19:00 一則業者主題;帳號需 API 已連線並開啟自動發布' },
   { id: 'instagram', label: 'Instagram', note: '與 FB 同一主題、每天 19:00 一則;必須有配圖才會自動發' },
-  { id: 'threads', label: 'Threads', note: '每天 00/06/12/18 熱議跟風、09 生活哏文、21 愛情散文;日常請到 Threads 工作台批准後才發' },
+  { id: 'threads', label: 'Threads', note: '主題在發文時段自訂（熱議、天氣、娛樂、運動、生活梗、感情、人際、現場、提問、實績）;日常請到 Threads 工作台批准後才發' },
   { id: 'website', label: '官網長文', note: '批准後一鍵發到 /blog。Washgo / Homigo / TaskGo 依品牌 ingest。沒有金鑰會發布失敗。' },
 ];
 

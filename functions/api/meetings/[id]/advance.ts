@@ -2,6 +2,7 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../../_shared/env';
 import { requireAuth } from '../../../_shared/auth';
 import { json, error } from '../../../_shared/response';
+import { toClientError } from '../../../_shared/openai';
 import { advanceMeetingOnce } from '../../../_shared/meeting-ai';
 
 // 直播會議:生成下一位小編的單則發言(前端每 12-18 秒輪詢一次)
@@ -33,6 +34,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       },
     }, 201);
   } catch (e) {
-    return error(`發言生成失敗:${e instanceof Error ? e.message : '未知錯誤'}`, 502);
+    const mapped = toClientError(e, '發言生成');
+    return error(mapped.message, mapped.status);
   }
 };

@@ -4,7 +4,9 @@ import { getBrandBySlug } from './queries';
 import { DEFAULT_PUBLIC_BASE, buildNetworkCardKey, putMedia, toPublicMediaUrl } from './media';
 import { ensureNetworkTables, upsertNetworkContact, type NetworkContactRecord } from './network-contacts';
 import { bytesToDataUrl, draftFromOcr, ocrBusinessCard } from './network-ocr';
-import { classifyVendorAsk, contactLineUri, contactTelUri, formatMatchText, logNetworkMatch, looksLikeVendorAsk, searchVendors, type RankedContact, type VendorAsk } from './network-match';
+import { classifyVendorAsk, contactLineUri, contactTelUri, formatMatchText, logNetworkMatch, looksLikeNudge, looksLikeVendorAsk, searchVendors, type RankedContact, type VendorAsk } from './network-match';
+import { pickAckText, toTaiwanText } from './network-trades';
+import { speakAsXiaomi, spokenMatchScript, transcribeLineAudio } from './network-voice';
 
 const LINE_API = 'https://api.line.me/v2/bot';
 const LINE_DATA = 'https://api-data.line.me/v2/bot';
@@ -17,7 +19,7 @@ export interface LineEvent {
   type: string;
   replyToken?: string;
   source?: { type?: string; userId?: string; groupId?: string; roomId?: string };
-  message?: { id?: string; type?: string; text?: string };
+  message?: { id?: string; type?: string; text?: string; duration?: number };
 }
 
 function encodeBase64(bytes: Uint8Array): string {
@@ -88,12 +90,12 @@ export async function pushLine(env: Env, to: string, messages: unknown[]): Promi
   }
 }
 
-async function downloadLineImage(env: Env, messageId: string): Promise<{ bytes: Uint8Array; contentType: string }> {
+async function downloadLineContent(env: Env, messageId: string, fallbackType: string): Promise<{ bytes: Uint8Array; contentType: string }> {
   const res = await fetch(`${LINE_DATA}/message/${messageId}/content`, {
     headers: { Authorization: `Bearer ${requireToken(env)}` },
   });
-  if (!res.ok) throw new Error(`下載 LINE 圖片失敗 (${res.status})`);
-  const contentType = res.headers.get('content-type') || 'image/jpeg';
+  if (!res.ok) throw new Error(`下載 LINE 內容失敗 (${res.status})`);
+  const contentType = res.headers.get('content-type') || fallbackType;
   return { bytes: new Uint8Array(await res.arrayBuffer()), contentType };
 }
 
@@ -195,6 +197,117 @@ function matchMessages(env: Env, ask: VendorAsk, matches: RankedContact[]): unkn
   ];
 }
 
+async function ackFirst(env: Env, event: LineEvent, text: string): Promise<boolean> {
+  if (!event.replyToken) return false;
+  try {
+    await replyLine(env, event.replyToken, [textMsg(text)]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function lastVendorAskInThread(
+  env: Env,
+  brandId: string,
+  groupId: string | null,
+  userId: string | null,
+): Promise<string | null> {
+  const sql = getSql(env);
+  const rows = groupId
+    ? await sql`
+        SELECT text FROM line_network_inbox
+        WHERE brand_id = ${brandId}::uuid
+          AND line_group_id = ${groupId}
+          AND text IS NOT NULL AND text <> ''
+        ORDER BY created_at DESC
+        LIMIT 20
+      `
+    : await sql`
+        SELECT text FROM line_network_inbox
+        WHERE brand_id = ${brandId}::uuid
+          AND line_user_id = ${userId}
+          AND text IS NOT NULL AND text <> ''
+        ORDER BY created_at DESC
+        LIMIT 20
+      `;
+  for (const row of rows as { text?: string }[]) {
+    const t = String(row.text ?? '').trim();
+    if (!t || looksLikeNudge(t)) continue;
+    if (looksLikeVendorAsk(t)) return t;
+  }
+  return null;
+}
+
+async function deliverAskResult(
+  env: Env,
+  brandSlug: string,
+  event: LineEvent,
+  ask: VendorAsk,
+  matches: RankedContact[],
+  opts: { preferVoice: boolean; replyUsed: boolean; heard?: string },
+): Promise<void> {
+  const messages = matchMessages(env, ask, matches);
+  if (opts.heard && messages[0] && typeof messages[0] === 'object' && 'text' in messages[0]) {
+    const first = messages[0] as { type: string; text: string };
+    first.text = `我聽到：「${opts.heard}」\n\n${first.text}`;
+  }
+  if (opts.preferVoice) {
+    try {
+      const audio = await speakAsXiaomi(env, brandSlug, spokenMatchScript(ask, matches));
+      if (audio) {
+        messages.unshift({
+          type: 'audio',
+          originalContentUrl: audio.url,
+          duration: audio.durationMs,
+        });
+      }
+    } catch (err) {
+      console.error('xiaomi tts failed', err instanceof Error ? err.message : err);
+    }
+  }
+  if (!opts.replyUsed) {
+    await replyOrPush(env, event, messages);
+    return;
+  }
+  const to = event.source?.groupId ?? event.source?.roomId ?? event.source?.userId;
+  if (to) await pushLine(env, to, messages);
+}
+
+async function processVendorAsk(
+  env: Env,
+  brandId: string,
+  brandSlug: string,
+  event: LineEvent,
+  text: string,
+  opts: { preferVoice: boolean; replyUsed: boolean },
+): Promise<void> {
+  const ask = await classifyVendorAsk(env, text);
+  if (!ask.isVendorAsk) {
+    const msg = textMsg('這則我先當一般討論。若要找廠商，直接說工種就好，例如修馬桶、壁癌、搬家。');
+    if (opts.replyUsed) {
+      const to = event.source?.groupId ?? event.source?.roomId ?? event.source?.userId;
+      if (to) await pushLine(env, to, [msg]);
+    } else {
+      await replyOrPush(env, event, [msg]);
+    }
+    return;
+  }
+  const matches = await searchVendors(env, brandId, ask);
+  await logNetworkMatch(env, {
+    brandId,
+    queryText: text,
+    ask,
+    matches,
+    lineUserId: event.source?.userId ?? null,
+    lineGroupId: event.source?.groupId ?? event.source?.roomId ?? null,
+  });
+  await deliverAskResult(env, brandSlug, event, ask, matches, {
+    ...opts,
+    heard: opts.preferVoice ? toTaiwanText(text) : undefined,
+  });
+}
+
 async function replyOrPush(env: Env, event: LineEvent, messages: unknown[]): Promise<void> {
   if (event.replyToken) {
     try {
@@ -231,14 +344,14 @@ async function handleOneEvent(env: Env, brandId: string, brandSlug: string, even
 
   if (event.type === 'follow' && event.replyToken) {
     await replyLine(env, event.replyToken, [textMsg(
-      '你好，我是 FIXERCOWORK 人脈小幫手。\n\n傳名片照片給我，我會辨識後寫進品牌人脈庫。\n在群組問「有沒有做○○的廠商」，我會幫你找名單。',
+      '你好，我是 FIXERCOWORK 人脈小幫手。\n\n傳名片照片給我，我會辨識後寫進品牌人脈庫。\n在群組問「修馬桶、壁癌、搬家」這類，我會幫你找名單。工班開車也能傳語音，小咪會用講的回你。',
     )]);
     return;
   }
 
   if (event.type === 'join' && event.replyToken) {
     await replyLine(env, event.replyToken, [textMsg(
-      '我已加入群組。問「高雄有沒有水電／防水／冷氣」這類問題，我會用人脈庫回卡片，可直接通話或加 LINE。傳名片照片也會幫你建檔。',
+      '我已加入群組。問修馬桶、壁癌、水電、搬家這類，我會用人脈庫回卡片。也可以傳語音，小咪會聽完再用講的回。傳名片照片也會幫你建檔。',
     )]);
     return;
   }
@@ -248,19 +361,21 @@ async function handleOneEvent(env: Env, brandId: string, brandSlug: string, even
   const messageType = event.message.type ?? '';
   const text = event.message.text ?? null;
 
-  await sql`
+  const inserted = await sql`
     INSERT INTO line_network_inbox (brand_id, line_user_id, line_group_id, event_type, message_type, text, raw)
     VALUES (
       ${brandId}::uuid, ${userId}, ${groupId}, ${event.type}, ${messageType}, ${text},
       ${JSON.stringify({ type: event.type, source: event.source, messageType })}::jsonb
     )
+    RETURNING id
   `;
+  const inboxId = (inserted[0] as { id?: string } | undefined)?.id ?? null;
 
   if (messageType === 'image' && event.message.id) {
     if (event.replyToken) {
       await replyLine(env, event.replyToken, [textMsg('收到照片，正在辨識是不是名片…')]).catch(() => undefined);
     }
-    const image = await downloadLineImage(env, event.message.id);
+    const image = await downloadLineContent(env, event.message.id, 'image/jpeg');
     const ext = image.contentType.includes('png') ? 'png' : 'jpg';
     let cardImageUrl: string | null = null;
     try {
@@ -290,23 +405,55 @@ async function handleOneEvent(env: Env, brandId: string, brandSlug: string, even
     return;
   }
 
+  if (messageType === 'audio' && event.message.id) {
+    const replyUsed = await ackFirst(env, event, pickAckText('audio'));
+    try {
+      const audio = await downloadLineContent(env, event.message.id, 'audio/mp4');
+      const transcript = await transcribeLineAudio(env, audio.bytes, audio.contentType);
+      if (inboxId && transcript) {
+        await sql`UPDATE line_network_inbox SET text = ${transcript} WHERE id = ${inboxId}::uuid`;
+      }
+      if (!transcript) {
+        const msg = textMsg(env.ELEVENLABS_API_KEY
+          ? '語音我沒聽清楚，可以再說一次，或直接打字工種給我，例如修馬桶、壁癌。'
+          : '這台目前還沒接語音，先打字給我工種，例如修馬桶、壁癌。');
+        const to = groupId ?? userId;
+        if (replyUsed && to) await pushLine(env, to, [msg]);
+        else await replyOrPush(env, event, [msg]);
+        return;
+      }
+      await processVendorAsk(env, brandId, brandSlug, event, transcript, { preferVoice: true, replyUsed });
+    } catch (err) {
+      console.error('line audio failed', err instanceof Error ? err.message : err);
+      const msg = textMsg('語音這則我先沒對上，你打字再說一次工種，我馬上幫你找。');
+      const to = groupId ?? userId;
+      if (replyUsed && to) await pushLine(env, to, [msg]);
+      else await replyOrPush(env, event, [msg]);
+    }
+    return;
+  }
+
   if (messageType === 'text' && text) {
-    if (!looksLikeVendorAsk(text)) return;
-    const ask = await classifyVendorAsk(env, text);
-    if (!ask.isVendorAsk) {
-      await replyOrPush(env, event, [textMsg('這則我先當一般討論。若要找廠商，直接說工種和地區，例如「高雄水電有推薦嗎？」')]);
+    if (looksLikeNudge(text)) {
+      const replyUsed = await ackFirst(env, event, pickAckText('nudge'));
+      const prev = await lastVendorAskInThread(env, brandId, groupId, userId);
+      if (!prev) {
+        const msg = textMsg('在！你直接講工種就好，例如修馬桶、壁癌、搬家，我幫你對人脈庫。');
+        if (replyUsed) {
+          const to = groupId ?? userId;
+          if (to) await pushLine(env, to, [msg]);
+        } else {
+          await replyOrPush(env, event, [msg]);
+        }
+        return;
+      }
+      await processVendorAsk(env, brandId, brandSlug, event, prev, { preferVoice: false, replyUsed });
       return;
     }
-    const matches = await searchVendors(env, brandId, ask);
-    await logNetworkMatch(env, {
-      brandId,
-      queryText: text,
-      ask,
-      matches,
-      lineUserId: userId,
-      lineGroupId: groupId,
-    });
-    await replyOrPush(env, event, matchMessages(env, ask, matches));
+
+    if (!looksLikeVendorAsk(text)) return;
+    const replyUsed = await ackFirst(env, event, pickAckText('ask'));
+    await processVendorAsk(env, brandId, brandSlug, event, text, { preferVoice: false, replyUsed });
   }
 }
 

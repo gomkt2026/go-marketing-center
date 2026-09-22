@@ -16,13 +16,19 @@ const statusLabel: Record<PublishingJobStatus, string> = {
 };
 const platformLabel: Record<string, string> = { facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads' };
 const genSourceLabel: Record<string, string> = {
-  threads_hourly: '熱議跟風', threads_offtopic: '生活哏文', daily_theme: '每日主題',
+  threads_hourly: '熱議跟風', threads_offtopic: '生活梗文',
+  threads_love: '感情散文', threads_weather: '天氣季節', threads_entertainment: '娛樂影視',
+  threads_sports: '運動賽事', threads_emotion: '人際視角',
+  threads_workplace: '行業現場', threads_qa: '互動提問', threads_image: '實績畫面',
+  daily_theme: '每日主題',
   auto_signal: '情報自動', market_signal: '市場情報', meeting_plan: '會議計畫',
 };
 // threads_hourly 貼文的角度輪替(避免連續發文都落在同一個角度),見 functions/_shared/prompts.ts 的 THREADS_HOURLY_CATEGORIES
 const genCategoryLabel: Record<string, string> = {
   seasonal_trend: '時事跟風', emotion: '感情視角', weather: '天氣話題',
   entertainment: '娛樂話題', sports: '運動話題', image_inspired: '圖片靈感',
+  workplace: '行業現場', qa: '互動提問',
+  love_story: '愛情散文', life_gag: '生活梗文', reflection: '生活省思', love_view: '感情觀點',
 };
 const contentStatusLabel: Record<string, string> = {
   draft: '草稿', pending_review: '待審閱', approved: '已批准', needs_revision: '修改中',

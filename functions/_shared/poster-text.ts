@@ -45,15 +45,15 @@ interface PosterTheme {
   kicker: string;
   bannerOpacity: number;
   slant: boolean;
-  /** editorial = 紙本留白上的安靜小字; graphic = 斜切色塊海報; lively = 可愛品牌的圓潤主標 */
-  mode: 'editorial' | 'graphic' | 'lively';
+  /** editorial = 紙本留白; homigo = 大字情緒主標; graphic = 斜切色塊; lively = 可愛圓潤主標 */
+  mode: 'editorial' | 'homigo' | 'graphic' | 'lively';
 }
 
 const THEME: Record<string, PosterTheme> = {
   homigo: {
     banner: '#F5F1EA', main: '#0B2D5C', accent: '#F7B500', stripe: '#F7B500',
     advantage: '#5C5346', kicker: '#0B2D5C',
-    bannerOpacity: 0.0, slant: false, mode: 'editorial',
+    bannerOpacity: 0.0, slant: false, mode: 'homigo',
   },
   taskgo: {
     banner: '#0B2D5C', main: '#FFFFFF', accent: '#F7B500', stripe: '#2BA3D6',
@@ -199,6 +199,7 @@ function bannerGeometry(width: number, height: number, landscape: boolean) {
 
 function letterSpacingPx(fontSize: number, mode: PosterTheme['mode']): number {
   if (mode === 'editorial') return Math.round(fontSize * 0.12);
+  if (mode === 'homigo') return Math.round(fontSize * 0.03);
   if (mode === 'lively') return Math.round(fontSize * 0.02);
   return 0;
 }
@@ -272,21 +273,26 @@ function buildEditorialSvg(params: {
   landscape: boolean;
 }): { svg: string; x: number; y: number } {
   const { width, height, theme, main, accent, advantage, landscape } = params;
-  const pad = Math.round(width * (landscape ? 0.04 : 0.08));
+  const isHomigo = theme.mode === 'homigo';
+  const pad = isHomigo
+    ? (landscape ? Math.max(80, Math.round(width * 0.04)) : Math.max(80, Math.round(width * 0.074)))
+    : Math.round(width * (landscape ? 0.04 : 0.08));
   const colW = landscape ? Math.round(width * 0.38) : width;
   const cx = landscape ? Math.round(colW / 2) : Math.round(width / 2);
   const maxTextW = colW - pad * 2;
   const lines = accent ? [main, accent] : [main];
   const longest = lines.reduce((a, b) => (a.length >= b.length ? a : b));
-  let fontSize = landscape ? Math.round(colW * 0.11) : Math.round(width * (theme.mode === 'lively' ? 0.078 : 0.072));
+  let fontSize = landscape
+    ? Math.round(colW * 0.11)
+    : Math.round(width * (theme.mode === 'lively' ? 0.078 : isHomigo ? 0.092 : 0.072));
   while (spacedWidth(longest, fontSize, letterSpacingPx(fontSize, theme.mode)) > maxTextW && fontSize > 28) {
     fontSize -= 2;
   }
   const tracking = letterSpacingPx(fontSize, theme.mode);
-  const lineGap = Math.round(fontSize * (theme.mode === 'lively' ? 1.14 : 1.22));
+  const lineGap = Math.round(fontSize * (theme.mode === 'lively' ? 1.14 : isHomigo ? 1.16 : 1.22));
   const headY = landscape
     ? Math.round(height * 0.22 + fontSize * 0.8)
-    : Math.round(height * 0.09 + fontSize * 0.8);
+    : Math.round((isHomigo ? Math.max(120, height * 0.09) : height * 0.09) + fontSize * 0.8);
   const stripeH = Math.max(theme.mode === 'lively' ? 6 : 4, Math.round(fontSize * (theme.mode === 'lively' ? 0.12 : 0.08)));
   const texts = lines.map((line, i) => {
     const fill = i === 0 ? theme.main : theme.accent;
@@ -300,7 +306,11 @@ function buildEditorialSvg(params: {
   let advSize = landscape ? Math.round(colW * 0.045) : Math.round(width * 0.032);
   const advTrack = letterSpacingPx(advSize, theme.mode);
   while (spacedWidth(advantage, advSize, advTrack) > maxTextW && advSize > 16) advSize -= 2;
-  const advY = landscape ? Math.round(height * 0.88) : Math.round(height * 0.93);
+  const advY = landscape
+    ? Math.round(height * 0.88)
+    : isHomigo
+      ? height - Math.max(120, Math.round(height * 0.09))
+      : Math.round(height * 0.93);
   const advEl = advantage
     ? `<text x="${cx}" y="${advY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${advSize}" font-weight="700" fill="${theme.advantage}" fill-opacity="0.88" letter-spacing="${letterSpacingPx(advSize, theme.mode)}">${escapeXml(advantage)}</text>`
     : '';

@@ -72,6 +72,10 @@ export function BrandSeo() {
     () => (slug ? api.seoReport(slug) : Promise.reject(new Error('no slug'))),
     [slug],
   );
+  const topicsQuery = useAsyncData(
+    () => (slug ? api.seoTopics(slug) : Promise.reject(new Error('no slug'))),
+    [slug],
+  );
 
   useEffect(() => {
     setNotice(null);
@@ -186,11 +190,41 @@ export function BrandSeo() {
         </Card>
       )}
 
+      <Card style={{ marginBottom: 12 }}>
+        <strong style={{ display: 'block', marginBottom: 8 }}>SEO 主題庫</strong>
+        <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginBottom: 10, lineHeight: 1.6 }}>
+          新品牌建立時會先產出主題。選一題即可產官網長文，審閱後再發到官網。
+        </p>
+        {(topicsQuery.data?.topics ?? []).length === 0 && (
+          <p style={{ fontSize: 13 }}>尚未有主題。請到設定 → 品牌確認這個品牌已建立，或先寫完品牌智慧再回來產文。</p>
+        )}
+        <div style={{ display: 'grid', gap: 8 }}>
+          {(topicsQuery.data?.topics ?? []).map((topic) => (
+            <div key={topic.topic} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12 }}>
+              <div className="card-row" style={{ alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <strong style={{ fontSize: 14 }}>{topic.topic}</strong>
+                  <p style={{ fontSize: 12.5, marginTop: 4, lineHeight: 1.6 }}>{topic.angle}</p>
+                </div>
+                <Button
+                  variant="primary"
+                  disabled={generating !== null}
+                  style={{ fontSize: 12, padding: '4px 12px', flexShrink: 0 }}
+                  onClick={() => void generateFromGap(topic.topic)}
+                >
+                  {generating === topic.topic ? '產文中…' : '產生這篇長文'}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       {!audit && (
         <Card>
           <strong style={{ display: 'block', marginBottom: 8 }}>還沒有健檢報告</strong>
           <p style={{ fontSize: 13, lineHeight: 1.7 }}>
-            按右上角執行一次，系統會抓首頁、robots.txt、sitemap、/blog，對照品牌不可宣稱與主題庫，產出 P0–P3 待辦與可產文的內容缺口。
+            有官網網址後，按右上角執行一次，系統會抓首頁、robots.txt、sitemap、/blog，對照品牌不可宣稱與主題庫，產出 P0–P3 待辦與可產文的內容缺口。
           </p>
         </Card>
       )}

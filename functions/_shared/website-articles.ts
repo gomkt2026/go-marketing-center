@@ -162,7 +162,7 @@ export function websiteCta(slug: string, audience?: string | null): string {
   if (slug === 'washgo') {
     return '想把到府收衣服、線上報價和衣物追蹤放在同一處，加入 Washgo LINE 官方帳號 @washgo，加入即可下單。';
   }
-  return '想了解更多，歡迎到品牌官網閱讀完整說明。';
+  return `想了解更多，歡迎到${websiteAuthor(slug)}官網閱讀完整說明，或來信 Service@inforcraft.com.tw。`;
 }
 
 export function websiteCtaRule(slug: string, audience?: string | null): string {

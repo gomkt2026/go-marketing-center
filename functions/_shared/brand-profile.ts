@@ -16,12 +16,27 @@ export async function applyBrandWebsiteMigration(env: Env): Promise<string[]> {
   await sql`ALTER TABLE brands ADD COLUMN IF NOT EXISTS website_url TEXT`;
   await sql`ALTER TABLE brands ADD COLUMN IF NOT EXISTS website_note TEXT`;
   await sql`
-    UPDATE brands
-    SET website_url = COALESCE(website_url, 'https://app.taskgo.com.tw'),
-        website_note = COALESCE(website_note, '產品入口與註冊頁,價格與方案以官網為準')
+    UPDATE brands SET
+      logo_url = COALESCE(logo_url, '/api/media/brand-assets/homigo/logo.png'),
+      website_url = COALESCE(website_url, 'https://cc.homigo.workers.dev'),
+      website_note = COALESCE(website_note, 'Homigo 指揮中心；房客／房東主要走 LINE LIFF')
+    WHERE slug = 'homigo'
+  `;
+  await sql`
+    UPDATE brands SET
+      logo_url = COALESCE(logo_url, '/api/media/brand-assets/taskgo/logo.png'),
+      website_url = COALESCE(website_url, 'https://app.taskgo.com.tw'),
+      website_note = COALESCE(website_note, '產品入口與註冊頁,價格與方案以官網為準')
     WHERE slug = 'taskgo'
   `;
-  return ['columns:brands.website', 'seed:taskgo'];
+  await sql`
+    UPDATE brands SET
+      logo_url = COALESCE(logo_url, '/api/media/brand-assets/washgo/logo.png'),
+      website_url = COALESCE(website_url, 'https://washgo.pages.dev'),
+      website_note = COALESCE(website_note, 'Washgo 產品網站；門市與司機作業走 LINE LIFF（washgo-liff.pages.dev）')
+    WHERE slug = 'washgo'
+  `;
+  return ['columns:brands.website', 'seed:brand-profile'];
 }
 
 export async function loadBrandWebsite(env: Env, brandId: string): Promise<{ websiteUrl: string | null; websiteNote: string | null }> {

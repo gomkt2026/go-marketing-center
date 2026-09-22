@@ -8,7 +8,7 @@ import { logActivity } from '../../../../../_shared/activity';
 import { toPublicMediaUrl } from '../../../../../_shared/media';
 import { buildBrandContext, defaultAudienceLane } from '../../../../../_shared/prompts';
 import {
-  generatePlatformPost, generatePostFromImage, saveGeneratedContent, findBrandAgent,
+  generatePlatformPost, generatePostFromImage, saveGeneratedContent, findBrandAgent, runPlatformJobs,
   SUPPORTED_PLATFORMS, type SocialPlatform,
 } from '../../../../../_shared/generate';
 import {
@@ -50,54 +50,41 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   ].filter(Boolean).join('\n');
   const imageUrl = doc.mimeType?.startsWith('image/') ? toPublicMediaUrl(context.env, doc.fileUrl) : null;
 
-  const work = (async () => {
-    const created: { contentId: string; platform: SocialPlatform }[] = [];
-    const failures: { platform: SocialPlatform; error: string }[] = [];
-    const results = await Promise.all(platforms.map(async (platform) => {
-      try {
-        const result = imageUrl
-          ? await generatePostFromImage(context.env, {
-            brandCtx, platform, imageUrl,
-            caption: topicSummary,
-            imageCategory: 'other',
-            audienceLane: defaultAudienceLane(platform),
-            extraInstruction: extra,
-          })
-          : await generatePlatformPost(context.env, {
-            brandCtx, platform,
-            topic: `${kind}:${doc.title}`,
-            topicSummary,
-            extraInstruction: extra,
-          });
-        const { contentId } = await saveGeneratedContent(context.env, {
-          brandCtx, platform, result, generatedByAgentId: agentId,
-          promptMeta: { source: 'brand_document', documentId: id, sourceType: doc.sourceType },
-          imageAssetMeta: imageUrl ? { sourceDocumentId: id, generated: false, reused: true } : undefined,
-        });
-        await logActivity(context.env, {
-          brandId: brand.id,
-          actorType: agentId ? 'ai_agent' : 'user',
-          actorAgentId: agentId,
-          actorUserId: agentId ? null : auth.id,
-          action: 'content.generated',
-          entityType: 'content',
-          entityId: contentId,
-          afterState: { platform, fromDocument: id, sourceType: doc.sourceType },
-        });
-        return { ok: true as const, item: { contentId, platform } };
-      } catch (e) {
-        return { ok: false as const, platform, error: e instanceof Error ? e.message : '生成失敗' };
-      }
-    }));
-    for (const r of results) {
-      if (r.ok) created.push(r.item);
-      else failures.push({ platform: r.platform, error: r.error });
-    }
-    return { created, failures };
-  })();
+  const pending = runPlatformJobs(platforms, async (platform) => {
+    const result = imageUrl
+      ? await generatePostFromImage(context.env, {
+        brandCtx, platform, imageUrl,
+        caption: topicSummary,
+        imageCategory: 'other',
+        audienceLane: defaultAudienceLane(platform),
+        extraInstruction: extra,
+      })
+      : await generatePlatformPost(context.env, {
+        brandCtx, platform,
+        topic: `${kind}:${doc.title}`,
+        topicSummary,
+        extraInstruction: extra,
+      });
+    const { contentId } = await saveGeneratedContent(context.env, {
+      brandCtx, platform, result, generatedByAgentId: agentId,
+      promptMeta: { source: 'brand_document', documentId: id, sourceType: doc.sourceType },
+      imageAssetMeta: imageUrl ? { sourceDocumentId: id, generated: false, reused: true } : undefined,
+    });
+    await logActivity(context.env, {
+      brandId: brand.id,
+      actorType: agentId ? 'ai_agent' : 'user',
+      actorAgentId: agentId,
+      actorUserId: agentId ? null : auth.id,
+      action: 'content.generated',
+      entityType: 'content',
+      entityId: contentId,
+      afterState: { platform, fromDocument: id, sourceType: doc.sourceType },
+    });
+    return { contentId, platform };
+  });
 
-  context.waitUntil(work.then(() => undefined, () => undefined));
-  const { created, failures } = await work;
+  context.waitUntil(pending.then(() => undefined, () => undefined));
+  const { created, failures } = await pending;
   if (!created.length) {
     return error(`全部平台生成失敗:${failures.map((f) => `${f.platform}: ${f.error}`).join(';')}`, 502);
   }

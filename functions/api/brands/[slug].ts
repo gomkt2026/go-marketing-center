@@ -6,6 +6,7 @@ import { getBrandBySlug, getBrandVersion, mapBrand } from '../../_shared/queries
 import { json, error } from '../../_shared/response';
 import { applyBrandWebsiteMigration, isMissingWebsiteColumn } from '../../_shared/brand-profile';
 import { saveBrandWebsiteDestination } from '../../_shared/website-articles';
+import { recordKnowledgeChange } from '../../_shared/brand-knowledge';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -77,5 +78,29 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   }
 
   const updated = await getBrandBySlug(context.env, slug);
+  const beforeSite = {
+    websiteUrl: brand.websiteUrl ?? null,
+    websiteNote: brand.websiteNote ?? null,
+    blogBaseUrl: brand.blogBaseUrl ?? null,
+    ingestBaseUrl: brand.ingestBaseUrl ?? null,
+  };
+  const afterSite = {
+    websiteUrl: updated?.websiteUrl ?? websiteUrl,
+    websiteNote: updated?.websiteNote ?? websiteNote,
+    blogBaseUrl: updated?.blogBaseUrl ?? brand.blogBaseUrl ?? null,
+    ingestBaseUrl: updated?.ingestBaseUrl ?? brand.ingestBaseUrl ?? null,
+  };
+  if (JSON.stringify(beforeSite) !== JSON.stringify(afterSite) || body.ingestKey?.trim()) {
+    await recordKnowledgeChange(context.env, {
+      brandId: brand.id,
+      actor: auth,
+      section: 'core',
+      action: 'update',
+      entityId: brand.id,
+      label: '官方網站／SEO 目的地',
+      before: beforeSite,
+      after: { ...afterSite, ingestKey: body.ingestKey?.trim() ? '（已更新金鑰）' : undefined },
+    }).catch(() => undefined);
+  }
   return json({ brand: updated ?? mapBrand(rows[0] as Record<string, unknown>, context.env) });
 };

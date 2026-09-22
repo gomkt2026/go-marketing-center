@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useMeta } from '@/context/MetaContext';
 import { useBrand } from '@/context/BrandContext';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { Meeting, MeetingMessage, AgentWithPersona, MeetingPostPlanItem } from '@/types';
 
@@ -78,6 +78,8 @@ export function LiveMeetingRoom({ meeting, initialMessages, onReload }: {
 
   const runningRef = useRef(false);
   const concludedRef = useRef(meeting.status === 'concluded');
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const scene = pickScene(meeting.id);
   const agentMap = new Map<string, AgentWithPersona>((agentsQuery.data?.agents ?? []).map((a) => [a.id, a]));
@@ -142,24 +144,44 @@ export function LiveMeetingRoom({ meeting, initialMessages, onReload }: {
     }
   }, [meeting.id, concluding, onReload]);
 
-  // 時間到自動總結
+  // 時間到自動總結;完全沒發言就不要打 conclude(會 500)
   useEffect(() => {
-    if (running && remaining === 0) void conclude();
+    if (!running || remaining !== 0) return;
+    if (messagesRef.current.length === 0) {
+      runningRef.current = false;
+      setRunning(false);
+      setActionMsg((prev) => prev ?? '3 分鐘內小編沒有成功發言。若是 OpenAI 額度不足,請先儲值再重開一場。');
+      return;
+    }
+    void conclude();
   }, [remaining, running, conclude]);
 
   // 發言迴圈:advance → 顯示 → 間隔 → 再 advance
   async function speakLoop() {
+    let consecutiveFails = 0;
     while (runningRef.current) {
       setTyping(true);
       try {
         const res = await api.advanceMeeting(meeting.id);
         if (!runningRef.current) break;
         setTyping(false);
+        consecutiveFails = 0;
         if (res.done || !res.message) break;
         setMessages((prev) => [...prev, res.message!]);
-      } catch {
+      } catch (e) {
         setTyping(false);
-        // 單則失敗不中斷會議,等下一輪
+        const status = e instanceof ApiError ? e.status : 0;
+        const msg = e instanceof Error ? e.message : '未知錯誤';
+        const fatal = status === 401 || status === 402 || status === 403
+          || /額度不足|API Key|尚未設定/.test(msg);
+        consecutiveFails += 1;
+        if (fatal || consecutiveFails >= 3) {
+          runningRef.current = false;
+          setRunning(false);
+          setActionMsg(msg);
+          break;
+        }
+        setActionMsg(`發言暫時失敗,正在重試…(${msg})`);
       }
       if (!runningRef.current) break;
       const gap = GAP_MS_MIN + Math.random() * (GAP_MS_MAX - GAP_MS_MIN);

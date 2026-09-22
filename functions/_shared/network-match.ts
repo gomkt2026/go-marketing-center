@@ -3,43 +3,65 @@ import { getSql } from './db';
 import { chatCompleteJson } from './openai';
 import { asStringList, ensureNetworkTables, type NetworkContactRecord } from './network-contacts';
 import { rowToCamel } from './case';
+import {
+  cleanAskField,
+  expandSearchTerms,
+  inferTradesFromText,
+  looksLikeNudge,
+  looksLikeVendorAsk,
+  toTaiwanText,
+} from './network-trades';
+
+export { looksLikeNudge, looksLikeVendorAsk } from './network-trades';
 
 export interface VendorAsk {
   isVendorAsk: boolean;
   category: string | null;
   region: string | null;
   summary: string | null;
-}
-
-const ASK_HINT = /有人|認識|推薦|廠商|師傅|誰會|想做|可以問|有沒有人|求推薦|介紹一下|會做|能做|包商|施工|拍謝問|請問|我想找|找一個|水電|防水|冷氣|抓漏/;
-
-export function looksLikeVendorAsk(text: string): boolean {
-  const t = text.replace(/\s+/g, '');
-  if (t.length < 4 || t.length > 400) return false;
-  return ASK_HINT.test(t) || /[嗎呢？?]/.test(t) && /(做|修|裝|清|抓漏|防水|冷氣|電梯|排煙|貼膜)/.test(t);
+  aliases: string[];
 }
 
 export async function classifyVendorAsk(env: Env, text: string): Promise<VendorAsk> {
-  if (!looksLikeVendorAsk(text)) {
-    return { isVendorAsk: false, category: null, region: null, summary: null };
+  const textTw = toTaiwanText(text);
+  const inferred = inferTradesFromText(textTw);
+  if (looksLikeNudge(textTw)) {
+    return { isVendorAsk: false, category: null, region: null, summary: null, aliases: [] };
   }
+  if (inferred.category) {
+    return {
+      isVendorAsk: true,
+      category: inferred.category,
+      region: inferred.region,
+      summary: inferred.summary ?? textTw.slice(0, 40),
+      aliases: inferred.aliases,
+    };
+  }
+  if (!looksLikeVendorAsk(textTw)) {
+    return { isVendorAsk: false, category: null, region: null, summary: null, aliases: [] };
+  }
+
   const result = await chatCompleteJson<VendorAsk>(env, {
     messages: [
       {
         role: 'system',
-        content: '你在判斷台灣修繕群組訊息是否在「求廠商／求推薦」。只回 JSON。' +
-          '{"isVendorAsk":true/false,"category":"工種如排煙管/電梯/貼膜/冷氣清洗","region":"縣市或行政區或null","summary":"一句話需求"}',
+        content: '你在判斷台灣修繕群組訊息是否在「求廠商／求推薦」。只回 JSON。'
+          + '症狀要對到工種：修馬桶/水管/跳電→水電；壁癌/滲水/屋頂漏→防水；冷氣不冷→冷氣；搬家公司→搬家；二手傢俱→傢俱。'
+          + '{"isVendorAsk":true/false,"category":"工種","region":"縣市或行政區或空字串","summary":"一句話需求"}'
+          + '沒有地區就回空字串，不要回 null 這個字。',
       },
-      { role: 'user', content: text },
+      { role: 'user', content: textTw },
     ],
     temperature: 0.1,
     maxTokens: 300,
   });
+  const category = cleanAskField(result.category);
   return {
     isVendorAsk: result.isVendorAsk !== false,
-    category: result.category?.trim() || null,
-    region: result.region?.trim() || null,
-    summary: result.summary?.trim() || null,
+    category,
+    region: cleanAskField(result.region) ?? inferred.region,
+    summary: cleanAskField(result.summary),
+    aliases: expandSearchTerms(category),
   };
 }
 
@@ -56,26 +78,16 @@ export async function searchVendors(
 ): Promise<RankedContact[]> {
   await ensureNetworkTables(env);
   const sql = getSql(env);
-  const category = ask.category?.trim() || '';
-  const region = ask.region?.trim() || '';
-  const likeCat = category ? `%${category}%` : '%';
-  const likeRegion = region ? `%${region}%` : '%';
+  const terms = expandSearchTerms(ask.category, ask.aliases ?? []);
+  const region = cleanAskField(ask.region) ?? '';
+  if (!terms.length) return [];
 
   const rows = await sql`
     SELECT * FROM network_contacts
     WHERE brand_id = ${brandId}::uuid
       AND status <> 'archived'
-      AND (
-        ${category} = ''
-        OR name ILIKE ${likeCat}
-        OR COALESCE(company, '') ILIKE ${likeCat}
-        OR COALESCE(industry, '') ILIKE ${likeCat}
-        OR COALESCE(notes, '') ILIKE ${likeCat}
-        OR specialties::text ILIKE ${likeCat}
-        OR COALESCE(title, '') ILIKE ${likeCat}
-      )
     ORDER BY updated_at DESC
-    LIMIT 40
+    LIMIT 200
   `;
 
   const ranked = (rows as Record<string, unknown>[]).map((row) => {
@@ -84,35 +96,45 @@ export async function searchVendors(
       specialties: asStringList((row as { specialties?: unknown }).specialties),
       serviceRegions: asStringList((row as { service_regions?: unknown }).service_regions),
     };
-    return scoreContact(contact, category, region);
+    return scoreContact(contact, terms, region);
   }).filter((item) => item.score > 0);
 
   ranked.sort((a, b) => b.score - a.score);
   return ranked.slice(0, 3);
 }
 
-function scoreContact(contact: NetworkContactRecord, category: string, region: string): RankedContact {
+function scoreContact(contact: NetworkContactRecord, terms: string[], region: string): RankedContact {
   let score = 0;
   const reasons: string[] = [];
   const blob = [contact.name, contact.company, contact.industry, contact.title, contact.notes, ...contact.specialties]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
-  const cat = category.toLowerCase();
-  const specHit = contact.specialties.some((s) => category && (s.includes(category) || category.includes(s)));
-  if (specHit) {
-    score += 4;
-    reasons.push(`專長符合「${category}」`);
-  } else if (cat && blob.includes(cat)) {
-    score += 3;
-    reasons.push(`資料提到「${category}」`);
-  } else if (cat) {
-    const tokens = category.split(/[／/\s、]+/).filter((item) => item.length >= 2);
-    if (tokens.some((token) => blob.includes(token.toLowerCase()))) {
-      score += 2;
-      reasons.push(`資料接近「${category}」`);
+
+  let termScore = 0;
+  let hitTerm = '';
+  for (const term of terms) {
+    const cat = term.toLowerCase();
+    if (!cat) continue;
+    const specHit = contact.specialties.some((s) => s.includes(term) || term.includes(s));
+    if (specHit && termScore < 4) {
+      termScore = 4;
+      hitTerm = term;
+    } else if (blob.includes(cat) && termScore < 3) {
+      termScore = 3;
+      hitTerm = term;
+    } else if (termScore < 2) {
+      const tokens = term.split(/[／/\s、]+/).filter((item) => item.length >= 2);
+      if (tokens.some((token) => blob.includes(token.toLowerCase()))) {
+        termScore = 2;
+        hitTerm = term;
+      }
     }
   }
+  if (termScore <= 0) return { contact, score: 0, reasons };
+  score += termScore;
+  reasons.push(termScore >= 4 ? `專長符合「${hitTerm}」` : `資料提到「${hitTerm}」`);
+
   if (region) {
     const regionHit = contact.serviceRegions.some((r) => r.includes(region) || region.includes(r))
       || (contact.address ?? '').includes(region)
@@ -172,10 +194,16 @@ export function contactTelUri(raw: string | null | undefined): string | null {
   return `tel:${phone}`;
 }
 
+export function formatMatchTopic(ask: VendorAsk): string {
+  return [cleanAskField(ask.region), cleanAskField(ask.category)].filter(Boolean).join('／')
+    || cleanAskField(ask.summary)
+    || '你說的這項';
+}
+
 export function formatMatchText(ask: VendorAsk, matches: RankedContact[]): string {
-  const topic = [ask.region, ask.category].filter(Boolean).join('／') || ask.summary || '你的需求';
+  const topic = formatMatchTopic(ask);
   if (!matches.length) {
-    return `😅 人脈庫暫時沒找到「${topic}」的現成名單，我先記下來，之後有人加入會再對。`;
+    return `這題我對過了，「${topic}」人脈庫裡暫時沒有現成名單。我先記下來，之後有人加入會再跟你說。`;
   }
   const blocks = matches.map((m, i) => {
     const c = m.contact;
@@ -188,5 +216,5 @@ export function formatMatchText(ask: VendorAsk, matches: RankedContact[]): strin
       lineLink ? `💬 ${lineLink}` : '',
     ].filter(Boolean).join('\n');
   });
-  return `🔎 ${topic}，幫你找到這幾位可以問問👇\n先跟對方確認檔期與報價喔\n\n${blocks.join('\n\n')}`;
+  return `「${topic}」我幫你對到這幾位，可以直接打電話或加 LINE 問檔期～\n\n${blocks.join('\n\n')}`;
 }

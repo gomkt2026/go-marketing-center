@@ -35,7 +35,7 @@ export function TopBar() {
             <Avatar label={user.displayName} color="var(--color-secondary)" size={32} />
             <div className="user-meta">
               <div style={{ fontSize: 13, fontWeight: 600 }}>{user.displayName}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>上帝視角 · {user.role}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{user.role}</div>
             </div>
             {!isMobile && (
               <Button variant="ghost" onClick={() => void logout()} style={{ fontSize: 12, padding: '6px 10px' }}>

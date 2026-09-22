@@ -7,6 +7,9 @@ import type { MeetingEmotion } from './meeting-ai';
 
 const ELEVENLABS_BASE = 'https://api.elevenlabs.io/v1';
 
+/** Homigo 小咪。與 db/migrations/005_podcast.sql 的 voiceId 一致。 */
+export const HOMIGO_XIAOMI_VOICE_ID = '1AKkSX7KMPHIWuz76m0n';
+
 /** 單次 Text-to-Dialogue 請求的總字數上限(官方建議 2000,保留緩衝) */
 export const DIALOGUE_CHAR_LIMIT = 1800;
 
@@ -88,6 +91,36 @@ export async function synthesizeDialogue(
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new ElevenLabsError(res.status, `ElevenLabs text-to-dialogue 失敗 (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+/**
+ * 單人 TTS。人脈 Bot 用語音回工班，預設 Homigo 小咪。
+ */
+export async function synthesizeSpeech(
+  env: Env,
+  params: {
+    text: string;
+    voiceId?: string;
+    languageCode?: string;
+  },
+): Promise<Uint8Array> {
+  const apiKey = requireApiKey(env);
+  const voiceId = params.voiceId || HOMIGO_XIAOMI_VOICE_ID;
+  const res = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'xi-api-key': apiKey },
+    body: JSON.stringify({
+      text: params.text,
+      model_id: 'eleven_multilingual_v2',
+      ...(params.languageCode ? { language_code: params.languageCode } : {}),
+      voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new ElevenLabsError(res.status, `ElevenLabs text-to-speech 失敗 (${res.status}): ${text.slice(0, 300)}`);
   }
   return new Uint8Array(await res.arrayBuffer());
 }

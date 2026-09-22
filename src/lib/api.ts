@@ -62,6 +62,27 @@ export const api = {
 
   brands: () => request<{ brands: import('@/types').Brand[] }>('/api/brands'),
 
+  createBrand: (body: {
+    name: string;
+    slug: string;
+    tagline?: string;
+    primaryColor?: string;
+    industry: string;
+    audience?: string;
+    websiteUrl?: string;
+    blogBaseUrl?: string;
+    ingestBaseUrl?: string;
+    cta?: string;
+    editorNickname?: string;
+  }) =>
+    request<{
+      brand: import('@/types').Brand;
+      brandId: string;
+      slug: string;
+      name: string;
+      seoTopicCount: number;
+    }>('/api/brands', { method: 'POST', body: JSON.stringify(body) }),
+
   brand: (slug: string) =>
     request<{ brand: import('@/types').Brand; version: import('@/types').BrandVersion | null }>(`/api/brands/${slug}`),
 
@@ -90,7 +111,60 @@ export const api = {
       assets: import('@/types').BrandAsset[];
       pressCoverages: import('@/types').PressCoverage[];
       pressReleases: import('@/types').PressRelease[];
+      imagePrompts?: import('@/types').BrandImagePrompt[];
+      versions?: import('@/types').BrandVersion[];
     }>(`/api/brands/${slug}/intelligence`),
+
+  brandVersions: (slug: string) =>
+    request<{
+      versions: import('@/types').BrandVersion[];
+      draft: import('@/types').BrandVersion | null;
+      published: import('@/types').BrandVersion | null;
+    }>(`/api/brands/${slug}/versions`),
+
+  createBrandDraft: (slug: string) =>
+    request<{
+      draft: import('@/types').BrandVersion;
+      published: import('@/types').BrandVersion | null;
+      versions: import('@/types').BrandVersion[];
+    }>(`/api/brands/${slug}/versions`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'draft' }),
+    }),
+
+  publishBrandVersion: (slug: string, note?: string) =>
+    request<{
+      published: import('@/types').BrandVersion;
+      draft: null;
+      versions: import('@/types').BrandVersion[];
+    }>(`/api/brands/${slug}/versions`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'publish', note }),
+    }),
+
+  saveBrandKnowledge: (slug: string, body: {
+    section: 'core' | 'audience' | 'persona' | 'channel' | 'rule' | 'visual' | 'keyword' | 'example';
+    action: 'update' | 'create' | 'delete';
+    id?: string;
+    payload?: Record<string, unknown>;
+  }) =>
+    request<{
+      item: Record<string, unknown> | null;
+      draft: import('@/types').BrandVersion;
+      versions: import('@/types').BrandVersion[];
+    }>(`/api/brands/${slug}/knowledge`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  brandImagePrompts: (slug: string) =>
+    request<{ prompts: import('@/types').BrandImagePrompt[] }>(`/api/brands/${slug}/image-prompts`),
+
+  saveBrandImagePrompt: (slug: string, body: { slot: import('@/types').BrandImagePromptSlot; prompt?: string; reset?: boolean }) =>
+    request<{ prompts: import('@/types').BrandImagePrompt[]; draft?: import('@/types').BrandVersion | null }>(`/api/brands/${slug}/image-prompts`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
 
   // -- 品牌智慧圖片素材庫(系統截圖會做成 B 端痛點海報;實拍可直接當配圖) --------
   brandAssets: (slug: string) =>

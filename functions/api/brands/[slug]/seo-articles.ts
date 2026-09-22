@@ -5,8 +5,9 @@ import { getSql } from '../../../_shared/db';
 import { getBrandBySlug } from '../../../_shared/queries';
 import { json, error } from '../../../_shared/response';
 import { logActivity } from '../../../_shared/activity';
-import { buildBrandContext, SEO_TOPIC_BANK } from '../../../_shared/prompts';
-import { generateSeoArticle, saveSeoArticle, findBrandAgent, pickSeoTopic } from '../../../_shared/generate';
+import { buildBrandContext } from '../../../_shared/prompts';
+import { generateSeoArticle, saveSeoArticle, findBrandAgent, pickSeoTopicFromList } from '../../../_shared/generate';
+import { listSeoTopicsForBrand } from '../../../_shared/seo-topics';
 
 // GET  /api/brands/:slug/seo-articles → 主題庫
 // POST /api/brands/:slug/seo-articles → 官網 SEO 長文(website 頻道)
@@ -19,7 +20,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const brand = await getBrandBySlug(context.env, slug);
   if (!brand) return error('Brand not found', 404);
 
-  return json({ topics: SEO_TOPIC_BANK[slug] ?? [] });
+  const topics = await listSeoTopicsForBrand(context.env, brand.id, slug);
+  return json({ topics });
 };
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -45,13 +47,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     LIMIT 20
   `;
   const usedTitles = (usedRows as { title: string | null }[]).map((r) => r.title ?? '');
-  const bank = SEO_TOPIC_BANK[slug] ?? [];
+  const bank = await listSeoTopicsForBrand(context.env, brand.id, slug);
   const picked = body.topic?.trim()
     ? (bank.find((t) => t.topic === body.topic?.trim()) ?? {
       topic: body.topic.trim(),
       angle: body.instruction?.trim() || '依品牌事實寫給會搜這個詞的讀者。',
     })
-    : pickSeoTopic(slug, usedTitles);
+    : pickSeoTopicFromList(bank, usedTitles);
 
   const brandCtx = await buildBrandContext(context.env, brand.id);
   const agentId = await findBrandAgent(context.env, brand.id);

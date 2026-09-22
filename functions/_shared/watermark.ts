@@ -48,7 +48,7 @@ export type LogoPosition = 'bottom-right' | 'bottom-left';
 export async function compositeLogo(
   imageBytes: Uint8Array,
   logoBytes: Uint8Array,
-  opts?: { position?: LogoPosition },
+  opts?: { position?: LogoPosition; marginX?: number; marginY?: number },
 ): Promise<Uint8Array> {
   const { PhotonImage, SamplingFilter, resize, watermark } = await loadPhoton();
   const base = PhotonImage.new_from_byteslice(imageBytes);
@@ -68,11 +68,12 @@ export async function compositeLogo(
     const targetH = Math.max(1, Math.round(logo.get_height() * scale));
     resized = resize(logo, targetW, targetH, SamplingFilter.Lanczos3);
 
-    const margin = Math.round(baseW * MARGIN_RATIO);
+    const marginX = opts?.marginX ?? Math.round(baseW * MARGIN_RATIO);
+    const marginY = opts?.marginY ?? Math.round(baseW * MARGIN_RATIO);
     const x = (opts?.position ?? 'bottom-right') === 'bottom-left'
-      ? margin
-      : baseW - targetW - margin;
-    const y = baseH - targetH - margin;
+      ? marginX
+      : baseW - targetW - marginX;
+    const y = baseH - targetH - marginY;
     watermark(base, resized, BigInt(x), BigInt(y));
 
     return base.get_bytes_jpeg(90);

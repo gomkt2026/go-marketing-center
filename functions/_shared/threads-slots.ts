@@ -12,7 +12,11 @@ import { getThreadsAccount } from './threads';
 import { toPublicMediaUrl } from './media';
 import { fetchGoogleTrendsTW } from './sources';
 import { logActivity } from './activity';
-import { countSlotsByBrand, listBrandThreadHours, sourceForBrandHour } from './posting-slots';
+import {
+  countSlotsByBrand, listBrandThreadHours, sourceForBrandHour, listBrandPostingSlots,
+  hourlyCategoryForKind, isHourlyFamily, isOfftopicFamily, slotKindLabel,
+  type PostingSlotKind,
+} from './posting-slots';
 
 /** 品牌相關跟風文時段(台灣時間) */
 export const THREADS_POST_HOURS_TW: readonly number[] = [0, 6, 12, 18];
@@ -22,12 +26,11 @@ export const THREADS_OFFTOPIC_HOURS_TW: readonly number[] = [9, 21];
 export const THREADS_DESK_HOURS_TW: readonly number[] = [0, 6, 9, 12, 18, 21];
 
 export const THREADS_SLOT_BRANDS = ['homigo', 'taskgo', 'washgo'] as const;
-const OFFTOPIC_BRANDS = ['homigo', 'washgo', 'taskgo'] as const;
 const THREADS_DAILY_CAP = 4;
 const THREADS_OFFTOPIC_DAILY_CAP = 2;
 const THREADS_BRANDS_PER_TICK = 3;
 
-export type ThreadsSlotSource = 'threads_hourly' | 'threads_offtopic';
+export type ThreadsSlotSource = PostingSlotKind;
 
 export interface ThreadsSlotWrite {
   slug: string;
@@ -65,9 +68,8 @@ export function sourceForDeskHour(hourTW: number): ThreadsSlotSource {
     : 'threads_hourly';
 }
 
-export function slotLabel(source: ThreadsSlotSource, hourTW: number): string {
-  if (source === 'threads_hourly') return '熱議跟風';
-  return hourTW === 21 ? '愛情散文' : '生活哏文';
+export function slotLabel(source: ThreadsSlotSource, _hourTW?: number): string {
+  return slotKindLabel(source);
 }
 
 export async function brandHasSlotContent(
@@ -85,7 +87,7 @@ export async function brandHasSlotContent(
     SELECT c.id FROM contents c
     WHERE c.brand_id = ${brandId}::uuid
       AND c.target_platform = ${platform}
-      AND c.generation_prompt_meta->>'source' = ${source}
+      AND c.generation_prompt_meta->>'source' LIKE 'threads_%'
       AND (c.generation_prompt_meta->>'slotAt')::timestamptz
           BETWEEN ${from}::timestamptz AND ${to}::timestamptz
     LIMIT 1
@@ -100,7 +102,7 @@ export async function brandHasSlotContent(
 export async function generateThreadsSlot(
   env: Env,
   slotAt: Date,
-  opts?: { slugs?: string[]; ignoreInterval?: boolean; onlyMissing?: boolean },
+  opts?: { slugs?: string[]; ignoreInterval?: boolean; onlyMissing?: boolean; slotKind?: PostingSlotKind },
 ): Promise<ThreadsSlotBatchResult> {
   const sql = getSql(env);
   const result: ThreadsSlotBatchResult = { generated: [], skipped: [] };
@@ -113,21 +115,21 @@ export async function generateThreadsSlot(
     SELECT b.id, b.slug, b.name,
            (SELECT max(c.created_at) FROM contents c
             WHERE c.brand_id = b.id AND c.target_platform = 'threads'
-              AND c.generation_prompt_meta->>'source' = 'threads_hourly') AS last_at,
+              AND c.generation_prompt_meta->>'source' LIKE 'threads_%') AS last_at,
            (SELECT count(*)::int FROM contents c
             WHERE c.brand_id = b.id AND c.target_platform = 'threads'
-              AND c.generation_prompt_meta->>'source' = 'threads_hourly'
+              AND c.generation_prompt_meta->>'source' LIKE 'threads_%'
               AND (c.generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
               AND (c.generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
            ) AS today_count,
            (SELECT array_agg(cat) FROM (
               SELECT c.generation_prompt_meta->>'category' AS cat FROM contents c
               WHERE c.brand_id = b.id AND c.target_platform = 'threads'
-                AND c.generation_prompt_meta->>'source' = 'threads_hourly'
+                AND c.generation_prompt_meta->>'source' LIKE 'threads_%'
               ORDER BY c.created_at DESC LIMIT 2
             ) recent) AS recent_categories
     FROM brands b
-    WHERE b.is_active = true AND b.slug IN ('homigo', 'taskgo', 'washgo')
+    WHERE b.is_active = true
     ORDER BY last_at ASC NULLS FIRST
     LIMIT ${opts?.slugs?.length ? 20 : THREADS_BRANDS_PER_TICK}
   `;
@@ -135,7 +137,7 @@ export async function generateThreadsSlot(
     id: string; slug: string; name: string; last_at: string | null; today_count: number;
     recent_categories: (string | null)[] | null;
   }[]).filter((b) => !opts?.slugs?.length || opts.slugs.includes(b.slug));
-  const hourlyCaps = await countSlotsByBrand(env, 'threads', 'threads_hourly');
+  const hourlyCaps = await countSlotsByBrand(env, 'threads');
 
   if (opts?.slugs?.length) {
     for (const slug of opts.slugs) {
@@ -183,13 +185,26 @@ export async function generateThreadsSlot(
         ? imageRows[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null }
         : null;
 
+      const hourTW = (slotAt.getUTCHours() + 8) % 24;
+      const brandSlots = await listBrandPostingSlots(env, brand.id);
+      const slotKind = opts?.slotKind
+        ?? brandSlots.find((s) => s.platform === 'threads' && s.enabled && s.hourTw === hourTW)?.slotKind
+        ?? 'threads_hourly';
+      const lockedId = hourlyCategoryForKind(slotKind) as ThreadsHourlyCategoryId | null;
       const recentCategoryIds = (brand.recent_categories ?? []).filter((c): c is string => !!c) as ThreadsHourlyCategoryId[];
       const availableCategoryIds = (candidateImage
         ? THREADS_HOURLY_CATEGORIES
         : THREADS_HOURLY_CATEGORIES.filter((c) => c.id !== 'image_inspired')
       ).filter((c) => trends.length > 0 || c.id !== 'seasonal_trend')
         .map((c) => c.id);
-      const category = pickThreadsHourlyCategory(recentCategoryIds, availableCategoryIds);
+      if (isOfftopicFamily(slotKind)) {
+        result.skipped.push({ slug: brand.slug, reason: '這一檔是生活／感情主題，改走另一條產稿' });
+        continue;
+      }
+      const locked = lockedId ? THREADS_HOURLY_CATEGORIES.find((c) => c.id === lockedId) : undefined;
+      const category = (locked?.id === 'image_inspired' && !candidateImage)
+        ? pickThreadsHourlyCategory(recentCategoryIds, availableCategoryIds.filter((id) => id !== 'image_inspired'))
+        : locked ?? pickThreadsHourlyCategory(recentCategoryIds, availableCategoryIds);
 
       let post;
       if (category.id === 'image_inspired' && candidateImage) {
@@ -226,7 +241,7 @@ export async function generateThreadsSlot(
         generatedByAgentId: agentId,
         status: 'pending_review',
         promptMeta: {
-          source: 'threads_hourly', category: category.id, trends: trends.map((t) => t.title), socialTopics,
+          source: slotKind, category: category.id, trends: trends.map((t) => t.title), socialTopics,
           slotAt: slotAt.toISOString(),
           audienceLane: 'b2c',
           audienceName: post.audienceName,
@@ -264,14 +279,15 @@ export async function generateThreadsSlot(
 export async function generateThreadsOfftopicSlot(
   env: Env,
   slotAt: Date,
-  opts?: { slugs?: string[]; onlyMissing?: boolean },
+  opts?: { slugs?: string[]; onlyMissing?: boolean; slotKind?: PostingSlotKind },
 ): Promise<ThreadsSlotBatchResult> {
   const sql = getSql(env);
   const result: ThreadsSlotBatchResult = { generated: [], skipped: [] };
   const targetSlugs = opts?.slugs?.length
-    ? opts.slugs.filter((s) => (OFFTOPIC_BRANDS as readonly string[]).includes(s))
-    : [...OFFTOPIC_BRANDS];
-  const offtopicCaps = await countSlotsByBrand(env, 'threads', 'threads_offtopic');
+    ? opts.slugs
+    : ((await sql`SELECT slug FROM brands WHERE is_active = true ORDER BY slug`) as { slug: string }[])
+      .map((b) => b.slug);
+  const offtopicCaps = await countSlotsByBrand(env, 'threads');
 
   for (const slug of targetSlugs) {
     try {
@@ -281,7 +297,13 @@ export async function generateThreadsOfftopicSlot(
         continue;
       }
       const brand = brandRows[0] as { id: string; slug: string; name: string };
-      if (await brandHasSlotContent(env, brand.id, 'threads', 'threads_offtopic', slotAt)) {
+      const hourTW = (slotAt.getUTCHours() + 8) % 24;
+      const slotKind = opts?.slotKind ?? await sourceForBrandHour(env, brand.id, hourTW);
+      if (isHourlyFamily(slotKind)) {
+        result.skipped.push({ slug: brand.slug, reason: '這一檔是話題／現場主題，改走另一條產稿' });
+        continue;
+      }
+      if (await brandHasSlotContent(env, brand.id, 'threads', slotKind, slotAt)) {
         if (opts?.onlyMissing) {
           console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} Threads 生活哏文已存在,跳過`);
         }
@@ -292,7 +314,7 @@ export async function generateThreadsOfftopicSlot(
       const todayRows = await sql`
         SELECT count(*)::int AS n FROM contents
         WHERE brand_id = ${brand.id}::uuid
-          AND generation_prompt_meta->>'source' = 'threads_offtopic'
+          AND generation_prompt_meta->>'source' LIKE 'threads_%'
           AND (generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
           AND (generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
       `;
@@ -304,7 +326,7 @@ export async function generateThreadsOfftopicSlot(
 
       const usedRows = await sql`
         SELECT title, generation_prompt_meta->>'loveAngle' AS angle FROM contents
-        WHERE brand_id = ${brand.id}::uuid AND generation_prompt_meta->>'source' = 'threads_offtopic'
+        WHERE brand_id = ${brand.id}::uuid AND generation_prompt_meta->>'source' LIKE 'threads_%'
           AND created_at > now() - interval '14 days'
         ORDER BY created_at DESC LIMIT 20
       `;
@@ -312,8 +334,7 @@ export async function generateThreadsOfftopicSlot(
       const usedAngles = (usedRows as { angle: string | null }[])
         .map((r) => r.angle)
         .filter((a): a is string => !!a);
-      const hourTW = (slotAt.getUTCHours() + 8) % 24;
-      const forceLoveStory = hourTW === 21;
+      const forceLoveStory = slotKind === 'threads_love' || (slotKind === 'threads_offtopic' && hourTW === 21);
 
       const agentId = await findBrandAgent(env, brand.id);
       const post = await generateOfftopicPost(env, {
@@ -330,7 +351,7 @@ export async function generateThreadsOfftopicSlot(
         generatedByAgentId: agentId,
         status: 'pending_review',
         promptMeta: {
-          source: 'threads_offtopic',
+          source: slotKind,
           category: post.offtopicCategory ?? 'life_gag',
           loveAngle: post.loveAngle,
           slotAt: slotAt.toISOString(),
@@ -346,14 +367,14 @@ export async function generateThreadsOfftopicSlot(
         action: 'content.generated',
         entityType: 'content',
         entityId: contentId,
-        afterState: { platform: 'threads', source: 'threads_offtopic', scheduled: false, slotAt: slotAt.toISOString() },
+        afterState: { platform: 'threads', source: slotKind, scheduled: false, slotAt: slotAt.toISOString() },
       });
       result.generated.push({
         slug: brand.slug,
         contentId,
         category: post.offtopicCategory ?? (forceLoveStory ? 'love_story' : 'life_gag'),
       });
-      console.log(`[offtopic] ${brand.slug} 已產${forceLoveStory ? '愛情散文' : '生活哏文'},${slotAt.toISOString()}(待工作台審核)`);
+      console.log(`[offtopic] ${brand.slug} 已產${slotKindLabel(slotKind)},${slotAt.toISOString()}(待工作台審核)`);
     } catch (e) {
       const reason = e instanceof Error ? e.message : '生成失敗';
       result.skipped.push({ slug, reason });
@@ -380,10 +401,10 @@ export async function generateThreadsDeskSlot(
   const source = brandId
     ? await sourceForBrandHour(env, brandId, hourTW)
     : sourceForDeskHour(hourTW);
-  if (source === 'threads_offtopic') {
-    return generateThreadsOfftopicSlot(env, slotAt, { slugs: [slug], onlyMissing: true });
+  if (isOfftopicFamily(source)) {
+    return generateThreadsOfftopicSlot(env, slotAt, { slugs: [slug], onlyMissing: true, slotKind: source });
   }
-  return generateThreadsSlot(env, slotAt, { slugs: [slug], ignoreInterval: true, onlyMissing: true });
+  return generateThreadsSlot(env, slotAt, { slugs: [slug], ignoreInterval: true, onlyMissing: true, slotKind: source });
 }
 
 /**
@@ -403,7 +424,7 @@ export async function promoteDueThreadsSafetyNet(env: Env): Promise<number> {
     WHERE c.target_platform = 'threads'
       AND c.status = 'pending_review'
       AND coalesce(c.generation_prompt_meta->>'skipped', 'false') <> 'true'
-      AND c.generation_prompt_meta->>'source' IN ('threads_hourly', 'threads_offtopic')
+      AND c.generation_prompt_meta->>'source' LIKE 'threads_%'
       AND (c.generation_prompt_meta->>'slotAt')::timestamptz <= now()
       AND acc.auto_publish = true
       AND acc.status = 'connected'

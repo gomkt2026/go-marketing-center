@@ -7,26 +7,45 @@ import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Tabs } from '@/components/ui/Tabs';
 import { useBrand } from '@/context/BrandContext';
+import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
+import { HelpTip } from '@/components/ui/HelpTip';
+import { VersionHistoryList } from '@/pages/brand/knowledge-version-ui';
 import type {
   BrandRule, BrandAudience, BrandPersona, BrandChannel, BrandVisual,
   BrandKeyword, BrandExample, BrandDocument, BrandVersion, VerificationStatus,
   BrandAsset, BrandAssetImageCategory, PressCoverage, PressRelease, DiscoveredPressItem,
+  BrandImagePrompt, BrandRuleType,
 } from '@/types';
 
 const TABS = [
-  { id: 'core', label: '品牌核心' },
-  { id: 'audience', label: '受眾' },
-  { id: 'channel', label: '平台調性' },
-  { id: 'rules', label: '規則邊界' },
-  { id: 'press', label: '媒體報導' },
-  { id: 'releases', label: '新聞稿' },
-  { id: 'collateral', label: 'EDM／簡報' },
-  { id: 'visual', label: '視覺' },
-  { id: 'library', label: '素材庫' },
-  { id: 'raw', label: '原始檢視' },
+  { id: 'core', label: '品牌核心', hint: '品牌怎麼介紹自己、最近想聊什麼、常用句子與 Hashtag。小編改完按各區塊儲存即可。' },
+  { id: 'audience', label: '受眾', hint: '這品牌在對誰說話。B 端是業者、C 端是一般使用者。產文會照這裡的痛點寫。' },
+  { id: 'channel', label: '平台調性', hint: 'FB、IG、Threads 各平台語氣、字數，以及一篇要帶幾則 Hashtag。' },
+  { id: 'rules', label: '規則邊界', hint: '能講什麼、不能講什麼。AI 產文會遵守，避免發明數字或保證成效。' },
+  { id: 'press', label: '媒體報導', hint: '已見報的新聞。可引用媒體名與事實，不可把轉載算成多次專訪。' },
+  { id: 'releases', label: '新聞稿', hint: '品牌自己發的新聞稿，可再轉成官網長文。' },
+  { id: 'collateral', label: 'EDM／簡報', hint: '上傳 DM、簡報給小編與產文參考，也可用在客戶 LINE 資訊包。' },
+  { id: 'visual', label: '視覺', hint: '色票、圖卡尺寸等視覺規定，產圖時會對齊。' },
+  { id: 'image-prompt', label: '產圖 Prompt', hint: '直接改生圖風格。不用等工程師改程式。' },
+  { id: 'library', label: '素材庫', hint: '上傳系統畫面或現場照片，Threads「實績畫面」會從這裡取材。' },
+  { id: 'raw', label: '原始檢視', hint: '系統彙整後的唯讀全文，方便核對，不要當編輯區。' },
 ];
+
+const PLATFORM_LABEL: Record<string, string> = {
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  threads: 'Threads',
+  website: '官網長文',
+};
+
+const CHANNEL_HASHTAG_HINT: Record<string, string> = {
+  instagram: 'IG 一篇通常 8 到 12 則，放在文末。',
+  facebook: 'FB 一篇通常 2 到 3 則就好，太多像廣告。',
+  threads: 'Threads 通常 0 到 5 則，生活文可以更少。',
+  website: '官網長文一般不放 Hashtag。',
+};
 
 const verificationTone: Record<VerificationStatus, BadgeTone> = {
   verified: 'primary', claimed: 'accent', pending: 'default',
@@ -57,6 +76,9 @@ const imageCategoryLabel: Record<string, string> = Object.fromEntries(
 export function BrandIntelligence() {
   const { brand: slug } = useParams();
   const { brandBySlug, brandsLoading } = useBrand();
+  const { user } = useAuth();
+  const canEdit = user?.role !== 'viewer';
+  const canPublish = user?.role === 'super_admin' || user?.role === 'brand_manager' || user?.role === 'brand_editor';
   const brand = slug ? brandBySlug(slug) : undefined;
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = TABS.some((t) => t.id === searchParams.get('tab')) ? searchParams.get('tab')! : 'core';
@@ -107,6 +129,27 @@ export function BrandIntelligence() {
   const [lineMessage, setLineMessage] = useState('');
   const [lineFiles, setLineFiles] = useState<{ title: string; kind: string; url: string }[]>([]);
   const [lineBusy, setLineBusy] = useState(false);
+  const [imagePrompts, setImagePrompts] = useState<BrandImagePrompt[]>([]);
+  const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({});
+  const [promptBusy, setPromptBusy] = useState<string | null>(null);
+  const [promptMessage, setPromptMessage] = useState<string | null>(null);
+  const [tagline, setTagline] = useState('');
+  const [audiences, setAudiences] = useState<BrandAudience[]>([]);
+  const [personas, setPersonas] = useState<BrandPersona[]>([]);
+  const [channels, setChannels] = useState<BrandChannel[]>([]);
+  const [visuals, setVisuals] = useState<BrandVisual[]>([]);
+  const [keywords, setKeywords] = useState<BrandKeyword[]>([]);
+  const [examples, setExamples] = useState<BrandExample[]>([]);
+  const [newKeyword, setNewKeyword] = useState('');
+  const [newKeywordCat, setNewKeywordCat] = useState<BrandKeyword['category']>('key_message');
+  const [versions, setVersions] = useState<BrandVersion[]>([]);
+  const [draftVersion, setDraftVersion] = useState<BrandVersion | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [publishNote, setPublishNote] = useState('');
+  const [versionBusy, setVersionBusy] = useState(false);
+  const [versionMessage, setVersionMessage] = useState<string | null>(null);
+  const [saveBusy, setSaveBusy] = useState<string | null>(null);
+  const [ruleDrafts, setRuleDrafts] = useState<Record<string, Partial<BrandRule>>>({});
 
   const brandQuery = useAsyncData(
     () => slug ? api.brand(slug) : Promise.reject(new Error('no slug')),
@@ -133,8 +176,35 @@ export function BrandIntelligence() {
     if (intelQuery.data?.documents) setDocuments(intelQuery.data.documents);
   }, [intelQuery.data?.documents]);
   useEffect(() => {
+    const list = intelQuery.data?.imagePrompts;
+    if (!list?.length) return;
+    setImagePrompts(list);
+    setPromptDrafts(Object.fromEntries(list.map((p) => [p.slot, p.prompt])));
+  }, [intelQuery.data?.imagePrompts]);
+  useEffect(() => {
+    if (tab !== 'image-prompt' || !slug || imagePrompts.length) return;
+    api.brandImagePrompts(slug).then(({ prompts }) => {
+      setImagePrompts(prompts);
+      setPromptDrafts(Object.fromEntries(prompts.map((p) => [p.slot, p.prompt])));
+    }).catch(() => undefined);
+  }, [tab, slug, imagePrompts.length]);
+  useEffect(() => {
+    const intel = intelQuery.data;
+    if (!intel) return;
+    setAudiences((intel.audiences ?? []).map((a) => ({ ...a, painPoints: Array.isArray(a.painPoints) ? a.painPoints : [] })));
+    setPersonas((intel.personas ?? []).map((p) => ({ ...p, painPoints: Array.isArray(p.painPoints) ? p.painPoints : [] })));
+    setChannels(intel.channels ?? []);
+    setVisuals(intel.visuals ?? []);
+    setKeywords(intel.keywords ?? []);
+    setExamples(intel.examples ?? []);
+    const list = intel.versions ?? [];
+    setVersions(list);
+    setDraftVersion(list.find((v) => v.status === 'draft') ?? null);
+  }, [intelQuery.data]);
+  useEffect(() => {
     const b = brandQuery.data?.brand;
     if (!b) return;
+    setTagline(b.tagline ?? '');
     setWebsiteUrl(b.websiteUrl ?? '');
     setWebsiteNote(b.websiteNote ?? '');
     setBlogBaseUrl(b.blogBaseUrl ?? '');
@@ -150,12 +220,6 @@ export function BrandIntelligence() {
   }
 
   const version = brandQuery.data?.version as BrandVersion | null | undefined;
-  const intel = intelQuery.data!;
-  const audiences = intel.audiences as BrandAudience[];
-  const personas = intel.personas as BrandPersona[];
-  const channels = intel.channels as BrandChannel[];
-  const visuals = intel.visuals as BrandVisual[];
-  const keywords = intel.keywords as BrandKeyword[];
   const isCollateralDoc = (d: BrandDocument) => (
     d.sourceType === 'dm' || d.sourceType === 'presentation'
     || ((d.sourceType === 'pdf' || d.sourceType === 'image') && !!d.fileName)
@@ -163,24 +227,49 @@ export function BrandIntelligence() {
   const collateralKindText = (d: BrandDocument) => (d.sourceType === 'presentation' ? '簡報' : 'EDM');
   const seedDocuments = documents.filter((d) => !isCollateralDoc(d));
   const collaterals = documents.filter(isCollateralDoc);
-  const pillars = (intel.examples as BrandExample[]).filter((e) => e.category === 'content_pillar');
-  const hotTopics = (intel.examples as BrandExample[]).filter((e) => e.category === 'hot_topic_bank');
+  const pillars = examples.filter((e) => e.category === 'content_pillar');
+  const hotTopics = examples.filter((e) => e.category === 'hot_topic_bank');
+
+  function applyVersionPayload(payload: { draft?: BrandVersion | null; versions?: BrandVersion[] }) {
+    if (payload.versions) {
+      setVersions(payload.versions);
+      setDraftVersion(payload.versions.find((v) => v.status === 'draft') ?? payload.draft ?? null);
+    } else if (payload.draft !== undefined) {
+      setDraftVersion(payload.draft);
+      if (payload.draft) {
+        setVersions((prev) => {
+          const others = prev.filter((v) => v.id !== payload.draft!.id && v.status !== 'draft');
+          return [payload.draft!, ...others];
+        });
+      }
+    }
+  }
+
+  async function saveKnowledge(body: Parameters<typeof api.saveBrandKnowledge>[1]) {
+    if (!slug) throw new Error('no slug');
+    const res = await api.saveBrandKnowledge(slug, body);
+    applyVersionPayload(res);
+    setVersionMessage('已寫入草稿，發布後會留下這一版改了什麼');
+    return res;
+  }
 
   async function archiveRule(id: string) {
-    await api.deleteBrandRule(id);
+    const res = await saveKnowledge({ section: 'rule', action: 'delete', id });
     setRules((prev) => prev.filter((r) => r.id !== id));
+    void res;
   }
 
   async function addRule() {
-    if (!brand) return;
-    const { rule } = await api.createBrandRule({
-      brandId: brand.id,
-      ruleType: 'marketing_rule',
-      statement: '新規則(點擊編輯以填寫內容)',
-      verification: 'pending',
+    const res = await saveKnowledge({
+      section: 'rule',
+      action: 'create',
+      payload: { ruleType: 'marketing_rule', statement: '新規則(點擊編輯以填寫內容)', verification: 'pending' },
     });
-    setRules((prev) => [...prev, rule]);
-    setEditingId(rule.id);
+    if (res.item) {
+      const rule = res.item as unknown as BrandRule;
+      setRules((prev) => [...prev, rule]);
+      setEditingId(rule.id);
+    }
   }
 
   async function uploadAsset() {
@@ -523,7 +612,10 @@ export function BrandIntelligence() {
       setIngestBaseUrl(saved.ingestBaseUrl ?? '');
       setHasIngestKey(Boolean(saved.hasIngestKey) || hasIngestKey || Boolean(ingestKey.trim()));
       setIngestKey('');
-      setWebsiteMessage('已寫入品牌資訊與官網長文目的地');
+      setWebsiteMessage('已寫入品牌資訊與官網長文目的地，並記入草稿');
+      if (slug) {
+        api.brandVersions(slug).then((res) => applyVersionPayload(res)).catch(() => undefined);
+      }
     } catch (e) {
       setWebsiteMessage(e instanceof Error ? e.message : '官網儲存失敗');
     } finally {
@@ -591,6 +683,41 @@ export function BrandIntelligence() {
     }
   }
 
+  async function createDraft() {
+    if (!slug) return;
+    setVersionBusy(true);
+    setVersionMessage(null);
+    try {
+      const res = await api.createBrandDraft(slug);
+      applyVersionPayload(res);
+      setShowHistory(true);
+      setVersionMessage('已建立草稿。各分頁改完會記在這一版，再按發布。');
+    } catch (e) {
+      setVersionMessage(e instanceof Error ? e.message : '建立草稿失敗');
+    } finally {
+      setVersionBusy(false);
+    }
+  }
+
+  async function publishVersion() {
+    if (!slug) return;
+    setVersionBusy(true);
+    setVersionMessage(null);
+    try {
+      const res = await api.publishBrandVersion(slug, publishNote.trim() || undefined);
+      applyVersionPayload({ draft: null, versions: res.versions });
+      setDraftVersion(null);
+      setPublishNote('');
+      setShowHistory(true);
+      setVersionMessage(`已發布 v${res.published.versionNumber}，之後生成文案會用這一版`);
+      brandQuery.reload();
+    } catch (e) {
+      setVersionMessage(e instanceof Error ? e.message : '發布失敗');
+    } finally {
+      setVersionBusy(false);
+    }
+  }
+
   async function generateFromCollateral(id: string) {
     if (!slug) return;
     setDocBusyId(id);
@@ -610,17 +737,51 @@ export function BrandIntelligence() {
     <div>
       <PageHeader
         title={`${brand.name} 品牌智慧`}
-        subtitle="結構化知識條目為唯一事實來源;Markdown 僅為發布時自動編譯的唯讀成品"
+        subtitle="小編可直接改各分頁。存檔立刻生效並記入草稿；發布後會留下這版改了哪些。"
         actions={
           <>
-            <Badge tone="primary">版本 v{version?.versionNumber ?? '-'} 已發布</Badge>
-            <Button variant="ghost">歷史版本</Button>
-            <Button variant="secondary">建立草稿並編輯</Button>
+            <Badge tone="primary">已發布 v{version?.versionNumber ?? '-'}</Badge>
+            {draftVersion && (
+              <Badge tone="accent">草稿 v{draftVersion.versionNumber} · {(draftVersion.changeLog ?? []).length} 項未發布</Badge>
+            )}
+            <Button variant="ghost" onClick={() => setShowHistory((v) => !v)}>
+              {showHistory ? '收合版本' : '歷史版本'}
+            </Button>
+            {canEdit && !draftVersion && (
+              <Button variant="secondary" disabled={versionBusy} onClick={() => void createDraft()}>
+                {versionBusy ? '建立中…' : '建立草稿並編輯'}
+              </Button>
+            )}
+            {canPublish && draftVersion && (
+              <Button variant="primary" disabled={versionBusy} onClick={() => void publishVersion()}>
+                {versionBusy ? '發布中…' : '發布這個版本'}
+              </Button>
+            )}
           </>
         }
       />
 
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
+      {(showHistory || draftVersion || versionMessage) && (
+        <Card style={{ marginBottom: 16, display: 'grid', gap: 12 }}>
+          <p style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--color-text-muted)', margin: 0 }}>
+            品牌小編可直接改各分頁條目。存檔會立刻給之後的發文用，並記入草稿；發布後會留下「改了哪些」的版本紀錄。
+          </p>
+          {canPublish && draftVersion && (
+            <div style={{ display: 'grid', gap: 8 }}>
+              <input
+                placeholder="這版調整重點（選填，會寫進版本摘要）"
+                value={publishNote}
+                onChange={(e) => setPublishNote(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+          )}
+          {versionMessage && <p style={{ fontSize: 13, margin: 0 }}>{versionMessage}</p>}
+          {showHistory && <VersionHistoryList versions={versions} />}
+        </Card>
+      )}
+
+      <Card style={{ padding: 0 }}>
         <div style={{ padding: '4px 16px 0' }}>
           <Tabs tabs={TABS} active={tab} onChange={(next) => {
             setTab(next);
@@ -638,8 +799,39 @@ export function BrandIntelligence() {
             >
               {tab === 'core' && (
                 <div style={{ display: 'grid', gap: 14 }}>
-                  <Field label="一句話定位">{brand.tagline}</Field>
-                  <Field label="官方網站(給客戶 LINE 資訊包用,會寫進品牌資料)">
+                  <Field label="這品牌一句話怎麼說" hint="給第一次聽到這品牌的人看。之後貼文、官網、SEO 都會用這句當定位。">
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <textarea
+                        value={tagline}
+                        onChange={(e) => setTagline(e.target.value)}
+                        rows={3}
+                        disabled={!canEdit}
+                        style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.55 }}
+                      />
+                      {canEdit && (
+                        <Button
+                          variant="secondary"
+                          style={{ justifySelf: 'start' }}
+                          disabled={saveBusy === 'tagline'}
+                          onClick={async () => {
+                            setSaveBusy('tagline');
+                            setVersionMessage(null);
+                            try {
+                              await saveKnowledge({ section: 'core', action: 'update', payload: { tagline } });
+                              brandQuery.reload();
+                            } catch (e) {
+                              setVersionMessage(e instanceof Error ? e.message : '儲存失敗');
+                            } finally {
+                              setSaveBusy(null);
+                            }
+                          }}
+                        >
+                          {saveBusy === 'tagline' ? '儲存中…' : '儲存定位'}
+                        </Button>
+                      )}
+                    </div>
+                  </Field>
+                  <Field label="官方網站" hint="產品入口網址。客戶 LINE 資訊包與品牌資料會帶到這裡。">
                     <div style={{ display: 'grid', gap: 8 }}>
                       <input
                         placeholder="https:// 產品入口（指揮中心 / app）"
@@ -655,7 +847,7 @@ export function BrandIntelligence() {
                       />
                     </div>
                   </Field>
-                  <Field label="官網長文目的地（SEO /blog ingest）">
+                  <Field label="官網文章要發到哪" hint="公開部落格網域、對方 ingest 網址與金鑰。產完 SEO 長文批准後會送到這裡上架。">
                     <div style={{ display: 'grid', gap: 8 }}>
                       <input
                         placeholder="公開網域，例如 https://washgo.com.tw"
@@ -688,79 +880,436 @@ export function BrandIntelligence() {
                       {websiteMessage && <p style={{ fontSize: 12, color: 'var(--color-primary-dark)', margin: 0 }}>{websiteMessage}</p>}
                     </div>
                   </Field>
-                  <Field label="內容支柱(Content Pillars)">
-                    <div style={{ display: 'grid', gap: 8 }}>
+                  <Field label="平常主要在講哪幾類" hint="例如痛點、產品怎麼用、現場故事。右邊數字是這類大約佔幾成，加起來接近 100 即可。">
+                    <div style={{ display: 'grid', gap: 10 }}>
                       {pillars.map((p) => (
-                        <div key={p.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
-                          <Badge tone="secondary">{p.weightPercent}%</Badge>
-                          <div>
-                            <strong style={{ fontSize: 13 }}>{p.title}</strong>
-                            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{p.body}</div>
-                          </div>
-                        </div>
+                        <ExampleEditor
+                          key={p.id}
+                          item={p}
+                          busy={saveBusy === p.id}
+                          canEdit={canEdit}
+                          onChange={(next) => setExamples((prev) => prev.map((x) => (x.id === p.id ? next : x)))}
+                          onSave={async (item) => {
+                            setSaveBusy(item.id);
+                            try {
+                              const res = await saveKnowledge({
+                                section: 'example', action: 'update', id: item.id,
+                                payload: { title: item.title, body: item.body, weightPercent: item.weightPercent, category: item.category },
+                              });
+                              if (res.item) setExamples((prev) => prev.map((x) => (x.id === item.id ? res.item as unknown as BrandExample : x)));
+                            } catch (e) {
+                              setVersionMessage(e instanceof Error ? e.message : '儲存失敗');
+                              throw e;
+                            } finally {
+                              setSaveBusy(null);
+                            }
+                          }}
+                          onDelete={async (id) => {
+                            setSaveBusy(id);
+                            try {
+                              await saveKnowledge({ section: 'example', action: 'delete', id });
+                              setExamples((prev) => prev.filter((x) => x.id !== id));
+                            } catch (e) {
+                              setVersionMessage(e instanceof Error ? e.message : '刪除失敗');
+                            } finally {
+                              setSaveBusy(null);
+                            }
+                          }}
+                        />
                       ))}
+                      {canEdit && (
+                        <Button
+                          variant="secondary"
+                          style={{ justifySelf: 'start' }}
+                          disabled={saveBusy === 'new-pillar'}
+                          onClick={async () => {
+                            setSaveBusy('new-pillar');
+                            try {
+                              const res = await saveKnowledge({
+                                section: 'example', action: 'create',
+                                payload: { category: 'content_pillar', title: '新內容支柱', body: '', weightPercent: 0 },
+                              });
+                              if (res.item) setExamples((prev) => [...prev, res.item as unknown as BrandExample]);
+                            } catch (e) {
+                              setVersionMessage(e instanceof Error ? e.message : '新增失敗');
+                            } finally {
+                              setSaveBusy(null);
+                            }
+                          }}
+                        >
+                          + 新增支柱
+                        </Button>
+                      )}
                     </div>
                   </Field>
-                  {hotTopics.length > 0 && (
-                    <Field label="熱點主題庫">
-                      <div style={{ display: 'grid', gap: 8 }}>
-                        {hotTopics.map((h) => (
-                          <div key={h.id}>
-                            <strong style={{ fontSize: 13 }}>{h.title}</strong>
-                            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{h.body}</div>
-                          </div>
+                  <Field label="最近想發的主題" hint="寫主題名稱，下面寫小編該怎麼切入。存檔後，產文比較會聊這些題，而不是每次都同一套。">
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      {hotTopics.map((h) => (
+                        <ExampleEditor
+                          key={h.id}
+                          item={h}
+                          hideWeight
+                          busy={saveBusy === h.id}
+                          canEdit={canEdit}
+                          onChange={(next) => setExamples((prev) => prev.map((x) => (x.id === h.id ? next : x)))}
+                          onSave={async (item) => {
+                            setSaveBusy(item.id);
+                            try {
+                              const res = await saveKnowledge({
+                                section: 'example', action: 'update', id: item.id,
+                                payload: { title: item.title, body: item.body, category: item.category || 'hot_topic_bank' },
+                              });
+                              if (res.item) setExamples((prev) => prev.map((x) => (x.id === item.id ? { ...(res.item as unknown as BrandExample), category: 'hot_topic_bank' } : x)));
+                            } catch (e) {
+                              setVersionMessage(e instanceof Error ? e.message : '儲存失敗');
+                              throw e;
+                            } finally {
+                              setSaveBusy(null);
+                            }
+                          }}
+                          onDelete={async (id) => {
+                            setSaveBusy(id);
+                            try {
+                              await saveKnowledge({ section: 'example', action: 'delete', id });
+                              setExamples((prev) => prev.filter((x) => x.id !== id));
+                            } catch (e) {
+                              setVersionMessage(e instanceof Error ? e.message : '刪除失敗');
+                            } finally {
+                              setSaveBusy(null);
+                            }
+                          }}
+                        />
+                      ))}
+                      {canEdit && (
+                        <Button
+                          variant="secondary"
+                          style={{ justifySelf: 'start' }}
+                          disabled={saveBusy === 'new-topic'}
+                          onClick={async () => {
+                            setSaveBusy('new-topic');
+                            try {
+                              const res = await saveKnowledge({
+                                section: 'example', action: 'create',
+                                payload: { category: 'hot_topic_bank', title: '新熱點主題', body: '' },
+                              });
+                              if (res.item) setExamples((prev) => [...prev, res.item as unknown as BrandExample]);
+                            } catch (e) {
+                              setVersionMessage(e instanceof Error ? e.message : '新增失敗');
+                            } finally {
+                              setSaveBusy(null);
+                            }
+                          }}
+                        >
+                          + 新增熱點
+                        </Button>
+                      )}
+                    </div>
+                  </Field>
+                  <Field label="常講的句子、Hashtag、行動呼籲" hint="關鍵訊息是品牌常講的一句話。Hashtag 是 #標籤。CTA 是文末要人做的事，例如來電或來看官網。">
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {keywords.map((k) => (
+                          <span key={k.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <Badge tone={k.category === 'hashtag' ? 'primary' : k.category === 'cta' ? 'accent' : 'default'}>
+                              {k.value}
+                            </Badge>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await saveKnowledge({ section: 'keyword', action: 'delete', id: k.id });
+                                    setKeywords((prev) => prev.filter((x) => x.id !== k.id));
+                                  } catch (e) {
+                                    setVersionMessage(e instanceof Error ? e.message : '刪除失敗');
+                                  }
+                                }}
+                                style={{ border: 0, background: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 12 }}
+                              >
+                                刪
+                              </button>
+                            )}
+                          </span>
                         ))}
                       </div>
-                    </Field>
-                  )}
-                  <Field label="關鍵訊息 / Hashtag / CTA">
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {keywords.map((k) => (
-                        <Badge key={k.id} tone={k.category === 'hashtag' ? 'primary' : k.category === 'cta' ? 'accent' : 'default'}>
-                          {k.value}
-                        </Badge>
-                      ))}
+                      {canEdit && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <select value={newKeywordCat} onChange={(e) => setNewKeywordCat(e.target.value as BrandKeyword['category'])} style={inputStyle}>
+                            <option value="key_message">關鍵訊息</option>
+                            <option value="hashtag">Hashtag</option>
+                            <option value="cta">CTA</option>
+                          </select>
+                          <input
+                            value={newKeyword}
+                            onChange={(e) => setNewKeyword(e.target.value)}
+                            placeholder="例如 #包租代管，或一句行動呼籲"
+                            style={{ ...inputStyle, minWidth: 180 }}
+                          />
+                          <Button
+                            variant="secondary"
+                            disabled={!newKeyword.trim() || saveBusy === 'keyword'}
+                            onClick={async () => {
+                              setSaveBusy('keyword');
+                              try {
+                                const res = await saveKnowledge({
+                                  section: 'keyword', action: 'create',
+                                  payload: { category: newKeywordCat, value: newKeyword.trim() },
+                                });
+                                if (res.item) setKeywords((prev) => [...prev, res.item as unknown as BrandKeyword]);
+                                setNewKeyword('');
+                              } catch (e) {
+                                setVersionMessage(e instanceof Error ? e.message : '新增失敗');
+                              } finally {
+                                setSaveBusy(null);
+                              }
+                            }}
+                          >
+                            新增
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </Field>
                 </div>
               )}
 
               {tab === 'audience' && (
-                <div className="grid-2" style={{ gap: 12 }}>
-                  {audiences.map((a) => (
-                    <div key={a.id} style={cardBoxStyle}>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <strong style={{ fontSize: 14 }}>{a.name}</strong>
-                        {a.lane === 'b2b' && <Badge tone="primary">B 端</Badge>}
-                        {a.lane === 'b2c' && <Badge tone="default">C 端</Badge>}
+                <div style={{ display: 'grid', gap: 16 }}>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0, lineHeight: 1.6 }}>
+                    先寫這群人是誰、最煩什麼、我們用什麼角度說話。存檔後產文會照這裡寫。
+                  </p>
+                  <div className="grid-2" style={{ gap: 12 }}>
+                    {audiences.map((a) => (
+                      <div key={a.id} style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
+                        <label style={miniLabel}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>這群人是誰 <HelpTip text="例如自管房東、洗衣店主、工班頭。不要寫太抽象。" /></span>
+                          <input value={a.name} disabled={!canEdit} onChange={(e) => setAudiences((prev) => prev.map((x) => (x.id === a.id ? { ...x, name: e.target.value } : x)))} style={inputStyle} />
+                        </label>
+                        <label style={miniLabel}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>B 端或 C 端 <HelpTip text="B 端是會付錢買系統的業者。C 端是會用服務的個人。" /></span>
+                          <select
+                          value={a.lane ?? ''}
+                          disabled={!canEdit}
+                          onChange={(e) => setAudiences((prev) => prev.map((x) => (x.id === a.id ? { ...x, lane: (e.target.value || null) as BrandAudience['lane'] } : x)))}
+                          style={inputStyle}
+                        >
+                          <option value="">不分 B/C</option>
+                          <option value="b2b">B 端（業者）</option>
+                          <option value="b2c">C 端（使用者）</option>
+                        </select>
+                        </label>
+                        <label style={miniLabel}>
+                          <span>他們最煩什麼（一行一則）</span>
+                        <textarea
+                          value={(a.painPoints ?? []).join('\n')}
+                          disabled={!canEdit}
+                          placeholder="他們最煩什麼，一行一則"
+                          onChange={(e) => setAudiences((prev) => prev.map((x) => (x.id === a.id ? { ...x, painPoints: e.target.value.split('\n') } : x)))}
+                          rows={3}
+                          style={{ ...inputStyle, resize: 'vertical' }}
+                        />
+                        </label>
+                        <label style={miniLabel}>
+                          <span>我們用什麼角度說話</span>
+                        <textarea
+                          value={a.appealAngle ?? ''}
+                          disabled={!canEdit}
+                          placeholder="例如：每天只看一眼的自動化"
+                          onChange={(e) => setAudiences((prev) => prev.map((x) => (x.id === a.id ? { ...x, appealAngle: e.target.value } : x)))}
+                          rows={2}
+                          style={{ ...inputStyle, resize: 'vertical' }}
+                        />
+                        </label>
+                        {canEdit && (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <Button
+                              variant="secondary"
+                              disabled={saveBusy === a.id}
+                              onClick={async () => {
+                                setSaveBusy(a.id);
+                                try {
+                                  const res = await saveKnowledge({
+                                    section: 'audience', action: 'update', id: a.id,
+                                    payload: { name: a.name, painPoints: a.painPoints, appealAngle: a.appealAngle, lane: a.lane },
+                                  });
+                                  if (res.item) setAudiences((prev) => prev.map((x) => (x.id === a.id ? res.item as unknown as BrandAudience : x)));
+                                } catch (e) {
+                                  setVersionMessage(e instanceof Error ? e.message : '儲存失敗');
+                                } finally {
+                                  setSaveBusy(null);
+                                }
+                              }}
+                            >
+                              {saveBusy === a.id ? '儲存中…' : '儲存受眾'}
+                            </Button>
+                            <Button variant="danger" disabled={saveBusy === a.id} onClick={async () => {
+                              try {
+                                await saveKnowledge({ section: 'audience', action: 'delete', id: a.id });
+                                setAudiences((prev) => prev.filter((x) => x.id !== a.id));
+                              } catch (e) {
+                                setVersionMessage(e instanceof Error ? e.message : '刪除失敗');
+                              }
+                            }}>刪除</Button>
+                          </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0' }}>痛點:{a.painPoints.join('、')}</div>
-                      <div style={{ fontSize: 12 }}>訴求角度:{a.appealAngle}</div>
-                    </div>
-                  ))}
-                  {personas.map((p) => (
-                    <div key={p.id} style={cardBoxStyle}>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <Badge tone="secondary">{p.code}</Badge>
-                        <strong style={{ fontSize: 14 }}>{p.name}</strong>
+                    ))}
+                    {personas.map((p) => (
+                      <div key={p.id} style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 8 }}>
+                          <input value={p.code ?? ''} disabled={!canEdit} placeholder="P1" onChange={(e) => setPersonas((prev) => prev.map((x) => (x.id === p.id ? { ...x, code: e.target.value } : x)))} style={inputStyle} />
+                          <input value={p.name} disabled={!canEdit} onChange={(e) => setPersonas((prev) => prev.map((x) => (x.id === p.id ? { ...x, name: e.target.value } : x)))} style={inputStyle} />
+                        </div>
+                        <input value={p.ageRange ?? ''} disabled={!canEdit} placeholder="年齡層" onChange={(e) => setPersonas((prev) => prev.map((x) => (x.id === p.id ? { ...x, ageRange: e.target.value } : x)))} style={inputStyle} />
+                        <textarea
+                          value={(p.painPoints ?? []).join('\n')}
+                          disabled={!canEdit}
+                          placeholder="痛點，一行一則"
+                          onChange={(e) => setPersonas((prev) => prev.map((x) => (x.id === p.id ? { ...x, painPoints: e.target.value.split('\n') } : x)))}
+                          rows={3}
+                          style={{ ...inputStyle, resize: 'vertical' }}
+                        />
+                        <textarea
+                          value={p.appealAngle ?? ''}
+                          disabled={!canEdit}
+                          placeholder="訴求角度"
+                          onChange={(e) => setPersonas((prev) => prev.map((x) => (x.id === p.id ? { ...x, appealAngle: e.target.value } : x)))}
+                          rows={2}
+                          style={{ ...inputStyle, resize: 'vertical' }}
+                        />
+                        {canEdit && (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <Button
+                              variant="secondary"
+                              disabled={saveBusy === p.id}
+                              onClick={async () => {
+                                setSaveBusy(p.id);
+                                try {
+                                  const res = await saveKnowledge({
+                                    section: 'persona', action: 'update', id: p.id,
+                                    payload: { code: p.code, name: p.name, ageRange: p.ageRange, painPoints: p.painPoints, appealAngle: p.appealAngle, lane: p.lane },
+                                  });
+                                  if (res.item) setPersonas((prev) => prev.map((x) => (x.id === p.id ? res.item as unknown as BrandPersona : x)));
+                                } catch (e) {
+                                  setVersionMessage(e instanceof Error ? e.message : '儲存失敗');
+                                } finally {
+                                  setSaveBusy(null);
+                                }
+                              }}
+                            >
+                              {saveBusy === p.id ? '儲存中…' : '儲存 Persona'}
+                            </Button>
+                            <Button variant="danger" disabled={saveBusy === p.id} onClick={async () => {
+                              try {
+                                await saveKnowledge({ section: 'persona', action: 'delete', id: p.id });
+                                setPersonas((prev) => prev.filter((x) => x.id !== p.id));
+                              } catch (e) {
+                                setVersionMessage(e instanceof Error ? e.message : '刪除失敗');
+                              }
+                            }}>刪除</Button>
+                          </div>
+                        )}
                       </div>
-                      {p.ageRange && <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 6 }}>年齡層:{p.ageRange}</div>}
-                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0' }}>痛點:{p.painPoints.join('、')}</div>
-                      <div style={{ fontSize: 12 }}>訴求角度:{p.appealAngle}</div>
+                    ))}
+                  </div>
+                  {canEdit && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <Button variant="secondary" disabled={saveBusy === 'new-aud'} onClick={async () => {
+                        setSaveBusy('new-aud');
+                        try {
+                          const res = await saveKnowledge({ section: 'audience', action: 'create', payload: { name: '新受眾', painPoints: [], appealAngle: '' } });
+                          if (res.item) setAudiences((prev) => [...prev, res.item as unknown as BrandAudience]);
+                        } catch (e) {
+                          setVersionMessage(e instanceof Error ? e.message : '新增失敗');
+                        } finally {
+                          setSaveBusy(null);
+                        }
+                      }}>+ 新增受眾</Button>
+                      <Button variant="secondary" disabled={saveBusy === 'new-per'} onClick={async () => {
+                        setSaveBusy('new-per');
+                        try {
+                          const res = await saveKnowledge({ section: 'persona', action: 'create', payload: { code: `P${personas.length + 1}`, name: '新 Persona', painPoints: [], appealAngle: '' } });
+                          if (res.item) setPersonas((prev) => [...prev, res.item as unknown as BrandPersona]);
+                        } catch (e) {
+                          setVersionMessage(e instanceof Error ? e.message : '新增失敗');
+                        } finally {
+                          setSaveBusy(null);
+                        }
+                      }}>+ 新增 Persona</Button>
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
 
               {tab === 'channel' && (
                 <div className="grid-2" style={{ gap: 12 }}>
                   {channels.map((c) => (
-                    <div key={c.id} style={cardBoxStyle}>
-                      <Badge tone="primary">{c.platform}</Badge>
-                      <div style={{ fontSize: 12, margin: '8px 0 4px' }}><strong>語氣:</strong>{c.toneOfVoice}</div>
-                      <div style={{ fontSize: 12, marginBottom: 4 }}><strong>字數:</strong>{c.lengthGuideline}</div>
-                      <div style={{ fontSize: 12, marginBottom: 4 }}><strong>格式:</strong>{c.formatGuideline}</div>
-                      <div style={{ fontSize: 12 }}><strong>Hashtag 數量:</strong>{c.hashtagCountMin}–{c.hashtagCountMax}</div>
+                    <div key={c.id} style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Badge tone="primary">{PLATFORM_LABEL[c.platform] ?? c.platform}</Badge>
+                        <HelpTip text={`${PLATFORM_LABEL[c.platform] ?? c.platform} 產文會照這張卡的語氣、長度與 Hashtag 則數。改完按「儲存這平台」。`} />
+                      </div>
+                      <label style={miniLabel}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          說話語氣
+                          <HelpTip text="這平台聽起來像誰在講話。例如 IG 生活感、FB 把故事講完、Threads 口語短句。" />
+                        </span>
+                        <textarea value={c.toneOfVoice ?? ''} disabled={!canEdit} placeholder="例如：口語、短、敢聊現場" rows={3} onChange={(e) => setChannels((prev) => prev.map((x) => (x.id === c.id ? { ...x, toneOfVoice: e.target.value } : x)))} style={{ ...inputStyle, resize: 'vertical' }} />
+                      </label>
+                      <label style={miniLabel}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          建議長度
+                          <HelpTip text="一篇大概寫多長。例如 IG 80–180 字、FB 長文、Threads 1–3 段。" />
+                        </span>
+                        <input value={c.lengthGuideline ?? ''} disabled={!canEdit} placeholder="例如：80-180字，前 125 字要完整" onChange={(e) => setChannels((prev) => prev.map((x) => (x.id === c.id ? { ...x, lengthGuideline: e.target.value } : x)))} style={inputStyle} />
+                      </label>
+                      <label style={miniLabel}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          版型與格式
+                          <HelpTip text="圖怎麼排、文怎麼收尾。例如 IG 4:5 痛點海報、Threads 結尾留一句好回的話。" />
+                        </span>
+                        <textarea value={c.formatGuideline ?? ''} disabled={!canEdit} placeholder="例如：4:5 痛點海報 + 現場畫面" rows={2} onChange={(e) => setChannels((prev) => prev.map((x) => (x.id === c.id ? { ...x, formatGuideline: e.target.value } : x)))} style={{ ...inputStyle, resize: 'vertical' }} />
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <label style={miniLabel}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            最少幾則 Hashtag
+                            <HelpTip text={`產文時至少帶幾則 #。${CHANNEL_HASHTAG_HINT[c.platform] ?? '依平台習慣填。'} 左邊是最少，右邊是最多。`} />
+                          </span>
+                          <input type="number" min={0} max={30} value={c.hashtagCountMin ?? 0} disabled={!canEdit} onChange={(e) => setChannels((prev) => prev.map((x) => (x.id === c.id ? { ...x, hashtagCountMin: Number(e.target.value) } : x)))} style={inputStyle} />
+                        </label>
+                        <label style={miniLabel}>
+                          <span>最多幾則 Hashtag</span>
+                          <input type="number" min={0} max={30} value={c.hashtagCountMax ?? 0} disabled={!canEdit} onChange={(e) => setChannels((prev) => prev.map((x) => (x.id === c.id ? { ...x, hashtagCountMax: Number(e.target.value) } : x)))} style={inputStyle} />
+                        </label>
+                      </div>
+                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0, lineHeight: 1.5 }}>
+                        {CHANNEL_HASHTAG_HINT[c.platform] ?? 'Hashtag 則數是產文時要帶幾個 #，不是字數。'}
+                      </p>
+                      {canEdit && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          style={{ justifySelf: 'start' }}
+                          disabled={saveBusy === c.id}
+                          onClick={async () => {
+                            setSaveBusy(c.id);
+                            try {
+                              const res = await saveKnowledge({
+                                section: 'channel', action: 'update', id: c.id,
+                                payload: { toneOfVoice: c.toneOfVoice, lengthGuideline: c.lengthGuideline, formatGuideline: c.formatGuideline, hashtagCountMin: c.hashtagCountMin, hashtagCountMax: c.hashtagCountMax },
+                              });
+                              if (res.item) setChannels((prev) => prev.map((x) => (x.id === c.id ? res.item as unknown as BrandChannel : x)));
+                            } catch (e) {
+                              setVersionMessage(e instanceof Error ? e.message : '儲存失敗');
+                            } finally {
+                              setSaveBusy(null);
+                            }
+                          }}
+                        >
+                          {saveBusy === c.id ? '儲存中…' : '儲存這平台'}
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -769,40 +1318,101 @@ export function BrandIntelligence() {
               {tab === 'rules' && (
                 <div style={{ display: 'grid', gap: 10 }}>
                   {rules.map((r) => {
-                    const meta = ruleTypeLabel[r.ruleType];
+                    const meta = ruleTypeLabel[r.ruleType] ?? { label: r.ruleType, tone: 'default' as BadgeTone };
+                    const draft = { ...r, ...ruleDrafts[r.id] };
                     const isEditing = editingId === r.id;
                     return (
-                      <motion.div key={r.id} layout style={cardBoxStyle}>
-                        <div className="card-row" style={{ flexWrap: 'wrap' }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-                              <Badge tone={meta.tone}>{meta.label}</Badge>
-                              <Badge tone={verificationTone[r.verification]}>{verificationLabel[r.verification]}</Badge>
-                              {r.validUntil && <Badge tone="accent">失效日:{new Date(r.validUntil).toLocaleDateString('zh-TW')}</Badge>}
+                      <motion.div key={r.id} layout style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <Badge tone={meta.tone}>{meta.label}</Badge>
+                          <Badge tone={verificationTone[r.verification]}>{verificationLabel[r.verification]}</Badge>
+                        </div>
+                        {isEditing ? (
+                          <>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                              <select
+                                value={draft.ruleType}
+                                onChange={(e) => setRuleDrafts((prev) => ({ ...prev, [r.id]: { ...prev[r.id], ruleType: e.target.value as BrandRuleType } }))}
+                                style={inputStyle}
+                              >
+                                <option value="can_claim">可宣稱</option>
+                                <option value="cannot_claim">不可宣稱</option>
+                                <option value="marketing_rule">行銷規則</option>
+                                <option value="negative_rule">負面表列</option>
+                              </select>
+                              <select
+                                value={draft.verification}
+                                onChange={(e) => setRuleDrafts((prev) => ({ ...prev, [r.id]: { ...prev[r.id], verification: e.target.value as VerificationStatus } }))}
+                                style={inputStyle}
+                              >
+                                <option value="pending">待驗證</option>
+                                <option value="claimed">行銷宣稱</option>
+                                <option value="verified">已驗證</option>
+                              </select>
                             </div>
-                            {isEditing ? (
-                              <textarea
-                                defaultValue={r.statement}
-                                style={{ width: '100%', minHeight: 60, borderRadius: 8, border: '1px solid var(--color-border)', padding: 8, fontSize: 13, fontFamily: 'inherit' }}
-                              />
-                            ) : (
-                              <div style={{ fontSize: 14 }}>{r.statement}</div>
-                            )}
-                            {r.conditionNote && <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>條件:{r.conditionNote}</div>}
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            <Button variant="ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setEditingId(isEditing ? null : r.id)}>
-                              {isEditing ? '完成' : '編輯'}
+                            <textarea
+                              value={draft.statement}
+                              onChange={(e) => setRuleDrafts((prev) => ({ ...prev, [r.id]: { ...prev[r.id], statement: e.target.value } }))}
+                              rows={3}
+                              style={{ ...inputStyle, resize: 'vertical' }}
+                            />
+                            <input
+                              value={draft.conditionNote ?? ''}
+                              placeholder="條件說明（選填）"
+                              onChange={(e) => setRuleDrafts((prev) => ({ ...prev, [r.id]: { ...prev[r.id], conditionNote: e.target.value } }))}
+                              style={inputStyle}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: 14 }}>{r.statement}</div>
+                            {r.conditionNote && <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>條件:{r.conditionNote}</div>}
+                          </>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {canEdit && isEditing && (
+                            <Button
+                              variant="secondary"
+                              disabled={saveBusy === r.id}
+                              onClick={async () => {
+                                setSaveBusy(r.id);
+                                try {
+                                  const res = await saveKnowledge({
+                                    section: 'rule', action: 'update', id: r.id,
+                                    payload: { statement: draft.statement, conditionNote: draft.conditionNote, verification: draft.verification, ruleType: draft.ruleType },
+                                  });
+                                  if (res.item) setRules((prev) => prev.map((x) => (x.id === r.id ? res.item as unknown as BrandRule : x)));
+                                  setEditingId(null);
+                                } catch (e) {
+                                  setVersionMessage(e instanceof Error ? e.message : '儲存失敗');
+                                } finally {
+                                  setSaveBusy(null);
+                                }
+                              }}
+                            >
+                              {saveBusy === r.id ? '儲存中…' : '儲存規則'}
                             </Button>
-                            <Button variant="danger" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => void archiveRule(r.id)}>封存</Button>
-                          </div>
+                          )}
+                          {canEdit && (
+                            <Button variant="ghost" onClick={() => {
+                              if (!isEditing) setRuleDrafts((prev) => ({ ...prev, [r.id]: r }));
+                              setEditingId(isEditing ? null : r.id);
+                            }}>
+                              {isEditing ? '取消' : '編輯'}
+                            </Button>
+                          )}
+                          {canEdit && (
+                            <Button variant="danger" onClick={() => void archiveRule(r.id)}>刪除</Button>
+                          )}
                         </div>
                       </motion.div>
                     );
                   })}
-                  <Button variant="secondary" style={{ justifySelf: 'start' }} onClick={() => void addRule()}>
-                    + 新增規則
-                  </Button>
+                  {canEdit && (
+                    <Button variant="secondary" style={{ justifySelf: 'start' }} onClick={() => void addRule()}>
+                      + 新增規則
+                    </Button>
+                  )}
                 </div>
               )}
 
@@ -1113,15 +1723,163 @@ export function BrandIntelligence() {
               {tab === 'visual' && (
                 <div className="grid-4" style={{ gap: 12 }}>
                   {visuals.map((v) => (
-                    <div key={v.id} style={cardBoxStyle}>
+                    <div key={v.id} style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
                       {v.category === 'color' && (
-                        <div style={{ width: '100%', height: 40, borderRadius: 8, background: v.value, marginBottom: 8, border: '1px solid var(--color-border)' }} />
+                        <div style={{ width: '100%', height: 40, borderRadius: 8, background: v.value, border: '1px solid var(--color-border)' }} />
                       )}
-                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{v.label}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{v.value}</div>
+                      <input value={v.label} disabled={!canEdit} onChange={(e) => setVisuals((prev) => prev.map((x) => (x.id === v.id ? { ...x, label: e.target.value } : x)))} style={inputStyle} />
+                      <input value={v.value} disabled={!canEdit} onChange={(e) => setVisuals((prev) => prev.map((x) => (x.id === v.id ? { ...x, value: e.target.value } : x)))} style={inputStyle} />
+                      <select
+                        value={v.category}
+                        disabled={!canEdit}
+                        onChange={(e) => setVisuals((prev) => prev.map((x) => (x.id === v.id ? { ...x, category: e.target.value as BrandVisual['category'] } : x)))}
+                        style={inputStyle}
+                      >
+                        <option value="color">色票</option>
+                        <option value="layout">版面</option>
+                        <option value="typography">字體</option>
+                      </select>
+                      {canEdit && (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <Button
+                            variant="secondary"
+                            disabled={saveBusy === v.id}
+                            onClick={async () => {
+                              setSaveBusy(v.id);
+                              try {
+                                const res = await saveKnowledge({
+                                  section: 'visual', action: 'update', id: v.id,
+                                  payload: { label: v.label, value: v.value, category: v.category },
+                                });
+                                if (res.item) setVisuals((prev) => prev.map((x) => (x.id === v.id ? res.item as unknown as BrandVisual : x)));
+                              } catch (e) {
+                                setVersionMessage(e instanceof Error ? e.message : '儲存失敗');
+                              } finally {
+                                setSaveBusy(null);
+                              }
+                            }}
+                          >
+                            {saveBusy === v.id ? '儲存中…' : '儲存'}
+                          </Button>
+                          <Button variant="danger" onClick={async () => {
+                            try {
+                              await saveKnowledge({ section: 'visual', action: 'delete', id: v.id });
+                              setVisuals((prev) => prev.filter((x) => x.id !== v.id));
+                            } catch (e) {
+                              setVersionMessage(e instanceof Error ? e.message : '刪除失敗');
+                            }
+                          }}>刪</Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                   {visuals.length === 0 && <p>尚無視覺規範資料</p>}
+                  {canEdit && (
+                    <Button
+                      variant="secondary"
+                      style={{ alignSelf: 'start' }}
+                      disabled={saveBusy === 'new-visual'}
+                      onClick={async () => {
+                        setSaveBusy('new-visual');
+                        try {
+                          const res = await saveKnowledge({
+                            section: 'visual', action: 'create',
+                            payload: { label: '新色票', value: '#0B2D5C', category: 'color' },
+                          });
+                          if (res.item) setVisuals((prev) => [...prev, res.item as unknown as BrandVisual]);
+                        } catch (e) {
+                          setVersionMessage(e instanceof Error ? e.message : '新增失敗');
+                        } finally {
+                          setSaveBusy(null);
+                        }
+                      }}
+                    >
+                      + 新增視覺項目
+                    </Button>
+                  )}
+                  <p style={{ gridColumn: '1 / -1', fontSize: 13, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                    發文產圖風格請到「產圖 Prompt」分頁自行調整，不必等系統管理員改程式。改完記得發布版本，才看得到這次動了哪些。
+                  </p>
+                </div>
+              )}
+
+              {tab === 'image-prompt' && (
+                <div style={{ display: 'grid', gap: 16 }}>
+                  <p style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--color-text-muted)' }}>
+                    這裡列出這個品牌發文時實際用的產圖 Prompt。品牌主可以直接改、存檔，下一則 FB／IG／Threads 圖就會跟新風格走。
+                    系統仍會自動補上「不要畫字、官方 logo 後製」等防呆，不必寫進這三段。
+                  </p>
+                  {(imagePrompts.length ? imagePrompts : []).map((item) => (
+                    <div key={item.slot} style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                        <strong>{item.title}</strong>
+                        <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                          {item.isCustom ? '已自訂' : '系統預設'}
+                          {item.updatedAt ? ` · ${new Date(item.updatedAt).toLocaleString('zh-TW')}` : ''}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--color-text-muted)' }}>{item.hint}</p>
+                      <textarea
+                        value={promptDrafts[item.slot] ?? item.prompt}
+                        onChange={(e) => setPromptDrafts((prev) => ({ ...prev, [item.slot]: e.target.value }))}
+                        rows={item.slot === 'copy_spec' ? 8 : 14}
+                        style={{ ...inputStyle, minHeight: item.slot === 'copy_spec' ? 160 : 240, resize: 'vertical', lineHeight: 1.55 }}
+                      />
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <Button
+                          variant="primary"
+                          disabled={promptBusy === item.slot}
+                          onClick={async () => {
+                            if (!slug) return;
+                            setPromptBusy(item.slot);
+                            setPromptMessage(null);
+                            try {
+                              const { prompts, draft } = await api.saveBrandImagePrompt(slug, {
+                                slot: item.slot,
+                                prompt: promptDrafts[item.slot] ?? item.prompt,
+                              });
+                              setImagePrompts(prompts);
+                              setPromptDrafts(Object.fromEntries(prompts.map((p) => [p.slot, p.prompt])));
+                              if (draft) applyVersionPayload({ draft });
+                              setPromptMessage(`已儲存「${item.title}」，已記入草稿`);
+                            } catch (e) {
+                              setPromptMessage(e instanceof Error ? e.message : '儲存失敗');
+                            } finally {
+                              setPromptBusy(null);
+                            }
+                          }}
+                        >
+                          {promptBusy === item.slot ? '儲存中…' : '儲存這段'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          disabled={promptBusy === item.slot}
+                          onClick={async () => {
+                            if (!slug) return;
+                            setPromptBusy(item.slot);
+                            setPromptMessage(null);
+                            try {
+                              const { prompts, draft } = await api.saveBrandImagePrompt(slug, { slot: item.slot, reset: true });
+                              setImagePrompts(prompts);
+                              setPromptDrafts(Object.fromEntries(prompts.map((p) => [p.slot, p.prompt])));
+                              if (draft) applyVersionPayload({ draft });
+                              setPromptMessage(`已還原「${item.title}」為系統預設`);
+                            } catch (e) {
+                              setPromptMessage(e instanceof Error ? e.message : '還原失敗');
+                            } finally {
+                              setPromptBusy(null);
+                            }
+                          }}
+                        >
+                          還原預設
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {imagePrompts.length === 0 && (
+                    <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>正在載入預設 Prompt，請重新整理此頁。</p>
+                  )}
+                  {promptMessage && <p style={{ fontSize: 13 }}>{promptMessage}</p>}
                 </div>
               )}
 
@@ -1248,7 +2006,7 @@ export function BrandIntelligence() {
 > 本檔案由系統自動編譯,不可手動修改。如需修改請至上方分頁編輯結構化條目。
 
 ## 1. 品牌總覽
-一句話定位: ${brand.tagline}
+一句話定位: ${tagline}
 
 ## 3. 目標受眾
 ${audiences.map((a) => `- ${a.name}:${a.appealAngle}`).join('\n')}
@@ -1266,10 +2024,93 @@ ${rules.map((r) => `- [${ruleTypeLabel[r.ruleType].label}] ${r.statement}`).join
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function ExampleEditor({
+  item, hideWeight, busy, canEdit, onChange, onSave, onDelete,
+}: {
+  item: BrandExample;
+  hideWeight?: boolean;
+  busy: boolean;
+  canEdit: boolean;
+  onChange: (next: BrandExample) => void;
+  onSave: (item: BrandExample) => void | Promise<void>;
+  onDelete: (id: string) => void | Promise<void>;
+}) {
+  const [note, setNote] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  return (
+    <div style={{ ...cardBoxStyle, display: 'grid', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: hideWeight ? '1fr' : '1fr 110px', gap: 8 }}>
+        <label style={miniLabel}>
+          <span>{hideWeight ? '主題名稱' : '這類在講什麼'}</span>
+          <input
+            value={item.title}
+            disabled={!canEdit}
+            placeholder={hideWeight ? '例如：換季收納、月底對帳' : '例如：現場痛點、怎麼開始用'}
+            onChange={(e) => { setNote(null); onChange({ ...item, title: e.target.value }); }}
+            style={inputStyle}
+          />
+        </label>
+        {!hideWeight && (
+          <label style={miniLabel}>
+            <span>大約佔幾成</span>
+            <input
+              type="number"
+              value={item.weightPercent ?? 0}
+              disabled={!canEdit}
+              onChange={(e) => { setNote(null); onChange({ ...item, weightPercent: Number(e.target.value) }); }}
+              style={inputStyle}
+            />
+          </label>
+        )}
+      </div>
+      <label style={miniLabel}>
+        <span>{hideWeight ? '小編該怎麼寫' : '補充說明'}</span>
+        <textarea
+          value={item.body ?? ''}
+          disabled={!canEdit}
+          rows={3}
+          placeholder={hideWeight ? '例如：用房東月底對不到帳的畫面開頭，不要先推產品。' : '這類內容要注意什麼'}
+          onChange={(e) => { setNote(null); onChange({ ...item, body: e.target.value }); }}
+          style={{ ...inputStyle, resize: 'vertical' }}
+        />
+      </label>
+      {canEdit && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={busy}
+            onClick={async () => {
+              setFailed(false);
+              setNote(null);
+              try {
+                await onSave(item);
+                setNote('已儲存');
+              } catch (e) {
+                setFailed(true);
+                setNote(e instanceof Error ? e.message : '儲存失敗');
+              }
+            }}
+          >
+            {busy ? '儲存中…' : '儲存'}
+          </Button>
+          <Button type="button" variant="danger" disabled={busy} onClick={() => void onDelete(item.id)}>刪除</Button>
+          {note && (
+            <span style={{ fontSize: 12, color: failed ? 'var(--color-danger)' : 'var(--color-primary-dark)' }}>{note}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{label}</div>
+        {hint && <HelpTip text={hint} label={`${label}說明`} />}
+      </div>
       <div style={{ fontSize: 14 }}>{children}</div>
     </div>
   );
@@ -1282,4 +2123,12 @@ const cardBoxStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   width: '100%', padding: '7px 12px', borderRadius: 8, border: '1px solid var(--color-border)',
   fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box',
+};
+
+const miniLabel: CSSProperties = {
+  display: 'grid',
+  gap: 4,
+  fontSize: 12,
+  fontWeight: 600,
+  color: 'var(--color-text-muted)',
 };

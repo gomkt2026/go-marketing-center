@@ -18,7 +18,7 @@ import {
   slotAtToday, brandHasSlotContent, hourTWFromIso,
   THREADS_POST_HOURS_TW, THREADS_OFFTOPIC_HOURS_TW,
 } from '../../../functions/_shared/threads-slots';
-import { listAllPostingSlots, type PostingSlot } from '../../../functions/_shared/posting-slots';
+import { listAllPostingSlots, isHourlyFamily, isOfftopicFamily, isThreadsSlotKind, type PostingSlot } from '../../../functions/_shared/posting-slots';
 import { getThreadsAccount, publishThreadsPost, isThreadsAccessBlocked, THREADS_ACCESS_BLOCKED_NOTE } from '../../../functions/_shared/threads';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, metaTokenInvalidNoteFromMessage } from '../../../functions/_shared/meta';
 import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '../../../functions/_shared/x';
@@ -195,10 +195,13 @@ async function generateSignalDrafts(env: Env): Promise<void> {
 //   產稿邏輯在 functions/_shared/threads-slots.ts:一律 pending_review,先不建 job。
 //   auto_publish 是到期安全網,由 promoteDueThreadsSafetyNet 在 slot 到了才補單。
 // ============================================================================
-const AUTO_POST_BRANDS = ['homigo', 'taskgo', 'washgo'] as const;
 const CATCHUP_GENERATIONS_PER_TICK = 1; // 每 tick 只補 1 則,避開 Workers 子請求上限(Neon 每條 SQL 都算 1 次)
 
-const CATCHUP_BRANDS = AUTO_POST_BRANDS;
+async function listAutoPostSlugs(env: Env): Promise<string[]> {
+  const slots = await listAllPostingSlots(env, { enabledOnly: true });
+  const slugs = [...new Set(slots.map((s) => s.brandSlug))];
+  return slugs.length ? slugs : ['homigo', 'taskgo', 'washgo'];
+}
 
 async function brandHasSlotJob(
   env: Env,
@@ -249,7 +252,7 @@ async function ensureAutoPublishJobs(env: Env): Promise<number> {
       SELECT file_url FROM content_assets
       WHERE content_version_id = v.id AND asset_type IN ('image', 'video') LIMIT 1
     ) a ON true
-    WHERE b.slug IN ('homigo', 'taskgo', 'washgo')
+    WHERE b.is_active = true
       AND c.target_platform IN ('facebook', 'instagram', 'threads')
       AND c.status IN ('scheduled', 'approved')
       AND acc.auto_publish = true
@@ -283,23 +286,23 @@ async function ensureAutoPublishJobs(env: Env): Promise<number> {
 async function findNextMissingThreadsSlot(
   env: Env,
   slugs: string[],
-): Promise<{ slug: string; hour: number; source: 'threads_hourly' | 'threads_offtopic'; slotAt: Date } | null> {
+): Promise<{ slug: string; hour: number; source: PostingSlot['slotKind']; slotAt: Date } | null> {
   const sql = getSql(env);
   const now = new Date();
   const configured = await listAllPostingSlots(env, { enabledOnly: true });
   const dueSlots = configured.filter((s) =>
     s.platform === 'threads'
     && slugs.includes(s.brandSlug)
-    && (s.slotKind === 'threads_hourly' || s.slotKind === 'threads_offtopic')
+    && isThreadsSlotKind(s.slotKind)
     && slotGenerationDue(s.hourTw, now)
   );
   const due = dueSlots.length
-    ? dueSlots.map((s) => ({ slug: s.brandSlug, hour: s.hourTw, source: s.slotKind as 'threads_hourly' | 'threads_offtopic' }))
+    ? dueSlots.map((s) => ({ slug: s.brandSlug, hour: s.hourTw, source: s.slotKind }))
     : [
         ...THREADS_POST_HOURS_TW.filter((h) => slotGenerationDue(h, now)).map((hour) => ({ hour, source: 'threads_hourly' as const })),
         ...THREADS_OFFTOPIC_HOURS_TW.filter((h) => slotGenerationDue(h, now)).map((hour) => ({ hour, source: 'threads_offtopic' as const })),
-      ].flatMap((slot) => slugs.filter((s) => (AUTO_POST_BRANDS as readonly string[]).includes(s)).map((slug) => ({ slug, ...slot })));
-  const targetSlugs = slugs.filter((s) => (AUTO_POST_BRANDS as readonly string[]).includes(s));
+      ].flatMap((slot) => slugs.map((slug) => ({ slug, ...slot })));
+  const targetSlugs = slugs;
   if (!due.length || !targetSlugs.length) return null;
 
   const rows = await sql`
@@ -308,9 +311,9 @@ async function findNextMissingThreadsSlot(
            extract(hour from (c.generation_prompt_meta->>'slotAt')::timestamptz AT TIME ZONE 'Asia/Taipei')::int AS hour
     FROM contents c
     JOIN brands b ON b.id = c.brand_id
-    WHERE b.slug IN ('homigo', 'taskgo', 'washgo')
+    WHERE b.slug = ANY(${targetSlugs}::text[])
       AND c.target_platform = 'threads'
-      AND c.generation_prompt_meta->>'source' IN ('threads_hourly', 'threads_offtopic')
+      AND c.generation_prompt_meta->>'source' LIKE 'threads_%'
       AND (c.generation_prompt_meta->>'slotAt')::timestamptz
           >= date_trunc('day', now() AT TIME ZONE 'Asia/Taipei') AT TIME ZONE 'Asia/Taipei'
       AND (c.generation_prompt_meta->>'slotAt')::timestamptz
@@ -337,12 +340,12 @@ async function catchupMissingThreadsSlots(env: Env, slugs: string[], limit = CAT
   while (generated < limit) {
     const missing = await findNextMissingThreadsSlot(env, slugs);
     if (!missing) break;
-    if (missing.source === 'threads_hourly') {
-      console.log(`[catchup] 補 ${missing.slug} Threads 跟風 ${missing.hour}:00`);
-      await generateThreadsSlot(env, missing.slotAt, { slugs: [missing.slug], ignoreInterval: true, onlyMissing: true });
+    if (isOfftopicFamily(missing.source)) {
+      console.log(`[catchup] 補 ${missing.slug} Threads ${missing.source} ${missing.hour}:00`);
+      await generateThreadsOfftopicSlot(env, missing.slotAt, { slugs: [missing.slug], onlyMissing: true, slotKind: missing.source });
     } else {
-      console.log(`[catchup] 補 ${missing.slug} Threads 生活哏文 ${missing.hour}:00`);
-      await generateThreadsOfftopicSlot(env, missing.slotAt, { slugs: [missing.slug], onlyMissing: true });
+      console.log(`[catchup] 補 ${missing.slug} Threads ${missing.source} ${missing.hour}:00`);
+      await generateThreadsSlot(env, missing.slotAt, { slugs: [missing.slug], ignoreInterval: true, onlyMissing: true, slotKind: missing.source });
     }
     generated += 1;
   }
@@ -351,7 +354,7 @@ async function catchupMissingThreadsSlots(env: Env, slugs: string[], limit = CAT
 
 /** 手動補發:Homigo / TaskGo / Washgo 今天已過、但還沒產出或還沒發出的自動檔 */
 async function catchupTodayAutoPosts(env: Env): Promise<void> {
-  const slugs = [...CATCHUP_BRANDS];
+  const slugs = await listAutoPostSlugs(env);
   console.log(`[catchup] 開始補齊 ${slugs.join(' / ')} 今日自動發文`);
   await recoverStuckPublishingJobs(env);
   await ensureDailyThemePublishJobs(env, slugs);
@@ -578,7 +581,7 @@ async function ensureDailyThemePublishJobs(env: Env, slugs: string[]): Promise<v
       SELECT file_url FROM content_assets
       WHERE content_version_id = v.id AND asset_type = 'image' LIMIT 1
     ) a ON true
-    WHERE b.slug IN ('homigo', 'taskgo', 'washgo')
+    WHERE b.is_active = true
       AND c.generation_prompt_meta->>'source' = ${DAILY_THEME_SOURCE}
       AND c.created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours'
       AND NOT EXISTS (SELECT 1 FROM publishing_jobs pj WHERE pj.content_id = c.id)
@@ -1056,8 +1059,8 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
     const genHour = (twHour + GENERATION_LEAD_HOURS) % 24;
     const slotAt = slotDateFor(genHour);
     const due = configured.filter((s) => s.hourTw === genHour);
-    const needHourly = due.some((s) => s.slotKind === 'threads_hourly') || (!configured.length && THREADS_POST_HOURS_TW.includes(genHour));
-    const needOfftopic = due.some((s) => s.slotKind === 'threads_offtopic') || (!configured.length && THREADS_OFFTOPIC_HOURS_TW.includes(genHour));
+    const needHourly = due.some((s) => isHourlyFamily(s.slotKind)) || (!configured.length && THREADS_POST_HOURS_TW.includes(genHour));
+    const needOfftopic = due.some((s) => isOfftopicFamily(s.slotKind)) || (!configured.length && THREADS_OFFTOPIC_HOURS_TW.includes(genHour));
     const needTheme = due.some((s) => s.slotKind === 'daily_theme') || (!configured.length && genHour === DAILY_THEME_HOUR_TW);
     if (needHourly) await generateThreadsSlot(env, slotAt);
     if (needOfftopic) await generateThreadsOfftopicSlot(env, slotAt);
@@ -1077,11 +1080,12 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
   const heavyThemeTick = isTopOfHour && themeHours.has((twHour + GENERATION_LEAD_HOURS) % 24);
   if (!heavyThemeTick) {
     try {
-      const threadsFilled = await catchupMissingThreadsSlots(env, [...AUTO_POST_BRANDS], 1);
+      const autoSlugs = await listAutoPostSlugs(env);
+      const threadsFilled = await catchupMissingThreadsSlots(env, autoSlugs, 1);
       if (!threadsFilled) {
         await fillMissingDailyThemePlatforms(
           env,
-          [...AUTO_POST_BRANDS],
+          autoSlugs,
           { maxPlatforms: 1, onlyAutoPublish: true },
         );
       }

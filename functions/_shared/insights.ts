@@ -70,14 +70,22 @@ export function computeEngagementRate(m: {
   return Math.min(eng / m.impressions, 9.9999);
 }
 
+function numericInsight(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.values(value as Record<string, unknown>).reduce((sum, item) => sum + numericInsight(item), 0);
+  }
+  return 0;
+}
+
 function insightValue(item: {
   name?: string;
-  values?: { value?: number }[];
-  total_value?: { value?: number };
+  values?: { value?: unknown }[];
+  total_value?: { value?: unknown };
 }): number {
-  if (typeof item.total_value?.value === 'number') return item.total_value.value;
-  if (typeof item.values?.[0]?.value === 'number') return item.values[0].value;
-  return 0;
+  const total = numericInsight(item.total_value?.value);
+  if (total > 0) return total;
+  return numericInsight(item.values?.[0]?.value);
 }
 
 function mapInsights(data: { name?: string; values?: { value?: number }[]; total_value?: { value?: number } }[]): Record<string, number> {
@@ -142,35 +150,50 @@ async function fetchThreadsInsights(account: { accessToken: string }, postId: st
 
 async function fetchFacebookInsights(account: MetaAccount, postId: string): Promise<NormalizedMetrics> {
   const pageToken = await resolvePageToken(account);
-  const params = new URLSearchParams({
-    metric: 'post_impressions,post_clicks,post_engaged_users',
-    access_token: pageToken,
-  });
-  const insights = await fetchJson(`${GRAPH_API}/${encodeURIComponent(postId)}/insights?${params}`);
-  const mapped = insights.ok
-    ? mapInsights((insights.data.data as { name?: string; values?: { value?: number }[]; total_value?: { value?: number } }[]) ?? [])
-    : {};
+  const attempts = [
+    { metric: 'post_media_view,post_total_media_view_unique', period: 'lifetime' },
+    { metric: 'post_media_view', period: 'lifetime' },
+    { metric: 'post_total_media_view_unique', period: 'lifetime' },
+  ];
+  let mapped: Record<string, number> = {};
+  let lastError = '';
+  for (const attempt of attempts) {
+    const params = new URLSearchParams({
+      metric: attempt.metric,
+      period: attempt.period,
+      access_token: pageToken,
+    });
+    const insights = await fetchJson(`${GRAPH_API}/${encodeURIComponent(postId)}/insights?${params}`);
+    if (insights.ok) {
+      mapped = mapInsights((insights.data.data as { name?: string; values?: { value?: unknown }[]; total_value?: { value?: unknown } }[]) ?? []);
+      lastError = '';
+      break;
+    }
+    lastError = JSON.stringify(insights.data);
+  }
 
   const fields = new URLSearchParams({
     fields: 'shares,comments.summary(true),reactions.summary(true)',
     access_token: pageToken,
   });
   const post = await fetchJson(`${GRAPH_API}/${encodeURIComponent(postId)}?${fields}`);
-  if (!insights.ok && !post.ok) {
-    const raw = JSON.stringify(insights.data);
-    const needPageToken = raw.includes('2069032') || raw.includes('不支援用戶存取權杖');
-    throw new Error(
-      needPageToken
-        ? 'Facebook 新版粉專必須用粉絲專頁權杖回收成效。請到設定重新貼上 Page Access Token(不要用個人 User Token)。'
-        : `Facebook 成效回收失敗 (${insights.status}): ${raw.slice(0, 220)}`,
-    );
+  const hasInsightNumbers = (mapped.post_media_view ?? mapped.post_total_media_view_unique ?? mapped.post_impressions ?? 0) > 0;
+  if (!hasInsightNumbers && !post.ok) {
+    const blob = lastError || JSON.stringify(post.data);
+    if (blob.includes('2069032') || blob.includes('不支援用戶存取權杖')) {
+      throw new Error('Facebook 新版粉專必須用粉絲專頁權杖回收成效。請到設定重新貼上 Page Access Token(不要用個人 User Token)。');
+    }
+    if (blob.includes('pages_read_user_content') || blob.includes('pages_read_engagement')) {
+      throw new Error('Facebook 粉專權杖缺少 pages_read_engagement 或 pages_read_user_content，無法讀貼文成效。請到設定用粉專權杖重新授權這兩個權限。');
+    }
+    throw new Error(`Facebook 成效回收失敗: ${blob.slice(0, 220)}`);
   }
 
   const shares = Number((post.data.shares as { count?: number } | undefined)?.count ?? 0);
   const comments = Number((post.data.comments as { summary?: { total_count?: number } } | undefined)?.summary?.total_count ?? 0);
   const likes = Number((post.data.reactions as { summary?: { total_count?: number } } | undefined)?.summary?.total_count ?? 0);
   const metrics = {
-    impressions: mapped.post_impressions ?? 0,
+    impressions: mapped.post_media_view ?? mapped.post_total_media_view_unique ?? mapped.post_impressions ?? 0,
     clicks: mapped.post_clicks ?? 0,
     comments,
     shares,
@@ -180,15 +203,19 @@ async function fetchFacebookInsights(account: MetaAccount, postId: string): Prom
   return {
     ...metrics,
     engagementRate: computeEngagementRate(metrics),
-    raw: { source: 'facebook_insights', engagedUsers: mapped.post_engaged_users ?? 0, ...mapped },
+    raw: {
+      source: 'facebook_insights',
+      uniqueViewers: mapped.post_total_media_view_unique ?? 0,
+      ...mapped,
+    },
   };
 }
 
 async function fetchInstagramInsights(account: { accessToken: string }, mediaId: string): Promise<NormalizedMetrics> {
   const attempts = [
     'views,reach,likes,comments,shares,saved,total_interactions',
-    'impressions,reach,likes,comments,shares,saved',
-    'impressions,reach,engagement,saved',
+    'views,reach,saved,shares,total_interactions',
+    'reach,saved,likes,comments,shares',
   ];
   let mapped: Record<string, number> = {};
   let lastError = '';
@@ -196,9 +223,13 @@ async function fetchInstagramInsights(account: { accessToken: string }, mediaId:
     const params = new URLSearchParams({ metric, access_token: account.accessToken });
     const insights = await fetchJson(`${GRAPH_API}/${encodeURIComponent(mediaId)}/insights?${params}`);
     if (insights.ok) {
-      mapped = mapInsights((insights.data.data as { name?: string; values?: { value?: number }[]; total_value?: { value?: number } }[]) ?? []);
+      mapped = mapInsights((insights.data.data as { name?: string; values?: { value?: unknown }[]; total_value?: { value?: unknown } }[]) ?? []);
+      if ((mapped.views ?? mapped.impressions ?? mapped.reach ?? 0) > 0 || mapped.total_interactions || mapped.saved) {
+        lastError = '';
+        break;
+      }
       lastError = '';
-      break;
+      continue;
     }
     lastError = `IG insights ${insights.status}: ${JSON.stringify(insights.data).slice(0, 180)}`;
   }
@@ -209,11 +240,14 @@ async function fetchInstagramInsights(account: { accessToken: string }, mediaId:
   });
   const media = await fetchJson(`${GRAPH_API}/${encodeURIComponent(mediaId)}?${fields}`);
   if (!Object.keys(mapped).length && !media.ok) {
+    if (lastError.includes('does not have permission') || lastError.includes('instagram_manage_insights')) {
+      throw new Error('Instagram 權杖缺少 instagram_manage_insights，無法讀曝光。請到設定用同一把粉專權杖重新授權後再同步。');
+    }
     throw new Error(lastError || `Instagram 成效回收失敗`);
   }
 
   const metrics = {
-    impressions: mapped.views ?? mapped.impressions ?? 0,
+    impressions: mapped.views ?? mapped.impressions ?? mapped.reach ?? 0,
     clicks: 0,
     comments: mapped.comments ?? Number(media.data.comments_count ?? 0),
     shares: mapped.shares ?? 0,
@@ -481,7 +515,9 @@ async function loadPublishedJobs(env: Env, brandId?: string, jobId?: string): Pr
         AND pj.status = 'published'
         AND pj.external_post_id IS NOT NULL
         AND pj.published_at >= now() - interval '28 days'
-      ORDER BY (pr.id IS NULL) DESC, pj.published_at DESC
+      ORDER BY (pr.id IS NULL) DESC,
+        (pr.id IS NOT NULL AND pr.impressions = 0 AND pj.platform IN ('facebook', 'instagram')) DESC,
+        pj.published_at DESC
       LIMIT ${MAX_JOBS_PER_RUN}
     `;
     return (rows as Record<string, unknown>[]).map(mapJob);

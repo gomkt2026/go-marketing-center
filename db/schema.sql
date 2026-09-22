@@ -214,6 +214,7 @@ CREATE TABLE brand_versions (
   version_number    INTEGER NOT NULL,               -- 1, 2, 3...
   status            brand_version_status NOT NULL DEFAULT 'draft',
   summary_of_changes TEXT,                          -- 與上一版的差異摘要
+  change_log        JSONB NOT NULL DEFAULT '[]',    -- 草稿累積的條目變更
   compiled_markdown TEXT,                           -- 發布時自動編譯的唯讀 MD 快照
   confidence_score  NUMERIC(4,3),                   -- Onboarding AI 產出時的信心分數
   published_by      UUID REFERENCES users(id),
@@ -331,6 +332,17 @@ CREATE TABLE brand_visuals (
 );
 CREATE INDEX idx_brand_visuals_brand ON brand_visuals(brand_id);
 
+CREATE TABLE brand_image_prompts (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id    UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  slot        TEXT NOT NULL,
+  prompt      TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (brand_id, slot)
+);
+CREATE INDEX idx_brand_image_prompts_brand ON brand_image_prompts(brand_id);
+
 -- 各平台調性設定(FB/IG/Threads/X...)
 CREATE TABLE brand_channels (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -361,7 +373,12 @@ CREATE TABLE brand_posting_slots (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT brand_posting_slots_hour_check CHECK (hour_tw >= 0 AND hour_tw <= 23),
-  CONSTRAINT brand_posting_slots_kind_check CHECK (slot_kind IN ('daily_theme', 'threads_hourly', 'threads_offtopic')),
+  CONSTRAINT brand_posting_slots_kind_check CHECK (slot_kind IN (
+    'daily_theme', 'threads_hourly', 'threads_offtopic',
+    'threads_love', 'threads_weather', 'threads_entertainment',
+    'threads_sports', 'threads_emotion',
+    'threads_workplace', 'threads_qa', 'threads_image'
+  )),
   UNIQUE (brand_id, platform, hour_tw, slot_kind)
 );
 CREATE INDEX idx_brand_posting_slots_brand ON brand_posting_slots(brand_id, platform, enabled);
@@ -378,6 +395,21 @@ CREATE TABLE brand_keywords (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_brand_keywords_brand ON brand_keywords(brand_id, category);
+
+CREATE TABLE brand_seo_topics (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id        UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  topic           TEXT NOT NULL,
+  angle           TEXT NOT NULL,
+  primary_keyword TEXT,
+  related_terms   JSONB NOT NULL DEFAULT '[]',
+  category        TEXT,
+  search_intent   TEXT,
+  audience        TEXT,
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_brand_seo_topics_brand ON brand_seo_topics(brand_id);
 
 -- 品牌歷史 / 里程碑
 CREATE TABLE brand_histories (

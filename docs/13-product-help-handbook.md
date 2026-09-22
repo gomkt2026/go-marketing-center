@@ -35,7 +35,7 @@ https://go-marketing-center.pages.dev/api/public/help/widget
 
 ### 2.1 上傳文件（客服文件分頁）
 
-TaskGo、Homigo 已有官方操作說明。在客服文件分頁按 **同步官方操作文件** 即可覆蓋並發布（TaskGo 32 份、Homigo 21 份）。來源分別是 `docs/help/taskgo`、`docs/help/homigo`。
+TaskGo、Homigo、Washgo 已有官方操作說明。在客服文件分頁按 **同步官方操作文件** 即可覆蓋並發布（TaskGo 32 份、Homigo 21 份、Washgo 19 份）。來源分別是 `docs/help/taskgo`、`docs/help/homigo`、`docs/help/washgo`。
 
 1. 選 **適用角色**（可多選）。同一份「報修說明」可以同時給房東 + 房客。
 2. 上傳 `.md` / `.txt` / `.pdf` / `.docx`（單檔 10MB 內）。舊版 `.doc` 請另存 docx。
@@ -69,7 +69,7 @@ TaskGo、Homigo 已有官方操作說明。在客服文件分頁按 **同步官�
 2. **origin 白名單**：一行一個網域。建議至少：
    - TaskGo：`https://app.taskgo.com.tw`
    - Homigo：`https://cc.homigo.workers.dev`，以及實際 LIFF 網域（常見還有 `https://liff.line.me`）
-   - Washgo LIFF：實際 LIFF 網域（常見還有 `https://liff.line.me`）
+   - Washgo：`https://washgo.pages.dev`、`https://washgo-liff.pages.dev`，以及實際 LIFF 網域（常見還有 `https://liff.line.me`）
    - 本機：`http://localhost:3000`（或你們的 dev port）
    - 留空 = 不限制來源（上線前請補上，避免被任意網站盜用 key）
 3. **各角色歡迎句**（選填）。空白則用系統預設。

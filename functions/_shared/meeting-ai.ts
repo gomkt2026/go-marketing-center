@@ -269,16 +269,18 @@ export async function advanceMeetingOnce(env: Env, meetingId: string): Promise<A
     ],
   });
 
+  const spoken = String(reply.message ?? (reply as { text?: string; content?: string }).text ?? (reply as { content?: string }).content ?? '').trim();
+  if (!spoken) throw new Error('OpenAI 回傳的發言是空的');
   const emotion = (MEETING_EMOTIONS as readonly string[]).includes(reply.emotion) ? reply.emotion as MeetingEmotion : 'neutral';
   const inserted = await sql`
     INSERT INTO meeting_messages (meeting_id, sender_type, sender_agent_id, content, metadata)
-    VALUES (${meetingId}::uuid, 'ai_agent', ${speaker.id}::uuid, ${reply.message.trim()}, ${JSON.stringify({ emotion, interrupted })})
+    VALUES (${meetingId}::uuid, 'ai_agent', ${speaker.id}::uuid, ${spoken}, ${JSON.stringify({ emotion, interrupted })})
     RETURNING id
   `;
 
   return {
     messageId: (inserted[0] as { id: string }).id,
-    content: reply.message.trim(),
+    content: spoken,
     emotion,
     interrupted,
     agent: speaker,

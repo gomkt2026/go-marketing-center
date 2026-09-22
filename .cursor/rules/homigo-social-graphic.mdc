@@ -1,0 +1,19 @@
+---
+description: Homigo FB、IG、Threads 圖文必須用米白深藍社群海報，不要紙本素描或房仲海報
+globs: functions/_shared/prompts.ts,functions/_shared/generate.ts,functions/_shared/poster-text.ts
+alwaysApply: false
+---
+
+# Homigo 社群圖文
+
+產生 Homigo 的 FB／IG／Threads 圖、自動發文配圖、或改產圖 prompt 時：
+
+1. 尺寸走 4:5 直式（1080×1350 感）；上下至少 120px、左右至少 80px 留白
+2. 主色米白 `#F5F1EA`、深藍 `#0B2D5C`；黃 `#F7B500` 只做主標強調
+3. 閱讀順序：痛點主標 → 真實疲憊情境 → 最後才是 Homigo 解法
+4. 人物是台灣年輕人、自然疲憊，不要商業假笑、不要搞笑
+5. 手機 UI 只能是簡潔白底租屋工具，深藍抽象 icon；模型不要畫字、假按鈕、奇怪數字
+6. 官方 logo 由系統後製（左下、不貼邊、不變形）；不要叫模型畫 logo
+7. 禁止：房仲海報、保險 DM、電商廣告、紙本素描封面、畫面過滿
+
+程式規格：`functions/_shared/prompts.ts` 的 `HOMIGO_IG_IMAGE_STYLE` / `HOMIGO_CORE`

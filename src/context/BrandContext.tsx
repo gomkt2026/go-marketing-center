@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import type { Brand } from '@/types';
 import { brandSlugFromPath } from '@/lib/constants';
@@ -9,6 +9,7 @@ interface BrandContextValue {
   setBrandBySlug: (slug: string | null) => void;
   brands: Brand[];
   brandsLoading: boolean;
+  reloadBrands: () => Promise<void>;
   brandBySlug: (slug: string) => Brand | undefined;
   brandById: (id: string) => Brand | undefined;
 }
@@ -22,18 +23,24 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [brandsLoading, setBrandsLoading] = useState(true);
 
-  useEffect(() => {
+  const reloadBrands = useCallback(async () => {
     setBrandsLoading(true);
-    api.brands()
-      .then(({ brands: list }) => {
-        setBrands(list);
-        setSlug((current) => {
-          if (current && list.some((b) => b.slug === current)) return current;
-          return list[0]?.slug ?? null;
-        });
-      })
-      .catch(() => setBrands([]))
-      .finally(() => setBrandsLoading(false));
+    try {
+      const { brands: list } = await api.brands();
+      setBrands(list);
+      setSlug((current) => {
+        if (current && list.some((b) => b.slug === current)) return current;
+        return list[0]?.slug ?? null;
+      });
+    } catch {
+      setBrands([]);
+    } finally {
+      setBrandsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reloadBrands();
   }, []);
 
   const value = useMemo<BrandContextValue>(() => {
@@ -46,6 +53,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       setBrandBySlug: setSlug,
       brands,
       brandsLoading,
+      reloadBrands,
       brandBySlug: brandBySlugFn,
       brandById: brandByIdFn,
     };

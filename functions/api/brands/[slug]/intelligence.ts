@@ -8,6 +8,8 @@ import { json, error } from '../../../_shared/response';
 import { toPressCoverage } from '../../../_shared/press';
 import { toBrandDocument } from '../../../_shared/documents';
 import { applyDocumentCollateralMigration, isMissingDocumentCollateral } from '../../../_shared/document-migrate';
+import { listBrandImagePrompts } from '../../../_shared/image-prompts';
+import { listBrandVersions } from '../../../_shared/brand-knowledge';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -57,5 +59,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     assets: rowsToCamel(assets as Record<string, unknown>[]),
     pressCoverages: (coverages as Record<string, unknown>[]).map(toPressCoverage),
     pressReleases: rowsToCamel(releases as Record<string, unknown>[]),
+    imagePrompts: await listBrandImagePrompts(context.env, brandId, slug).catch(() => []),
+    versions: await listBrandVersions(context.env, brandId).catch(() => []),
   });
 };

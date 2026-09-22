@@ -18,7 +18,10 @@ const typeLabel: Record<LearningRecordType, string> = {
 };
 
 const genSourceLabel: Record<string, string> = {
-  threads_30min: '30分熱議', threads_hourly: '熱議跟風', threads_offtopic: '生活哏文',
+  threads_30min: '30分熱議', threads_hourly: '熱議跟風', threads_offtopic: '生活梗文',
+  threads_love: '感情散文', threads_weather: '天氣季節', threads_entertainment: '娛樂影視',
+  threads_sports: '運動賽事', threads_emotion: '人際視角',
+  threads_workplace: '行業現場', threads_qa: '互動提問', threads_image: '實績畫面',
   daily_theme: '每日主題', auto_signal: '情報自動', market_signal: '市場情報',
   meeting_plan: '會議計畫',
 };

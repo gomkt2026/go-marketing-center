@@ -1,8 +1,9 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { rowToCamel } from './case';
-import { SEO_TOPIC_BANK, type SeoTopicSeed } from './prompts';
+import { type SeoTopicSeed } from './prompts';
 import { defaultWebsiteDestination } from './website-articles';
+import { listSeoTopicsForBrand } from './seo-topics';
 
 export type SeoPriority = 'P0' | 'P1' | 'P2' | 'P3';
 export type SeoFindingCategory =
@@ -443,6 +444,7 @@ export async function runBrandSeoAudit(
     throw new Error('尚未設定官網網址（blog_base_url）');
   }
 
+  const topicBank = await listSeoTopicsForBrand(env, brand.id, brand.slug);
   const extra = EXTRA_PATHS[brand.slug] ?? ['/blog'];
   const seedUrls = [
     siteUrl,
@@ -705,7 +707,7 @@ export async function runBrandSeoAudit(
       evidence: blogPage ? `HTTP ${blogPage.status ?? '失敗'} ${blogPage.error ?? ''}` : '未檢查到 /blog',
       recommendation: '依既有官網長文契約做 /blog 伺服端 HTML（答案區 → 正文 → FAQ），不要等瀏覽器再 fetch。',
       url: joinUrl(siteUrl, '/blog'),
-      contentTopic: (SEO_TOPIC_BANK[brand.slug] ?? [])[0]?.topic,
+      contentTopic: topicBank[0]?.topic,
     });
   } else if (blogPage.wordCount < 200) {
     addFinding(findings, counters, {
@@ -772,7 +774,7 @@ export async function runBrandSeoAudit(
   ].join('\n');
 
   const gaps: SeoContentGap[] = [];
-  for (const topic of SEO_TOPIC_BANK[brand.slug] ?? []) {
+  for (const topic of topicBank) {
     const needle = (topic.primaryKeyword || topic.topic).replace(/\s+/g, '');
     const inPublished = published.some((a) =>
       `${a.title}${a.seo.primary_keyword || ''}`.replace(/\s+/g, '').includes(needle),

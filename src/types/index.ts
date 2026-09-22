@@ -34,6 +34,18 @@ export interface Brand {
   versionNumber?: number | null;
 }
 
+export interface BrandKnowledgeChange {
+  id: string;
+  section: string;
+  action: 'update' | 'create' | 'delete';
+  entityId?: string | null;
+  label: string;
+  before?: unknown;
+  after?: unknown;
+  at: string;
+  by?: string;
+}
+
 export interface BrandVersion {
   id: string;
   brandId: string;
@@ -43,6 +55,9 @@ export interface BrandVersion {
   confidenceScore: number;
   publishedBy?: string;
   publishedAt?: string;
+  changeLog?: BrandKnowledgeChange[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type VerificationStatus = 'verified' | 'claimed' | 'pending';
@@ -107,6 +122,17 @@ export interface BrandVisual {
   label: string;
   value: string;
   category: 'color' | 'layout' | 'typography';
+}
+
+export type BrandImagePromptSlot = 'design_style' | 'photo_style' | 'copy_spec';
+
+export interface BrandImagePrompt {
+  slot: BrandImagePromptSlot;
+  title: string;
+  hint: string;
+  prompt: string;
+  isCustom: boolean;
+  updatedAt: string | null;
 }
 
 export interface BrandHistory {
@@ -584,7 +610,7 @@ export interface ThreadsReplyTarget {
 /** Threads 小編工作台:今日固定時段的自家發文卡片 */
 export interface ThreadsDeskSlot {
   hour: number;
-  source: 'threads_hourly' | 'threads_offtopic';
+  source: PostingSlotKind | 'threads_hourly' | 'threads_offtopic';
   slotAt: string;
   label: string;
   categoryLabel?: string | null;
@@ -653,7 +679,18 @@ export interface PublishingJob {
   externalPostId?: string | null;
 }
 
-export type PostingSlotKind = 'daily_theme' | 'threads_hourly' | 'threads_offtopic';
+export type PostingSlotKind =
+  | 'daily_theme'
+  | 'threads_hourly'
+  | 'threads_offtopic'
+  | 'threads_love'
+  | 'threads_weather'
+  | 'threads_entertainment'
+  | 'threads_sports'
+  | 'threads_emotion'
+  | 'threads_workplace'
+  | 'threads_qa'
+  | 'threads_image';
 
 export interface PostingSlot {
   id: string;

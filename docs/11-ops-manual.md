@@ -111,7 +111,7 @@ npm run dev
 2. KV `CACHE` 已建立：`0571f06408cb41fa849c1df9b5cb3066`（兩份 wrangler 已綁定）。
 3. Queue `go-marketing-brand-jobs` 已建立（scheduler 已宣告 producer/consumer）。
 4. Hyperdrive `go-marketing-neon` 已建立：`286329edb5f24551b6684450d1eac8f8`（連 Neon direct host）。部署 Pages 與 scheduler 後才會生效。
-5. 部署後用超級管理員打 `GET /api/admin/perf-status` 確認 `hyperdrive` / `kvCache` / `brandJobsQueue`。
+5. 部署後用超級管理員打 `GET /api/admin/perf-status` 確認 `hyperdrive` / `kvCache` / `brandJobsQueue`。Pages 的 log 請在 Dashboard 專案 Settings 開啟（`wrangler.toml` 的 `[observability]` 僅 scheduler 可用）。
 6. 套索引：`POST /api/admin/migrate-hotpath-indexes`（含 054 的 publishing_jobs 時間索引）。
 
 ### Neon Launch（約 USD $20–40／月）

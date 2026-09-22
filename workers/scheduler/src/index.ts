@@ -15,173 +15,26 @@ import {
 } from '../../../functions/_shared/generate';
 import {
   generateThreadsSlot, generateThreadsOfftopicSlot, promoteDueThreadsSafetyNet,
-  slotAtToday,
+  slotAtToday, brandHasSlotContent, hourTWFromIso,
   THREADS_POST_HOURS_TW, THREADS_OFFTOPIC_HOURS_TW,
 } from '../../../functions/_shared/threads-slots';
+import { listAllPostingSlots, type PostingSlot } from '../../../functions/_shared/posting-slots';
 import { getThreadsAccount, publishThreadsPost, isThreadsAccessBlocked, THREADS_ACCESS_BLOCKED_NOTE } from '../../../functions/_shared/threads';
-import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, META_TOKEN_INVALID_NOTE } from '../../../functions/_shared/meta';
+import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, metaTokenInvalidNoteFromMessage } from '../../../functions/_shared/meta';
 import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '../../../functions/_shared/x';
 import { toPublicMediaUrl } from '../../../functions/_shared/media';
 import { processBrandReplyRound } from '../../../functions/_shared/threads-reply-round';
 import { encryptToken, decryptToken } from '../../../functions/_shared/crypto';
 import { logActivity } from '../../../functions/_shared/activity';
-import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from '../../../functions/_shared/sources';
+import { fetchGoogleNews, fetchTaiwanNews } from '../../../functions/_shared/sources';
+import { collectSignals, BRAND_SOURCES, findMarketAnalystAgent } from '../../../functions/_shared/market-collect';
 import { createPodcastEpisode } from '../../../functions/_shared/podcast';
 import { slugifyStoryKey } from '../../../functions/_shared/press';
 import { syncPerformanceInsights } from '../../../functions/_shared/insights';
 import { analyzeAllBrandPerformance } from '../../../functions/_shared/performance-learn';
-
-// 每品牌的議題來源設定;filterKeywords 用於從一般新聞中挑出行業相關文章
-const BRAND_SOURCES: Record<string, {
-  newsQuery: string;
-  filterKeywords: string[];
-  brandQueries: string[];
-  brandNames: string[];
-  pttBoard?: string;
-  dcardForum?: string;
-}> = {
-  homigo: {
-    newsQuery: '租屋 OR 租金補貼 OR 包租代管 OR 房東 房客',
-    filterKeywords: ['租屋', '租金', '房東', '房客', '租客', '包租', '社宅', '房市', '押金', '租約', '囤房'],
-    brandQueries: ['Homigo', '匠管 Homigo', 'Inforcraft 租屋'],
-    brandNames: ['Homigo', '匠管', 'Inforcraft'],
-    pttBoard: 'home-sale', dcardForum: 'rent',
-  },
-  taskgo: {
-    newsQuery: '裝修 OR 室內裝潢 OR 工班 OR 老屋翻新',
-    filterKeywords: ['裝修', '裝潢', '工班', '翻新', '缺工', '工地', '建材', '室內設計', '水電', '漏水'],
-    brandQueries: ['TaskGo', 'Task Go', '匠管 Task'],
-    brandNames: ['TaskGo', 'Task Go', '匠管'],
-    pttBoard: 'Interior', dcardForum: 'interior_design',
-  },
-  washgo: {
-    newsQuery: '洗衣店 OR 乾洗 OR 衣物保養 OR 換季收納',
-    filterKeywords: ['洗衣', '乾洗', '衣物', '棉被', '羽絨', '換季', '收納', '梅雨', '潮濕', '黴'],
-    brandQueries: ['Washgo', 'WashGo', '匠管 洗衣'],
-    brandNames: ['Washgo', 'WashGo'],
-    dcardForum: 'life',
-  },
-};
+import { notifyPendingReviewDigest, notifyPublishFailed } from '../../../functions/_shared/line-ops';
 
 const AUTO_DRAFT_THRESHOLD = 0.75;
-// AI 給分低於此門檻的議題不入庫,避免塞入無關時事
-const MIN_RELEVANCE = 0.6;
-// 每品牌每輪最多寫入的情報數(控制 Workers 子請求數量)
-const MAX_SIGNALS_PER_BRAND = 3;
-
-interface SignalSelection {
-  index: number;
-  relevance: number;
-  signalType: string;
-  summary: string;
-}
-
-const VALID_SIGNAL_TYPES = ['news', 'policy', 'current_event', 'trending_topic', 'industry_trend', 'social_content', 'evergreen'];
-
-async function findMarketAnalystAgent(env: Env): Promise<string | null> {
-  const sql = getSql(env);
-  const rows = await sql`
-    SELECT a.id FROM ai_agents a
-    JOIN agent_roles r ON r.id = a.role_id
-    WHERE r.code = 'market_analyst' AND a.is_active = true
-    LIMIT 1
-  `;
-  return rows.length ? (rows[0] as { id: string }).id : null;
-}
-
-// ============================================================================
-// 主流程 1:蒐集熱門議題 → AI 依品牌篩選 → 寫入 market_signals → 高分自動生成草稿
-// ============================================================================
-async function collectSignals(env: Env): Promise<void> {
-  const sql = getSql(env);
-  const brands = await sql`SELECT id, slug, name FROM brands WHERE is_active = true`;
-  const [trends, generalNews] = await Promise.all([fetchGoogleTrendsTW(), fetchTaiwanNews()]);
-  const analystId = await findMarketAnalystAgent(env);
-
-  for (const brand of brands as { id: string; slug: string; name: string }[]) {
-    try {
-      const config = BRAND_SOURCES[brand.slug] ?? { newsQuery: brand.name, filterKeywords: [], brandQueries: [brand.name], brandNames: [brand.name] };
-      const [news, ptt, dcard] = await Promise.all([
-        fetchGoogleNews(config.newsQuery),
-        config.pttBoard ? fetchPttBoard(config.pttBoard) : Promise.resolve([]),
-        config.dcardForum ? fetchDcard(config.dcardForum) : Promise.resolve([]),
-      ]);
-      // 一般新聞先做關鍵字預過濾,行業相關的優先進候選;另附少量泛時事讓 AI 判斷跟風空間
-      const keywordNews = generalNews.filter((n) => config.filterKeywords.some((k) => n.title.includes(k) || n.snippet?.includes(k)));
-      const otherNews = generalNews.filter((n) => !keywordNews.includes(n)).slice(0, 8);
-      const seen = new Set<string>();
-      const candidates: TrendItem[] = [...news, ...keywordNews, ...ptt, ...dcard, ...trends, ...otherNews]
-        .filter((c) => { if (seen.has(c.title)) return false; seen.add(c.title); return true; })
-        .slice(0, 40);
-      console.log(`[collect] ${brand.slug} 來源統計 trends=${trends.length} gnews=${news.length} 關鍵字新聞=${keywordNews.length} 一般新聞=${otherNews.length} ptt=${ptt.length} dcard=${dcard.length}`);
-      if (!candidates.length) continue;
-
-      // 近 14 天已存在的情報標題,避免重複寫入
-      const recentRows = await sql`
-        SELECT title FROM market_signals
-        WHERE brand_id = ${brand.id}::uuid AND discovered_at > now() - interval '14 days'
-      `;
-      const existingTitles = new Set((recentRows as { title: string }[]).map((r) => r.title));
-      const fresh = candidates.filter((c) => !existingTitles.has(c.title));
-      if (!fresh.length) continue;
-
-      const voice = getBrandVoice(brand.slug);
-      const listText = fresh.map((c, i) => `${i}. [${c.source}] ${c.title}${c.snippet ? ` — ${c.snippet.slice(0, 120)}` : ''}`).join('\n');
-      const selection = await chatCompleteJson<{ selections: SignalSelection[] }>(env, {
-        temperature: 0.2,
-        messages: [
-          {
-            role: 'system',
-            content: `你是品牌「${brand.name}」的市場情報分析師。${voice.frontlinePersona}\n這個行業關心的議題:${voice.dailyConcerns}`,
-          },
-          {
-            role: 'user',
-            content: [
-              '以下是剛抓到的熱門議題清單,請挑出對這個品牌社群操作「真正有價值」的項目(最多 5 個;跟行業無關又難跟風的不要選,relevance 至少 0.6 才列入):',
-              listText,
-              '',
-              '回傳 JSON:{"selections":[{"index":清單編號,"relevance":0到1,"signalType":"news|policy|current_event|trending_topic|industry_trend|social_content","summary":"為什麼這議題對品牌有用、可以怎麼切入(80字內)"}]}',
-            ].join('\n'),
-          },
-        ],
-      });
-
-      // 依相關性排序,只取前幾名且高於門檻的寫入
-      const picked = (selection.selections ?? [])
-        .filter((sel) => fresh[sel.index] && sel.relevance >= MIN_RELEVANCE)
-        .sort((a, b) => b.relevance - a.relevance)
-        .slice(0, MAX_SIGNALS_PER_BRAND);
-
-      for (const sel of picked) {
-        const item = fresh[sel.index];
-        const signalType = VALID_SIGNAL_TYPES.includes(sel.signalType) ? sel.signalType : 'trending_topic';
-        const inserted = await sql`
-          INSERT INTO market_signals (
-            brand_id, signal_type, title, summary, source_url, relevance_score,
-            status, discovered_by_agent_id, source_platform, raw_data, auto_generated
-          ) VALUES (
-            ${brand.id}::uuid, ${signalType}, ${item.title}, ${sel.summary},
-            ${item.url ?? null}, ${Math.min(1, Math.max(0, sel.relevance))},
-            'new', ${analystId}, ${item.source}, ${JSON.stringify(item)}, true
-          ) RETURNING id
-        `;
-        const signalId = (inserted[0] as { id: string }).id;
-
-        await logActivity(env, {
-          brandId: brand.id,
-          actorType: 'ai_agent',
-          actorAgentId: analystId,
-          action: 'market_signal.discovered',
-          entityType: 'market_signal',
-          entityId: signalId,
-          afterState: { title: item.title, source: item.source, relevance: sel.relevance },
-        });
-      }
-    } catch (e) {
-      console.error(`[collect] 品牌 ${brand.slug} 蒐集失敗`, e);
-    }
-  }
-}
 
 // ============================================================================
 // 品牌名監測:Google News + 台灣媒體 RSS → press_coverages.inbox
@@ -433,10 +286,19 @@ async function findNextMissingThreadsSlot(
 ): Promise<{ slug: string; hour: number; source: 'threads_hourly' | 'threads_offtopic'; slotAt: Date } | null> {
   const sql = getSql(env);
   const now = new Date();
-  const due: Array<{ hour: number; source: 'threads_hourly' | 'threads_offtopic' }> = [
-    ...THREADS_POST_HOURS_TW.filter((h) => slotGenerationDue(h, now)).map((hour) => ({ hour, source: 'threads_hourly' as const })),
-    ...THREADS_OFFTOPIC_HOURS_TW.filter((h) => slotGenerationDue(h, now)).map((hour) => ({ hour, source: 'threads_offtopic' as const })),
-  ];
+  const configured = await listAllPostingSlots(env, { enabledOnly: true });
+  const dueSlots = configured.filter((s) =>
+    s.platform === 'threads'
+    && slugs.includes(s.brandSlug)
+    && (s.slotKind === 'threads_hourly' || s.slotKind === 'threads_offtopic')
+    && slotGenerationDue(s.hourTw, now)
+  );
+  const due = dueSlots.length
+    ? dueSlots.map((s) => ({ slug: s.brandSlug, hour: s.hourTw, source: s.slotKind as 'threads_hourly' | 'threads_offtopic' }))
+    : [
+        ...THREADS_POST_HOURS_TW.filter((h) => slotGenerationDue(h, now)).map((hour) => ({ hour, source: 'threads_hourly' as const })),
+        ...THREADS_OFFTOPIC_HOURS_TW.filter((h) => slotGenerationDue(h, now)).map((hour) => ({ hour, source: 'threads_offtopic' as const })),
+      ].flatMap((slot) => slugs.filter((s) => (AUTO_POST_BRANDS as readonly string[]).includes(s)).map((slug) => ({ slug, ...slot })));
   const targetSlugs = slugs.filter((s) => (AUTO_POST_BRANDS as readonly string[]).includes(s));
   if (!due.length || !targetSlugs.length) return null;
 
@@ -458,9 +320,11 @@ async function findNextMissingThreadsSlot(
     .map((r) => `${r.slug}|${r.source}|${r.hour}`));
 
   for (const slot of due) {
-    for (const slug of targetSlugs) {
-      if (!have.has(`${slug}|${slot.source}|${slot.hour}`)) {
-        return { slug, hour: slot.hour, source: slot.source, slotAt: slotAtToday(slot.hour, now) };
+    const slug = 'slug' in slot ? slot.slug : undefined;
+    const candidates = slug ? [slug] : targetSlugs;
+    for (const nextSlug of candidates) {
+      if (!have.has(`${nextSlug}|${slot.source}|${slot.hour}`)) {
+        return { slug: nextSlug, hour: slot.hour, source: slot.source, slotAt: slotAtToday(slot.hour, now) };
       }
     }
   }
@@ -495,8 +359,8 @@ async function catchupTodayAutoPosts(env: Env): Promise<void> {
   await promoteDueThreadsSafetyNet(env);
   await publishDueJobs(env);
   const threadsFilled = await catchupMissingThreadsSlots(env, slugs, 1);
-  if (!threadsFilled && slotGenerationDue(DAILY_THEME_HOUR_TW)) {
-    await fillMissingDailyThemePlatforms(env, slotAtToday(DAILY_THEME_HOUR_TW), slugs, {
+  if (!threadsFilled) {
+    await fillMissingDailyThemePlatforms(env, slugs, {
       maxPlatforms: 1,
       onlyAutoPublish: true,
     });
@@ -562,38 +426,56 @@ type DailyThemeBrand = { id: string; slug: string; name: string; theme_count: nu
 /** 回傳 true 表示這次已經做了主題生成(呼叫端可據此決定要不要跳過其他任務) */
 async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
   const sql = getSql(env);
-  // 台灣今天已生成的主題數(以 daily_theme 內容的 themeKey 去重)
-  // 只處理已接 FB 或 IG 的品牌(Homigo / TaskGo / Washgo 接上就進每晚 19:00 檔)
-  let brands;
-  try {
-    brands = await sql`
-      SELECT b.id, b.slug, b.name,
-             (SELECT count(DISTINCT c.generation_prompt_meta->>'themeKey')::int FROM contents c
-              WHERE c.brand_id = b.id
-                AND c.generation_prompt_meta->>'source' = ${DAILY_THEME_SOURCE}
-                AND c.created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours') AS theme_count
-      FROM brands b
-      WHERE b.is_active = true
-        AND EXISTS (
-          SELECT 1 FROM brand_social_accounts a
-          WHERE a.brand_id = b.id
-            AND a.platform IN ('facebook', 'instagram')
-            AND a.status = 'connected'
-        )
-      ORDER BY b.slug
-    `;
-  } catch (e) {
-    // 這裡若失敗(例如資料庫連線暫時性問題)不能讓例外往上拋,
-    // 否則會中斷同一輪 halfHourlyDispatch 後面的 publishDueJobs / 回覆輪等其他任務
-    console.error('[themes] 品牌篩選查詢失敗', e);
-    return false;
+  const hour = hourTWFromIso(slotAt.toISOString());
+  const configured = await listAllPostingSlots(env, { enabledOnly: true });
+  const dueSlots = configured.filter((s) => s.slotKind === 'daily_theme' && s.hourTw === hour);
+  const byBrand = new Map<string, DailyThemeBrand & { platforms: Array<'facebook' | 'instagram'> }>();
+
+  if (dueSlots.length) {
+    for (const slot of dueSlots) {
+      if (slot.platform !== 'facebook' && slot.platform !== 'instagram') continue;
+      let brand = byBrand.get(slot.brandId);
+      if (!brand) {
+        brand = { id: slot.brandId, slug: slot.brandSlug, name: slot.brandSlug, theme_count: 0, platforms: [] };
+        byBrand.set(slot.brandId, brand);
+      }
+      if (!brand.platforms.includes(slot.platform)) brand.platforms.push(slot.platform);
+    }
+  } else if (hour === DAILY_THEME_HOUR_TW) {
+    try {
+      const brands = await sql`
+        SELECT b.id, b.slug, b.name
+        FROM brands b
+        WHERE b.is_active = true
+          AND EXISTS (
+            SELECT 1 FROM brand_social_accounts a
+            WHERE a.brand_id = b.id
+              AND a.platform IN ('facebook', 'instagram')
+              AND a.status = 'connected'
+          )
+        ORDER BY b.slug
+      `;
+      for (const row of brands as DailyThemeBrand[]) {
+        byBrand.set(row.id, { ...row, theme_count: 0, platforms: ['facebook', 'instagram'] });
+      }
+    } catch (e) {
+      console.error('[themes] 品牌篩選查詢失敗', e);
+      return false;
+    }
   }
-  const due = (brands as DailyThemeBrand[]).filter((b) => b.theme_count < DAILY_THEME_TARGET);
-  if (!due.length) return false;
+
+  if (!byBrand.size) return false;
 
   let any = false;
-  for (const brand of due) {
-    const ok = await generateDailyThemeForBrand(env, brand, slotAt);
+  for (const brand of byBrand.values()) {
+    const missing: Array<'facebook' | 'instagram'> = [];
+    for (const platform of brand.platforms) {
+      if (!(await brandHasSlotContent(env, brand.id, platform, DAILY_THEME_SOURCE, slotAt))) {
+        missing.push(platform);
+      }
+    }
+    if (!missing.length) continue;
+    const ok = await generateDailyThemeForBrand(env, brand, slotAt, missing);
     if (ok) any = true;
   }
   return any;
@@ -742,69 +624,82 @@ async function ensureDailyThemePublishJobs(env: Env, slugs: string[]): Promise<v
   }
 }
 
-/** 只補今天缺的 FB/IG 每日主題平台(已有主題的品牌沿用同一則,避免 TaskGo 有 FB 沒 IG 時被 theme_count 擋住) */
+/** 只補已到生成時間、但還沒產出的 FB/IG 每日主題 */
 async function fillMissingDailyThemePlatforms(
   env: Env,
-  slotAt: Date,
   slugs: string[],
   opts?: { maxPlatforms?: number; onlyAutoPublish?: boolean },
 ): Promise<number> {
   const sql = getSql(env);
   let generated = 0;
   const maxPlatforms = opts?.maxPlatforms ?? 4;
-  for (const slug of slugs) {
-    if (generated >= maxPlatforms) break;
-    const brandRows = await sql`SELECT id, slug, name FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1`;
-    if (!brandRows.length) continue;
-    const brand = brandRows[0] as DailyThemeBrand;
-    brand.theme_count = 0;
+  const now = new Date();
+  const configured = await listAllPostingSlots(env, { enabledOnly: true });
+  const due: PostingSlot[] = configured.filter((s) =>
+    s.slotKind === 'daily_theme'
+    && slugs.includes(s.brandSlug)
+    && (s.platform === 'facebook' || s.platform === 'instagram')
+    && slotGenerationDue(s.hourTw, now)
+  );
+  const fallbackHours = due.length ? [] : [DAILY_THEME_HOUR_TW].filter((h) => slotGenerationDue(h, now));
 
+  const work: Array<{ brand: DailyThemeBrand; platform: 'facebook' | 'instagram'; slotAt: Date }> = [];
+  if (due.length) {
+    for (const slot of due) {
+      work.push({
+        brand: { id: slot.brandId, slug: slot.brandSlug, name: slot.brandSlug, theme_count: 0 },
+        platform: slot.platform as 'facebook' | 'instagram',
+        slotAt: slotAtToday(slot.hourTw, now),
+      });
+    }
+  } else {
+    for (const hour of fallbackHours) {
+      for (const slug of slugs) {
+        const brandRows = await sql`SELECT id, slug, name FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1`;
+        if (!brandRows.length) continue;
+        const brand = brandRows[0] as DailyThemeBrand;
+        brand.theme_count = 0;
+        work.push({ brand, platform: 'facebook', slotAt: slotAtToday(hour, now) });
+        work.push({ brand, platform: 'instagram', slotAt: slotAtToday(hour, now) });
+      }
+    }
+  }
+
+  for (const item of work) {
+    if (generated >= maxPlatforms) break;
+    if (await brandHasSlotContent(env, item.brand.id, item.platform, DAILY_THEME_SOURCE, item.slotAt)) continue;
+    if (opts?.onlyAutoPublish) {
+      const account = await getMetaAccount(env, item.brand.id, item.platform);
+      if (!account?.autoPublish) {
+        console.log(`[catchup] ${item.brand.slug}/${item.platform} 帳號未連線或未開自動發布,不補每日主題`);
+        continue;
+      }
+    }
     const existing = await sql`
-      SELECT c.target_platform AS platform,
-             c.generation_prompt_meta->>'theme' AS theme,
+      SELECT c.generation_prompt_meta->>'theme' AS theme,
              c.generation_prompt_meta->>'themeKey' AS theme_key
       FROM contents c
-      WHERE c.brand_id = ${brand.id}::uuid
+      WHERE c.brand_id = ${item.brand.id}::uuid
         AND c.generation_prompt_meta->>'source' = ${DAILY_THEME_SOURCE}
-        AND c.created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours'
-        AND (
-          EXISTS (SELECT 1 FROM publishing_jobs pj WHERE pj.content_id = c.id)
-          OR c.target_platform <> 'instagram'
-        )
+        AND (c.generation_prompt_meta->>'slotAt')::timestamptz
+            BETWEEN ${(new Date(item.slotAt.getTime() - 90 * 60 * 1000)).toISOString()}::timestamptz
+            AND ${(new Date(item.slotAt.getTime() + 90 * 60 * 1000)).toISOString()}::timestamptz
+      LIMIT 1
     `;
-    const have = new Set((existing as { platform: string }[]).map((r) => r.platform));
-    const missing: Array<'facebook' | 'instagram'> = [];
-    for (const platform of (['facebook', 'instagram'] as const)) {
-      if (have.has(platform)) continue;
-      if (opts?.onlyAutoPublish) {
-        const account = await getMetaAccount(env, brand.id, platform);
-        if (!account?.autoPublish) {
-          console.log(`[catchup] ${slug}/${platform} 帳號未連線或未開自動發布,不補每日主題`);
-          continue;
-        }
-      }
-      missing.push(platform);
-    }
-    if (!missing.length) {
-      console.log(`[catchup] ${slug} 今日可自動發布的 FB/IG 主題已齊`);
-      continue;
-    }
-
-    const batch = missing.slice(0, maxPlatforms - generated);
-    const reused = (existing as { theme: string | null; theme_key: string | null }[]).find((r) => r.theme);
+    const reused = existing[0] as { theme: string | null; theme_key: string | null } | undefined;
     if (reused?.theme) {
-      console.log(`[catchup] ${slug} 補 ${batch.join('+')} 每日主題(沿用「${reused.theme}」)`);
-      await generateDailyThemePlatforms(env, brand, slotAt, batch, {
+      console.log(`[catchup] ${item.brand.slug} 補 ${item.platform} 每日主題(沿用「${reused.theme}」)`);
+      await generateDailyThemePlatforms(env, item.brand, item.slotAt, [item.platform], {
         theme: reused.theme,
         angle: '',
         summary: reused.theme,
-        themeKey: reused.theme_key ?? `${new Date().toISOString().slice(0, 10)}-${slug}-1`,
+        themeKey: reused.theme_key ?? `${new Date().toISOString().slice(0, 10)}-${item.brand.slug}-1`,
       });
     } else {
-      console.log(`[catchup] ${slug} 今日尚無每日主題,先補 ${batch.join('+')}`);
-      await generateDailyThemeForBrand(env, brand, slotAt, batch);
+      console.log(`[catchup] ${item.brand.slug} 補 ${item.platform} 每日主題 ${item.slotAt.toISOString()}`);
+      await generateDailyThemeForBrand(env, item.brand, item.slotAt, [item.platform]);
     }
-    generated += batch.length;
+    generated += 1;
   }
   return generated;
 }
@@ -1152,14 +1047,21 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
   const twHour = (new Date().getUTCHours() + 8) % 24;
   const minute = new Date().getUTCMinutes();
   const isTopOfHour = minute < 15 || minute >= 45;
+  const configured = await listAllPostingSlots(env, { enabledOnly: true });
+  const themeHours = new Set(configured.filter((s) => s.slotKind === 'daily_theme').map((s) => s.hourTw));
+  if (!themeHours.size) themeHours.add(DAILY_THEME_HOUR_TW);
 
   // 生成階段:提前 1 小時,在整點 tick 幫「下一個時段」把內容生成好存 scheduled
   if (isTopOfHour) {
     const genHour = (twHour + GENERATION_LEAD_HOURS) % 24;
     const slotAt = slotDateFor(genHour);
-    if (THREADS_POST_HOURS_TW.includes(genHour)) await generateThreadsSlot(env, slotAt);
-    if (THREADS_OFFTOPIC_HOURS_TW.includes(genHour)) await generateThreadsOfftopicSlot(env, slotAt);
-    if (genHour === DAILY_THEME_HOUR_TW) await generateDailyTheme(env, slotAt);
+    const due = configured.filter((s) => s.hourTw === genHour);
+    const needHourly = due.some((s) => s.slotKind === 'threads_hourly') || (!configured.length && THREADS_POST_HOURS_TW.includes(genHour));
+    const needOfftopic = due.some((s) => s.slotKind === 'threads_offtopic') || (!configured.length && THREADS_OFFTOPIC_HOURS_TW.includes(genHour));
+    const needTheme = due.some((s) => s.slotKind === 'daily_theme') || (!configured.length && genHour === DAILY_THEME_HOUR_TW);
+    if (needHourly) await generateThreadsSlot(env, slotAt);
+    if (needOfftopic) await generateThreadsOfftopicSlot(env, slotAt);
+    if (needTheme) await generateDailyTheme(env, slotAt);
     if (genHour === ECOSYSTEM_CROSS_PROMO_HOUR_TW && ECOSYSTEM_CROSS_PROMO_DAYS_TW.includes(weekdayTW(slotAt))) {
       await generateEcosystemCrossPromo(env, slotAt);
     }
@@ -1172,15 +1074,13 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
   // 避開整點生成搶時間(單一 tick 產圖逾時後,下一輪半點會把缺的品牌補上)
   await recoverStuckPublishingJobs(env);
   await ensureAutoPublishJobs(env);
-  // 18:00 整點要產 FB/IG 配圖,那一檔把補漏留給 18:30;其餘 tick 都補,避免 :00 空檔浪費
-  const heavyThemeTick = isTopOfHour && ((twHour + GENERATION_LEAD_HOURS) % 24) === DAILY_THEME_HOUR_TW;
+  const heavyThemeTick = isTopOfHour && themeHours.has((twHour + GENERATION_LEAD_HOURS) % 24);
   if (!heavyThemeTick) {
     try {
       const threadsFilled = await catchupMissingThreadsSlots(env, [...AUTO_POST_BRANDS], 1);
-      if (!threadsFilled && slotGenerationDue(DAILY_THEME_HOUR_TW)) {
+      if (!threadsFilled) {
         await fillMissingDailyThemePlatforms(
           env,
-          slotAtToday(DAILY_THEME_HOUR_TW),
           [...AUTO_POST_BRANDS],
           { maxPlatforms: 1, onlyAutoPublish: true },
         );
@@ -1206,6 +1106,7 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
 
   // 發布階段:每個 tick 都檢查有沒有已經到期的排程要真正發出去(呼叫平台 API)
   await publishDueJobs(env);
+  await notifyPendingReviewDigest(env);
 }
 
 // ============================================================================
@@ -1361,14 +1262,22 @@ async function publishDueJobs(env: Env): Promise<void> {
         console.error(`[publish] ${label} Threads API access blocked,已暫停自動發文`);
       }
       if ((row.platform === 'facebook' || row.platform === 'instagram') && row.brand_id && isMetaTokenInvalid(msg)) {
+        const note = metaTokenInvalidNoteFromMessage(msg);
         await sql`
           UPDATE brand_social_accounts
-          SET status = 'error', notes = ${META_TOKEN_INVALID_NOTE}, updated_at = now()
+          SET status = 'error', notes = ${note}, updated_at = now()
           WHERE brand_id = ${row.brand_id}::uuid AND platform IN ('facebook', 'instagram')
         `;
         console.error(`[publish] ${label} FB/IG 權杖失效,已暫停自動發文`);
       }
       console.error(`[publish] ${label}/${row.platform} 發布失敗`, e);
+      await notifyPublishFailed(env, {
+        brandId: row.brand_id,
+        brandSlug: row.brand_slug,
+        platform: row.platform,
+        title: row.body?.slice(0, 40) ?? null,
+        error: msg,
+      });
     }
   }
 }

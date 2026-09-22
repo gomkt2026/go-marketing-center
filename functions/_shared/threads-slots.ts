@@ -12,6 +12,7 @@ import { getThreadsAccount } from './threads';
 import { toPublicMediaUrl } from './media';
 import { fetchGoogleTrendsTW } from './sources';
 import { logActivity } from './activity';
+import { countSlotsByBrand, listBrandThreadHours, sourceForBrandHour } from './posting-slots';
 
 /** 品牌相關跟風文時段(台灣時間) */
 export const THREADS_POST_HOURS_TW: readonly number[] = [0, 6, 12, 18];
@@ -134,6 +135,7 @@ export async function generateThreadsSlot(
     id: string; slug: string; name: string; last_at: string | null; today_count: number;
     recent_categories: (string | null)[] | null;
   }[]).filter((b) => !opts?.slugs?.length || opts.slugs.includes(b.slug));
+  const hourlyCaps = await countSlotsByBrand(env, 'threads', 'threads_hourly');
 
   if (opts?.slugs?.length) {
     for (const slug of opts.slugs) {
@@ -152,8 +154,9 @@ export async function generateThreadsSlot(
       result.skipped.push({ slug: brand.slug, reason });
       continue;
     }
-    if (brand.today_count >= THREADS_DAILY_CAP) {
-      result.skipped.push({ slug: brand.slug, reason: `今日跟風文已達 ${THREADS_DAILY_CAP} 篇上限` });
+    const hourlyCap = hourlyCaps[brand.id] ?? THREADS_DAILY_CAP;
+    if (brand.today_count >= hourlyCap) {
+      result.skipped.push({ slug: brand.slug, reason: `今日跟風文已達 ${hourlyCap} 篇上限` });
       continue;
     }
     try {
@@ -268,6 +271,7 @@ export async function generateThreadsOfftopicSlot(
   const targetSlugs = opts?.slugs?.length
     ? opts.slugs.filter((s) => (OFFTOPIC_BRANDS as readonly string[]).includes(s))
     : [...OFFTOPIC_BRANDS];
+  const offtopicCaps = await countSlotsByBrand(env, 'threads', 'threads_offtopic');
 
   for (const slug of targetSlugs) {
     try {
@@ -292,8 +296,9 @@ export async function generateThreadsOfftopicSlot(
           AND (generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
           AND (generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
       `;
-      if ((todayRows[0] as { n: number }).n >= THREADS_OFFTOPIC_DAILY_CAP) {
-        result.skipped.push({ slug: brand.slug, reason: `今日生活哏文已達 ${THREADS_OFFTOPIC_DAILY_CAP} 篇上限` });
+      const offtopicCap = offtopicCaps[brand.id] ?? THREADS_OFFTOPIC_DAILY_CAP;
+      if ((todayRows[0] as { n: number }).n >= offtopicCap) {
+        result.skipped.push({ slug: brand.slug, reason: `今日生活哏文已達 ${offtopicCap} 篇上限` });
         continue;
       }
 
@@ -364,11 +369,18 @@ export async function generateThreadsDeskSlot(
   slug: string,
   hourTW: number,
 ): Promise<ThreadsSlotBatchResult> {
-  if (!THREADS_DESK_HOURS_TW.includes(hourTW)) {
-    return { generated: [], skipped: [{ slug, reason: `不是 Threads 固定時段(${THREADS_DESK_HOURS_TW.join('/')})` }] };
+  const sql = getSql(env);
+  const brandRows = await sql`SELECT id FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1`;
+  const brandId = (brandRows[0] as { id: string } | undefined)?.id;
+  const hours = brandId ? await listBrandThreadHours(env, brandId) : [...THREADS_DESK_HOURS_TW];
+  if (!hours.includes(hourTW)) {
+    return { generated: [], skipped: [{ slug, reason: `不是這個品牌的 Threads 時段(${hours.map((h) => `${String(h).padStart(2, '0')}:00`).join('/')})` }] };
   }
   const slotAt = slotAtToday(hourTW);
-  if (sourceForDeskHour(hourTW) === 'threads_offtopic') {
+  const source = brandId
+    ? await sourceForBrandHour(env, brandId, hourTW)
+    : sourceForDeskHour(hourTW);
+  if (source === 'threads_offtopic') {
     return generateThreadsOfftopicSlot(env, slotAt, { slugs: [slug], onlyMissing: true });
   }
   return generateThreadsSlot(env, slotAt, { slugs: [slug], ignoreInterval: true, onlyMissing: true });

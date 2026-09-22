@@ -176,11 +176,7 @@ export const api = {
     }),
 
   brandWorkspace: (slug: string) =>
-    request<{
-      stats: { activeCampaigns: number; pendingContents: number; marketSignals: number; learningRecords: number };
-      histories: import('@/types').BrandHistory[];
-      pressCoverages: import('@/types').PressCoverage[];
-    }>(`/api/brands/${slug}/workspace`),
+    request<import('@/types').BrandWorkspacePayload>(`/api/brands/${slug}/workspace`),
 
   createPressCoverage: (slug: string, body: {
     outlet: string; headline: string; articleUrl?: string; publishedOn?: string;
@@ -386,6 +382,44 @@ export const api = {
       body: JSON.stringify({ jobId }),
     }),
 
+  rescheduleJob: (slug: string, jobId: string, scheduledAt: string) =>
+    request<{ ok: boolean }>(`/api/brands/${slug}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reschedule', jobId, scheduledAt }),
+    }),
+
+  postingSlots: (slug: string) =>
+    request<{
+      slots: import('@/types').PostingSlot[];
+      frequency: Record<string, string>;
+    }>(`/api/brands/${slug}/posting-slots`),
+
+  savePostingSlots: (slug: string, slots: Array<{
+    platform: 'facebook' | 'instagram' | 'threads';
+    hourTw: number;
+    slotKind: import('@/types').PostingSlotKind;
+    enabled?: boolean;
+  }>) =>
+    request<{
+      slots: import('@/types').PostingSlot[];
+      frequency: Record<string, string>;
+    }>(`/api/brands/${slug}/posting-slots`, {
+      method: 'PUT',
+      body: JSON.stringify({ slots }),
+    }),
+
+  lineBinding: () =>
+    request<import('@/types').LineBindingStatus>('/api/settings/line-bind'),
+
+  createLineBindCode: () =>
+    request<{ code: string; expiresAt: string }>('/api/settings/line-bind', { method: 'POST' }),
+
+  updateLineBinding: (body: { notifyReview?: boolean; notifyFailed?: boolean; unbind?: boolean }) =>
+    request<import('@/types').LineBindingStatus>('/api/settings/line-bind', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
   analytics: (slug: string) =>
     request<import('@/types').AnalyticsPayload>(`/api/brands/${slug}/analytics`),
 
@@ -432,7 +466,13 @@ export const api = {
         seoScore: number | null;
         seoAuditedAt: string | null;
         seoP0: number;
+        todayPublished?: number;
+        todayFailed?: number;
+        published7d?: number;
+        failed7d?: number;
+        impressions7d?: number;
       }[];
+      weekSeries?: Array<{ label: string; published: number; failed: number }>;
     }>('/api/dashboard'),
 
   proposals: () =>

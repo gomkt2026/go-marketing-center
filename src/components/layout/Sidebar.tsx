@@ -21,7 +21,7 @@ const groups: MenuGroup[] = [
   {
     title: '品牌經營',
     items: [
-      { label: '品牌工作區', path: '/workspace', brandScoped: true },
+      { label: '行銷儀表板', path: '/workspace', brandScoped: true },
       { label: '跟小編聊', path: '/editor', brandScoped: true },
       { label: '品牌智慧', path: '/intelligence', brandScoped: true },
       { label: '品牌客服資料庫', path: '/help', brandScoped: true },
@@ -53,6 +53,7 @@ const groups: MenuGroup[] = [
       { label: '行程表', path: '/schedule', brandScoped: true },
       { label: 'Threads 工作台', path: '/threads', brandScoped: true },
       { label: '社群帳號', path: '/social', brandScoped: true },
+      { label: '發文時段', path: '/posting-times', brandScoped: true },
       { label: 'Threads 申請手冊', path: '/settings/meta-threads' },
     ],
   },

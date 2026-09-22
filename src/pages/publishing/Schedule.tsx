@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams, Navigate, Link } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -76,6 +76,8 @@ export function Schedule() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [retrying, setRetrying] = useState<Set<string>>(new Set());
+  const [rescheduleAt, setRescheduleAt] = useState<Record<string, string>>({});
+  const [rescheduling, setRescheduling] = useState<Set<string>>(new Set());
 
   const weekStart = useMemo(() => {
     const s = startOfWeek(new Date());
@@ -100,6 +102,36 @@ export function Schedule() {
       else next.add(id);
       return next;
     });
+  }
+
+  function toLocalInput(iso: string | null | undefined): string {
+    const d = iso ? new Date(iso) : new Date();
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  async function handleReschedule(jobId: string) {
+    if (!slug) return;
+    const value = rescheduleAt[jobId] || toLocalInput(itemsById(jobId)?.scheduledAt);
+    if (!value) return;
+    setRescheduling((prev) => new Set(prev).add(jobId));
+    try {
+      await api.rescheduleJob(slug, jobId, new Date(value).toISOString());
+      reload();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRescheduling((prev) => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
+    }
+  }
+
+  function itemsById(id: string): ScheduleItem | undefined {
+    return data?.items.find((it) => it.id === id);
   }
 
   async function handleRetry(jobId: string) {
@@ -134,9 +166,12 @@ export function Schedule() {
     <div>
       <PageHeader
         title={`${brand.name} 行程表`}
-        subtitle="規則節奏:FB/IG 每天 19:00 各一則;Threads 00/06/12/18 跟風 + 09/21 哏文。Threads 待審請到工作台批准;漏檔會在之後的半點自動補"
+        subtitle="預設時段可在「發文時段」調整；單篇 queued／已排定／失敗可貼文改時間。Threads 待審請到工作台批准。"
         actions={
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Link to={`/${brand.slug}/posting-times`} style={{ textDecoration: 'none' }}>
+              <NavButton onClick={() => undefined}>發文時段</NavButton>
+            </Link>
             <NavButton onClick={() => setWeekOffset((n) => n - 1)}>‹ 上一週</NavButton>
             <NavButton onClick={() => setWeekOffset(0)}>本週</NavButton>
             <NavButton onClick={() => setWeekOffset((n) => n + 1)}>下一週 ›</NavButton>
@@ -236,6 +271,32 @@ export function Schedule() {
                             <p style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 6, wordBreak: 'break-word' }}>
                               {item.hashtags.map((h) => (h.startsWith('#') ? h : `#${h}`)).join(' ')}
                             </p>
+                          )}
+                          {['queued', 'scheduled', 'failed'].includes(item.status) && (
+                            <div style={{ marginTop: 8, display: 'grid', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                              <label style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
+                                改發文時間
+                                <input
+                                  type="datetime-local"
+                                  value={rescheduleAt[item.id] ?? toLocalInput(item.scheduledAt)}
+                                  onChange={(e) => setRescheduleAt((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                  style={{
+                                    display: 'block', width: '100%', marginTop: 4, padding: '6px 8px',
+                                    borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 12,
+                                  }}
+                                />
+                              </label>
+                              <button
+                                onClick={() => handleReschedule(item.id)}
+                                disabled={rescheduling.has(item.id)}
+                                style={{
+                                  padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                                  border: '1px solid var(--color-border)', background: 'var(--color-bg-soft)', cursor: 'pointer',
+                                }}
+                              >
+                                {rescheduling.has(item.id) ? '改時間中…' : '儲存發文時間'}
+                              </button>
+                            </div>
                           )}
                           {item.status === 'failed' && (
                             <div style={{ marginTop: 8 }}>

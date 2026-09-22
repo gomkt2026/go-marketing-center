@@ -11,6 +11,7 @@ import { useMeta } from '@/context/MetaContext';
 import { useAuth } from '@/context/AuthContext';
 import { ROLE_LABELS } from '@/lib/constants';
 import { api, ApiError } from '@/lib/api';
+import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { User, UserRole } from '@/types';
 
 const USER_ROLE_LABELS: Record<UserRole, string> = {
@@ -54,6 +55,7 @@ export function Settings() {
   const isAdmin = user?.role === 'super_admin';
   const tabs = [
     { id: 'agents', label: 'AI Agents' },
+    { id: 'line', label: 'Line 通知' },
     { id: 'permissions', label: '權限管理' },
     ...(isAdmin ? [{ id: 'accounts', label: '品牌帳號' }] : []),
   ];
@@ -145,8 +147,108 @@ export function Settings() {
         </>
       )}
 
+      {tab === 'line' && <LineNotifyPanel />}
       {tab === 'accounts' && isAdmin && <BrandAccountsPanel />}
     </div>
+  );
+}
+
+function LineNotifyPanel() {
+  const { data, loading, error, reload } = useAsyncData(() => api.lineBinding(), []);
+  const [code, setCode] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function createCode() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await api.createLineBindCode();
+      setCode(res.code);
+      setExpiresAt(res.expiresAt);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : '產生失敗');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function savePrefs(patch: { notifyReview?: boolean; notifyFailed?: boolean; unbind?: boolean }) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await api.updateLineBinding(patch);
+      if (patch.unbind) {
+        setCode(null);
+        setMessage('已解除綁定');
+      }
+      reload();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : '更新失敗');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+
+  return (
+    <Card>
+      <strong style={{ display: 'block', marginBottom: 8 }}>管理者 Line 綁定</strong>
+      <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12 }}>
+        用 GO 行銷中心官方帳推待審匯總與發文失敗，也可在 Line 回「成效」「失敗」「待審」。
+        先把 Messaging API webhook 設成 <code>/api/webhooks/line/ops</code>，並設定
+        LINE_OPS_CHANNEL_SECRET / LINE_OPS_CHANNEL_ACCESS_TOKEN。
+      </p>
+      {!data.configured && (
+        <p style={{ fontSize: 13, color: 'var(--color-danger)', marginBottom: 12 }}>伺服器尚未設定 Line 行銷 Bot 密鑰。</p>
+      )}
+      {data.addFriendUrl && (
+        <a href={data.addFriendUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>加好友 ↗</a>
+      )}
+      <div style={{ margin: '12px 0', fontSize: 13 }}>
+        {data.bound
+          ? `已綁定 ${data.displayName ?? data.lineUserIdMasked}`
+          : '尚未綁定'}
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        <Button variant="primary" disabled={busy} onClick={createCode}>
+          {busy ? '處理中…' : '產生綁定碼'}
+        </Button>
+        {data.bound && (
+          <Button variant="ghost" disabled={busy} onClick={() => savePrefs({ unbind: true })}>解除綁定</Button>
+        )}
+      </div>
+      {code && (
+        <p style={{ fontSize: 14, marginBottom: 12 }}>
+          加好友後傳 <strong>綁定 {code}</strong>
+          {expiresAt ? `（${new Date(expiresAt).toLocaleTimeString('zh-TW')} 前有效）` : ''}
+        </p>
+      )}
+      {data.bound && (
+        <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={data.notifyReview}
+              disabled={busy}
+              onChange={(e) => savePrefs({ notifyReview: e.target.checked })}
+            /> 待審閱匯總通知
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={data.notifyFailed}
+              disabled={busy}
+              onChange={(e) => savePrefs({ notifyFailed: e.target.checked })}
+            /> 發文失敗立即通知
+          </label>
+        </div>
+      )}
+      {message && <p style={{ fontSize: 13, marginTop: 10 }}>{message}</p>}
+    </Card>
   );
 }
 

@@ -1,6 +1,6 @@
 # 排程 Worker:市場情報自動蒐集 + Threads 趨勢草稿 + 媒體清理
 # 部署:cd workers/scheduler && wrangler deploy
-# secrets:wrangler secret put DATABASE_URL / OPENAI_API_KEY
+# secrets:wrangler secret put DATABASE_URL / OPENAI_API_KEY / LINE_OPS_CHANNEL_ACCESS_TOKEN
 name = "go-marketing-scheduler"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"

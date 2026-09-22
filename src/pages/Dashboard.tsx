@@ -8,6 +8,7 @@ import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import { useMeta } from '@/context/MetaContext';
 import { useBrand } from '@/context/BrandContext';
 import { BrandMark } from '@/components/brand/BrandMark';
+import { ChartCard, StackedPostsChart } from '@/components/charts/KpiCharts';
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -38,48 +39,16 @@ export function Dashboard() {
 
   return (
     <div>
-      <PageHeader title="總覽 Dashboard" subtitle="跨品牌的待辦事項與最新動態" />
+      <PageHeader title="總覽 Dashboard" subtitle="三品牌發文健康、待辦與近 7 天成敗" />
 
-      <div className="grid-3" style={{ marginBottom: 20 }}>
-        <Card delay={0}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <strong>待你決策</strong>
-            <Badge tone="accent">{pendingProposals.length}</Badge>
-          </div>
-          {pendingProposals.map((p) => (
-            <Link key={p.id} to="/decisions" style={{ display: 'block', fontSize: 13, padding: '6px 0', color: 'var(--color-text)', textDecoration: 'none', borderTop: '1px solid var(--color-border)' }}>
-              ▪ {p.title}
-            </Link>
-          ))}
-          <Link to="/decisions" style={{ fontSize: 12, color: 'var(--color-primary-dark)', fontWeight: 700, textDecoration: 'none' }}>去決策 →</Link>
-        </Card>
+      <Card delay={0} style={{ marginBottom: 20 }}>
+        <ChartCard title="近 7 天跨品牌發文成敗">
+          <StackedPostsChart data={data.weekSeries ?? []} />
+        </ChartCard>
+      </Card>
 
-        <Card delay={0.05}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <strong>待審閱內容</strong>
-            <Badge tone="accent">{pendingContents.length}</Badge>
-          </div>
-          {pendingContents.map((c) => (
-            <div key={c.id} style={{ fontSize: 13, padding: '6px 0', borderTop: '1px solid var(--color-border)' }}>
-              ▪ {c.title}{c.targetPlatform === 'website' ? '（官網）' : ''}
-            </div>
-          ))}
-          <Link to={pendingContents[0] ? `/${brandById(pendingContents[0].brandId)?.slug}/contents` : '#'} style={{ fontSize: 12, color: 'var(--color-primary-dark)', fontWeight: 700, textDecoration: 'none' }}>去審閱 →</Link>
-        </Card>
-
-        <Card delay={0.1}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <strong>今日市場情報</strong>
-            <Badge tone="primary">{data.marketSignals.filter((s) => s.status === 'new').length} 則新</Badge>
-          </div>
-          {recentSignals.map((s) => (
-            <div key={s.id} style={{ fontSize: 13, padding: '6px 0', borderTop: '1px solid var(--color-border)' }}>▪ {s.title}</div>
-          ))}
-        </Card>
-      </div>
-
-      <Card delay={0.15} style={{ marginBottom: 20 }}>
-        <strong style={{ display: 'block', marginBottom: 14 }}>三品牌狀態總覽</strong>
+      <Card delay={0.05} style={{ marginBottom: 20 }}>
+        <strong style={{ display: 'block', marginBottom: 14 }}>三品牌行銷狀態</strong>
         <div className="grid-3" style={{ gap: 12 }}>
           {(data.brands.length ? data.brands : brands).map((b) => {
             const stats = data.brandStats.find((s) => s.brandId === b.id);
@@ -92,24 +61,22 @@ export function Dashboard() {
                 }}
               >
                 <Link to={`/${b.slug}/workspace`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                     <BrandMark brand={b} size={22} />
                     <strong style={{ fontSize: 14 }}>{b.name}</strong>
                   </div>
                 </Link>
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  <span>進行中活動 {stats?.activeCampaigns ?? 0}</span>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'grid', gap: 4 }}>
+                  <span>今日成功 {stats?.todayPublished ?? 0} · 失敗 {stats?.todayFailed ?? 0}</span>
                   <span>待審閱 {stats?.pendingContents ?? 0}</span>
-                  <span>
-                    SEO {stats?.seoScore != null ? `${stats.seoScore} 分` : '尚未健檢'}
-                    {stats?.seoP0 ? ` · P0 ${stats.seoP0}` : ''}
-                  </span>
+                  <span>7 日曝光 {Number(stats?.impressions7d ?? 0).toLocaleString()}</span>
+                  <span>7 日發布 {stats?.published7d ?? 0} / 失敗 {stats?.failed7d ?? 0}</span>
                 </div>
                 <Link
-                  to={`/${b.slug}/seo`}
+                  to={`/${b.slug}/workspace`}
                   style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 700, color: 'var(--color-primary-dark)', textDecoration: 'none' }}
                 >
-                  看 SEO 報告 →
+                  打開行銷儀表板 →
                 </Link>
               </div>
             );
@@ -117,7 +84,45 @@ export function Dashboard() {
         </div>
       </Card>
 
-      <Card delay={0.2}>
+      <div className="grid-3" style={{ marginBottom: 20 }}>
+        <Card delay={0.08}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <strong>待你決策</strong>
+            <Badge tone="accent">{pendingProposals.length}</Badge>
+          </div>
+          {pendingProposals.slice(0, 4).map((p) => (
+            <Link key={p.id} to="/decisions" style={{ display: 'block', fontSize: 13, padding: '6px 0', color: 'var(--color-text)', textDecoration: 'none', borderTop: '1px solid var(--color-border)' }}>
+              ▪ {p.title}
+            </Link>
+          ))}
+          <Link to="/decisions" style={{ fontSize: 12, color: 'var(--color-primary-dark)', fontWeight: 700, textDecoration: 'none' }}>去決策 →</Link>
+        </Card>
+
+        <Card delay={0.1}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <strong>待審閱內容</strong>
+            <Badge tone="accent">{pendingContents.length}</Badge>
+          </div>
+          {pendingContents.slice(0, 4).map((c) => (
+            <div key={c.id} style={{ fontSize: 13, padding: '6px 0', borderTop: '1px solid var(--color-border)' }}>
+              ▪ {c.title}{c.targetPlatform === 'website' ? '（官網）' : ''}
+            </div>
+          ))}
+          <Link to={pendingContents[0] ? `/${brandById(pendingContents[0].brandId)?.slug}/contents` : '#'} style={{ fontSize: 12, color: 'var(--color-primary-dark)', fontWeight: 700, textDecoration: 'none' }}>去審閱 →</Link>
+        </Card>
+
+        <Card delay={0.12}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <strong>今日市場情報</strong>
+            <Badge tone="primary">{data.marketSignals.filter((s) => s.status === 'new').length} 則新</Badge>
+          </div>
+          {recentSignals.map((s) => (
+            <div key={s.id} style={{ fontSize: 13, padding: '6px 0', borderTop: '1px solid var(--color-border)' }}>▪ {s.title}</div>
+          ))}
+        </Card>
+      </div>
+
+      <Card delay={0.15}>
         <strong style={{ display: 'block', marginBottom: 14 }}>最新動態</strong>
         {recentActivity.map((a) => {
           const agent = a.actorAgentId ? agentById(a.actorAgentId) : undefined;

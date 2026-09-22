@@ -42,6 +42,10 @@ export interface Env {
   LINE_NETWORK_CHANNEL_ACCESS_TOKEN?: string;
   /** 此 Bot 寫入的品牌 slug,預設 fixercowork */
   LINE_NETWORK_BRAND_SLUG?: string;
+  /** GO 行銷中心管理者 Bot（審閱通知／成效查詢） */
+  LINE_OPS_CHANNEL_SECRET?: string;
+  LINE_OPS_CHANNEL_ACCESS_TOKEN?: string;
+  LINE_OPS_ADD_FRIEND_URL?: string;
   /** Cesium ion token（場域地圖 3D；Community 方案僅限評估/非商用） */
   CESIUM_ION_TOKEN?: string;
 }

@@ -10,6 +10,7 @@ import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { AnalyticsPost, LearningRecord, LearningRecordType } from '@/types';
+import { ChartCard, PlatformBarChart, TrendLineChart } from '@/components/charts/KpiCharts';
 
 const typeLabel: Record<LearningRecordType, string> = {
   content_performance: '內容成效', cta_effectiveness: 'CTA 成效',
@@ -228,6 +229,43 @@ export function Analytics() {
         已發布 {publishedCount} 篇 · 已回收 {syncedCount} 篇 · 上方數字為近 28 天
         {publishedCount > syncedCount ? ' · 尚未回收的貼文可同步或手動補登' : ''}
       </p>
+
+      <div className="grid-2" style={{ gap: 16, marginBottom: 16 }}>
+        <Card>
+          <ChartCard title="近 28 天曝光／互動趨勢">
+            <TrendLineChart data={(() => {
+              const map = new Map<string, { impressions: number; likes: number; comments: number }>();
+              for (const post of posts) {
+                if (!post.recent || !post.job.publishedAt || !post.perf) continue;
+                const key = post.job.publishedAt.slice(5, 10);
+                const cur = map.get(key) ?? { impressions: 0, likes: 0, comments: 0 };
+                cur.impressions += post.perf.impressions;
+                cur.likes += post.perf.likes ?? 0;
+                cur.comments += post.perf.comments;
+                map.set(key, cur);
+              }
+              return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([label, v]) => ({ label, ...v }));
+            })()} />
+          </ChartCard>
+        </Card>
+        <Card>
+          <ChartCard title="平台互動分布">
+            <PlatformBarChart data={(() => {
+              const map = new Map<string, { impressions: number; likes: number; comments: number }>();
+              for (const post of posts) {
+                if (!post.perf) continue;
+                const key = platformLabel[post.job.platform] ?? post.job.platform;
+                const cur = map.get(key) ?? { impressions: 0, likes: 0, comments: 0 };
+                cur.impressions += post.perf.impressions;
+                cur.likes += post.perf.likes ?? 0;
+                cur.comments += post.perf.comments;
+                map.set(key, cur);
+              }
+              return [...map.entries()].map(([platform, v]) => ({ platform, ...v }));
+            })()} />
+          </ChartCard>
+        </Card>
+      </div>
 
       <div className="grid-5" style={{ marginBottom: 12 }}>
         <StatCard label="曝光" value={totals.impressions} delay={0} tone="var(--color-primary-dark)" />

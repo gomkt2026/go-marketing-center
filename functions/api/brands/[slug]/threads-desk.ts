@@ -13,9 +13,10 @@ import {
 } from '../../../_shared/threads-replies';
 import { processBrandReplyRound } from '../../../_shared/threads-reply-round';
 import {
-  THREADS_DESK_HOURS_TW, sourceForDeskHour, slotLabel, slotAtToday, hourTWFromIso,
+  slotLabel, slotAtToday, hourTWFromIso,
   generateThreadsDeskSlot,
 } from '../../../_shared/threads-slots';
+import { listBrandThreadHours, sourceForBrandHour } from '../../../_shared/posting-slots';
 
 const GEN_CATEGORY_LABEL: Record<string, string> = {
   seasonal_trend: '時事跟風',
@@ -123,12 +124,15 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     if (!byHour.has(hour)) byHour.set(hour, raw);
   }
 
-  const slots = THREADS_DESK_HOURS_TW.map((hour) => {
-    const source = sourceForDeskHour(hour);
+  const deskHours = await listBrandThreadHours(context.env, brand.id);
+  const slots = [];
+  for (const hour of deskHours) {
+    const kind = await sourceForBrandHour(context.env, brand.id, hour);
+    const source = kind === 'threads_offtopic' ? 'threads_offtopic' as const : 'threads_hourly' as const;
     const slotAt = slotAtToday(hour).toISOString();
     const row = byHour.get(hour);
     if (!row) {
-      return {
+      slots.push({
         hour,
         source,
         slotAt,
@@ -149,11 +153,12 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         publishedAt: null,
         externalPostId: null,
         lastLogDetail: null,
-      };
+      });
+      continue;
     }
     const meta = asMeta(row.generation_prompt_meta);
     const category = metaString(meta, 'category');
-    return {
+    slots.push({
       hour,
       source,
       slotAt: metaString(meta, 'slotAt') ?? slotAt,
@@ -174,8 +179,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       publishedAt: row.published_at ?? null,
       externalPostId: row.external_post_id ?? null,
       lastLogDetail: row.last_log_detail ?? null,
-    };
-  });
+    });
+  }
 
   const replyRows = await sql`
     SELECT * FROM threads_reply_targets
@@ -256,8 +261,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   if (action === 'generate_slot') {
     const hour = Number(body.hour);
-    if (!THREADS_DESK_HOURS_TW.includes(hour)) {
-      return error('hour 必須是 0/6/9/12/18/21', 400);
+    const deskHours = await listBrandThreadHours(context.env, brand.id);
+    if (!deskHours.includes(hour)) {
+      return error(`hour 必須是這個品牌的 Threads 時段(${deskHours.join('/')})`, 400);
     }
     const result = await generateThreadsDeskSlot(context.env, slug, hour);
     if (!result.generated.length) {

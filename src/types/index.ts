@@ -117,6 +117,36 @@ export interface BrandHistory {
   description: string;
 }
 
+export interface BrandWorkspacePayload {
+  stats: {
+    activeCampaigns: number;
+    pendingContents: number;
+    marketSignals: number;
+    learningRecords: number;
+    publishedMonth: number;
+    failedMonth: number;
+    successRate: number;
+    scheduledToday: number;
+    publishedToday: number;
+    failedToday: number;
+  };
+  monthDaily: Array<{ label: string; date: string; published: number; failed: number }>;
+  platformEngagement: Array<{ platform: string; impressions: number; likes: number; comments: number }>;
+  monthOutcome: { published: number; failed: number };
+  todayPipeline: { published: number; scheduled: number; pending: number; failed: number };
+  last28: { impressions: number; clicks: number; comments: number; shares: number; saves: number; likes: number };
+  slotCoverage: {
+    expected: number;
+    filled: number;
+    percent: number;
+    nextSlot: { platform: string; hourTw: number; slotKind: string } | null;
+  };
+  pendingItems: Array<{ id: string; title: string | null; platform: string | null; updatedAt: string }>;
+  failedItems: Array<{ id: string; title: string | null; platform: string; scheduledAt: string | null; lastLogDetail: string | null }>;
+  histories: BrandHistory[];
+  pressCoverages: PressCoverage[];
+}
+
 export interface BrandExample {
   id: string;
   brandId: string;
@@ -621,6 +651,28 @@ export interface PublishingJob {
   publishedAt?: string;
   publishedBy?: string;
   externalPostId?: string | null;
+}
+
+export type PostingSlotKind = 'daily_theme' | 'threads_hourly' | 'threads_offtopic';
+
+export interface PostingSlot {
+  id: string;
+  brandId: string;
+  brandSlug: string;
+  platform: 'facebook' | 'instagram' | 'threads';
+  hourTw: number;
+  slotKind: PostingSlotKind;
+  enabled: boolean;
+}
+
+export interface LineBindingStatus {
+  bound: boolean;
+  lineUserIdMasked?: string | null;
+  displayName?: string | null;
+  notifyReview: boolean;
+  notifyFailed: boolean;
+  configured: boolean;
+  addFriendUrl?: string | null;
 }
 
 /** 行程表頁面:排程/發布狀態項目(讀取 publishing_jobs,依 scheduled_at 排序) */

@@ -42,6 +42,7 @@ import { BrandNetwork } from '@/pages/network/BrandNetwork';
 import { BrandEditorDesk } from '@/pages/editor/BrandEditorDesk';
 import { BrandGeo } from '@/pages/geo/BrandGeo';
 import { BrandSeo } from '@/pages/seo/BrandSeo';
+import { PostingTimes } from '@/pages/brand/PostingTimes';
 
 export default function App() {
   return (
@@ -92,6 +93,7 @@ export default function App() {
                         <Route path="/:brand/threads" element={<ThreadsDesk />} />
                         <Route path="/:brand/thread-replies" element={<ThreadsReplies />} />
                         <Route path="/:brand/social" element={<SocialAccounts />} />
+                        <Route path="/:brand/posting-times" element={<PostingTimes />} />
                         <Route path="/personas" element={<AgentPersonas />} />
                         <Route path="/:brand/analytics" element={<Analytics />} />
                         <Route path="/:brand/learning" element={<Learning />} />

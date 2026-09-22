@@ -151,6 +151,33 @@ CREATE TABLE brand_members (
   UNIQUE (brand_id, user_id)
 );
 
+CREATE TABLE user_line_bindings (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  line_user_id    TEXT NOT NULL UNIQUE,
+  display_name    TEXT,
+  notify_review   BOOLEAN NOT NULL DEFAULT true,
+  notify_failed   BOOLEAN NOT NULL DEFAULT true,
+  bound_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id)
+);
+CREATE TRIGGER trg_user_line_bindings_updated_at BEFORE UPDATE ON user_line_bindings
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE line_bind_codes (
+  code        TEXT PRIMARY KEY,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at  TIMESTAMPTZ NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE line_review_digests (
+  brand_id           UUID PRIMARY KEY REFERENCES brands(id) ON DELETE CASCADE,
+  pending_count      INTEGER NOT NULL DEFAULT 0,
+  last_notified_at   TIMESTAMPTZ
+);
+
 -- ============================================================================
 -- Brand Intelligence(品牌智慧)
 -- ============================================================================
@@ -322,6 +349,23 @@ CREATE TABLE brand_channels (
 );
 CREATE INDEX idx_brand_channels_brand ON brand_channels(brand_id);
 CREATE TRIGGER trg_brand_channels_updated_at BEFORE UPDATE ON brand_channels
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE brand_posting_slots (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id    UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  platform    publishing_platform NOT NULL,
+  hour_tw     SMALLINT NOT NULL,
+  slot_kind   TEXT NOT NULL,
+  enabled     BOOLEAN NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT brand_posting_slots_hour_check CHECK (hour_tw >= 0 AND hour_tw <= 23),
+  CONSTRAINT brand_posting_slots_kind_check CHECK (slot_kind IN ('daily_theme', 'threads_hourly', 'threads_offtopic')),
+  UNIQUE (brand_id, platform, hour_tw, slot_kind)
+);
+CREATE INDEX idx_brand_posting_slots_brand ON brand_posting_slots(brand_id, platform, enabled);
+CREATE TRIGGER trg_brand_posting_slots_updated_at BEFORE UPDATE ON brand_posting_slots
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- 關鍵字 / Hashtag / CTA 庫

@@ -65,10 +65,38 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const brand = await getBrandBySlug(context.env, slug);
   if (!brand) return error('Brand not found', 404);
 
-  const body = await context.request.json().catch(() => ({})) as { jobId?: string };
+  const body = await context.request.json().catch(() => ({})) as {
+    action?: string;
+    jobId?: string;
+    scheduledAt?: string;
+  };
   if (!body.jobId) return error('jobId is required', 400);
 
   const sql = getSql(context.env);
+
+  if (body.action === 'reschedule') {
+    const when = body.scheduledAt ? new Date(body.scheduledAt) : null;
+    if (!when || Number.isNaN(when.getTime())) return error('scheduledAt 必須是有效時間', 400);
+    const rows = await sql`
+      SELECT pj.id, pj.status FROM publishing_jobs pj
+      JOIN contents c ON c.id = pj.content_id
+      WHERE pj.id = ${body.jobId}::uuid AND c.brand_id = ${brand.id}::uuid
+        AND pj.status IN ('queued', 'scheduled', 'failed')
+      LIMIT 1
+    `;
+    if (!rows.length) return error('找不到可改時間的排程', 404);
+    await sql`
+      UPDATE publishing_jobs
+      SET status = 'scheduled', scheduled_at = ${when.toISOString()}::timestamptz, updated_at = now()
+      WHERE id = ${body.jobId}::uuid
+    `;
+    await sql`
+      INSERT INTO publishing_logs (publishing_job_id, event, detail)
+      VALUES (${body.jobId}::uuid, 'retried', ${`改排到 ${when.toLocaleString('zh-TW')}`})
+    `;
+    return json({ ok: true, scheduledAt: when.toISOString() });
+  }
+
   const rows = await sql`
     SELECT pj.id FROM publishing_jobs pj
     JOIN contents c ON c.id = pj.content_id

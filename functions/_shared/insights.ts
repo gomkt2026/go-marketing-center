@@ -73,22 +73,28 @@ export function computeEngagementRate(m: {
 function numericInsight(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return Object.values(value as Record<string, unknown>).reduce((sum, item) => sum + numericInsight(item), 0);
+    let sum = 0;
+    for (const item of Object.values(value as Record<string, unknown>)) {
+      sum += numericInsight(item);
+    }
+    return sum;
   }
   return 0;
 }
 
-function insightValue(item: {
+type InsightMetric = {
   name?: string;
   values?: { value?: unknown }[];
   total_value?: { value?: unknown };
-}): number {
+};
+
+function insightValue(item: InsightMetric): number {
   const total = numericInsight(item.total_value?.value);
   if (total > 0) return total;
   return numericInsight(item.values?.[0]?.value);
 }
 
-function mapInsights(data: { name?: string; values?: { value?: number }[]; total_value?: { value?: number } }[]): Record<string, number> {
+function mapInsights(data: InsightMetric[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const item of data) {
     if (item.name) out[item.name] = insightValue(item);
@@ -109,7 +115,7 @@ async function fetchThreadsInsights(account: { accessToken: string }, postId: st
   });
   const insights = await fetchJson(`${THREADS_API}/${encodeURIComponent(postId)}/insights?${params}`);
   if (insights.ok) {
-    const mapped = mapInsights((insights.data.data as { name?: string; values?: { value?: number }[]; total_value?: { value?: number } }[]) ?? []);
+    const mapped = mapInsights((insights.data.data as InsightMetric[]) ?? []);
     const metrics = {
       impressions: mapped.views ?? 0,
       clicks: 0,
@@ -165,7 +171,7 @@ async function fetchFacebookInsights(account: MetaAccount, postId: string): Prom
     });
     const insights = await fetchJson(`${GRAPH_API}/${encodeURIComponent(postId)}/insights?${params}`);
     if (insights.ok) {
-      mapped = mapInsights((insights.data.data as { name?: string; values?: { value?: unknown }[]; total_value?: { value?: unknown } }[]) ?? []);
+      mapped = mapInsights((insights.data.data as InsightMetric[]) ?? []);
       lastError = '';
       break;
     }
@@ -223,7 +229,7 @@ async function fetchInstagramInsights(account: { accessToken: string }, mediaId:
     const params = new URLSearchParams({ metric, access_token: account.accessToken });
     const insights = await fetchJson(`${GRAPH_API}/${encodeURIComponent(mediaId)}/insights?${params}`);
     if (insights.ok) {
-      mapped = mapInsights((insights.data.data as { name?: string; values?: { value?: unknown }[]; total_value?: { value?: unknown } }[]) ?? []);
+      mapped = mapInsights((insights.data.data as InsightMetric[]) ?? []);
       if ((mapped.views ?? mapped.impressions ?? mapped.reach ?? 0) > 0 || mapped.total_interactions || mapped.saved) {
         lastError = '';
         break;

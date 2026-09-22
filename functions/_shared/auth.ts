@@ -98,6 +98,11 @@ export function getSessionTokenFromRequest(request: Request): string | null {
 
 function asStringArray(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === 'string') {
+    const inner = value.replace(/^\{|\}$/g, '').trim();
+    if (!inner) return [];
+    return inner.split(',').map((s) => s.replace(/^"|"$/g, '').trim()).filter(Boolean);
+  }
   return [];
 }
 

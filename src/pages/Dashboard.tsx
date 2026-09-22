@@ -28,30 +28,41 @@ export function Dashboard() {
     if (data?.actionLabels) setActionLabels(data.actionLabels);
   }, [data?.actionLabels, setActionLabels]);
 
-  if (loading) return <LoadingState />;
-  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+  if (loading && !brands.length) return <LoadingState />;
+  if ((error || !data) && !brands.length) {
+    return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+  }
 
-  const pendingProposals = data.pendingProposals;
-  const pendingContents = data.pendingContents;
-  const recentSignals = [...data.marketSignals].slice(0, 3);
-  const recentActivity = data.recentActivity.slice(0, 6);
-  const labels = { ...data.actionLabels, ...actionLabels };
+  const pendingProposals = data?.pendingProposals ?? [];
+  const pendingContents = data?.pendingContents ?? [];
+  const recentSignals = [...(data?.marketSignals ?? [])].slice(0, 3);
+  const recentActivity = (data?.recentActivity ?? []).slice(0, 6);
+  const labels = { ...(data?.actionLabels ?? {}), ...actionLabels };
+  const brandCards = data?.brands?.length ? data.brands : brands;
+  const brandStats = data?.brandStats ?? [];
 
   return (
     <div>
       <PageHeader title="總覽 Dashboard" subtitle="三品牌發文健康、待辦與近 7 天成敗" />
 
+      {error && brands.length ? (
+        <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--color-text-muted)' }}>
+          總覽統計暫時載不進來，品牌清單仍可切換。
+          <button type="button" onClick={reload} style={{ marginLeft: 8, fontWeight: 700, color: 'var(--color-primary-dark)', background: 'none', border: 'none', cursor: 'pointer' }}>重試統計</button>
+        </div>
+      ) : null}
+
       <Card delay={0} style={{ marginBottom: 20 }}>
         <ChartCard title="近 7 天跨品牌發文成敗">
-          <StackedPostsChart data={data.weekSeries ?? []} />
+          <StackedPostsChart data={data?.weekSeries ?? []} />
         </ChartCard>
       </Card>
 
       <Card delay={0.05} style={{ marginBottom: 20 }}>
         <strong style={{ display: 'block', marginBottom: 14 }}>三品牌行銷狀態</strong>
         <div className="grid-3" style={{ gap: 12 }}>
-          {(data.brands.length ? data.brands : brands).map((b) => {
-            const stats = data.brandStats.find((s) => s.brandId === b.id);
+          {brandCards.map((b) => {
+            const stats = brandStats.find((s) => s.brandId === b.id);
             return (
               <div
                 key={b.id}
@@ -114,7 +125,7 @@ export function Dashboard() {
         <Card delay={0.12}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <strong>今日市場情報</strong>
-            <Badge tone="primary">{data.marketSignals.filter((s) => s.status === 'new').length} 則新</Badge>
+            <Badge tone="primary">{(data?.marketSignals ?? []).filter((s) => s.status === 'new').length} 則新</Badge>
           </div>
           {recentSignals.map((s) => (
             <div key={s.id} style={{ fontSize: 13, padding: '6px 0', borderTop: '1px solid var(--color-border)' }}>▪ {s.title}</div>

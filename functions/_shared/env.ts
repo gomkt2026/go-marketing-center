@@ -3,8 +3,9 @@ import type { BrandJobMessage } from './brand-jobs';
 
 export interface Env {
   DATABASE_URL: string;
-  /** Hyperdrive 連 Neon direct host；有 binding 時優先於 DATABASE_URL */
+  /** Hyperdrive 連 Neon direct host；僅 USE_HYPERDRIVE=1 時啟用 */
   HYPERDRIVE?: Hyperdrive;
+  USE_HYPERDRIVE?: string;
   /** 熱路徑短 TTL 快取（workspace / desk / slots / brands） */
   CACHE?: KVNamespace;
   /** scheduler 每品牌一則的產稿／發布佇列 */

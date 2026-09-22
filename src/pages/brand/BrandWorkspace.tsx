@@ -28,8 +28,8 @@ export function BrandWorkspace() {
   const workspaceQuery = useAsyncData(() => slug ? api.brandWorkspace(slug) : Promise.reject(new Error('no slug')), [slug]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
-  if ((brandQuery.error || workspaceQuery.error) && !workspaceQuery.data) {
-    return <ErrorState message={brandQuery.error ?? workspaceQuery.error ?? '載入失敗'} onRetry={() => { brandQuery.reload(); workspaceQuery.reload(); }} />;
+  if (workspaceQuery.error && !workspaceQuery.data) {
+    return <ErrorState message={workspaceQuery.error} onRetry={workspaceQuery.reload} />;
   }
   if (!workspaceQuery.data) {
     return (
@@ -40,7 +40,7 @@ export function BrandWorkspace() {
     );
   }
 
-  const version = brandQuery.data?.version;
+  const versionNumber = brandQuery.data?.version?.versionNumber ?? brand.versionNumber;
   const data = workspaceQuery.data;
   const { stats, histories, pressCoverages = [] } = data;
 
@@ -60,7 +60,7 @@ export function BrandWorkspace() {
       <PageHeader
         title={`${brand.name} 行銷儀表板`}
         subtitle="一眼看發文成敗、待審與近月互動。時段與單篇時間分別在發文時段、行程表調整。"
-        actions={<Badge tone="primary">v{version?.versionNumber ?? '-'} 已發布</Badge>}
+        actions={<Badge tone="primary">v{versionNumber ?? '-'} 已發布</Badge>}
       />
       <HubShortcuts
         items={[

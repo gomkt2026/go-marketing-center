@@ -14,19 +14,19 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   try {
   const sql = getSql(context.env);
-  const [brands, pendingProposals, pendingContents, marketSignals, activityRows, campaignStats, seoAudits, jobStats, weekRows, perf7] = await Promise.all([
-    getBrandsForUser(context.env, auth),
-    sql`SELECT id, title, brand_id, collaboration_id, status FROM proposals WHERE status = 'pending_decision' ORDER BY created_at DESC`,
-    sql`SELECT id, title, brand_id, status, target_platform FROM contents WHERE status = 'pending_review' ORDER BY updated_at DESC`,
-    sql`SELECT id, title, brand_id, status, discovered_at FROM market_signals ORDER BY discovered_at DESC LIMIT 10`,
-    sql`SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 20`,
+  const brands = await getBrandsForUser(context.env, auth);
+  const [pendingProposals, pendingContents, marketSignals, activityRows, campaignStats, seoAudits, jobStats, weekRows, perf7] = await Promise.all([
+    sql`SELECT id, title, brand_id, collaboration_id, status FROM proposals WHERE status = 'pending_decision' ORDER BY created_at DESC`.catch(() => []),
+    sql`SELECT id, title, brand_id, status, target_platform FROM contents WHERE status = 'pending_review' ORDER BY updated_at DESC LIMIT 80`.catch(() => []),
+    sql`SELECT id, title, brand_id, status, discovered_at FROM market_signals ORDER BY discovered_at DESC LIMIT 10`.catch(() => []),
+    sql`SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 20`.catch(() => []),
     sql`
       SELECT cb.brand_id, COUNT(*)::int AS active_count
       FROM campaigns c
       JOIN campaign_brands cb ON cb.campaign_id = c.id
       WHERE c.status = 'active'
       GROUP BY cb.brand_id
-    `,
+    `.catch(() => []),
     latestSeoAuditsByBrand(context.env).catch(() => []),
     sql`
       SELECT c.brand_id,

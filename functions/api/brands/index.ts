@@ -2,14 +2,18 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
 import { requireAuth } from '../../_shared/auth';
 import { getBrandsForUser, getBrandBySlug } from '../../_shared/queries';
-import { json, error } from '../../_shared/response';
+import { json, error, failLoad } from '../../_shared/response';
 import { onboardBrand } from '../../_shared/brand-onboard';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
-  const brands = await getBrandsForUser(context.env, auth);
-  return json({ brands });
+  try {
+    const brands = await getBrandsForUser(context.env, auth);
+    return json({ brands });
+  } catch (e) {
+    return failLoad('brands', e);
+  }
 };
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {

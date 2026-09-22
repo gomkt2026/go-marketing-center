@@ -37,6 +37,8 @@ export function BrandSwitcher() {
     if (slug) {
       if (onBrandSubpage) {
         navigate(`/${slug}/${page}`);
+      } else {
+        navigate(`/${slug}/workspace`);
       }
     } else if (onBrandSubpage) {
       navigate('/overview');

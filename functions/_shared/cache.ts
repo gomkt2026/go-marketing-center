@@ -4,6 +4,7 @@ const mem = new Map<string, { exp: number; value: unknown }>();
 
 export const cacheKeys = {
   brand: (slug: string) => `brand:${slug}`,
+  brandsAll: 'brands:all',
   slots: (brandId: string) => `slots:${brandId}`,
   desk: (slug: string) => `desk:${slug}`,
   workspace: (slug: string) => `workspace:${slug}`,
@@ -48,7 +49,7 @@ export async function cacheDelete(env: Env, ...keys: string[]): Promise<void> {
 }
 
 export async function invalidateBrandHotCache(env: Env, slug: string, brandId?: string): Promise<void> {
-  const keys = [cacheKeys.brand(slug), cacheKeys.desk(slug), cacheKeys.workspace(slug)];
+  const keys = [cacheKeys.brand(slug), cacheKeys.brandsAll, cacheKeys.desk(slug), cacheKeys.workspace(slug)];
   if (brandId) keys.push(cacheKeys.slots(brandId));
   await cacheDelete(env, ...keys);
 }

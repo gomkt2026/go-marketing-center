@@ -24,6 +24,7 @@ bucket_name = "go-marketing-media"
 binding = "CACHE"
 id = "0571f06408cb41fa849c1df9b5cb3066"
 
+# Pages 預設走 Neon HTTP。Neon 未關 scale-to-zero 時不要設 USE_HYPERDRIVE=1。
 [[hyperdrive]]
 binding = "HYPERDRIVE"
 id = "286329edb5f24551b6684450d1eac8f8"

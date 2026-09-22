@@ -60,13 +60,19 @@ async function selectActiveBrands(env: Env) {
 }
 
 export async function getAllBrands(env: Env) {
+  const cached = await cacheGet<Array<ReturnType<typeof mapBrand>>>(env, cacheKeys.brandsAll);
+  if (cached?.length) return cached;
   try {
-    return ((await selectActiveBrands(env)) as Record<string, unknown>[]).map((row) => mapBrand(row, env));
+    const brands = ((await selectActiveBrands(env)) as Record<string, unknown>[]).map((row) => mapBrand(row, env));
+    await cacheSet(env, cacheKeys.brandsAll, brands, 60);
+    return brands;
   } catch (e) {
     if (!isMissingWebsiteColumn(e) && !isMissingWebsiteArticleSchema(e)) throw e;
     if (isMissingWebsiteArticleSchema(e)) await applyWebsiteArticleMigration(env);
     if (isMissingWebsiteColumn(e)) await applyBrandWebsiteMigration(env);
-    return ((await selectActiveBrands(env)) as Record<string, unknown>[]).map((row) => mapBrand(row, env));
+    const brands = ((await selectActiveBrands(env)) as Record<string, unknown>[]).map((row) => mapBrand(row, env));
+    await cacheSet(env, cacheKeys.brandsAll, brands, 60);
+    return brands;
   }
 }
 
@@ -82,7 +88,7 @@ const brandBySlugCache = new Map<string, { at: number; brand: ReturnType<typeof 
 
 export function invalidateBrandSlugCache(slug: string, env?: Env) {
   brandBySlugCache.delete(slug);
-  if (env) void cacheDelete(env, cacheKeys.brand(slug));
+  if (env) void cacheDelete(env, cacheKeys.brand(slug), cacheKeys.brandsAll);
 }
 
 export async function getBrandBySlug(env: Env, slug: string, opts?: { fresh?: boolean }) {

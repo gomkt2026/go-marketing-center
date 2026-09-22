@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { HubShortcuts } from '@/components/layout/HubShortcuts';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -240,6 +241,12 @@ export function ContentCenter() {
             </Link>
           </div>
         }
+      />
+      <HubShortcuts
+        items={[
+          { to: `/${brand.slug}/threads`, label: 'Threads 工作台' },
+          { to: `/${brand.slug}/editor`, label: '跟小編聊' },
+        ]}
       />
 
       <Card style={{ padding: 0, marginBottom: 16 }}>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { HubShortcuts } from '@/components/layout/HubShortcuts';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { useBrand } from '@/context/BrandContext';
@@ -94,6 +95,12 @@ export function Publishing() {
       <PageHeader
         title={`${brand.name} 發布管理`}
         subtitle="FB / IG / Threads / 官網長文；發布保留時間、平台、版本、發布人"
+      />
+      <HubShortcuts
+        items={[
+          { to: `/${brand.slug}/schedule`, label: '行程表' },
+          { to: `/${brand.slug}/posting-times`, label: '發文時段' },
+        ]}
       />
       <div className="grid-auto" style={{ gap: 14, alignItems: 'start' }}>
         {PLATFORM_COLUMNS.map((col) => {

@@ -17,7 +17,7 @@ export function Login() {
 
   if (user) {
     if (user.role !== 'super_admin') {
-      const home = user.brandSlugs?.[0] ? `/${user.brandSlugs[0]}/events` : '/';
+      const home = user.brandSlugs?.[0] ? `/${user.brandSlugs[0]}/workspace` : '/';
       const allowed = user.brandSlugs?.some((s) => from.startsWith(`/${s}/`));
       return <Navigate to={allowed ? from : home} replace />;
     }

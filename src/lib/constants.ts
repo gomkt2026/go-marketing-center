@@ -2,6 +2,7 @@
 export const RESERVED_APP_PATHS = new Set([
   'settings', 'trending', 'meetings', 'personas', 'decisions',
   'collaborations', 'podcast', 'timeline', 'login', 'e', 'checkin', 'privacy',
+  'overview',
 ]);
 
 export const BRAND_SCOPED_PREFIXES = [

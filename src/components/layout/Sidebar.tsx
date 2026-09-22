@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
@@ -10,73 +11,153 @@ interface MenuItem {
   label: string;
   path: string;
   brandScoped?: boolean;
+  end?: boolean;
 }
-interface MenuGroup {
+
+interface MainItem extends MenuItem {
+  children?: MenuItem[];
+}
+
+interface OtherGroup {
   title: string;
   items: MenuItem[];
 }
 
-const groups: MenuGroup[] = [
-  { title: '', items: [{ label: '總覽 Dashboard', path: '/' }] },
+const mainItems: MainItem[] = [
+  { label: '儀表板', path: '/workspace', brandScoped: true, end: true },
   {
-    title: '品牌經營',
+    label: '內容',
+    path: '/contents',
+    brandScoped: true,
+    children: [{ label: 'Threads 工作台', path: '/threads', brandScoped: true }],
+  },
+  {
+    label: '發布',
+    path: '/publishing',
+    brandScoped: true,
+    children: [{ label: '行程表', path: '/schedule', brandScoped: true }],
+  },
+  { label: '成果', path: '/analytics', brandScoped: true },
+  { label: '品牌智慧', path: '/intelligence', brandScoped: true },
+];
+
+const otherGroups: OtherGroup[] = [
+  {
+    title: '產題',
     items: [
-      { label: '行銷儀表板', path: '/workspace', brandScoped: true },
       { label: '跟小編聊', path: '/editor', brandScoped: true },
-      { label: '品牌智慧', path: '/intelligence', brandScoped: true },
-      { label: '品牌客服資料庫', path: '/help', brandScoped: true },
-      { label: '人脈資料庫', path: '/network', brandScoped: true },
-      { label: '場域地圖', path: '/geo', brandScoped: true },
       { label: '市場情報', path: '/market', brandScoped: true },
-      { label: '官網 SEO', path: '/seo', brandScoped: true },
       { label: '即時熱門', path: '/trending' },
     ],
   },
   {
-    title: '協作決策',
+    title: '加值內容',
+    items: [
+      { label: 'Podcast 節目', path: '/podcast' },
+      { label: '短影音', path: '/shorts', brandScoped: true },
+      { label: '官網 SEO', path: '/seo', brandScoped: true },
+      { label: '行銷活動', path: '/campaigns', brandScoped: true },
+      { label: '活動報名', path: '/events', brandScoped: true },
+    ],
+  },
+  {
+    title: '協作',
     items: [
       { label: 'AI 會議室', path: '/meetings' },
-      { label: '小編人設', path: '/personas' },
       { label: '決策中心', path: '/decisions' },
       { label: '品牌合作', path: '/collaborations' },
     ],
   },
   {
-    title: '內容營運',
+    title: '品牌資產',
     items: [
-      { label: '行銷活動', path: '/campaigns', brandScoped: true },
-      { label: '活動報名', path: '/events', brandScoped: true },
-      { label: '內容中心', path: '/contents', brandScoped: true },
-      { label: 'Podcast 節目', path: '/podcast' },
-      { label: '短影音', path: '/shorts', brandScoped: true },
-      { label: '發布管理', path: '/publishing', brandScoped: true },
-      { label: '行程表', path: '/schedule', brandScoped: true },
-      { label: 'Threads 工作台', path: '/threads', brandScoped: true },
-      { label: '社群帳號', path: '/social', brandScoped: true },
-      { label: '發文時段', path: '/posting-times', brandScoped: true },
-      { label: 'Threads 申請手冊', path: '/settings/meta-threads' },
+      { label: '品牌客服資料庫', path: '/help', brandScoped: true },
+      { label: '人脈資料庫', path: '/network', brandScoped: true },
+      { label: '場域地圖', path: '/geo', brandScoped: true },
     ],
   },
   {
-    title: '洞察',
+    title: '系統',
     items: [
-      { label: '成效分析', path: '/analytics', brandScoped: true },
+      { label: '總覽 Dashboard', path: '/overview', end: true },
       { label: '持續學習', path: '/learning', brandScoped: true },
       { label: '時間軸', path: '/timeline' },
+      { label: '發文時段', path: '/posting-times', brandScoped: true },
+      { label: '社群帳號', path: '/social', brandScoped: true },
+      { label: '小編人設', path: '/personas' },
+      { label: 'Threads 申請手冊', path: '/settings/meta-threads' },
+      { label: '設定', path: '/settings', end: true },
     ],
   },
-  {
-    title: '',
-    items: [{ label: '設定', path: '/settings' }],
-  },
 ];
+
+function resolveTo(item: MenuItem, scopedSlug?: string) {
+  return item.brandScoped && scopedSlug ? `/${scopedSlug}${item.path}` : item.path;
+}
+
+function pathMatches(pathname: string, to: string, end?: boolean) {
+  if (end || to === '/') return pathname === to;
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+function SidebarLink({
+  item,
+  scopedSlug,
+  onNavigate,
+  child,
+}: {
+  item: MenuItem;
+  scopedSlug?: string;
+  onNavigate: () => void;
+  child?: boolean;
+}) {
+  const to = resolveTo(item, scopedSlug);
+  return (
+    <NavLink
+      to={to}
+      end={Boolean(item.end)}
+      onClick={onNavigate}
+      className={`app-sidebar-nav-link${child ? ' is-child' : ''}`}
+      style={({ isActive }) => ({
+        fontWeight: isActive ? 700 : 500,
+        color: isActive ? 'var(--color-primary-dark)' : 'var(--color-text-muted)',
+      })}
+    >
+      {({ isActive }) => (
+        <>
+          {isActive && (
+            <motion.div
+              layoutId="sidebar-active"
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              style={{
+                position: 'absolute', inset: 0, background: 'var(--color-primary-soft)',
+                borderRadius: 8, zIndex: -1,
+              }}
+            />
+          )}
+          {item.label}
+        </>
+      )}
+    </NavLink>
+  );
+}
 
 export function Sidebar() {
   const { currentBrand, brands } = useBrand();
   const { user, logout } = useAuth();
   const { isMobile, sidebarOpen, closeSidebar } = useLayout();
-  // 「全部品牌」模式下,品牌 scoped 連結退回第一個品牌,避免產生無效路徑
+  const { pathname } = useLocation();
   const scopedBrand = currentBrand ?? brands[0];
+  const scopedSlug = scopedBrand?.slug;
+
+  const otherActive = otherGroups.some((group) =>
+    group.items.some((item) => pathMatches(pathname, resolveTo(item, scopedSlug), item.end)),
+  );
+  const [otherOpen, setOtherOpen] = useState(otherActive);
+
+  useEffect(() => {
+    if (otherActive) setOtherOpen(true);
+  }, [otherActive]);
 
   return (
     <>
@@ -107,52 +188,47 @@ export function Sidebar() {
         </div>
 
         <nav style={{ flex: 1, padding: '4px 12px 20px' }}>
-          {groups.map((group, gi) => (
-            <div key={gi} style={{ marginBottom: 16 }}>
-              {group.title && (
-                <div
-                  style={{
-                    fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)',
-                    textTransform: 'uppercase', letterSpacing: 0.5, padding: '4px 12px 6px',
-                  }}
-                >
-                  {group.title}
-                </div>
-              )}
-              {group.items.map((item) => {
-                const to = item.brandScoped && scopedBrand ? `/${scopedBrand.slug}${item.path}` : item.path;
-                return (
-                  <NavLink
+          <div style={{ marginBottom: 16 }}>
+            {mainItems.map((item) => (
+              <div key={item.path}>
+                <SidebarLink item={item} scopedSlug={scopedSlug} onNavigate={closeSidebar} />
+                {item.children?.map((child) => (
+                  <SidebarLink
+                    key={child.path}
+                    item={child}
+                    scopedSlug={scopedSlug}
+                    onNavigate={closeSidebar}
+                    child
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+
+          <div className="app-sidebar-more">
+            <button
+              type="button"
+              className={`app-sidebar-more-toggle${otherOpen ? ' is-open' : ''}${otherActive ? ' is-active' : ''}`}
+              aria-expanded={otherOpen}
+              onClick={() => setOtherOpen((open) => !open)}
+            >
+              其他
+              <span aria-hidden>{otherOpen ? '▴' : '▾'}</span>
+            </button>
+            {otherOpen && otherGroups.map((group) => (
+              <div key={group.title} className="app-sidebar-more-group">
+                <div className="app-sidebar-group-title">{group.title}</div>
+                {group.items.map((item) => (
+                  <SidebarLink
                     key={item.path}
-                    to={to}
-                    end={item.path === '/settings' || item.path === '/'}
-                    onClick={closeSidebar}
-                    className="app-sidebar-nav-link"
-                    style={({ isActive }) => ({
-                      fontWeight: isActive ? 700 : 500,
-                      color: isActive ? 'var(--color-primary-dark)' : 'var(--color-text-muted)',
-                    })}
-                  >
-                    {({ isActive }) => (
-                      <>
-                        {isActive && (
-                          <motion.div
-                            layoutId="sidebar-active"
-                            transition={{ duration: 0.2, ease: 'easeOut' }}
-                            style={{
-                              position: 'absolute', inset: 0, background: 'var(--color-primary-soft)',
-                              borderRadius: 8, zIndex: -1,
-                            }}
-                          />
-                        )}
-                        {item.label}
-                      </>
-                    )}
-                  </NavLink>
-                );
-              })}
-            </div>
-          ))}
+                    item={item}
+                    scopedSlug={scopedSlug}
+                    onNavigate={closeSidebar}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
         </nav>
 
         {isMobile && user && (

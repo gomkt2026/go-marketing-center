@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/ui/StatCard';
+import { HubShortcuts } from '@/components/layout/HubShortcuts';
 import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
@@ -53,6 +54,16 @@ export function BrandWorkspace() {
         title={`${brand.name} 行銷儀表板`}
         subtitle="一眼看發文成敗、待審與近月互動。時段與單篇時間分別在發文時段、行程表調整。"
         actions={<Badge tone="primary">v{version?.versionNumber ?? '-'} 已發布</Badge>}
+      />
+      <HubShortcuts
+        items={[
+          { to: `/${brand.slug}/contents`, label: '內容' },
+          { to: `/${brand.slug}/threads`, label: 'Threads' },
+          { to: `/${brand.slug}/publishing`, label: '發布' },
+          { to: `/${brand.slug}/schedule`, label: '行程表' },
+          { to: `/${brand.slug}/analytics`, label: '成果' },
+          { to: `/${brand.slug}/intelligence`, label: '品牌智慧' },
+        ]}
       />
 
       <div className="grid-4" style={{ marginBottom: 16 }}>
@@ -154,18 +165,6 @@ export function BrandWorkspace() {
         </Card>
       </div>
 
-      <Card style={{ marginBottom: 16 }}>
-        <strong style={{ display: 'block', marginBottom: 12 }}>快速前往</strong>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <Link to={`/${brand.slug}/contents`} style={linkStyle}>內容中心</Link>
-          <Link to={`/${brand.slug}/schedule`} style={linkStyle}>行程表</Link>
-          <Link to={`/${brand.slug}/posting-times`} style={linkStyle}>發文時段</Link>
-          <Link to={`/${brand.slug}/analytics`} style={linkStyle}>成效分析</Link>
-          <Link to={`/${brand.slug}/threads`} style={linkStyle}>Threads 工作台</Link>
-          <Link to={`/${brand.slug}/social`} style={linkStyle}>社群帳號</Link>
-        </div>
-      </Card>
-
       <button
         type="button"
         onClick={() => setHistoryOpen((v) => !v)}
@@ -203,8 +202,3 @@ export function BrandWorkspace() {
     </div>
   );
 }
-
-const linkStyle = {
-  fontSize: 13, color: 'var(--color-text)', textDecoration: 'none',
-  padding: '8px 12px', borderRadius: 8, background: 'var(--color-bg-soft)',
-};

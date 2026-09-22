@@ -7,6 +7,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { RouteBrandSync } from '@/components/layout/RouteBrandSync';
 import { Login } from '@/pages/Login';
 import { Dashboard } from '@/pages/Dashboard';
+import { HomeRedirect } from '@/pages/HomeRedirect';
 import { BrandWorkspace } from '@/pages/brand/BrandWorkspace';
 import { BrandIntelligence } from '@/pages/brand/BrandIntelligence';
 import { MarketIntelligence } from '@/pages/brand/MarketIntelligence';
@@ -72,7 +73,8 @@ export default function App() {
                         <Route path="/:brand/*" element={<RouteBrandSync />} />
                       </Routes>
                       <Routes>
-                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/" element={<HomeRedirect />} />
+                        <Route path="/overview" element={<Dashboard />} />
                         <Route path="/trending" element={<Trending />} />
 
                         <Route path="/:brand/workspace" element={<BrandWorkspace />} />

@@ -39,7 +39,7 @@ export function BrandSwitcher() {
         navigate(`/${slug}/${page}`);
       }
     } else if (onBrandSubpage) {
-      navigate('/');
+      navigate('/overview');
     }
   }
 

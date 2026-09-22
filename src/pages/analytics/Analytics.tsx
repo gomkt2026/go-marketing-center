@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { HubShortcuts } from '@/components/layout/HubShortcuts';
 import { Card } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -220,6 +221,9 @@ export function Analytics() {
             </Button>
           </div>
         }
+      />
+      <HubShortcuts
+        items={[{ to: `/${brand.slug}/learning`, label: '持續學習' }]}
       />
 
       {message && (

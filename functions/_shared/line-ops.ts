@@ -166,11 +166,23 @@ async function replyOpsMessages(
   messages: unknown[],
   brands?: BrandRow[],
 ): Promise<void> {
-  await linePost(env, '/message/reply', { replyToken, messages: withQuickReply(messages, brands) });
+  const packed = withQuickReply(messages, brands).slice(0, 5);
+  try {
+    await linePost(env, '/message/reply', { replyToken, messages: packed });
+  } catch (e) {
+    console.error('[line-ops] LINE 卡片發送失敗，改傳文字', e);
+    const fallback = packed.map((m) => {
+      const row = m as { type?: string; text?: string; altText?: string };
+      if (row.type === 'text' && row.text) return textMsg(String(row.text).slice(0, 4500));
+      if (row.altText) return textMsg(String(row.altText).slice(0, 4500));
+      return textMsg('查詢完成，但卡片發送失敗。請再問一次，或回「交腳本」。');
+    });
+    await linePost(env, '/message/reply', { replyToken, messages: withQuickReply(fallback, brands).slice(0, 5) });
+  }
 }
 
-export async function replyOps(env: Env, replyToken: string, text: string): Promise<void> {
-  await replyOpsMessages(env, replyToken, [textMsg(text)]);
+export async function replyOps(env: Env, replyToken: string, text: string, brands?: BrandRow[]): Promise<void> {
+  await replyOpsMessages(env, replyToken, [textMsg(text)], brands);
 }
 
 export async function pushOps(env: Env, to: string, text: string): Promise<boolean> {
@@ -207,7 +219,8 @@ function textMsg(text: string) {
 }
 
 function flexText(text: string, extra: Record<string, unknown> = {}) {
-  return { type: 'text', text, wrap: true, ...extra };
+  const value = String(text ?? '').trim() || '—';
+  return { type: 'text', text: value, wrap: true, ...extra };
 }
 
 function platformLabel(platform: string): string {
@@ -241,8 +254,9 @@ function fmtClock(iso: string | null): string {
   });
 }
 
-function clip(text: string, max: number): string {
-  const t = text.replace(/\s+/g, ' ').trim();
+function clip(text: unknown, max: number): string {
+  const t = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (!t) return '—';
   return t.length > max ? `${t.slice(0, max)}…` : t;
 }
 
@@ -1155,78 +1169,62 @@ async function assetMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> {
 async function shortsMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> {
   const sql = getSql(env);
   const ids = brands.map((b) => b.id);
-  const rows = (ids.length ? await sql`
-    SELECT v.title, v.status, v.strategy, v.preview_url, v.final_url, v.updated_at,
-           v.brand_id, v.source_type, e.title AS episode_title
-    FROM video_jobs v
-    LEFT JOIN podcast_episodes e ON e.id = v.podcast_episode_id
-    WHERE v.brand_id = ANY(${ids}::uuid[]) OR v.brand_id IS NULL
-    ORDER BY v.updated_at DESC
-    LIMIT 12
-  `.catch(() => []) : []) as Array<{
-    title: string | null; status: string; strategy: unknown;
-    preview_url: string | null; final_url: string | null; updated_at: string;
-    brand_id: string | null; source_type?: string; episode_title: string | null;
-  }>;
+  let rows: Array<{
+    title: string | null;
+    status: string;
+    hook: string | null;
+    strategy_title: string | null;
+    updated_at: string;
+    brand_id: string | null;
+    source_type: string | null;
+  }> = [];
+  if (ids.length) {
+    try {
+      rows = await sql`
+        SELECT
+          v.title,
+          v.status,
+          v.source_type,
+          v.brand_id,
+          v.updated_at,
+          v.strategy->>'hook' AS hook,
+          v.strategy->>'title' AS strategy_title
+        FROM video_jobs v
+        WHERE v.brand_id = ANY(${ids}::uuid[])
+        ORDER BY v.updated_at DESC
+        LIMIT 12
+      ` as typeof rows;
+    } catch (e) {
+      console.error('[line-ops] 讀短影音失敗', e);
+      try {
+        rows = await sql`
+          SELECT title, status, brand_id, updated_at, NULL::text AS source_type,
+                 NULL::text AS hook, NULL::text AS strategy_title
+          FROM video_jobs
+          WHERE brand_id = ANY(${ids}::uuid[])
+          ORDER BY updated_at DESC
+          LIMIT 12
+        ` as typeof rows;
+      } catch (e2) {
+        console.error('[line-ops] 讀短影音精簡查詢也失敗', e2);
+      }
+    }
+  }
 
-  const bubbles = brands.map((brand) => {
-    const theme = themeOf(brand.slug);
-    const items = rows
-      .filter((r) => r.brand_id === brand.id || (!r.brand_id && brand.id === brands[0]?.id))
-      .slice(0, 5);
-    const contents = items.length
-      ? items.map((r) => {
-        const strategy = (r.strategy && typeof r.strategy === 'object') ? r.strategy as { hook?: string; title?: string } : {};
-        const title = strategy.title || r.title || r.episode_title || '未命名短影音';
-        const hook = strategy.hook ? clip(strategy.hook, 28) : '尚無 hook';
-        const row: Record<string, unknown> = {
-          type: 'box',
-          layout: 'vertical',
-          spacing: 'xs',
-          margin: '6px',
-          paddingAll: '10px',
-          backgroundColor: '#F7F9F5',
-          cornerRadius: '8px',
-          contents: [
-            flexText(`${videoJobLabel(r.status, r.source_type)}  ${fmtTime(r.updated_at)}`, { size: 'xxs', color: '#6C6C6C' }),
-            flexText(clip(title, 24), { size: 'sm', weight: 'bold', color: '#3A3A3A' }),
-            flexText(hook, { size: 'xs', color: '#3A3A3A' }),
-          ],
-        };
-        const url = httpsUrl(r.final_url) ?? httpsUrl(r.preview_url);
-        if (url) row.action = { type: 'uri', uri: url };
-        return row;
-      })
-      : [flexText('目前沒有短影音工作。可在這裡交腳本，或從 Podcast 已核准集數切杯。', { size: 'sm', color: '#6C6C6C' })];
-
-    return {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: theme.header,
-        paddingAll: '14px',
-        contents: [
-          flexText(theme.label, { color: '#FFFFFF', size: 'md', weight: 'bold' }),
-          flexText('短影音工作與腳本', { color: '#D7E8E2', size: 'xs', margin: '4px' }),
-        ],
-      },
-      body: { type: 'box', layout: 'vertical', spacing: 'none', paddingAll: '14px', contents },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        contents: [{
-          type: 'button',
-          style: 'primary',
-          height: 'sm',
-          color: theme.header,
-          action: { type: 'message', label: '交腳本', text: '交腳本' },
-        }],
-      },
-    };
+  const blocks = brands.map((brand) => {
+    const items = rows.filter((r) => r.brand_id === brand.id).slice(0, 6);
+    if (!items.length) {
+      return `${brand.name} 目前沒有短影音工作。\n回「交腳本」把腳本貼過來，就會存進工作台。`;
+    }
+    const lines = items.map((r, i) => {
+      const title = clip(r.strategy_title || r.title || '未命名短影音', 36);
+      const label = videoJobLabel(r.status, r.source_type ?? undefined);
+      const hook = r.hook ? `\n   ${clip(r.hook, 40)}` : '';
+      return `${i + 1}. ${label} 《${title}》${hook}`;
+    });
+    return `${brand.name} 短影音工作\n\n${lines.join('\n')}\n\n回「交腳本」可再存新的。`;
   });
-  return [carousel('短影音工作', bubbles)];
+  return [textMsg(blocks.join('\n\n').slice(0, 4500))];
 }
 
 async function messagesForIntent(env: Env, intent: OpsIntent, brands: BrandRow[]): Promise<unknown[]> {
@@ -1450,23 +1448,27 @@ export async function handleLineOpsEvents(
         ? scoped[0]
         : (inferred ? scoped.find((b) => b.slug === inferred) ?? null : null);
 
-      const intake = await handleLineScriptIntake(env, {
-        text,
-        conversationId: conversationId || (lineUserId ? `dm:${lineUserId}` : 'unknown'),
-        lineUserId: lineUserId ?? null,
-        brand: intakeBrand,
-        needGroupBind: false,
-      });
-      if (intake) {
-        await replyOpsMessages(env, replyToken, intake, scoped);
-        continue;
+      const intent = parseOpsIntent(text);
+      const skipIntake = intent !== 'unknown' && intent !== 'upload_script' && intent !== 'bind';
+      if (!skipIntake) {
+        const intake = await handleLineScriptIntake(env, {
+          text,
+          conversationId: conversationId || (lineUserId ? `dm:${lineUserId}` : 'unknown'),
+          lineUserId: lineUserId ?? null,
+          brand: intakeBrand,
+          needGroupBind: false,
+        });
+        if (intake) {
+          await replyOpsMessages(env, replyToken, intake, scoped);
+          continue;
+        }
       }
 
-      const intent = parseOpsIntent(text);
       await replyOpsMessages(env, replyToken, await messagesForIntent(env, intent, scoped), scoped);
     } catch (e) {
-      console.error('[line-ops] 處理訊息失敗', e);
-      await replyOps(env, replyToken, '查詢暫時失敗，請稍後再試。').catch(() => undefined);
+      const detail = e instanceof Error ? e.message : String(e);
+      console.error('[line-ops] 處理訊息失敗', detail, e);
+      await replyOps(env, replyToken, `查詢暫時失敗：${clip(detail, 80)}。請再試一次，或回「交腳本」。`).catch(() => undefined);
     }
   }
 }

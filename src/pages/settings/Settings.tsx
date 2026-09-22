@@ -205,8 +205,8 @@ function LineNotifyPanel() {
     <Card>
       <strong style={{ display: 'block', marginBottom: 8 }}>GO 行銷機器人</strong>
       <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12 }}>
-        加好友後，內部人員用綁定碼才能在私訊查資料。外包小編請把機器人拉進<strong>單一品牌工作群</strong>，管理員回「這個群綁定 Homigo」，之後這個群只看 Homigo。
-        群組裡 <strong>@GO行銷機器人</strong> 或回覆它的訊息，可查今日發文、排程、交腳本。指定品牌前不會回任何成效。
+        加好友後，內部人員用綁定碼才能在私訊查資料。外包小編請把機器人拉進<strong>單一品牌工作群</strong>，管理員 @GO行銷機器人 後回「這個群綁定 Homigo」，之後這個群只看 Homigo。
+        群組裡<strong>只有被 @GO行銷機器人</strong>才會回話；一般對話、沒有 @ 的「今日發文」都不會插嘴。指定品牌前也不會回成效。
       </p>
       <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12, color: 'var(--color-text-muted)' }}>
         LINE Official Account 後台請允許加入群組／多人聊天；Messaging API webhook 設成
@@ -248,7 +248,7 @@ function LineNotifyPanel() {
       )}
       {data?.bound && (
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-          問答模式：私訊給已綁定的內部帳號；群組請 @機器人 或回覆它。工作群只看綁定的那一個品牌。
+          問答模式：私訊給已綁定的內部帳號；群組只有被 @GO行銷機器人 才會回。工作群只看綁定的那一個品牌。
         </p>
       )}
       {message && <p style={{ fontSize: 13, marginTop: 10 }}>{message}</p>}

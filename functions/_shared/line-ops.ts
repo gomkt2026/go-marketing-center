@@ -15,10 +15,7 @@ import {
   handleLineScriptIntake,
   hasOpenScriptSession,
   inferBrandSlug,
-  isScriptCancel,
-  isScriptConfirm,
   isScriptUploadCommand,
-  looksLikeScript,
 } from './short-scripts';
 
 const LINE_API = 'https://api.line.me/v2/bot';
@@ -58,6 +55,7 @@ export type LineOpsEvent = {
   replyToken?: string;
   source?: LineOpsSource;
   message?: { type?: string; text?: string; mention?: LineMention; quotedMessageId?: string; id?: string };
+  postback?: { data?: string };
 };
 
 type OpsIntent =
@@ -274,8 +272,7 @@ export function isGroupSource(source?: LineOpsSource): boolean {
 const BOT_MENTION_RE = /[@＠]?\s*GO\s*行銷\s*機器人|[@＠]?\s*行銷機器人|[@＠]?\s*GO行銷/gi;
 
 export function botWasMentioned(text: string, mention?: LineMention): boolean {
-  if (mention?.mentionees?.some((m) => m.isSelf || m.index === 0)) return true;
-  if (mention?.mentionees?.length) return true;
+  if (mention?.mentionees?.some((m) => m.isSelf)) return true;
   BOT_MENTION_RE.lastIndex = 0;
   return BOT_MENTION_RE.test(text);
 }
@@ -331,8 +328,12 @@ function httpsUrl(value: string | null | undefined): string | null {
   return value.trim();
 }
 
+function cmdAction(label: string, text: string) {
+  return { type: 'postback', label, data: text.slice(0, 300) };
+}
+
 function qrItem(label: string, text: string) {
-  return { type: 'action', action: { type: 'message', label, text } };
+  return { type: 'action', action: cmdAction(label, text) };
 }
 
 function quickReplyItems(brands?: BrandRow[]) {
@@ -386,17 +387,15 @@ function withQuickReply(messages: unknown[], brands?: BrandRow[]): unknown[] {
 
 const MENU_UNKNOWN = '這句我還沒學會。點下面一項就好。';
 const MENU_JOIN = [
-  '已加入這個群。請管理員先指定品牌，之後這個群就只看那一個品牌。',
+  '已加入這個群。之後只有被 @GO行銷機器人 才會回話，群組一般對話我不會插嘴。',
   '',
-  '已在 GO 行銷中心綁定 LINE 的管理員請回：',
-  '這個群綁定 Homigo',
-  '這個群綁定 TaskGo',
-  '這個群綁定 Washgo',
-  '',
-  '指定前我不會在這裡查成效、素材或腳本。',
+  '請管理員先 @我 再指定品牌，這個群之後只看那一個品牌：',
+  '@GO行銷機器人 這個群綁定 Homigo',
+  '@GO行銷機器人 這個群綁定 TaskGo',
+  '@GO行銷機器人 這個群綁定 Washgo',
 ].join('\n');
 const MENU_FOLLOW = '加好友成功。內部人員請先到設定頁產生綁定碼，傳「綁定 123456」。外包小編請在品牌工作群 @我，這個群只會看到該品牌。';
-const MENU_NEED_GROUP_BIND = '這個群還沒指定品牌，我不會在這裡查其他品牌的資料。管理員請回「這個群綁定 Homigo」。';
+const MENU_NEED_GROUP_BIND = '這個群還沒指定品牌。請管理員 @GO行銷機器人 再回「這個群綁定 Homigo」。';
 const MENU_NEED_USER_BIND = '請先到 GO 行銷中心設定頁產生綁定碼，傳「綁定 123456」。外包小編請走品牌工作群，不必私訊查其他品牌。';
 const MENU_FOREIGN = (name: string) => `這個群只看 ${name}。要看別的品牌請進那個品牌的工作群，或用已綁定的總部私訊。`;
 
@@ -699,7 +698,7 @@ function todayBubble(brand: BrandRow, posts: TodayPost[]) {
         style: 'primary',
         height: 'sm',
         color: theme.header,
-        action: { type: 'message', label: `問 ${brand.name} 成效`, text: `${brand.name}成效` },
+        action: cmdAction(`問 ${brand.name} 成效`, `${brand.name}成效`),
       }],
     },
   };
@@ -767,19 +766,19 @@ function kpiBubble(brand: BrandRow, kpi: BrandKpi, todayCount = 0) {
           style: 'primary',
           height: 'sm',
           color: theme.header,
-          action: { type: 'message', label: `問 ${brand.name} 成效`, text: `${brand.name}成效` },
+          action: cmdAction(`問 ${brand.name} 成效`, `${brand.name}成效`),
         },
         {
           type: 'button',
           style: 'link',
           height: 'sm',
-          action: { type: 'message', label: '今日發文清單', text: `${brand.name}今日` },
+          action: cmdAction('今日發文清單', `${brand.name}今日`),
         },
         {
           type: 'button',
           style: 'link',
           height: 'sm',
-          action: { type: 'message', label: '看失敗單', text: `${brand.name}失敗` },
+          action: cmdAction('看失敗單', `${brand.name}失敗`),
         },
       ],
     },
@@ -825,7 +824,7 @@ function listBubble(brand: BrandRow, title: string, lines: string[], empty: stri
         style: 'primary',
         height: 'sm',
         color: theme.header,
-        action: { type: 'message', label: `問 ${brand.name} 成效`, text: ask },
+        action: cmdAction(`問 ${brand.name} 成效`, ask),
       }],
     },
   };
@@ -848,7 +847,7 @@ function menuButton(label: string, text: string, color?: string) {
     height: 'sm',
     flex: 1,
     ...(color ? { color } : {}),
-    action: { type: 'message', label, text },
+    action: cmdAction(label, text),
   };
 }
 
@@ -1079,7 +1078,7 @@ async function pressMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> {
           style: 'primary',
           height: 'sm',
           color: theme.header,
-          action: { type: 'message', label: `${brand.name} 口吻`, text: `${brand.name}口吻` },
+          action: cmdAction(`${brand.name} 口吻`, `${brand.name}口吻`),
         }],
       },
     };
@@ -1122,13 +1121,13 @@ function voiceMessages(brands: BrandRow[]): unknown[] {
             style: 'primary',
             height: 'sm',
             color: theme.header,
-            action: { type: 'message', label: `${brand.name} 今日發文`, text: `${brand.name}今日` },
+            action: cmdAction(`${brand.name} 今日發文`, `${brand.name}今日`),
           },
           {
             type: 'button',
             style: 'link',
             height: 'sm',
-            action: { type: 'message', label: `${brand.name} 媒體`, text: `${brand.name}媒體` },
+            action: cmdAction(`${brand.name} 媒體`, `${brand.name}媒體`),
           },
         ],
       },
@@ -1354,22 +1353,31 @@ export async function handleLineOpsEvents(
         await replyOpsMessages(env, replyToken, commandMenuMessages(await loadBrands(), MENU_FOLLOW), []);
         continue;
       }
-      if (event.type !== 'message' || event.message?.type !== 'text' || !event.message.text) {
+
+      let text = '';
+      let mentioned = false;
+      let fromPostback = false;
+      if (event.type === 'postback' && event.postback?.data) {
+        text = event.postback.data.trim();
+        fromPostback = true;
+      } else if (event.type === 'message' && event.message?.type === 'text' && event.message.text) {
+        const raw = event.message.text;
+        mentioned = botWasMentioned(raw, event.message.mention);
+        text = stripLineMention(raw, event.message.mention);
+      } else {
         await rememberSpace();
         continue;
       }
 
-      const raw = event.message.text;
-      const mentioned = botWasMentioned(raw, event.message.mention)
-        || /[@＠]/.test(raw);
-      const text = stripLineMention(raw, event.message.mention);
-      const quoted = Boolean(event.message.quotedMessageId);
-      const bindCmd = parseSpaceBindCommand(text);
-      const addressingLite = !inGroup || mentioned || quoted || isBareOpsCommand(text)
-        || Boolean(bindCmd)
-        || isScriptUploadCommand(text) || looksLikeScript(text)
-        || isScriptConfirm(text) || isScriptCancel(text);
-      if (inGroup && !addressingLite && text.length <= 20) continue;
+      if (inGroup && !fromPostback && !mentioned) {
+        const sessionOpen = conversationId && lineUserId
+          ? await hasOpenScriptSession(env, conversationId, lineUserId)
+          : false;
+        if (!sessionOpen) {
+          await rememberSpace();
+          continue;
+        }
+      }
 
       if (inGroup && conversationId) {
         const handledBind = await handleSpaceBindMessage(env, {
@@ -1390,13 +1398,6 @@ export async function handleLineOpsEvents(
         const result = await bindLineUser(env, lineUserId, bind[1]);
         await replyOps(env, replyToken, result);
         continue;
-      }
-
-      if (inGroup && !addressingLite) {
-        const sessionOpen = conversationId && lineUserId
-          ? await hasOpenScriptSession(env, conversationId, lineUserId)
-          : false;
-        if (!sessionOpen) continue;
       }
 
       let space: LineOpsSpace | null = null;

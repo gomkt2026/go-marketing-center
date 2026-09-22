@@ -80,6 +80,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       WHERE id = ${contentId}::uuid
     `;
     await sql`
+      UPDATE publishing_jobs
+      SET status = 'cancelled', updated_at = now()
+      WHERE content_id = ${contentId}::uuid AND status IN ('queued', 'scheduled', 'failed')
+    `;
+    await sql`
       INSERT INTO content_reviews (content_id, content_version_id, reviewer_id, action, comment)
       VALUES (${contentId}::uuid, ${versionId}::uuid, ${auth.id}::uuid, 'regenerate',
               ${body.instruction ?? 'AI 重新生成 SEO 長文'})
@@ -127,6 +132,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       engagement_analysis = ${result.prediction.analysis + (result.prediction.suggestions.length ? `\n改進建議:\n- ${result.prediction.suggestions.join('\n- ')}` : '')},
       updated_at = now()
     WHERE id = ${contentId}::uuid
+  `;
+
+  await sql`
+    UPDATE publishing_jobs
+    SET status = 'cancelled', updated_at = now()
+    WHERE content_id = ${contentId}::uuid AND status IN ('queued', 'scheduled', 'failed')
   `;
 
   await sql`

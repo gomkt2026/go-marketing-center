@@ -521,6 +521,18 @@ export const api = {
       body: JSON.stringify({ action: 'reschedule', jobId, scheduledAt }),
     }),
 
+  updateScheduledPost: (slug: string, jobId: string, payload: { title?: string; body?: string; hashtags?: string }) =>
+    request<{ ok: boolean; status: string }>(`/api/brands/${slug}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'update', jobId, ...payload }),
+    }),
+
+  unscheduleJob: (slug: string, jobId: string) =>
+    request<{ ok: boolean; status: string }>(`/api/brands/${slug}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'unschedule', jobId }),
+    }),
+
   postingSlots: (slug: string) =>
     request<{
       slots: import('@/types').PostingSlot[];

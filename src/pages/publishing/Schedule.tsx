@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -14,7 +14,7 @@ const statusTone: Record<PublishingJobStatus, BadgeTone> = {
 const statusLabel: Record<PublishingJobStatus, string> = {
   queued: '排隊中', scheduled: '已排定', publishing: '發布中', published: '已發布', failed: '失敗', cancelled: '已取消',
 };
-const platformLabel: Record<string, string> = { facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads' };
+const platformLabel: Record<string, string> = { facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads', website: '官網' };
 const genSourceLabel: Record<string, string> = {
   threads_hourly: '熱議跟風', threads_offtopic: '生活梗文',
   threads_love: '感情散文', threads_weather: '天氣季節', threads_entertainment: '娛樂影視',
@@ -23,7 +23,6 @@ const genSourceLabel: Record<string, string> = {
   daily_theme: '每日主題',
   auto_signal: '情報自動', market_signal: '市場情報', meeting_plan: '會議計畫',
 };
-// threads_hourly 貼文的角度輪替(避免連續發文都落在同一個角度),見 functions/_shared/prompts.ts 的 THREADS_HOURLY_CATEGORIES
 const genCategoryLabel: Record<string, string> = {
   seasonal_trend: '時事跟風', emotion: '感情視角', weather: '天氣話題',
   entertainment: '娛樂話題', sports: '運動話題', image_inspired: '圖片靈感',
@@ -33,6 +32,16 @@ const genCategoryLabel: Record<string, string> = {
 const contentStatusLabel: Record<string, string> = {
   draft: '草稿', pending_review: '待審閱', approved: '已批准', needs_revision: '修改中',
   rejected: '已退回', scheduled: '排程中', published: '已發布', archived: '已封存',
+};
+
+const fieldStyle: CSSProperties = {
+  display: 'block', width: '100%', marginTop: 4, padding: '6px 8px',
+  borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 12,
+  fontFamily: 'inherit', background: 'var(--color-bg)', boxSizing: 'border-box',
+};
+const actionBtnStyle: CSSProperties = {
+  padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+  border: '1px solid var(--color-border)', background: 'var(--color-bg-soft)', cursor: 'pointer',
 };
 
 function formatFullTime(iso: string | null | undefined): string | null {
@@ -59,8 +68,6 @@ function itemTime(item: ScheduleItem): Date {
   return new Date(item.scheduledAt ?? item.publishedAt ?? item.createdAt);
 }
 
-// 失敗訊息通常是 "OO 發布失敗 (400): {...平台原始 JSON...}",嘗試把 JSON 裡對人類較好懂的
-// error_user_msg / message 抽出來,抽不到就原樣顯示(平台格式不保證一致,失敗就退回原文)
 function formatFailureReason(raw: string): string {
   const jsonStart = raw.indexOf('{');
   if (jsonStart === -1) return raw;
@@ -75,6 +82,10 @@ function formatFailureReason(raw: string): string {
   return raw;
 }
 
+function formatHashtagInput(tags: string[] | null | undefined): string {
+  return (tags ?? []).map((h) => (h.startsWith('#') ? h : `#${h}`)).join(' ');
+}
+
 export function Schedule() {
   const { brand: slug } = useParams();
   const { brandBySlug, brandsLoading } = useBrand();
@@ -84,6 +95,10 @@ export function Schedule() {
   const [retrying, setRetrying] = useState<Set<string>>(new Set());
   const [rescheduleAt, setRescheduleAt] = useState<Record<string, string>>({});
   const [rescheduling, setRescheduling] = useState<Set<string>>(new Set());
+  const [editDrafts, setEditDrafts] = useState<Record<string, { title: string; body: string; hashtags: string }>>({});
+  const [saving, setSaving] = useState<Set<string>>(new Set());
+  const [unscheduling, setUnscheduling] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<Record<string, string>>({});
 
   const weekStart = useMemo(() => {
     const s = startOfWeek(new Date());
@@ -96,7 +111,7 @@ export function Schedule() {
     return e;
   }, [weekStart]);
 
-  const { data, loading, error, reload } = useAsyncData(
+  const { data, error, reload } = useAsyncData(
     () => (slug ? api.schedule(slug, { from: weekStart.toISOString(), to: weekEnd.toISOString() }) : Promise.reject(new Error('no slug'))),
     [slug, weekStart.getTime()],
   );
@@ -117,43 +132,103 @@ export function Schedule() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
-  async function handleReschedule(jobId: string) {
-    if (!slug) return;
-    const value = rescheduleAt[jobId] || toLocalInput(itemsById(jobId)?.scheduledAt);
-    if (!value) return;
-    setRescheduling((prev) => new Set(prev).add(jobId));
-    try {
-      await api.rescheduleJob(slug, jobId, new Date(value).toISOString());
-      reload();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setRescheduling((prev) => {
-        const next = new Set(prev);
-        next.delete(jobId);
-        return next;
-      });
-    }
-  }
-
   function itemsById(id: string): ScheduleItem | undefined {
     return data?.items.find((it) => it.id === id);
   }
 
+  function draftOf(item: ScheduleItem) {
+    return editDrafts[item.id] ?? {
+      title: item.title ?? '',
+      body: item.body ?? '',
+      hashtags: formatHashtagInput(item.hashtags),
+    };
+  }
+
+  function patchDraft(id: string, item: ScheduleItem, patch: Partial<{ title: string; body: string; hashtags: string }>) {
+    setEditDrafts((prev) => ({ ...prev, [id]: { ...draftOf(item), ...patch } }));
+  }
+
+  function setBusy(setter: typeof setSaving, id: string, on: boolean) {
+    setter((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  async function handleReschedule(jobId: string) {
+    if (!slug) return;
+    const value = rescheduleAt[jobId] || toLocalInput(itemsById(jobId)?.scheduledAt);
+    if (!value) return;
+    setBusy(setRescheduling, jobId, true);
+    setActionError((prev) => ({ ...prev, [jobId]: '' }));
+    try {
+      await api.rescheduleJob(slug, jobId, new Date(value).toISOString());
+      reload();
+    } catch (e) {
+      setActionError((prev) => ({ ...prev, [jobId]: e instanceof Error ? e.message : '改時間失敗' }));
+    } finally {
+      setBusy(setRescheduling, jobId, false);
+    }
+  }
+
+  async function handleSaveCopy(jobId: string) {
+    if (!slug) return;
+    const item = itemsById(jobId);
+    if (!item) return;
+    const draft = draftOf(item);
+    if (!draft.title.trim() || !draft.body.trim()) {
+      setActionError((prev) => ({ ...prev, [jobId]: '標題與文案不能空白' }));
+      return;
+    }
+    setBusy(setSaving, jobId, true);
+    setActionError((prev) => ({ ...prev, [jobId]: '' }));
+    try {
+      await api.updateScheduledPost(slug, jobId, {
+        title: draft.title,
+        body: draft.body,
+        hashtags: draft.hashtags,
+      });
+      setEditDrafts((prev) => {
+        const next = { ...prev };
+        delete next[jobId];
+        return next;
+      });
+      reload();
+    } catch (e) {
+      setActionError((prev) => ({ ...prev, [jobId]: e instanceof Error ? e.message : '儲存失敗' }));
+    } finally {
+      setBusy(setSaving, jobId, false);
+    }
+  }
+
+  async function handleUnschedule(jobId: string) {
+    if (!slug) return;
+    if (!window.confirm('確定取消這則排程？文案會回到工作台待審，不會自動發出。')) return;
+    setBusy(setUnscheduling, jobId, true);
+    setActionError((prev) => ({ ...prev, [jobId]: '' }));
+    try {
+      await api.unscheduleJob(slug, jobId);
+      reload();
+    } catch (e) {
+      setActionError((prev) => ({ ...prev, [jobId]: e instanceof Error ? e.message : '取消排程失敗' }));
+    } finally {
+      setBusy(setUnscheduling, jobId, false);
+    }
+  }
+
   async function handleRetry(jobId: string) {
     if (!slug) return;
-    setRetrying((prev) => new Set(prev).add(jobId));
+    setBusy(setRetrying, jobId, true);
+    setActionError((prev) => ({ ...prev, [jobId]: '' }));
     try {
       await api.retrySchedule(slug, jobId);
       reload();
     } catch (e) {
-      console.error(e);
+      setActionError((prev) => ({ ...prev, [jobId]: e instanceof Error ? e.message : '重新排入失敗' }));
     } finally {
-      setRetrying((prev) => {
-        const next = new Set(prev);
-        next.delete(jobId);
-        return next;
-      });
+      setBusy(setRetrying, jobId, false);
     }
   }
 
@@ -179,7 +254,7 @@ export function Schedule() {
     <div>
       <PageHeader
         title={`${brand.name} 行程表`}
-        subtitle="預設時段可在「發文時段」調整；單篇 queued／已排定／失敗可貼文改時間。Threads 待審請到工作台批准。"
+        subtitle="點卡片可改文案、標籤與發文時間；也可取消排程拉回工作台重審或重新產圖。"
         actions={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Link to={`/${brand.slug}/posting-times`} style={{ textDecoration: 'none' }}>
@@ -221,6 +296,7 @@ export function Schedule() {
                 {dayItems.map((item) => {
                   const isOpen = expanded.has(item.id);
                   const time = itemTime(item).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+                  const canEdit = ['queued', 'scheduled', 'failed'].includes(item.status);
                   return (
                     <Card
                       key={item.id}
@@ -260,7 +336,7 @@ export function Schedule() {
                         </p>
                       )}
                       {isOpen && (
-                        <div style={{ marginTop: 8, borderTop: '1px solid var(--color-border)', paddingTop: 8 }}>
+                        <div style={{ marginTop: 8, borderTop: '1px solid var(--color-border)', paddingTop: 8 }} onClick={(e) => e.stopPropagation()}>
                           {item.contentStatus && (
                             <div style={{ marginBottom: 6 }}>
                               <Badge tone="default">內容狀態:{contentStatusLabel[item.contentStatus] ?? item.contentStatus}</Badge>
@@ -275,41 +351,84 @@ export function Schedule() {
                           {item.imageUrl && (
                             <img src={item.imageUrl} alt="配圖" style={{ width: '100%', borderRadius: 8, marginBottom: 6 }} />
                           )}
-                          {item.body && (
-                            <p style={{ fontSize: 12, whiteSpace: 'pre-wrap', lineHeight: 1.6, wordBreak: 'break-word' }}>
-                              {item.body}
-                            </p>
-                          )}
-                          {!!item.hashtags?.length && (
-                            <p style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 6, wordBreak: 'break-word' }}>
-                              {item.hashtags.map((h) => (h.startsWith('#') ? h : `#${h}`)).join(' ')}
-                            </p>
-                          )}
-                          {['queued', 'scheduled', 'failed'].includes(item.status) && (
-                            <div style={{ marginTop: 8, display: 'grid', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                          {canEdit ? (
+                            <div style={{ display: 'grid', gap: 6 }}>
+                              <label style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
+                                標題
+                                <input
+                                  value={draftOf(item).title}
+                                  onChange={(e) => patchDraft(item.id, item, { title: e.target.value })}
+                                  style={fieldStyle}
+                                />
+                              </label>
+                              <label style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
+                                文案
+                                <textarea
+                                  rows={8}
+                                  value={draftOf(item).body}
+                                  onChange={(e) => patchDraft(item.id, item, { body: e.target.value })}
+                                  style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.6 }}
+                                />
+                              </label>
+                              <label style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
+                                Hashtags
+                                <input
+                                  value={draftOf(item).hashtags}
+                                  onChange={(e) => patchDraft(item.id, item, { hashtags: e.target.value })}
+                                  placeholder="#標籤 用空白隔開"
+                                  style={fieldStyle}
+                                />
+                              </label>
+                              <button
+                                onClick={() => void handleSaveCopy(item.id)}
+                                disabled={saving.has(item.id)}
+                                style={actionBtnStyle}
+                              >
+                                {saving.has(item.id) ? '儲存中…' : '儲存文案'}
+                              </button>
                               <label style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
                                 改發文時間
                                 <input
                                   type="datetime-local"
                                   value={rescheduleAt[item.id] ?? toLocalInput(item.scheduledAt)}
                                   onChange={(e) => setRescheduleAt((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                  style={{
-                                    display: 'block', width: '100%', marginTop: 4, padding: '6px 8px',
-                                    borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 12,
-                                  }}
+                                  style={fieldStyle}
                                 />
                               </label>
                               <button
-                                onClick={() => handleReschedule(item.id)}
+                                onClick={() => void handleReschedule(item.id)}
                                 disabled={rescheduling.has(item.id)}
-                                style={{
-                                  padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                                  border: '1px solid var(--color-border)', background: 'var(--color-bg-soft)', cursor: 'pointer',
-                                }}
+                                style={actionBtnStyle}
                               >
                                 {rescheduling.has(item.id) ? '改時間中…' : '儲存發文時間'}
                               </button>
+                              <button
+                                onClick={() => void handleUnschedule(item.id)}
+                                disabled={unscheduling.has(item.id)}
+                                style={{ ...actionBtnStyle, color: '#B85454' }}
+                              >
+                                {unscheduling.has(item.id) ? '取消中…' : '取消排程，拉回工作台'}
+                              </button>
+                              <Link to={`/${brand.slug}/contents`} style={{ fontSize: 12, fontWeight: 600 }}>
+                                去工作台重審 / 重新產圖 →
+                              </Link>
                             </div>
+                          ) : (
+                            <>
+                              {item.body && (
+                                <p style={{ fontSize: 12, whiteSpace: 'pre-wrap', lineHeight: 1.6, wordBreak: 'break-word' }}>
+                                  {item.body}
+                                </p>
+                              )}
+                              {!!item.hashtags?.length && (
+                                <p style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 6, wordBreak: 'break-word' }}>
+                                  {item.hashtags.map((h) => (h.startsWith('#') ? h : `#${h}`)).join(' ')}
+                                </p>
+                              )}
+                            </>
+                          )}
+                          {actionError[item.id] && (
+                            <p style={{ fontSize: 11.5, color: '#B85454', marginTop: 6 }}>{actionError[item.id]}</p>
                           )}
                           {item.status === 'failed' && (
                             <div style={{ marginTop: 8 }}>
@@ -319,12 +438,9 @@ export function Schedule() {
                                 </p>
                               )}
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleRetry(item.id); }}
+                                onClick={() => void handleRetry(item.id)}
                                 disabled={retrying.has(item.id)}
-                                style={{
-                                  marginTop: 6, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                                  border: '1px solid var(--color-border)', background: 'var(--color-bg-soft)', cursor: 'pointer',
-                                }}
+                                style={{ ...actionBtnStyle, marginTop: 6 }}
                               >
                                 {retrying.has(item.id) ? '重新排入中…' : '重新排入發布'}
                               </button>
@@ -337,7 +453,6 @@ export function Schedule() {
                                   href={item.externalPostId}
                                   target="_blank"
                                   rel="noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
                                   style={{ fontSize: 12 }}
                                 >
                                   查看貼文 ↗

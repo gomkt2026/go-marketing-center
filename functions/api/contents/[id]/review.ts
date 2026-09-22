@@ -14,6 +14,7 @@ const STATUS_MAP: Record<string, string> = {
   regenerate: 'needs_revision',
   return: 'needs_revision',
   postpone: 'draft',
+  unschedule: 'pending_review',
 };
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -54,10 +55,17 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       versionId = vRes.rows[0]?.id ?? null;
     }
 
+    const reviewAction = body.action === 'unschedule' ? 'return' : body.action;
     const reviewRes = await client.query(
       `INSERT INTO content_reviews (content_id, content_version_id, reviewer_id, action, comment)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [contentId, versionId, auth.id, body.action, body.comment ?? ''],
+      [
+        contentId,
+        versionId,
+        auth.id,
+        reviewAction,
+        body.comment ?? (body.action === 'unschedule' ? '拉回工作台待審' : ''),
+      ],
     );
 
     const nextStatus = STATUS_MAP[body.action] ?? content.status;
@@ -65,6 +73,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       'UPDATE contents SET status = $1, updated_at = now() WHERE id = $2',
       [nextStatus, contentId],
     );
+
+    if (!['scheduled', 'published', 'approved'].includes(nextStatus)) {
+      await client.query(
+        `UPDATE publishing_jobs SET status = 'cancelled', updated_at = now()
+         WHERE content_id = $1 AND status IN ('queued', 'scheduled', 'failed')`,
+        [contentId],
+      );
+    }
 
     await client.query('COMMIT');
 

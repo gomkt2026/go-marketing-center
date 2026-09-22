@@ -23,6 +23,7 @@ const statusLabel: Record<ContentStatus, string> = {
 
 const QUEUE_TABS = [
   { id: 'pending_review', label: '待審閱' },
+  { id: 'scheduled', label: '排程中' },
   { id: 'draft', label: '草稿' },
   { id: 'needs_revision', label: '修改中' },
   { id: 'approved', label: '已批准' },
@@ -135,13 +136,14 @@ export function ContentCenter() {
     : inTab.filter((c) => c.targetPlatform === platform);
   const selected = filtered.find((c) => c.id === selectedId) ?? filtered[0];
 
-  async function review(action: 'approve' | 'modify' | 'return' | 'postpone' | 'reject') {
+  async function review(action: 'approve' | 'modify' | 'return' | 'postpone' | 'reject' | 'unschedule') {
     if (!selected) return;
+    if (action === 'unschedule' && !window.confirm('確定取消排程？文案會回到待審，不會自動發出。')) return;
     const version = latestVersion(selected);
     await api.reviewContent(selected.id, {
       action,
       contentVersionId: version?.id,
-      comment: action === 'approve' ? '核准發布' : '',
+      comment: action === 'approve' ? '核准發布' : action === 'unschedule' ? '拉回工作台待審' : '',
     });
     reload();
   }
@@ -237,7 +239,7 @@ export function ContentCenter() {
     <div>
       <PageHeader
         title={`${brand.name} 工作台`}
-        subtitle="FB / IG / Threads / 官網都在這裡審：批准、修改、退回、重新生成、延期、否決"
+        subtitle="FB / IG / Threads / 官網都在這裡審：批准、修改、退回、重新生成、延期、否決。已排程也可拉回重改。"
         actions={
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <Button variant="primary" disabled={seoGenerating} onClick={() => void generateSeo()}>
@@ -261,7 +263,11 @@ export function ContentCenter() {
           <Tabs
             tabs={QUEUE_TABS.map((t) => ({ ...t, label: `${t.label} ${items.filter((c) => c.status === t.id || (t.id === 'approved' && c.status === 'published')).length}` }))}
             active={tab}
-            onChange={(id) => { setTab(id); setSelectedId(null); }}
+            onChange={(id) => {
+              setTab(id);
+              const next = items.filter((c) => c.status === id || (id === 'approved' && c.status === 'published'));
+              setSelectedId(next[0]?.id ?? null);
+            }}
           />
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '10px 16px 12px', borderTop: '1px solid var(--color-border)' }}>
@@ -562,14 +568,29 @@ export function ContentCenter() {
                 )}
 
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
-                  <Button variant="primary" onClick={() => void review('approve')}>✓ 批准</Button>
-                  <Button variant="ghost" onClick={() => void review('modify')}>✎ 修改</Button>
-                  <Button variant="secondary" onClick={() => void review('return')}>↩ 退回</Button>
-                  <Button variant="secondary" disabled={regenerating} onClick={() => void regenerate()}>
-                    {regenerating ? '⏳ AI 生成中...' : '🔄 重新生成'}
-                  </Button>
-                  <Button variant="ghost" onClick={() => void review('postpone')}>⏰ 延期</Button>
-                  <Button variant="danger" onClick={() => void review('reject')}>✗ 否決</Button>
+                  {selected.status === 'scheduled' ? (
+                    <>
+                      <Button variant="ghost" onClick={() => void review('unschedule')}>↩ 拉回待審</Button>
+                      <Button variant="secondary" disabled={regenerating} onClick={() => void regenerate()}>
+                        {regenerating ? '⏳ AI 生成中...' : '🔄 重新生成'}
+                      </Button>
+                      <Button variant="danger" onClick={() => void review('reject')}>✗ 否決</Button>
+                      <Link to={`/${brand.slug}/schedule`} style={{ fontSize: 13, fontWeight: 700, alignSelf: 'center' }}>
+                        去行程表改時間／文案 →
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="primary" onClick={() => void review('approve')}>✓ 批准</Button>
+                      <Button variant="ghost" onClick={() => void review('modify')}>✎ 修改</Button>
+                      <Button variant="secondary" onClick={() => void review('return')}>↩ 退回</Button>
+                      <Button variant="secondary" disabled={regenerating} onClick={() => void regenerate()}>
+                        {regenerating ? '⏳ AI 生成中...' : '🔄 重新生成'}
+                      </Button>
+                      <Button variant="ghost" onClick={() => void review('postpone')}>⏰ 延期</Button>
+                      <Button variant="danger" onClick={() => void review('reject')}>✗ 否決</Button>
+                    </>
+                  )}
                 </div>
               </Card>
             </motion.div>

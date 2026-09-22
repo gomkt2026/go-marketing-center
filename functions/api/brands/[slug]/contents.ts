@@ -4,7 +4,7 @@ import { requireAuth } from '../../../_shared/auth';
 import { getSql } from '../../../_shared/db';
 import { getBrandBySlug } from '../../../_shared/queries';
 import { rowsToCamel } from '../../../_shared/case';
-import { json, error } from '../../../_shared/response';
+import { json, error, failLoad } from '../../../_shared/response';
 
 const LIST_STATUSES = ['draft', 'pending_review', 'needs_revision', 'approved', 'rejected', 'scheduled', 'published', 'archived'] as const;
 
@@ -17,6 +17,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const slug = context.params.slug as string;
+  try {
   const brand = await getBrandBySlug(context.env, slug);
   if (!brand) return error('Brand not found', 404);
 
@@ -106,4 +107,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
 
   return json({ contents, counts, platformCounts });
+  } catch (e) {
+    return failLoad('contents', e);
+  }
 };

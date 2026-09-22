@@ -3,7 +3,8 @@ import type { Env } from '../../../_shared/env';
 import { requireAuth } from '../../../_shared/auth';
 import { getSql } from '../../../_shared/db';
 import { getBrandBySlug } from '../../../_shared/queries';
-import { json, error } from '../../../_shared/response';
+import { json, error, failLoad } from '../../../_shared/response';
+import { cacheGet, cacheSet, cacheKeys } from '../../../_shared/cache';
 import { toPressCoverage } from '../../../_shared/press';
 import { listBrandPostingSlots } from '../../../_shared/posting-slots';
 import { slotAtToday } from '../../../_shared/threads-slots';
@@ -33,6 +34,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const slug = context.params.slug as string;
+  try {
+    const cached = await cacheGet<Record<string, unknown>>(context.env, cacheKeys.workspace(slug));
+    if (cached) return json(cached);
+
   const brand = await getBrandBySlug(context.env, slug);
   if (!brand) return error('Brand not found', 404);
 
@@ -190,7 +195,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const publishedMonth = monthDaily.reduce((n, r) => n + r.published, 0);
   const failedMonth = monthDaily.reduce((n, r) => n + r.failed, 0);
 
-  return json({
+  const payload = {
     stats: {
       activeCampaigns: Number(bundle.active_campaigns ?? 0),
       pendingContents: pendingCount,
@@ -255,5 +260,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       description: h.description,
     })),
     pressCoverages: (coverages as Record<string, unknown>[]).map(toPressCoverage),
-  });
+  };
+    await cacheSet(context.env, cacheKeys.workspace(slug), payload, 15);
+    return json(payload);
+  } catch (e) {
+    return failLoad('workspace', e);
+  }
 };

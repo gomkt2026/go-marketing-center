@@ -5,7 +5,7 @@ import { getSql } from '../../../_shared/db';
 import { getBrandBySlug } from '../../../_shared/queries';
 import { logActivity } from '../../../_shared/activity';
 import { rowsToCamel } from '../../../_shared/case';
-import { json, error } from '../../../_shared/response';
+import { json, error, failLoad } from '../../../_shared/response';
 
 function parseHashtags(raw: unknown): string[] | undefined {
   if (raw === undefined) return undefined;
@@ -28,6 +28,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const slug = context.params.slug as string;
+  try {
   const brand = await getBrandBySlug(context.env, slug);
   if (!brand) return error('Brand not found', 404);
 
@@ -72,6 +73,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   `;
 
   return json({ items: rowsToCamel(rows as Record<string, unknown>[]), from, to });
+  } catch (e) {
+    return failLoad('schedule', e);
+  }
 };
 
 // 重新排入發布:把失敗的排程重設回 scheduled + 排定時間為現在,讓下一個 tick 的 publishDueJobs 重試

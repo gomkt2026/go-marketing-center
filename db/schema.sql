@@ -794,10 +794,15 @@ CREATE TABLE contents (
   title             TEXT,
   status            content_status NOT NULL DEFAULT 'draft',
   generated_by_agent_id UUID REFERENCES ai_agents(id),
+  generation_prompt_meta JSONB NOT NULL DEFAULT '{}',
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_contents_brand ON contents(brand_id, status);
+CREATE INDEX idx_contents_brand_updated ON contents(brand_id, updated_at DESC);
+CREATE INDEX idx_contents_brand_platform ON contents(brand_id, target_platform);
+CREATE INDEX idx_contents_slot_at ON contents ((generation_prompt_meta->>'slotAt'))
+  WHERE generation_prompt_meta ? 'slotAt';
 CREATE INDEX idx_contents_campaign ON contents(campaign_id);
 CREATE TRIGGER trg_contents_updated_at BEFORE UPDATE ON contents
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -826,6 +831,7 @@ CREATE TABLE content_assets (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_content_assets_version ON content_assets(content_version_id);
+CREATE INDEX idx_content_assets_version_type ON content_assets(content_version_id, asset_type);
 
 -- 管理者最終審閱紀錄(人工審閱,可多輪)
 CREATE TABLE content_reviews (
@@ -958,6 +964,7 @@ CREATE TABLE publishing_logs (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_publishing_logs_job ON publishing_logs(publishing_job_id);
+CREATE INDEX idx_publishing_logs_job_created ON publishing_logs(publishing_job_id, created_at DESC);
 
 -- ============================================================================
 -- Performance Tracking(成效追蹤)
@@ -1013,6 +1020,7 @@ CREATE TABLE activity_logs (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_activity_logs_brand ON activity_logs(brand_id, created_at DESC);
+CREATE INDEX idx_activity_logs_brand_action ON activity_logs(brand_id, action, created_at DESC);
 CREATE INDEX idx_activity_logs_entity ON activity_logs(entity_type, entity_id);
 CREATE INDEX idx_activity_logs_created ON activity_logs(created_at DESC);
 

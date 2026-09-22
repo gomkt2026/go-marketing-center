@@ -3,7 +3,12 @@
 # secrets:wrangler secret put DATABASE_URL / OPENAI_API_KEY / LINE_OPS_CHANNEL_ACCESS_TOKEN
 name = "go-marketing-scheduler"
 main = "src/index.ts"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-09-22"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
 
 [triggers]
 # 每 3 小時第 15 分:蒐集熱門議題 → AI 篩選寫入 market_signals;同時回收近 28 天貼文 Insights 並產生成效學習建議
@@ -23,3 +28,21 @@ crons = ["15 */3 * * *", "45 * * * *", "*/30 * * * *", "30 18 * * *", "0 23 * * 
 [[r2_buckets]]
 binding = "MEDIA"
 bucket_name = "go-marketing-media"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "0571f06408cb41fa849c1df9b5cb3066"
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "286329edb5f24551b6684450d1eac8f8"
+
+[[queues.producers]]
+binding = "BRAND_JOBS"
+queue = "go-marketing-brand-jobs"
+
+[[queues.consumers]]
+queue = "go-marketing-brand-jobs"
+max_batch_size = 1
+max_concurrency = 4
+max_retries = 3

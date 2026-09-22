@@ -4,7 +4,7 @@ import { requireAuth, isSuperAdmin } from '../_shared/auth';
 import { getSql } from '../_shared/db';
 import { getBrandsForUser } from '../_shared/queries';
 import { rowsToCamel } from '../_shared/case';
-import { json } from '../_shared/response';
+import { json, failLoad } from '../_shared/response';
 import { ACTION_LABELS } from '../_shared/activity';
 import { latestSeoAuditsByBrand } from '../_shared/seo-audit';
 
@@ -12,6 +12,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
 
+  try {
   const sql = getSql(context.env);
   const [brands, pendingProposals, pendingContents, marketSignals, activityRows, campaignStats, seoAudits, jobStats, weekRows, perf7] = await Promise.all([
     getBrandsForUser(context.env, auth),
@@ -42,6 +43,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       FROM publishing_jobs pj
       JOIN contents c ON c.id = pj.content_id
       WHERE c.brand_id IS NOT NULL
+        AND (
+          pj.published_at >= now() - interval '7 days'
+          OR pj.updated_at >= now() - interval '7 days'
+        )
       GROUP BY c.brand_id
     `.catch(() => []),
     sql`
@@ -117,4 +122,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       failed: Number(r.failed),
     })),
   });
+  } catch (e) {
+    return failLoad('dashboard', e);
+  }
 };

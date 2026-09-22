@@ -4,6 +4,7 @@ import type { Env } from '../../../_shared/env';
 import { requireAuth } from '../../../_shared/auth';
 import { logActivity } from '../../../_shared/activity';
 import { json, error } from '../../../_shared/response';
+import { getConnectionString } from '../../../_shared/db';
 
 neonConfig.fetchConnectionCache = true;
 
@@ -30,7 +31,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return error('Invalid action', 400);
   }
 
-  const pool = new Pool({ connectionString: context.env.DATABASE_URL });
+  const pool = new Pool({ connectionString: getConnectionString(context.env) });
   const client = await pool.connect();
 
   try {

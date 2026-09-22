@@ -1,5 +1,6 @@
-import type { ScheduledController, ExecutionContext } from '@cloudflare/workers-types';
+import type { ScheduledController, ExecutionContext, MessageBatch } from '@cloudflare/workers-types';
 import type { Env } from '../../../functions/_shared/env';
+import { enqueueBrandJobs, type BrandJobMessage } from '../../../functions/_shared/brand-jobs';
 import { getSql } from '../../../functions/_shared/db';
 import { chatCompleteJson } from '../../../functions/_shared/openai';
 import {
@@ -1046,6 +1047,68 @@ function slotDateFor(hourTW: number): Date {
   return new Date(slotUtcMs);
 }
 
+async function handleBrandJob(env: Env, job: BrandJobMessage): Promise<void> {
+  switch (job.kind) {
+    case 'generate_threads':
+      await generateThreadsSlot(env, new Date(job.slotAt), {
+        slugs: [job.slug], ignoreInterval: true, onlyMissing: true,
+        slotKind: job.slotKind && isThreadsSlotKind(job.slotKind) ? job.slotKind : undefined,
+      });
+      return;
+    case 'generate_offtopic':
+      await generateThreadsOfftopicSlot(env, new Date(job.slotAt), {
+        slugs: [job.slug], onlyMissing: true,
+        slotKind: job.slotKind && isThreadsSlotKind(job.slotKind) ? job.slotKind : undefined,
+      });
+      return;
+    case 'generate_theme': {
+      let brandId = job.brandId;
+      let name = job.name;
+      if (!brandId) {
+        const sql = getSql(env);
+        const rows = await sql`SELECT id, name FROM brands WHERE slug = ${job.slug} AND is_active = true LIMIT 1`;
+        if (!rows.length) return;
+        brandId = (rows[0] as { id: string }).id;
+        name = (rows[0] as { name: string }).name;
+      }
+      await generateDailyThemeForBrand(env, {
+        id: brandId, slug: job.slug, name, theme_count: 0,
+      }, new Date(job.slotAt), job.platforms);
+      return;
+    }
+    case 'catchup_brand': {
+      const threadsFilled = await catchupMissingThreadsSlots(env, [job.slug], 1);
+      if (!threadsFilled) {
+        await fillMissingDailyThemePlatforms(env, [job.slug], {
+          maxPlatforms: 1, onlyAutoPublish: true,
+        });
+      }
+      return;
+    }
+    case 'reply_round':
+      await processBrandReplyRound(env, {
+        brandId: job.brandId, brandSlug: job.slug, brandName: job.name, mode: 'cron',
+      });
+      return;
+    case 'publish':
+      await publishDueJobs(env);
+      return;
+  }
+}
+
+async function runBrandJobs(env: Env, jobs: BrandJobMessage[]): Promise<void> {
+  if (!jobs.length) return;
+  const queued = await enqueueBrandJobs(env, jobs);
+  if (queued) return;
+  for (const job of jobs) {
+    try {
+      await handleBrandJob(env, job);
+    } catch (e) {
+      console.error(`[brand-jobs] ${job.kind} 失敗`, e);
+    }
+  }
+}
+
 async function halfHourlyDispatch(env: Env): Promise<void> {
   const twHour = (new Date().getUTCHours() + 8) % 24;
   const minute = new Date().getUTCMinutes();
@@ -1053,8 +1116,9 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
   const configured = await listAllPostingSlots(env, { enabledOnly: true });
   const themeHours = new Set(configured.filter((s) => s.slotKind === 'daily_theme').map((s) => s.hourTw));
   if (!themeHours.size) themeHours.add(DAILY_THEME_HOUR_TW);
+  const jobs: BrandJobMessage[] = [];
 
-  // 生成階段:提前 1 小時,在整點 tick 幫「下一個時段」把內容生成好存 scheduled
+  // 生成階段:提前 1 小時,每個品牌各 enqueue 一則,避免單 tick 串行產圖逾時
   if (isTopOfHour) {
     const genHour = (twHour + GENERATION_LEAD_HOURS) % 24;
     const slotAt = slotDateFor(genHour);
@@ -1062,9 +1126,48 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
     const needHourly = due.some((s) => isHourlyFamily(s.slotKind)) || (!configured.length && THREADS_POST_HOURS_TW.includes(genHour));
     const needOfftopic = due.some((s) => isOfftopicFamily(s.slotKind)) || (!configured.length && THREADS_OFFTOPIC_HOURS_TW.includes(genHour));
     const needTheme = due.some((s) => s.slotKind === 'daily_theme') || (!configured.length && genHour === DAILY_THEME_HOUR_TW);
-    if (needHourly) await generateThreadsSlot(env, slotAt);
-    if (needOfftopic) await generateThreadsOfftopicSlot(env, slotAt);
-    if (needTheme) await generateDailyTheme(env, slotAt);
+    const autoSlugs = due.length ? [...new Set(due.map((s) => s.brandSlug))] : await listAutoPostSlugs(env);
+
+    if (needHourly) {
+      const slugs = due.filter((s) => isHourlyFamily(s.slotKind)).map((s) => s.brandSlug);
+      for (const slug of (slugs.length ? [...new Set(slugs)] : autoSlugs)) {
+        const slot = due.find((s) => s.brandSlug === slug && isHourlyFamily(s.slotKind));
+        jobs.push({ kind: 'generate_threads', slug, slotAt: slotAt.toISOString(), slotKind: slot?.slotKind });
+      }
+    }
+    if (needOfftopic) {
+      const slugs = due.filter((s) => isOfftopicFamily(s.slotKind)).map((s) => s.brandSlug);
+      for (const slug of (slugs.length ? [...new Set(slugs)] : autoSlugs)) {
+        const slot = due.find((s) => s.brandSlug === slug && isOfftopicFamily(s.slotKind));
+        jobs.push({ kind: 'generate_offtopic', slug, slotAt: slotAt.toISOString(), slotKind: slot?.slotKind });
+      }
+    }
+    if (needTheme) {
+      const themeDue = due.filter((s) => s.slotKind === 'daily_theme' && (s.platform === 'facebook' || s.platform === 'instagram'));
+      const byBrand = new Map<string, { brandId: string; slug: string; platforms: Array<'facebook' | 'instagram'> }>();
+      for (const slot of themeDue) {
+        const cur = byBrand.get(slot.brandId) ?? { brandId: slot.brandId, slug: slot.brandSlug, platforms: [] };
+        if (slot.platform === 'facebook' || slot.platform === 'instagram') {
+          if (!cur.platforms.includes(slot.platform)) cur.platforms.push(slot.platform);
+        }
+        byBrand.set(slot.brandId, cur);
+      }
+      if (!byBrand.size) {
+        for (const slug of autoSlugs) {
+          jobs.push({
+            kind: 'generate_theme', brandId: '', slug, name: slug,
+            slotAt: slotAt.toISOString(), platforms: ['facebook', 'instagram'],
+          });
+        }
+      } else {
+        for (const row of byBrand.values()) {
+          jobs.push({
+            kind: 'generate_theme', brandId: row.brandId, slug: row.slug, name: row.slug,
+            slotAt: slotAt.toISOString(), platforms: row.platforms,
+          });
+        }
+      }
+    }
     if (genHour === ECOSYSTEM_CROSS_PROMO_HOUR_TW && ECOSYSTEM_CROSS_PROMO_DAYS_TW.includes(weekdayTW(slotAt))) {
       await generateEcosystemCrossPromo(env, slotAt);
     }
@@ -1073,44 +1176,37 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
     }
   }
 
-  // 每個 tick 先救卡住的 job、補「有內容沒單」;半點 tick 再補漏檔,
-  // 避開整點生成搶時間(單一 tick 產圖逾時後,下一輪半點會把缺的品牌補上)
   await recoverStuckPublishingJobs(env);
   await ensureAutoPublishJobs(env);
   const heavyThemeTick = isTopOfHour && themeHours.has((twHour + GENERATION_LEAD_HOURS) % 24);
   if (!heavyThemeTick) {
     try {
       const autoSlugs = await listAutoPostSlugs(env);
-      const threadsFilled = await catchupMissingThreadsSlots(env, autoSlugs, 1);
-      if (!threadsFilled) {
-        await fillMissingDailyThemePlatforms(
-          env,
-          autoSlugs,
-          { maxPlatforms: 1, onlyAutoPublish: true },
-        );
-      }
+      for (const slug of autoSlugs) jobs.push({ kind: 'catchup_brand', slug });
     } catch (e) {
-      console.error('[catchup] 補檔失敗,仍繼續發布到期排程', e);
+      console.error('[catchup] 列品牌失敗,仍繼續發布到期排程', e);
     }
   }
 
-  // X access token 僅 2 小時效期,每個 30 分鐘 tick 都順手檢查一次(SQL 已篩選快到期才動作)
-  // Threads 回覆輪放在發布前面,避免 publishDueJobs 逾時把回覆掃文吃掉
   if (!(twHour >= 2 && twHour < 6) && !isTopOfHour) {
-    await threadsReplyRound(env);
+    const sql = getSql(env);
+    const brands = await sql`
+      SELECT b.id, b.slug, b.name
+      FROM brands b
+      WHERE b.is_active = true
+      ORDER BY b.slug
+    `;
+    for (const brand of brands as { id: string; slug: string; name: string }[]) {
+      jobs.push({ kind: 'reply_round', brandId: brand.id, slug: brand.slug, name: brand.name });
+    }
   }
 
   await refreshXTokens(env);
-
-  // 近 48 小時失敗的 Threads 每次只重試 1 則,避免半點一次塞 3 則被 Meta 擋
   await requeueRecentFailedThreads(env);
-
-  // Threads 到期仍待審且開了 auto_publish → 當安全網補單,再交給 publishDueJobs
   await promoteDueThreadsSafetyNet(env);
-
-  // 發布階段:每個 tick 都檢查有沒有已經到期的排程要真正發出去(呼叫平台 API)
-  await publishDueJobs(env);
+  jobs.push({ kind: 'publish' });
   await notifyPendingReviewDigest(env);
+  await runBrandJobs(env, jobs);
 }
 
 // ============================================================================
@@ -1353,6 +1449,18 @@ async function cleanupOldMedia(env: Env): Promise<void> {
 }
 
 export default {
+  async queue(batch: MessageBatch<BrandJobMessage>, env: Env): Promise<void> {
+    for (const msg of batch.messages) {
+      try {
+        await handleBrandJob(env, msg.body);
+        msg.ack();
+      } catch (e) {
+        console.error(`[brand-jobs] ${msg.body.kind} 失敗`, e);
+        msg.retry();
+      }
+    }
+  },
+
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     switch (controller.cron) {
       case '15 */3 * * *':

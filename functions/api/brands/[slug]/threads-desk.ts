@@ -4,7 +4,7 @@ import { requireAuth } from '../../../_shared/auth';
 import { getSql } from '../../../_shared/db';
 import { getBrandBySlug } from '../../../_shared/queries';
 import { rowsToCamel } from '../../../_shared/case';
-import { json, error } from '../../../_shared/response';
+import { json, error, failLoad } from '../../../_shared/response';
 import { logActivity } from '../../../_shared/activity';
 import { getThreadsAccount } from '../../../_shared/threads';
 import {
@@ -16,7 +16,11 @@ import {
   slotLabel, slotAtToday, hourTWFromIso,
   generateThreadsDeskSlot,
 } from '../../../_shared/threads-slots';
-import { listBrandThreadHours, sourceForBrandHour } from '../../../_shared/posting-slots';
+import {
+  listBrandPostingSlots, listBrandThreadHours,
+  threadHoursFromSlots, sourceFromSlots,
+} from '../../../_shared/posting-slots';
+import { cacheGet, cacheSet, cacheKeys, invalidateBrandHotCache } from '../../../_shared/cache';
 
 const GEN_CATEGORY_LABEL: Record<string, string> = {
   seasonal_trend: '時事跟風',
@@ -74,179 +78,194 @@ interface DeskAction {
   autoPublish?: boolean;
 }
 
+type DeskAccount = {
+  auto_reply?: boolean; auto_publish?: boolean;
+  reply_daily_cap?: number; reply_hourly_cap?: number;
+  access_token_enc?: string | null; status?: string; account_name?: string | null;
+};
+
+async function loadThreadsAccount(env: Env, brandId: string): Promise<DeskAccount> {
+  const sql = getSql(env);
+  try {
+    const accRows = await sql`
+      SELECT auto_reply, auto_publish, reply_daily_cap, reply_hourly_cap, access_token_enc, status, account_name
+      FROM brand_social_accounts
+      WHERE brand_id = ${brandId}::uuid AND platform = 'threads'
+      LIMIT 1
+    `;
+    return (accRows[0] ?? {}) as DeskAccount;
+  } catch {
+    const accRows = await sql`
+      SELECT auto_reply, auto_publish, reply_daily_cap, access_token_enc, status, account_name
+      FROM brand_social_accounts
+      WHERE brand_id = ${brandId}::uuid AND platform = 'threads'
+      LIMIT 1
+    `;
+    return (accRows[0] ?? {}) as DeskAccount;
+  }
+}
+
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
 
   const slug = context.params.slug as string;
-  const brand = await getBrandBySlug(context.env, slug);
-  if (!brand) return error('Brand not found', 404);
+  try {
+    const cached = await cacheGet<Record<string, unknown>>(context.env, cacheKeys.desk(slug));
+    if (cached) return json(cached);
 
-  const sql = getSql(context.env);
-  const dayStart = slotAtToday(0);
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    const brand = await getBrandBySlug(context.env, slug);
+    if (!brand) return error('Brand not found', 404);
 
-  const contentRows = await sql`
-    SELECT c.id, c.title, c.status, c.predicted_engagement_score, c.generation_prompt_meta,
-           v.id AS version_id, v.body, v.hashtags,
-           a.file_url AS image_url,
-           pj.id AS job_id, pj.status AS job_status, pj.scheduled_at, pj.published_at, pj.external_post_id,
-           lg.detail AS last_log_detail
-    FROM contents c
-    LEFT JOIN LATERAL (
-      SELECT id, body, hashtags FROM content_versions
-      WHERE content_id = c.id ORDER BY version_number DESC LIMIT 1
-    ) v ON true
-    LEFT JOIN LATERAL (
-      SELECT file_url FROM content_assets
-      WHERE content_version_id = v.id AND asset_type = 'image' LIMIT 1
-    ) a ON true
-    LEFT JOIN LATERAL (
-      SELECT id, status, scheduled_at, published_at, external_post_id
-      FROM publishing_jobs
-      WHERE content_id = c.id AND status != 'cancelled'
-      ORDER BY created_at DESC LIMIT 1
-    ) pj ON true
-    LEFT JOIN LATERAL (
-      SELECT detail FROM publishing_logs
-      WHERE publishing_job_id = pj.id ORDER BY created_at DESC LIMIT 1
-    ) lg ON true
-    WHERE c.brand_id = ${brand.id}::uuid
-      AND c.target_platform = 'threads'
-      AND c.generation_prompt_meta->>'source' LIKE 'threads_%'
-      AND (c.generation_prompt_meta->>'slotAt')::timestamptz >= ${dayStart.toISOString()}::timestamptz
-      AND (c.generation_prompt_meta->>'slotAt')::timestamptz < ${dayEnd.toISOString()}::timestamptz
-    ORDER BY (c.generation_prompt_meta->>'slotAt')::timestamptz ASC, c.created_at DESC
-  `;
+    const sql = getSql(context.env);
+    const dayStart = slotAtToday(0);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  const byHour = new Map<number, Record<string, unknown>>();
-  for (const raw of contentRows as Record<string, unknown>[]) {
-    const meta = asMeta(raw.generation_prompt_meta);
-    const slotAt = metaString(meta, 'slotAt');
-    if (!slotAt) continue;
-    const hour = hourTWFromIso(slotAt);
-    if (!byHour.has(hour)) byHour.set(hour, raw);
-  }
+    const [contentRows, postingSlots, replyRows, quota, acc, lastScan] = await Promise.all([
+      sql`
+        SELECT c.id, c.title, c.status, c.predicted_engagement_score, c.generation_prompt_meta,
+               v.id AS version_id, v.body, v.hashtags,
+               a.file_url AS image_url,
+               pj.id AS job_id, pj.status AS job_status, pj.scheduled_at, pj.published_at, pj.external_post_id,
+               lg.detail AS last_log_detail
+        FROM contents c
+        LEFT JOIN LATERAL (
+          SELECT id, body, hashtags FROM content_versions
+          WHERE content_id = c.id ORDER BY version_number DESC LIMIT 1
+        ) v ON true
+        LEFT JOIN LATERAL (
+          SELECT file_url FROM content_assets
+          WHERE content_version_id = v.id AND asset_type = 'image' LIMIT 1
+        ) a ON true
+        LEFT JOIN LATERAL (
+          SELECT id, status, scheduled_at, published_at, external_post_id
+          FROM publishing_jobs
+          WHERE content_id = c.id AND status != 'cancelled'
+          ORDER BY created_at DESC LIMIT 1
+        ) pj ON true
+        LEFT JOIN LATERAL (
+          SELECT detail FROM publishing_logs
+          WHERE publishing_job_id = pj.id ORDER BY created_at DESC LIMIT 1
+        ) lg ON true
+        WHERE c.brand_id = ${brand.id}::uuid
+          AND c.target_platform = 'threads'
+          AND c.generation_prompt_meta->>'source' LIKE 'threads_%'
+          AND (c.generation_prompt_meta->>'slotAt')::timestamptz >= ${dayStart.toISOString()}::timestamptz
+          AND (c.generation_prompt_meta->>'slotAt')::timestamptz < ${dayEnd.toISOString()}::timestamptz
+        ORDER BY (c.generation_prompt_meta->>'slotAt')::timestamptz ASC, c.created_at DESC
+      `,
+      listBrandPostingSlots(context.env, brand.id),
+      sql`
+        SELECT * FROM threads_reply_targets
+        WHERE brand_id = ${brand.id}::uuid AND status = 'pending'
+        ORDER BY created_at DESC LIMIT 20
+      `,
+      getReplyQuotaState(context.env, brand.id),
+      loadThreadsAccount(context.env, brand.id),
+      getLatestReplyScan(context.env, brand.id),
+    ]);
 
-  const deskHours = await listBrandThreadHours(context.env, brand.id);
-  const slots = [];
-  for (const hour of deskHours) {
-    const kind = await sourceForBrandHour(context.env, brand.id, hour);
-    const source = kind;
-    const slotAt = slotAtToday(hour).toISOString();
-    const row = byHour.get(hour);
-    if (!row) {
+    const byHour = new Map<number, Record<string, unknown>>();
+    for (const raw of contentRows as Record<string, unknown>[]) {
+      const meta = asMeta(raw.generation_prompt_meta);
+      const slotAt = metaString(meta, 'slotAt');
+      if (!slotAt) continue;
+      const hour = hourTWFromIso(slotAt);
+      if (!byHour.has(hour)) byHour.set(hour, raw);
+    }
+
+    const deskHours = threadHoursFromSlots(postingSlots);
+    const slots = [];
+    for (const hour of deskHours) {
+      const source = sourceFromSlots(postingSlots, hour);
+      const slotAt = slotAtToday(hour).toISOString();
+      const row = byHour.get(hour);
+      if (!row) {
+        slots.push({
+          hour,
+          source,
+          slotAt,
+          label: slotLabel(source, hour),
+          categoryLabel: null,
+          contentId: null,
+          title: null,
+          status: null,
+          skipped: false,
+          body: null,
+          replyBody: null,
+          hashtags: null,
+          imageUrl: null,
+          predictedEngagementScore: null,
+          jobId: null,
+          jobStatus: null,
+          scheduledAt: null,
+          publishedAt: null,
+          externalPostId: null,
+          lastLogDetail: null,
+        });
+        continue;
+      }
+      const meta = asMeta(row.generation_prompt_meta);
+      const category = metaString(meta, 'category');
       slots.push({
         hour,
         source,
-        slotAt,
+        slotAt: metaString(meta, 'slotAt') ?? slotAt,
         label: slotLabel(source, hour),
-        categoryLabel: null,
-        contentId: null,
-        title: null,
-        status: null,
-        skipped: false,
-        body: null,
-        replyBody: null,
-        hashtags: null,
-        imageUrl: null,
-        predictedEngagementScore: null,
-        jobId: null,
-        jobStatus: null,
-        scheduledAt: null,
-        publishedAt: null,
-        externalPostId: null,
-        lastLogDetail: null,
+        categoryLabel: category ? (GEN_CATEGORY_LABEL[category] ?? category) : null,
+        contentId: row.id,
+        title: row.title ?? null,
+        status: row.status ?? null,
+        skipped: isSkipped(meta) || row.status === 'rejected',
+        body: row.body ?? null,
+        replyBody: metaString(meta, 'replyBody'),
+        hashtags: row.hashtags ?? null,
+        imageUrl: row.image_url ?? null,
+        predictedEngagementScore: row.predicted_engagement_score ?? null,
+        jobId: row.job_id ?? null,
+        jobStatus: row.job_status ?? null,
+        scheduledAt: row.scheduled_at ?? null,
+        publishedAt: row.published_at ?? null,
+        externalPostId: row.external_post_id ?? null,
+        lastLogDetail: row.last_log_detail ?? null,
       });
-      continue;
     }
-    const meta = asMeta(row.generation_prompt_meta);
-    const category = metaString(meta, 'category');
-    slots.push({
-      hour,
-      source,
-      slotAt: metaString(meta, 'slotAt') ?? slotAt,
-      label: slotLabel(source, hour),
-      categoryLabel: category ? (GEN_CATEGORY_LABEL[category] ?? category) : null,
-      contentId: row.id,
-      title: row.title ?? null,
-      status: row.status ?? null,
-      skipped: isSkipped(meta) || row.status === 'rejected',
-      body: row.body ?? null,
-      replyBody: metaString(meta, 'replyBody'),
-      hashtags: row.hashtags ?? null,
-      imageUrl: row.image_url ?? null,
-      predictedEngagementScore: row.predicted_engagement_score ?? null,
-      jobId: row.job_id ?? null,
-      jobStatus: row.job_status ?? null,
-      scheduledAt: row.scheduled_at ?? null,
-      publishedAt: row.published_at ?? null,
-      externalPostId: row.external_post_id ?? null,
-      lastLogDetail: row.last_log_detail ?? null,
+
+    const hasThreadsAccount = !!acc.access_token_enc && acc.status !== 'error';
+    const canSearchPublic = lastScan?.canSearchPublic ?? null;
+    const blockReason = autoReplyBlockReason({
+      hasAccount: hasThreadsAccount,
+      canSearchPublic,
+      failedRecent: quota.failedRecent,
     });
+
+    const pendingCount = slots.filter((s) => s.contentId && !s.skipped && (s.status === 'pending_review' || s.status === 'approved')).length;
+    const scheduledCount = slots.filter((s) => s.jobStatus === 'scheduled').length;
+
+    const payload = {
+      date: dayStart.toISOString(),
+      slots,
+      replies: rowsToCamel(replyRows as Record<string, unknown>[]),
+      autoPublish: !!acc.auto_publish,
+      autoReply: !!acc.auto_reply,
+      hasThreadsAccount,
+      threadsUsername: acc.account_name ?? null,
+      accountStatus: acc.status ?? null,
+      replied1h: quota.replied1h,
+      replied24h: quota.replied24h,
+      replyHourlyCap: clampReplyHourlyCap(acc.reply_hourly_cap),
+      replyDailyCap: clampReplyDailyCap(acc.reply_daily_cap),
+      canSearchPublic,
+      autoReplyReady: hasThreadsAccount && canSearchPublic === true && quota.failedRecent === 0,
+      blockReason,
+      pendingCount,
+      scheduledCount,
+    };
+    await cacheSet(context.env, cacheKeys.desk(slug), payload, 15);
+    return json(payload);
+  } catch (e) {
+    return failLoad('threads-desk', e);
   }
-
-  const replyRows = await sql`
-    SELECT * FROM threads_reply_targets
-    WHERE brand_id = ${brand.id}::uuid AND status = 'pending'
-    ORDER BY created_at DESC LIMIT 20
-  `;
-
-  const quota = await getReplyQuotaState(context.env, brand.id);
-  let acc: {
-    auto_reply?: boolean; auto_publish?: boolean;
-    reply_daily_cap?: number; reply_hourly_cap?: number;
-    access_token_enc?: string | null; status?: string; account_name?: string | null;
-  } = {};
-  try {
-    const accRows = await sql`
-      SELECT auto_reply, auto_publish, reply_daily_cap, reply_hourly_cap, access_token_enc, status, account_name
-      FROM brand_social_accounts
-      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads'
-      LIMIT 1
-    `;
-    acc = (accRows[0] ?? {}) as typeof acc;
-  } catch {
-    const accRows = await sql`
-      SELECT auto_reply, auto_publish, reply_daily_cap, access_token_enc, status, account_name
-      FROM brand_social_accounts
-      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads'
-      LIMIT 1
-    `;
-    acc = (accRows[0] ?? {}) as typeof acc;
-  }
-
-  const lastScan = await getLatestReplyScan(context.env, brand.id);
-  const hasThreadsAccount = !!acc.access_token_enc && acc.status !== 'error';
-  const canSearchPublic = lastScan?.canSearchPublic ?? null;
-  const blockReason = autoReplyBlockReason({
-    hasAccount: hasThreadsAccount,
-    canSearchPublic,
-    failedRecent: quota.failedRecent,
-  });
-
-  const pendingCount = slots.filter((s) => s.contentId && !s.skipped && (s.status === 'pending_review' || s.status === 'approved')).length;
-  const scheduledCount = slots.filter((s) => s.jobStatus === 'scheduled').length;
-
-  return json({
-    date: dayStart.toISOString(),
-    slots,
-    replies: rowsToCamel(replyRows as Record<string, unknown>[]),
-    autoPublish: !!acc.auto_publish,
-    autoReply: !!acc.auto_reply,
-    hasThreadsAccount,
-    threadsUsername: acc.account_name ?? null,
-    accountStatus: acc.status ?? null,
-    replied1h: quota.replied1h,
-    replied24h: quota.replied24h,
-    replyHourlyCap: clampReplyHourlyCap(acc.reply_hourly_cap),
-    replyDailyCap: clampReplyDailyCap(acc.reply_daily_cap),
-    canSearchPublic,
-    autoReplyReady: hasThreadsAccount && canSearchPublic === true && quota.failedRecent === 0,
-    blockReason,
-    pendingCount,
-    scheduledCount,
-  });
 };
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -262,6 +281,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!action) return error('action is required', 400);
 
   const sql = getSql(context.env);
+  const ok = async (payload: Record<string, unknown>) => {
+    await invalidateBrandHotCache(context.env, slug, brand.id);
+    return json(payload);
+  };
 
   if (action === 'generate_slot') {
     const hour = Number(body.hour);
@@ -282,7 +305,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       entityId: result.generated[0].contentId,
       afterState: { source: 'threads_desk', hour },
     });
-    return json({ ok: true, status: 'generated', contentId: result.generated[0].contentId });
+    return ok({ ok: true, status: 'generated', contentId: result.generated[0].contentId });
   }
 
   if (action === 'set_auto_reply') {
@@ -301,7 +324,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       action: 'social_account.updated', entityType: 'brand_social_account', entityId: accountId,
       afterState: { platform: 'threads', autoReply: body.autoReply },
     });
-    return json({
+    return ok({
       ok: true,
       status: body.autoReply ? 'auto_reply_on' : 'auto_reply_off',
       detail: body.autoReply
@@ -327,7 +350,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       action: 'social_account.updated', entityType: 'brand_social_account', entityId: accountId,
       afterState: { platform: 'threads', autoPublish: body.autoPublish },
     });
-    return json({
+    return ok({
       ok: true,
       status: body.autoPublish ? 'auto_publish_on' : 'auto_publish_off',
       detail: body.autoPublish
@@ -344,7 +367,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       brandName: brand.name,
       mode: 'manual',
     });
-    return json({
+    return ok({
       ok: result.ok || result.queued > 0 || result.published > 0,
       status: result.status,
       detail: result.detail,
@@ -373,7 +396,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         brandId: brand.id, actorType: 'user', actorUserId: auth.id,
         action: 'threads_reply.skipped', entityType: 'threads_reply_target', entityId: target.id,
       });
-      return json({ ok: true, status: 'skipped' });
+      return ok({ ok: true, status: 'skipped' });
     }
 
     const account = await getThreadsAccount(context.env, brand.id);
@@ -392,7 +415,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       replyTextOverride: body.replyText?.trim() || undefined,
     });
     if (!published.ok) return error(published.error ?? '發布失敗', 500);
-    return json({ ok: true, status: 'replied', permalink: published.replyPermalink ?? null });
+    return ok({ ok: true, status: 'replied', permalink: published.replyPermalink ?? null });
   }
 
   if (!body.contentId) return error('需要 contentId', 400);
@@ -433,7 +456,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       action: 'content.reviewed', entityType: 'content', entityId: content.id,
       afterState: { source: 'threads_desk', edited: true },
     });
-    return json({ ok: true, status: 'saved' });
+    return ok({ ok: true, status: 'saved' });
   }
 
   if (action === 'skip') {
@@ -453,7 +476,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       action: 'content.rejected', entityType: 'content', entityId: content.id,
       afterState: { source: 'threads_desk', skipped: true },
     });
-    return json({ ok: true, status: 'skipped' });
+    return ok({ ok: true, status: 'skipped' });
   }
 
   if (action === 'cancel') {
@@ -473,7 +496,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       action: 'content.reviewed', entityType: 'content', entityId: content.id,
       afterState: { source: 'threads_desk', cancelled: true },
     });
-    return json({ ok: true, status: 'cancelled' });
+    return ok({ ok: true, status: 'cancelled' });
   }
 
   if (action === 'retry') {
@@ -495,7 +518,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       VALUES (${jobId}::uuid, 'retried', '工作台重新排入發布')
     `;
     await sql`UPDATE contents SET status = 'scheduled', updated_at = now() WHERE id = ${content.id}::uuid`;
-    return json({ ok: true, status: 'scheduled' });
+    return ok({ ok: true, status: 'scheduled' });
   }
 
   if (action === 'approve' || action === 'publish_now') {
@@ -522,7 +545,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         WHERE id = ${job.id}::uuid
       `;
       await sql`UPDATE contents SET status = 'scheduled', updated_at = now() WHERE id = ${content.id}::uuid`;
-      return json({ ok: true, status: 'scheduled', jobId: job.id, when: 'now' });
+      return ok({ ok: true, status: 'scheduled', jobId: job.id, when: 'now' });
     }
 
     const slotIso = metaString(meta, 'slotAt');
@@ -543,7 +566,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       action: 'content.approved_for_publish', entityType: 'content', entityId: content.id,
       afterState: { jobId, when: when.toISOString(), source: 'threads_desk' },
     });
-    return json({ ok: true, status: 'scheduled', jobId, when: when.toISOString() });
+    return ok({ ok: true, status: 'scheduled', jobId, when: when.toISOString() });
   }
 
   return error('未知的 action', 400);

@@ -1,6 +1,11 @@
 name = "go-marketing-center"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-09-22"
+compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "dist"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
 
 # ADMIN_USERNAME / ADMIN_PASSWORD / FIXERCOWORK_USERNAME / FIXERCOWORK_PASSWORD
 # / DATABASE_URL / OPENAI_API_KEY / LINE_NETWORK_CHANNEL_SECRET
@@ -17,3 +22,11 @@ pages_build_output_dir = "dist"
 [[r2_buckets]]
 binding = "MEDIA"
 bucket_name = "go-marketing-media"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "0571f06408cb41fa849c1df9b5cb3066"
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "286329edb5f24551b6684450d1eac8f8"

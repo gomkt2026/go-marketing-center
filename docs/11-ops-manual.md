@@ -6,8 +6,10 @@
 Browser (React SPA)
     ↓ /api/*
 Cloudflare Pages Functions (functions/)
-    ↓ @neondatabase/serverless
-Neon PostgreSQL
+    ↓ Hyperdrive（有 binding）或 Neon HTTP fallback
+Neon PostgreSQL（Launch、關閉 scale-to-zero）
+    ↑
+go-marketing-scheduler → Queues（每品牌一則）→ 同一顆 Neon
 ```
 
 ## 環境變數
@@ -98,4 +100,30 @@ npm run dev
 ## 已知限制
 
 - AI 會議/提案內容仍來自 seed 資料，非即時 AI 生成
-- Neon Free tier 有連線數與 compute 時間限制
+
+## 效能升級（Workers Paid + Neon Launch + Hyperdrive）
+
+3 品牌就出現空 500 時，先套熱路徑索引，再開付費方案拿掉免費上限。
+
+### Cloudflare（約 USD $5／月）
+
+1. Dashboard → **Workers & Pages → Plans** 開 **Workers Paid**（Pages Functions 與 `go-marketing-scheduler` 共用）。
+2. KV `CACHE` 已建立：`0571f06408cb41fa849c1df9b5cb3066`（兩份 wrangler 已綁定）。
+3. Queue `go-marketing-brand-jobs` 已建立（scheduler 已宣告 producer/consumer）。
+4. Hyperdrive `go-marketing-neon` 已建立：`286329edb5f24551b6684450d1eac8f8`（連 Neon direct host）。部署 Pages 與 scheduler 後才會生效。
+5. 部署後用超級管理員打 `GET /api/admin/perf-status` 確認 `hyperdrive` / `kvCache` / `brandJobsQueue`。
+6. 套索引：`POST /api/admin/migrate-hotpath-indexes`（含 054 的 publishing_jobs 時間索引）。
+
+### Neon Launch（約 USD $20–40／月）
+
+1. Neon Console → org 升 **Launch**（不必先上 Scale）。
+2. Project → Compute：**關閉 scale-to-zero**。
+3. min **0.25–0.5 CU**，autoscale 上限 **2 CU**。
+4. 區域維持靠近台灣（例如 `ap-southeast-1`）。
+5. Hyperdrive 用 **direct** 連線字串；`DATABASE_URL` secret 可暫時留 `-pooler` 當 fallback。
+
+### 驗證
+
+- TaskGo Threads 工作台、品牌工作區、行程表、內容列表首屏應在數秒內出現。
+- Cloudflare Observability 看 threads-desk / workspace p95 與 5xx。
+- Neon Monitoring：不應再有每次閒置後的冷啟動。

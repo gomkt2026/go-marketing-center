@@ -1,7 +1,14 @@
-import type { R2Bucket } from '@cloudflare/workers-types';
+import type { Hyperdrive, KVNamespace, Queue, R2Bucket } from '@cloudflare/workers-types';
+import type { BrandJobMessage } from './brand-jobs';
 
 export interface Env {
   DATABASE_URL: string;
+  /** Hyperdrive 連 Neon direct host；有 binding 時優先於 DATABASE_URL */
+  HYPERDRIVE?: Hyperdrive;
+  /** 熱路徑短 TTL 快取（workspace / desk / slots / brands） */
+  CACHE?: KVNamespace;
+  /** scheduler 每品牌一則的產稿／發布佇列 */
+  BRAND_JOBS?: Queue<BrandJobMessage>;
   ADMIN_USERNAME: string;
   ADMIN_PASSWORD: string;
   /** FIXERCOWORK 品牌限定登入(明文比對,僅存伺服器端) */

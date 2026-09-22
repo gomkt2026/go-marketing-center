@@ -1,5 +1,6 @@
 import type { Env } from './env';
 import { getSql } from './db';
+import { cacheGet, cacheSet, cacheDelete, cacheKeys, invalidateBrandHotCache } from './cache';
 
 export type PostingSlotPlatform = 'facebook' | 'instagram' | 'threads';
 export type PostingSlotKind =
@@ -309,6 +310,8 @@ export async function listAllPostingSlots(env: Env, opts?: { enabledOnly?: boole
 }
 
 export async function listBrandPostingSlots(env: Env, brandId: string): Promise<PostingSlot[]> {
+  const cached = await cacheGet<PostingSlot[]>(env, cacheKeys.slots(brandId));
+  if (cached) return cached;
   const sql = getSql(env);
   try {
     const rows = await sql`
@@ -318,7 +321,9 @@ export async function listBrandPostingSlots(env: Env, brandId: string): Promise<
       WHERE s.brand_id = ${brandId}::uuid
       ORDER BY s.platform, s.hour_tw
     `;
-    return (rows as Record<string, unknown>[]).map(mapSlotRow);
+    const mapped = (rows as Record<string, unknown>[]).map(mapSlotRow);
+    await cacheSet(env, cacheKeys.slots(brandId), mapped, 30);
+    return mapped;
   } catch (e) {
     if (!isMissingSlots(e)) throw e;
     try {
@@ -340,11 +345,20 @@ export async function listEnabledSlotsAtHour(
   return slots.filter((s) => s.hourTw === hourTw && (!kind || s.slotKind === kind));
 }
 
-export async function listBrandThreadHours(env: Env, brandId: string): Promise<number[]> {
-  const slots = (await listBrandPostingSlots(env, brandId))
-    .filter((s) => s.platform === 'threads' && s.enabled);
-  const hours = [...new Set(slots.map((s) => s.hourTw))].sort((a, b) => a - b);
+export function threadHoursFromSlots(slots: PostingSlot[]): number[] {
+  const hours = [...new Set(slots.filter((s) => s.platform === 'threads' && s.enabled).map((s) => s.hourTw))]
+    .sort((a, b) => a - b);
   return hours.length ? hours : [0, 6, 9, 12, 18, 21];
+}
+
+export function sourceFromSlots(slots: PostingSlot[], hourTw: number): PostingSlotKind {
+  const hit = slots.find((s) => s.platform === 'threads' && s.enabled && s.hourTw === hourTw);
+  if (hit) return hit.slotKind;
+  return hourTw === 9 || hourTw === 21 ? 'threads_offtopic' : 'threads_hourly';
+}
+
+export async function listBrandThreadHours(env: Env, brandId: string): Promise<number[]> {
+  return threadHoursFromSlots(await listBrandPostingSlots(env, brandId));
 }
 
 export async function sourceForBrandHour(
@@ -352,10 +366,7 @@ export async function sourceForBrandHour(
   brandId: string,
   hourTw: number,
 ): Promise<PostingSlotKind> {
-  const slots = await listBrandPostingSlots(env, brandId);
-  const hit = slots.find((s) => s.platform === 'threads' && s.enabled && s.hourTw === hourTw);
-  if (hit) return hit.slotKind;
-  return hourTw === 9 || hourTw === 21 ? 'threads_offtopic' : 'threads_hourly';
+  return sourceFromSlots(await listBrandPostingSlots(env, brandId), hourTw);
 }
 
 export async function countSlotsByBrand(
@@ -442,7 +453,9 @@ export async function replaceBrandPostingSlots(
     }
   }
 
+  await cacheDelete(env, cacheKeys.slots(brandId));
   const slots = await listBrandPostingSlots(env, brandId);
+  if (slots[0]?.brandSlug) await invalidateBrandHotCache(env, slots[0].brandSlug, brandId);
   const summary = summarizeFrequency(slots);
   await sql`
     UPDATE brand_channels

@@ -7,9 +7,14 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+const DEFAULT_TIMEOUT_MS = 25_000;
+const WORKSPACE_TIMEOUT_MS = 40_000;
+
+type RequestOpts = RequestInit & { timeoutMs?: number; retryOn5xx?: boolean };
+
+async function requestOnce<T>(path: string, init: RequestOpts | undefined, timeoutMs: number): Promise<T> {
   const ctrl = new AbortController();
-  const timer = window.setTimeout(() => ctrl.abort(), 25_000);
+  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(path, {
       credentials: 'include',
@@ -20,7 +25,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = (data as { error?: string }).error
-        || (res.status >= 500 ? `伺服器忙碌（${res.status}），請再試一次` : res.statusText)
+        || (res.status >= 500 ? `伺服器錯誤（${res.status}），請再試一次` : res.statusText)
         || `請求失敗（${res.status}）`;
       throw new ApiError(res.status, msg);
     }
@@ -33,6 +38,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw e;
   } finally {
     window.clearTimeout(timer);
+  }
+}
+
+async function request<T>(path: string, init?: RequestOpts): Promise<T> {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const timeoutMs = init?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const retry = init?.retryOn5xx ?? method === 'GET';
+  try {
+    return await requestOnce<T>(path, init, timeoutMs);
+  } catch (e) {
+    if (retry && e instanceof ApiError && e.status >= 500) {
+      return requestOnce<T>(path, init, timeoutMs);
+    }
+    throw e;
   }
 }
 
@@ -306,7 +325,9 @@ export const api = {
     }),
 
   brandWorkspace: (slug: string) =>
-    request<import('@/types').BrandWorkspacePayload>(`/api/brands/${slug}/workspace`),
+    request<import('@/types').BrandWorkspacePayload>(`/api/brands/${slug}/workspace`, {
+      timeoutMs: WORKSPACE_TIMEOUT_MS,
+    }),
 
   createPressCoverage: (slug: string, body: {
     outlet: string; headline: string; articleUrl?: string; publishedOn?: string;
@@ -340,6 +361,17 @@ export const api = {
     request<{ ok: boolean; steps: string[] }>('/api/admin/migrate-press', {
       method: 'POST', body: JSON.stringify({}),
     }),
+
+  migrateHotpathIndexes: () =>
+    request<{ ok: boolean; indexes: string[] }>('/api/admin/migrate-hotpath-indexes', {
+      method: 'POST', body: JSON.stringify({}),
+    }),
+
+  perfStatus: () =>
+    request<{
+      hyperdrive: boolean; kvCache: boolean; brandJobsQueue: boolean; databaseUrl: boolean;
+      notes: Record<string, string>;
+    }>('/api/admin/perf-status'),
 
   listBrandDocuments: (slug: string) =>
     request<{ documents: import('@/types').BrandDocument[] }>(`/api/brands/${slug}/documents`),
@@ -472,7 +504,7 @@ export const api = {
       contents: import('@/types').ContentListItem[];
       counts?: Record<string, number>;
       platformCounts?: Record<string, number>;
-    }>(`/api/brands/${slug}/contents${suffix}`);
+    }>(`/api/brands/${slug}/contents${suffix}`, { timeoutMs: WORKSPACE_TIMEOUT_MS });
   },
 
   contentDetail: (contentId: string) =>
@@ -531,6 +563,7 @@ export const api = {
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return request<{ items: import('@/types').ScheduleItem[]; from: string; to: string }>(
       `/api/brands/${slug}/schedule${suffix}`,
+      { timeoutMs: WORKSPACE_TIMEOUT_MS },
     );
   },
 
@@ -652,7 +685,7 @@ export const api = {
         impressions7d?: number;
       }[];
       weekSeries?: Array<{ label: string; published: number; failed: number }>;
-    }>('/api/dashboard'),
+    }>('/api/dashboard', { timeoutMs: WORKSPACE_TIMEOUT_MS }),
 
   proposals: () =>
     request<{ proposals: import('@/types').Proposal[]; decisions: import('@/types').Decision[] }>('/api/proposals'),
@@ -868,7 +901,9 @@ export const api = {
     ),
 
   threadsDesk: (slug: string) =>
-    request<import('@/types').ThreadsDeskData>(`/api/brands/${slug}/threads-desk`),
+    request<import('@/types').ThreadsDeskData>(`/api/brands/${slug}/threads-desk`, {
+      timeoutMs: WORKSPACE_TIMEOUT_MS,
+    }),
 
   actThreadsDesk: (slug: string, body: {
     action: 'save' | 'approve' | 'publish_now' | 'skip' | 'cancel' | 'retry' | 'generate_slot'

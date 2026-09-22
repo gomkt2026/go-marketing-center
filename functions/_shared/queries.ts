@@ -3,6 +3,7 @@ import { getSql } from './db';
 import { rowsToCamel, rowToCamel } from './case';
 import { applyBrandWebsiteMigration, isMissingWebsiteColumn } from './brand-profile';
 import { applyWebsiteArticleMigration, isMissingWebsiteArticleSchema, ingestKeyFromEnv, defaultWebsiteDestination } from './website-articles';
+import { cacheGet, cacheSet, cacheDelete, cacheKeys } from './cache';
 
 export interface DbBrand {
   id: string;
@@ -79,14 +80,20 @@ export async function getBrandsForUser(env: Env, user: { role: string; brandIds:
 const BRAND_SLUG_TTL_MS = 60_000;
 const brandBySlugCache = new Map<string, { at: number; brand: ReturnType<typeof mapBrand> | null }>();
 
-export function invalidateBrandSlugCache(slug: string) {
+export function invalidateBrandSlugCache(slug: string, env?: Env) {
   brandBySlugCache.delete(slug);
+  if (env) void cacheDelete(env, cacheKeys.brand(slug));
 }
 
 export async function getBrandBySlug(env: Env, slug: string, opts?: { fresh?: boolean }) {
   if (!opts?.fresh) {
     const hit = brandBySlugCache.get(slug);
     if (hit && Date.now() - hit.at < BRAND_SLUG_TTL_MS) return hit.brand;
+    const cached = await cacheGet<ReturnType<typeof mapBrand>>(env, cacheKeys.brand(slug));
+    if (cached) {
+      brandBySlugCache.set(slug, { at: Date.now(), brand: cached });
+      return cached;
+    }
   }
 
   const sql = getSql(env);
@@ -119,6 +126,7 @@ export async function getBrandBySlug(env: Env, slug: string, opts?: { fresh?: bo
   }
   const brand = rows.length ? mapBrand(rows[0] as Record<string, unknown>, env) : null;
   brandBySlugCache.set(slug, { at: Date.now(), brand });
+  if (brand) await cacheSet(env, cacheKeys.brand(slug), brand, 60);
   return brand;
 }
 

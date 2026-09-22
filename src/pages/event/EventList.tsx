@@ -31,8 +31,7 @@ export function EventList() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
-  if (loading) return <LoadingState />;
-  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+  if (error && !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
 
   async function createEvent() {
     const title = window.prompt('活動名稱(例:小小洗衣師職人體驗營)');
@@ -70,8 +69,11 @@ export function EventList() {
         subtitle="建立或複製活動,產生報名連結與報到授權碼,追蹤名額、報到率與推薦人拆帳"
         actions={<Button variant="primary" disabled={creating} onClick={() => void createEvent()}>+ 建立活動</Button>}
       />
+      {loading && !data ? (
+        <LoadingState label="載入活動…" />
+      ) : (
       <div style={{ display: 'grid', gap: 14 }}>
-        {data.events.map((e) => (
+        {(data?.events ?? []).map((e) => (
           <Card key={e.id} hoverable>
             <div className="card-row">
               <Link to={`/${slug}/events/${e.id}`} style={{ textDecoration: 'none', color: 'inherit', flex: 1, minWidth: 0 }}>
@@ -96,8 +98,9 @@ export function EventList() {
             </div>
           </Card>
         ))}
-        {data.events.length === 0 && <Card><p>尚無活動,點擊右上角建立第一個活動報名頁</p></Card>}
+        {(data?.events ?? []).length === 0 && !loading && <Card><p>尚無活動,點擊右上角建立第一個活動報名頁</p></Card>}
       </div>
+      )}
       {copyFrom && slug && (
         <DuplicateEventDialog
           event={copyFrom}

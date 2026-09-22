@@ -450,8 +450,20 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  contents: (slug: string) =>
-    request<{ contents: import('@/types').Content[] }>(`/api/brands/${slug}/contents`),
+  contents: (slug: string, params?: { status?: string; platform?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set('status', params.status);
+    if (params?.platform && params.platform !== 'all') qs.set('platform', params.platform);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<{
+      contents: import('@/types').ContentListItem[];
+      counts?: Record<string, number>;
+      platformCounts?: Record<string, number>;
+    }>(`/api/brands/${slug}/contents${suffix}`);
+  },
+
+  contentDetail: (contentId: string) =>
+    request<{ content: import('@/types').Content }>(`/api/contents/${contentId}`),
 
   seoTopics: (slug: string) =>
     request<{

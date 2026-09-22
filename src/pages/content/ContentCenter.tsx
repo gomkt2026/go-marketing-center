@@ -10,7 +10,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
-import type { Content, ContentStatus } from '@/types';
+import type { Content, ContentListItem, ContentStatus } from '@/types';
 
 const statusTone: Record<ContentStatus, BadgeTone> = {
   draft: 'default', pending_review: 'accent', approved: 'primary', needs_revision: 'secondary',
@@ -49,7 +49,7 @@ const apiPublishLabel: Record<string, string> = {
   facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads', website: '官網',
 };
 
-function isWebsiteArticle(content: Content) {
+function isWebsiteArticle(content: { contentType?: string | null; targetPlatform?: string | null }) {
   return content.contentType === 'article' && (content.targetPlatform === 'website' || !content.targetPlatform);
 }
 
@@ -76,8 +76,12 @@ export function ContentCenter() {
   const brand = slug ? brandBySlug(slug) : undefined;
   const [tab, setTab] = useState('pending_review');
   const [platform, setPlatform] = useState('all');
-  const [items, setItems] = useState<Content[]>([]);
+  const [items, setItems] = useState<ContentListItem[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [platformCounts, setPlatformCounts] = useState<Record<string, number>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Content | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState<string | null>(null);
   const [publishMessage, setPublishMessage] = useState<string | null>(null);
@@ -86,24 +90,42 @@ export function ContentCenter() {
   const [seoGenerating, setSeoGenerating] = useState(false);
   const [seoError, setSeoError] = useState<string | null>(null);
 
-  const { data, loading, error, reload } = useAsyncData(
-    () => slug ? api.contents(slug) : Promise.reject(new Error('no slug')),
-    [slug],
+  const { data, error, reload } = useAsyncData(
+    () => slug ? api.contents(slug, { status: tab, platform }) : Promise.reject(new Error('no slug')),
+    [slug, tab, platform],
   );
 
   useEffect(() => {
-    let cancelled = false;
-    if (data?.contents) {
-      if (!cancelled) {
-        setItems(data.contents);
-        setSelectedId((prev) => {
-          if (prev && data.contents.some((c) => c.id === prev)) return prev;
-          return data.contents.find((c) => c.status === 'pending_review')?.id ?? data.contents[0]?.id ?? null;
-        });
-      }
+    if (!data) return;
+    if (data.counts) setCounts(data.counts);
+    if (data.platformCounts) setPlatformCounts(data.platformCounts);
+    setItems(data.contents);
+    setSelectedId((prev) => {
+      if (prev && data.contents.some((c) => c.id === prev)) return prev;
+      return data.contents[0]?.id ?? null;
+    });
+  }, [data]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setSelected(null);
+      return;
     }
+    let cancelled = false;
+    setDetailLoading(true);
+    api.contentDetail(selectedId).then((res) => {
+      if (!cancelled) {
+        setSelected(res.content);
+        setDetailLoading(false);
+      }
+    }).catch((e) => {
+      if (!cancelled) {
+        setDetailLoading(false);
+        setRegenError(e instanceof Error ? e.message : '載入內容失敗');
+      }
+    });
     return () => { cancelled = true; };
-  }, [data?.contents]);
+  }, [selectedId]);
 
   useEffect(() => {
     if (!slug) return;
@@ -120,21 +142,7 @@ export function ContentCenter() {
   }, [slug]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
-  if (error && !data) return <ErrorState message={error} onRetry={reload} />;
-  if (!data) {
-    return (
-      <div>
-        <PageHeader title={`${brand.name} 工作台`} subtitle="正在載入待審內容…" />
-        <LoadingState label="載入工作台…" />
-      </div>
-    );
-  }
-
-  const inTab = items.filter((c) => c.status === tab || (tab === 'approved' && c.status === 'published'));
-  const filtered = platform === 'all' ? inTab
-    : platform === 'seo' ? inTab.filter((c) => isWebsiteArticle(c))
-    : inTab.filter((c) => c.targetPlatform === platform);
-  const selected = filtered.find((c) => c.id === selectedId) ?? filtered[0];
+  if (error && !data && items.length === 0) return <ErrorState message={error} onRetry={reload} />;
 
   async function review(action: 'approve' | 'modify' | 'return' | 'postpone' | 'reject' | 'unschedule') {
     if (!selected) return;
@@ -146,6 +154,8 @@ export function ContentCenter() {
       comment: action === 'approve' ? '核准發布' : action === 'unschedule' ? '拉回工作台待審' : '',
     });
     reload();
+    const res = await api.contentDetail(selected.id);
+    setSelected(res.content);
   }
 
   async function copyBody() {
@@ -222,12 +232,15 @@ export function ContentCenter() {
 
   async function regenerate() {
     if (!selected || regenerating) return;
+    if (selected.status === 'scheduled' && !window.confirm('重新生成會取消這則排程，新稿會回到待審。確定？')) return;
     const instruction = window.prompt('要給 AI 的修改方向?(可留空直接換角度重寫)') ?? undefined;
     setRegenerating(true);
     setRegenError(null);
     try {
       await api.regenerateContent(selected.id, instruction ? { instruction } : undefined);
       reload();
+      const res = await api.contentDetail(selected.id);
+      setSelected(res.content);
     } catch (e) {
       setRegenError(e instanceof Error ? e.message : '重新生成失敗');
     } finally {
@@ -261,20 +274,14 @@ export function ContentCenter() {
       <Card style={{ padding: 0, marginBottom: 16 }}>
         <div style={{ padding: '4px 16px 0' }}>
           <Tabs
-            tabs={QUEUE_TABS.map((t) => ({ ...t, label: `${t.label} ${items.filter((c) => c.status === t.id || (t.id === 'approved' && c.status === 'published')).length}` }))}
+            tabs={QUEUE_TABS.map((t) => ({ ...t, label: `${t.label} ${counts[t.id] ?? 0}` }))}
             active={tab}
-            onChange={(id) => {
-              setTab(id);
-              const next = items.filter((c) => c.status === id || (id === 'approved' && c.status === 'published'));
-              setSelectedId(next[0]?.id ?? null);
-            }}
+            onChange={(id) => { setTab(id); setSelectedId(null); }}
           />
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '10px 16px 12px', borderTop: '1px solid var(--color-border)' }}>
           {PLATFORM_FILTERS.map((p) => {
-            const count = p.id === 'all' ? inTab.length
-              : p.id === 'seo' ? inTab.filter((c) => isWebsiteArticle(c)).length
-              : inTab.filter((c) => c.targetPlatform === p.id).length;
+            const count = platformCounts[p.id] ?? 0;
             const active = platform === p.id;
             return (
               <button
@@ -297,12 +304,12 @@ export function ContentCenter() {
 
       <div className="grid-split">
         <div className="content-queue">
-          {filtered.map((c) => (
+          {items.map((c) => (
             <button
               key={c.id}
               onClick={() => setSelectedId(c.id)}
               style={{
-                textAlign: 'left', border: c.id === selected?.id ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                textAlign: 'left', border: c.id === selectedId ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
                 borderRadius: 10, padding: 10, background: 'var(--color-bg)', cursor: 'pointer',
               }}
             >
@@ -312,12 +319,15 @@ export function ContentCenter() {
                   {isWebsiteArticle(c) ? '官網' : (platformLabel[c.targetPlatform ?? ''] ?? c.targetPlatform ?? 'SEO')}
                 </Badge>
                 <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                  v{latestVersion(c)?.versionNumber ?? '-'}
+                  v{c.versionNumber ?? '-'}
                 </span>
               </div>
             </button>
           ))}
-          {filtered.length === 0 && (
+          {items.length === 0 && !data && (
+            <LoadingState label="載入列表…" />
+          )}
+          {items.length === 0 && data && (
             <div>
               <p style={{ fontSize: 13 }}>此分類目前沒有內容</p>
               {platform === 'seo' && seoTopics.length > 0 && (
@@ -344,7 +354,9 @@ export function ContentCenter() {
         </div>
 
         <AnimatePresence mode="wait">
-          {selected && latestVersion(selected) ? (
+          {detailLoading && !selected ? (
+            <Card><LoadingState label="載入這篇文案…" /></Card>
+          ) : selected && latestVersion(selected) ? (
             <motion.div
               key={selected.id}
               initial={{ opacity: 0, x: 30 }}

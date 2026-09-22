@@ -96,19 +96,30 @@ export function getSessionTokenFromRequest(request: Request): string | null {
   return match?.[1] ?? null;
 }
 
-async function loadBrandMemberships(env: Env, userId: string): Promise<{ brandIds: string[]; brandSlugs: string[] }> {
+function asStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  return [];
+}
+
+async function loadUserRowById(env: Env, userId: string): Promise<AuthUser | null> {
   const sql = getSql(env);
   const rows = await sql`
-    SELECT b.id, b.slug
-    FROM brand_members m
-    JOIN brands b ON b.id = m.brand_id
-    WHERE m.user_id = ${userId}::uuid AND b.is_active = true
-    ORDER BY b.name
+    SELECT u.id, u.email, u.display_name, u.role, u.avatar_url,
+           coalesce(array_agg(b.id) FILTER (WHERE b.id IS NOT NULL), '{}'::uuid[]) AS brand_ids,
+           coalesce(array_agg(b.slug) FILTER (WHERE b.slug IS NOT NULL), '{}'::text[]) AS brand_slugs
+    FROM users u
+    LEFT JOIN brand_members m ON m.user_id = u.id
+    LEFT JOIN brands b ON b.id = m.brand_id AND b.is_active = true
+    WHERE u.id = ${userId}::uuid AND u.is_active = true
+    GROUP BY u.id
+    LIMIT 1
   `;
-  return {
-    brandIds: (rows as { id: string }[]).map((r) => r.id),
-    brandSlugs: (rows as { slug: string }[]).map((r) => r.slug),
-  };
+  if (!rows.length) return null;
+  const row = rows[0] as Record<string, unknown>;
+  return mapUserRow(row, {
+    brandIds: asStringArray(row.brand_ids),
+    brandSlugs: asStringArray(row.brand_slugs),
+  });
 }
 
 function mapUserRow(row: Record<string, unknown>, memberships: { brandIds: string[]; brandSlugs: string[] }): AuthUser {
@@ -151,16 +162,7 @@ export async function getAuthUser(request: Request, env: Env): Promise<AuthUser 
   const session = await parseSessionToken(token, env);
   if (!session) return null;
 
-  const sql = getSql(env);
-  const rows = await sql`
-    SELECT id, email, display_name, role, avatar_url
-    FROM users
-    WHERE id = ${session.userId}::uuid AND is_active = true
-    LIMIT 1
-  `;
-  if (!rows.length) return null;
-  const memberships = await loadBrandMemberships(env, session.userId);
-  return mapUserRow(rows[0] as Record<string, unknown>, memberships);
+  return loadUserRowById(env, session.userId);
 }
 
 export async function requireAuth(request: Request, env: Env): Promise<AuthUser | Response> {
@@ -177,16 +179,13 @@ export async function requireAuth(request: Request, env: Env): Promise<AuthUser 
 export async function findAdminUser(env: Env): Promise<AuthUser | null> {
   const sql = getSql(env);
   const rows = await sql`
-    SELECT id, email, display_name, role, avatar_url
-    FROM users
+    SELECT id FROM users
     WHERE role = 'super_admin' AND is_active = true
     ORDER BY created_at ASC
     LIMIT 1
   `;
   if (!rows.length) return null;
-  const row = rows[0] as Record<string, unknown>;
-  const memberships = await loadBrandMemberships(env, row.id as string);
-  return mapUserRow(row, memberships);
+  return loadUserRowById(env, (rows[0] as { id: string }).id);
 }
 
 export async function findUserByUsername(env: Env, username: string): Promise<(AuthUser & { passwordHash: string }) | null> {
@@ -199,11 +198,9 @@ export async function findUserByUsername(env: Env, username: string): Promise<(A
   `;
   if (!rows.length) return null;
   const row = rows[0] as Record<string, unknown>;
-  const memberships = await loadBrandMemberships(env, row.id as string);
-  return {
-    ...mapUserRow(row, memberships),
-    passwordHash: row.password_hash as string,
-  };
+  const user = await loadUserRowById(env, row.id as string);
+  if (!user) return null;
+  return { ...user, passwordHash: row.password_hash as string };
 }
 
 export async function findUserByEmail(env: Env, email: string): Promise<AuthUser | null> {
@@ -215,9 +212,7 @@ export async function findUserByEmail(env: Env, email: string): Promise<AuthUser
     LIMIT 1
   `;
   if (!rows.length) return null;
-  const row = rows[0] as Record<string, unknown>;
-  const memberships = await loadBrandMemberships(env, row.id as string);
-  return mapUserRow(row, memberships);
+  return loadUserRowById(env, (rows[0] as { id: string }).id);
 }
 
 export { SESSION_MAX_AGE_SEC };

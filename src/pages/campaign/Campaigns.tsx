@@ -28,7 +28,7 @@ export function Campaigns() {
   const [creating, setCreating] = useState(false);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
-  if (loading || contentsQuery.loading) return <LoadingState />;
+  if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
 
   const allContents = contentsQuery.data?.contents ?? [];

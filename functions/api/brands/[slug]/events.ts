@@ -19,11 +19,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const sql = getSql(context.env);
   const rows = await sql`
-    SELECT e.*,
-      (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered')::int AS registration_count,
-      (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.checked_in_at IS NOT NULL)::int AS checked_in_count
+    SELECT e.id, e.slug, e.title, e.status, e.event_date, e.location, e.created_at,
+      COUNT(*) FILTER (WHERE r.status = 'registered')::int AS registration_count,
+      COUNT(*) FILTER (WHERE r.checked_in_at IS NOT NULL)::int AS checked_in_count
     FROM events e
+    LEFT JOIN event_registrations r ON r.event_id = e.id
     WHERE e.brand_id = ${brand.id}::uuid
+    GROUP BY e.id
     ORDER BY e.created_at DESC
   `;
 

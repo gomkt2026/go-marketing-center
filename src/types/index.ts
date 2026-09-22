@@ -550,6 +550,20 @@ export interface Content {
   reviews: ContentReviewAction[];
 }
 
+export interface ContentListItem {
+  id: string;
+  campaignId?: string | null;
+  title: string;
+  status: ContentStatus;
+  contentType: ContentType;
+  targetPlatform: PublishingPlatform | null;
+  updatedAt?: string;
+  versionId?: string | null;
+  versionNumber?: number | null;
+  hasImage?: boolean;
+  hasVideo?: boolean;
+}
+
 export type SocialAccountStatus = 'disconnected' | 'manual' | 'connected' | 'error';
 
 export interface SocialAccount {

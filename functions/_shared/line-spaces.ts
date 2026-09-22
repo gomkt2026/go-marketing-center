@@ -304,7 +304,7 @@ export async function bindLineSpace(env: Env, params: {
 export function parseSpaceBindCommand(text: string): { action: 'bind' | 'unbind'; brandKey: string | null } | null {
   const compact = text.replace(/\s+/g, '');
   if (/這個群解綁|解綁這個群/.test(compact)) return { action: 'unbind', brandKey: null };
-  const bind = text.match(/(?:這個群綁|綁這個群|這個群是)\s*([^\s]+)/i) || compact.match(/這個群綁(.+)/);
+  const bind = compact.match(/(?:這個群綁定?|綁定?這個群|這個群是)(.+)/i);
   if (!bind) return null;
   return { action: 'bind', brandKey: bind[1].trim() };
 }

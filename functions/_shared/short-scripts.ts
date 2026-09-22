@@ -575,7 +575,7 @@ export async function handleLineScriptIntake(env: Env, params: {
   const looks = looksLikeScript(params.text);
 
   if (params.needGroupBind && (uploadCmd || looks || session)) {
-    return [textMsg('這個群還沒指定品牌，管理員先回「這個群綁 Homigo」，我才會把腳本存進去。')];
+    return [textMsg('這個群還沒指定品牌，管理員先回「這個群綁定 Homigo」，我才會把腳本存進去。')];
   }
   if (!params.brand && (uploadCmd || looks || session)) {
     return [textMsg('這支要存到哪個品牌？請先在工作群綁品牌，或私訊時寫 Homigo／TaskGo／Washgo。')];

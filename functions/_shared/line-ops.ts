@@ -257,15 +257,19 @@ export function isGroupSource(source?: LineOpsSource): boolean {
     || Boolean(source?.groupId || source?.roomId);
 }
 
+const BOT_MENTION_RE = /[@＠]?\s*GO\s*行銷\s*機器人|[@＠]?\s*行銷機器人|[@＠]?\s*GO行銷/gi;
+
 export function botWasMentioned(text: string, mention?: LineMention): boolean {
-  if (mention?.mentionees?.some((m) => m.isSelf)) return true;
-  return /@?\s*(GO行銷機器人|行銷機器人|GO行銷)/i.test(text);
+  if (mention?.mentionees?.some((m) => m.isSelf || m.index === 0)) return true;
+  if (mention?.mentionees?.length) return true;
+  BOT_MENTION_RE.lastIndex = 0;
+  return BOT_MENTION_RE.test(text);
 }
 
 export function stripLineMention(text: string, mention?: LineMention): string {
   let next = text;
   const selves = (mention?.mentionees ?? [])
-    .filter((m) => m.isSelf && typeof m.index === 'number' && typeof m.length === 'number')
+    .filter((m) => (m.isSelf || m.index === 0) && typeof m.index === 'number' && typeof m.length === 'number')
     .sort((a, b) => (b.index ?? 0) - (a.index ?? 0));
   for (const m of selves) {
     const start = m.index ?? 0;
@@ -273,8 +277,8 @@ export function stripLineMention(text: string, mention?: LineMention): string {
     if (start >= 0 && end <= next.length) next = `${next.slice(0, start)}${next.slice(end)}`;
   }
   next = next
-    .replace(/@\s*(GO行銷機器人|行銷機器人|GO行銷)/gi, '')
-    .replace(/[\u200b\u200c\u200d\ufeff]/g, '')
+    .replace(BOT_MENTION_RE, '')
+    .replace(/[\u200b\u200c\u200d\ufeff\u00a0\u2060]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
   return next;
@@ -320,9 +324,9 @@ function qrItem(label: string, text: string) {
 function quickReplyItems(brands?: BrandRow[]) {
   if (brands && brands.length === 0) {
     return [
-      qrItem('綁 Homigo', '這個群綁 Homigo'),
-      qrItem('綁 TaskGo', '這個群綁 TaskGo'),
-      qrItem('綁 Washgo', '這個群綁 Washgo'),
+      qrItem('綁 Homigo', '這個群綁定 Homigo'),
+      qrItem('綁 TaskGo', '這個群綁定 TaskGo'),
+      qrItem('綁 Washgo', '這個群綁定 Washgo'),
       qrItem('指令集', '指令'),
     ];
   }
@@ -371,14 +375,14 @@ const MENU_JOIN = [
   '已加入這個群。請管理員先指定品牌，之後這個群就只看那一個品牌。',
   '',
   '已在 GO 行銷中心綁定 LINE 的管理員請回：',
-  '這個群綁 Homigo',
-  '這個群綁 TaskGo',
-  '這個群綁 Washgo',
+  '這個群綁定 Homigo',
+  '這個群綁定 TaskGo',
+  '這個群綁定 Washgo',
   '',
   '指定前我不會在這裡查成效、素材或腳本。',
 ].join('\n');
 const MENU_FOLLOW = '加好友成功。內部人員請先到設定頁產生綁定碼，傳「綁定 123456」。外包小編請在品牌工作群 @我，這個群只會看到該品牌。';
-const MENU_NEED_GROUP_BIND = '這個群還沒指定品牌，我不會在這裡查其他品牌的資料。管理員請回「這個群綁 Homigo」。';
+const MENU_NEED_GROUP_BIND = '這個群還沒指定品牌，我不會在這裡查其他品牌的資料。管理員請回「這個群綁定 Homigo」。';
 const MENU_NEED_USER_BIND = '請先到 GO 行銷中心設定頁產生綁定碼，傳「綁定 123456」。外包小編請走品牌工作群，不必私訊查其他品牌。';
 const MENU_FOREIGN = (name: string) => `這個群只看 ${name}。要看別的品牌請進那個品牌的工作群，或用已綁定的總部私訊。`;
 
@@ -1261,7 +1265,7 @@ async function handleSpaceBindMessage(
   }
   const actor = await findOpsUserByLineId(env, params.lineUserId);
   if (!actor) {
-    await replyOps(env, params.replyToken, '請管理員先到設定頁綁定 LINE，再回「這個群綁 Homigo」。');
+    await replyOps(env, params.replyToken, '請管理員先到設定頁綁定 LINE，再回「這個群綁定 Homigo」。');
     return true;
   }
   if (parsed.action === 'unbind') {
@@ -1277,7 +1281,7 @@ async function handleSpaceBindMessage(
   const slug = parsed.brandKey ? brandKeyToSlug(parsed.brandKey, params.brands) : null;
   const brand = slug ? params.brands.find((b) => b.slug === slug) : null;
   if (!brand) {
-    await replyOps(env, params.replyToken, '請寫「這個群綁 Homigo」或 TaskGo、Washgo。');
+    await replyOps(env, params.replyToken, '請寫「這個群綁定 Homigo」或 TaskGo、Washgo。');
     return true;
   }
   const next = await bindLineSpace(env, {
@@ -1330,7 +1334,8 @@ export async function handleLineOpsEvents(
       if (event.type !== 'message' || event.message?.type !== 'text' || !event.message.text) continue;
 
       const raw = event.message.text;
-      const mentioned = botWasMentioned(raw, event.message.mention);
+      const mentioned = botWasMentioned(raw, event.message.mention)
+        || /[@＠]/.test(raw);
       const text = stripLineMention(raw, event.message.mention);
       const quoted = Boolean(event.message.quotedMessageId);
       const sessionOpen = conversationId && lineUserId

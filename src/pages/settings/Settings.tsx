@@ -197,10 +197,15 @@ function LineNotifyPanel() {
 
   return (
     <Card>
-      <strong style={{ display: 'block', marginBottom: 8 }}>管理者 Line 綁定</strong>
+      <strong style={{ display: 'block', marginBottom: 8 }}>GO 行銷機器人</strong>
       <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12 }}>
-        加好友後會收到三個品牌近 7 天發文與成效卡片。之後用問答查「成效」「Homigo成效」「失敗」「待審」，
-        不會主動推發文通知。Messaging API webhook 設成 <code>/api/webhooks/line/ops</code>。
+        加好友後會收到三個品牌近 7 天發文與成效卡片。也可把機器人拉進外包小編或短影音群組，
+        <strong>@GO行銷機器人</strong> 再下指令，例如「今日發文」「排程」「媒體」「口吻」「素材」「短影音」。
+        群組沒被 @、也不是這些指令時不會回話。不會主動推發文通知。
+      </p>
+      <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12, color: 'var(--color-text-muted)' }}>
+        LINE Official Account 後台請允許加入群組／多人聊天；Messaging API webhook 設成
+        <code>/api/webhooks/line/ops</code>。建議開啟「僅在被提及或被回覆時接收 webhook」，避免群組閒聊打進來。
       </p>
       {!data.configured && (
         <p style={{ fontSize: 13, color: 'var(--color-danger)', marginBottom: 12 }}>伺服器尚未設定 Line 行銷 Bot 密鑰。</p>
@@ -229,7 +234,7 @@ function LineNotifyPanel() {
       )}
       {data.bound && (
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-          已改成問答模式：傳「成效」或點卡片按鈕即可，系統不會主動推發文或待審訊息。
+          問答模式：私訊直接傳指令，群組請 @機器人 或點卡片按鈕。系統不會主動推發文或待審訊息。
         </p>
       )}
       {message && <p style={{ fontSize: 13, marginTop: 10 }}>{message}</p>}

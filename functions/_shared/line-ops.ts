@@ -31,10 +31,85 @@ type TodayPost = {
   permalink: string | null;
 };
 
+type LineMentionee = { index?: number; length?: number; isSelf?: boolean; userId?: string };
+type LineMention = { mentionees?: LineMentionee[] };
+type LineOpsSource = { type?: string; userId?: string; groupId?: string; roomId?: string };
+export type LineOpsEvent = {
+  type?: string;
+  replyToken?: string;
+  source?: LineOpsSource;
+  message?: { type?: string; text?: string; mention?: LineMention; quotedMessageId?: string };
+};
+
+type OpsIntent =
+  | 'bind' | 'kpi' | 'today' | 'failed' | 'pending'
+  | 'schedule' | 'press' | 'voice' | 'assets' | 'shorts'
+  | 'help' | 'unknown';
+
 const BRAND_THEME: Record<string, { header: string; accent: string; label: string }> = {
   homigo: { header: '#2F6F5E', accent: '#8CAA71', label: 'Homigo 包租管家' },
   taskgo: { header: '#1A2F4B', accent: '#3D7EA6', label: 'TaskGo 匠管' },
   washgo: { header: '#0B6E8A', accent: '#2A9BB5', label: 'Washgo 洗衣店' },
+};
+
+const EDITOR_BRIEFS: Record<string, { editor: string; lines: string[] }> = {
+  homigo: {
+    editor: '小咪 · 包租管家',
+    lines: [
+      '對象：房東／代管；不要寫成房客吐槽或房仲廣告',
+      'FB／IG 80–180 字（上限 220），前 125 字就要是痛點 hook',
+      'Threads 像 LINE 群回覆：務實、有溫度，可吐槽行業亂象',
+      '可講：租屋關係、收租報修、合約信任、已核准露出',
+      '禁止：假裝限時優惠、留言才告訴你、站隊罵房東或房客',
+      '視覺：米白＋深藍，黃只做主標；痛點→情境→最後才是 Homigo',
+      '主 CTA：Service@inforcraft.com.tw ／ 0972-395-117',
+    ],
+  },
+  taskgo: {
+    editor: '阿豪 · 工班頭',
+    lines: [
+      '對象：工程行老闆／工班頭；不要變成裝潢估價業務',
+      'FB／IG 80–180 字（上限 220），圖上主標與第一句同義',
+      'Threads 80–180 字（上限 220），一句一行，可用台語',
+      '可講：派工、現場回報、案場日常、已核准露出',
+      '禁止：數位轉型廣告腔、深灰橘色語錄卡、人身攻擊業主',
+      '視覺：海軍藍斜切工地風＋蜂巢；人物是海報構圖，不是寫實工地照',
+      '主 CTA：Service@inforcraft.com.tw ／ 0972-395-117',
+    ],
+  },
+  washgo: {
+    editor: '阿樂 · 洗衣店店員',
+    lines: [
+      'Threads 60–120 字（上限 150），一篇只講一件事',
+      '主軸擇一：A 系統服務／B 洗滌知識／C 流行洗法',
+      'FB／IG 80–180 字（上限 220），前 125 字是店主痛點 hook',
+      '可講：洗衣乾洗日常、LINE 送洗履歷、門市調撥、已核准露出',
+      '禁止：硬廣折扣、私訊加 LINE、文青獨白、整頁後台截圖直發',
+      '配圖：可愛洗衣插畫痛點海報；FB／IG 結尾必須出現匠管聯絡',
+      '主 CTA：Service@inforcraft.com.tw ／ 0972-395-117',
+    ],
+  },
+};
+
+const VIDEO_STATUS_LABEL: Record<string, string> = {
+  analyzing: '分析中',
+  strategy_review: '待核准策略',
+  rendering_preview: '等 720p 預覽',
+  preview_review: '待核准預覽',
+  rendering_final: '等正式檔',
+  ready: '可交付',
+  rejected: '已打回',
+};
+
+const ASSET_CATEGORY_LABEL: Record<string, string> = {
+  system_screenshot: '系統畫面',
+  real_photo: '實拍',
+  people: '人物',
+  scene: '場景',
+  brand_collab: '聯名',
+  press_clipping: '見報',
+  brand_identity: '品牌',
+  other: '其他',
 };
 
 export function lineOpsConfigured(env: Env): boolean {
@@ -146,16 +221,82 @@ function themeOf(slug: string) {
   return BRAND_THEME[slug] ?? { header: '#3A3A3A', accent: '#8CAA71', label: slug };
 }
 
+const BARE_COMMAND_RE = /^(homigo|taskgo|washgo|小咪|匠管|阿豪|阿樂)?(成效|kpi|今日發文|今日|今天|失敗|待審|排程|待發|檔期|行程|媒體|新聞|露出|報導|口吻|人設|怎麼寫|規格|素材|短影音|影片|shorts|腳本|怎麼問|說明|幫助|help|指令|選單|菜單|你好|嗨|hi|hello)$/i;
+
+export function isGroupSource(source?: LineOpsSource): boolean {
+  return source?.type === 'group' || source?.type === 'room'
+    || Boolean(source?.groupId || source?.roomId);
+}
+
+export function botWasMentioned(text: string, mention?: LineMention): boolean {
+  if (mention?.mentionees?.some((m) => m.isSelf)) return true;
+  return /@?\s*(GO行銷機器人|行銷機器人|GO行銷)/i.test(text);
+}
+
+export function stripLineMention(text: string, mention?: LineMention): string {
+  let next = text;
+  const selves = (mention?.mentionees ?? [])
+    .filter((m) => m.isSelf && typeof m.index === 'number' && typeof m.length === 'number')
+    .sort((a, b) => (b.index ?? 0) - (a.index ?? 0));
+  for (const m of selves) {
+    const start = m.index ?? 0;
+    const end = start + (m.length ?? 0);
+    if (start >= 0 && end <= next.length) next = `${next.slice(0, start)}${next.slice(end)}`;
+  }
+  next = next
+    .replace(/@\s*(GO行銷機器人|行銷機器人|GO行銷)/gi, '')
+    .replace(/[\u200b\u200c\u200d\ufeff]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return next;
+}
+
+const BRAND_ONLY_RE = /^(homigo|taskgo|washgo|小咪|匠管|阿豪|阿樂)$/i;
+
+export function isBareOpsCommand(text: string): boolean {
+  const compact = text.replace(/\s+/g, '');
+  if (!compact) return false;
+  if (/^綁定\d{6}$/.test(compact)) return true;
+  if (BRAND_ONLY_RE.test(compact)) return true;
+  return BARE_COMMAND_RE.test(compact);
+}
+
+export function parseOpsIntent(text: string): OpsIntent {
+  if (/^綁定\s*\d{6}$/.test(text)) return 'bind';
+  if (/失敗/.test(text)) return 'failed';
+  if (/待審/.test(text)) return 'pending';
+  if (/短影音|shorts|腳本|影片/.test(text)) return 'shorts';
+  if (/媒體|新聞|露出|報導/.test(text)) return 'press';
+  if (/排程|待發|檔期|行程/.test(text)) return 'schedule';
+  if (/口吻|人設|怎麼寫|規格/.test(text)) return 'voice';
+  if (/素材/.test(text)) return 'assets';
+  if (/今日|今天/.test(text) && !/成效|kpi/i.test(text)) return 'today';
+  if (/成效|kpi|曝光|數據|怎麼了/i.test(text)) return 'kpi';
+  if (/怎麼問|說明|幫助|help|指令|選單|菜單/i.test(text)) return 'help';
+  if (/你好|嗨|hi|hello/i.test(text)) return 'help';
+  if (!text || BRAND_ONLY_RE.test(text.replace(/\s+/g, ''))) return 'help';
+  return 'unknown';
+}
+
+function httpsUrl(value: string | null | undefined): string | null {
+  if (!value || !/^https:\/\//i.test(value.trim())) return null;
+  return value.trim();
+}
+
 function quickReplyItems() {
   return [
-    { type: 'action', action: { type: 'message', label: '三品牌成效', text: '成效' } },
     { type: 'action', action: { type: 'message', label: '今日發文', text: '今日發文' } },
+    { type: 'action', action: { type: 'message', label: '排程', text: '排程' } },
+    { type: 'action', action: { type: 'message', label: '媒體露出', text: '媒體' } },
+    { type: 'action', action: { type: 'message', label: '短影音', text: '短影音' } },
+    { type: 'action', action: { type: 'message', label: '口吻規格', text: '口吻' } },
+    { type: 'action', action: { type: 'message', label: '素材', text: '素材' } },
+    { type: 'action', action: { type: 'message', label: '三品牌成效', text: '成效' } },
     { type: 'action', action: { type: 'message', label: 'Homigo', text: 'Homigo成效' } },
     { type: 'action', action: { type: 'message', label: 'TaskGo', text: 'TaskGo成效' } },
     { type: 'action', action: { type: 'message', label: 'Washgo', text: 'Washgo成效' } },
-    { type: 'action', action: { type: 'message', label: '失敗單', text: '失敗' } },
     { type: 'action', action: { type: 'message', label: '待審', text: '待審' } },
-    { type: 'action', action: { type: 'message', label: '怎麼問', text: '怎麼問' } },
+    { type: 'action', action: { type: 'message', label: '指令集', text: '指令' } },
   ];
 }
 
@@ -166,19 +307,9 @@ function withQuickReply(messages: unknown[]): unknown[] {
   return [...messages.slice(0, -1), { ...last, quickReply: { items: quickReplyItems() } }];
 }
 
-const HELP = `用問的就好，我不會主動推發文通知。
-
-可以直接傳：
-・成效／KPI
-・今日發文
-・Homigo成效、TaskGo成效、Washgo成效
-・失敗
-・待審
-或點下方按鈕。
-
-綁定後台帳號請傳「綁定 123456」。`;
-
-const WELCOME = '已加入 GO 行銷機器人。下面是三個品牌近 7 天發文與成效。之後用按鈕或直接問我，例如「Homigo 成效」「失敗」「待審」。我不會主動推發文通知。';
+const MENU_UNKNOWN = '這句我還沒學會。點下面一項就好。';
+const MENU_JOIN = '已加入這個群組。之後 @我，再點下面指令。';
+const MENU_FOLLOW = '加好友成功。點下面一項就好，不用背指令。';
 
 export async function getBindingForUser(env: Env, userId: string) {
   await ensurePostingOpsTables(env);
@@ -263,7 +394,14 @@ async function opsBrands(env: Env): Promise<BrandRow[]> {
 }
 
 function scopeBrands(brands: BrandRow[], text: string): BrandRow[] {
-  const hit = brands.find((b) => text.toLowerCase().includes(b.slug) || text.includes(b.name));
+  const lower = text.toLowerCase();
+  const hit = brands.find((b) => {
+    if (lower.includes(b.slug) || text.includes(b.name)) return true;
+    if (b.slug === 'homigo' && /小咪/.test(text)) return true;
+    if (b.slug === 'taskgo' && /阿豪|匠管/.test(text)) return true;
+    if (b.slug === 'washgo' && /阿樂/.test(text)) return true;
+    return false;
+  });
   return hit ? [hit] : brands;
 }
 
@@ -601,6 +739,87 @@ function carousel(altText: string, bubbles: unknown[]) {
   };
 }
 
+function menuButton(label: string, text: string, color?: string) {
+  return {
+    type: 'button',
+    style: color ? 'primary' : 'secondary',
+    height: 'sm',
+    flex: 1,
+    ...(color ? { color } : {}),
+    action: { type: 'message', label, text },
+  };
+}
+
+function menuRow(left: [string, string], right?: [string, string], color?: string) {
+  const contents = [menuButton(left[0], left[1], color)];
+  if (right) contents.push(menuButton(right[0], right[1], color));
+  return {
+    type: 'box',
+    layout: 'horizontal',
+    spacing: 'sm',
+    margin: '8px',
+    contents,
+  };
+}
+
+function menuSection(title: string) {
+  return flexText(title, { size: 'xs', color: '#6C6C6C', weight: 'bold', margin: '12px' });
+}
+
+function commandMenuMessages(brands: BrandRow[], intro?: string): unknown[] {
+  const scoped = brands.length === 1 ? brands[0] : null;
+  const prefix = scoped?.name ?? '';
+  const cmd = (name: string) => (prefix ? `${prefix}${name}` : name);
+  const headerColor = scoped ? themeOf(scoped.slug).header : '#1A2F4B';
+  const subtitle = scoped
+    ? `${themeOf(scoped.slug).label} · 點一項就好`
+    : '點一項就好，不用打字、不用背指令';
+
+  const body = [
+    flexText(subtitle, { size: 'sm', color: '#3A3A3A' }),
+    menuSection('小編'),
+    menuRow(['今日發文', cmd('今日發文')], ['之後排程', cmd('排程')]),
+    menuRow(['媒體露出', cmd('媒體')], ['寫文規格', cmd('口吻')]),
+    menuRow(['素材庫', cmd('素材')], ['待審稿', cmd('待審')]),
+    menuSection('短影音'),
+    menuRow(['短影音工作', cmd('短影音')], ['寫文規格', cmd('口吻')]),
+  ];
+
+  if (scoped) {
+    body.push(menuSection('成效'));
+    body.push(menuRow(['近 7 天成效', cmd('成效')], ['失敗單', cmd('失敗')], headerColor));
+  } else {
+    body.push(menuSection('指定品牌今日'));
+    body.push(menuRow(['Homigo', 'Homigo今日'], ['TaskGo', 'TaskGo今日']));
+    body.push(menuRow(['Washgo', 'Washgo今日'], ['三品牌成效', '成效'], headerColor));
+  }
+
+  const bubble = {
+    type: 'bubble',
+    size: 'mega',
+    header: {
+      type: 'box',
+      layout: 'vertical',
+      backgroundColor: headerColor,
+      paddingAll: '14px',
+      contents: [
+        flexText('GO 行銷機器人', { color: '#FFFFFF', size: 'md', weight: 'bold' }),
+        flexText('指令集', { color: '#D7E8E2', size: 'xs', margin: '4px' }),
+      ],
+    },
+    body: { type: 'box', layout: 'vertical', spacing: 'none', paddingAll: '14px', contents: body },
+  };
+
+  const messages: unknown[] = [];
+  if (intro) messages.push(textMsg(intro));
+  messages.push({
+    type: 'flex',
+    altText: scoped ? `${scoped.name} 指令：今日發文、排程、媒體、口吻、短影音` : '點指令：今日發文、排程、媒體、口吻、短影音、成效',
+    contents: bubble,
+  });
+  return messages;
+}
+
 async function todayMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> {
   const today = await loadTodayPosts(env, brands);
   const bubbles = brands.map((brand) => todayBubble(brand, today.get(brand.id) ?? []));
@@ -664,26 +883,314 @@ async function pendingMessages(env: Env, brands: BrandRow[]): Promise<unknown[]>
   return [carousel('待審閱內容', bubbles)];
 }
 
+async function scheduleMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> {
+  const sql = getSql(env);
+  const ids = brands.map((b) => b.id);
+  const rows = ids.length ? await sql`
+    SELECT c.brand_id, c.title, pj.platform, pj.status, pj.scheduled_at
+    FROM publishing_jobs pj
+    JOIN contents c ON c.id = pj.content_id
+    WHERE c.brand_id = ANY(${ids}::uuid[])
+      AND pj.status IN ('scheduled', 'queued', 'publishing')
+      AND pj.scheduled_at IS NOT NULL
+      AND pj.scheduled_at < now() + interval '7 days'
+      AND pj.scheduled_at >= now() - interval '2 hours'
+    ORDER BY pj.scheduled_at ASC
+  `.catch(() => []) as Array<{
+    brand_id: string; title: string | null; platform: string; status: string; scheduled_at: string | null;
+  }> : [];
+
+  const bubbles = brands.map((brand) => {
+    const items = rows.filter((r) => r.brand_id === brand.id).slice(0, 6);
+    const lines = items.map((r) => {
+      const when = fmtTime(r.scheduled_at);
+      const state = r.status === 'publishing' ? '發送中' : r.status === 'queued' ? '排隊' : '已排';
+      return `・${when} ${platformLabel(r.platform)} ${state} ${clip(r.title || '(無標題)', 18)}`;
+    });
+    return listBubble(brand, '未來 7 天排程', lines, '未來 7 天沒有已排貼文。', `${brand.name}今日`);
+  });
+  return [carousel('未來 7 天排程', bubbles)];
+}
+
+async function pressMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> {
+  const sql = getSql(env);
+  const ids = brands.map((b) => b.id);
+  const rows = ids.length ? await sql`
+    SELECT brand_id, outlet, headline, published_on, status, article_url
+    FROM press_coverages
+    WHERE brand_id = ANY(${ids}::uuid[])
+      AND status IN ('published', 'syndicated', 'inbox')
+    ORDER BY published_on DESC NULLS LAST, updated_at DESC
+    LIMIT 24
+  `.catch(() => []) as Array<{
+    brand_id: string; outlet: string; headline: string; published_on: string | null;
+    status: string; article_url: string | null;
+  }> : [];
+
+  const bubbles = brands.map((brand) => {
+    const theme = themeOf(brand.slug);
+    const items = rows.filter((r) => r.brand_id === brand.id).slice(0, 5);
+    const contents = items.length
+      ? items.map((r) => {
+        const day = r.published_on
+          ? new Date(r.published_on).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' })
+          : '日期未定';
+        const state = r.status === 'inbox' ? '待整理' : r.status === 'syndicated' ? '轉載' : '可跟風';
+        const row: Record<string, unknown> = {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'xs',
+          margin: '6px',
+          paddingAll: '10px',
+          backgroundColor: '#F7F9F5',
+          cornerRadius: '8px',
+          contents: [
+            flexText(`${day}  ${r.outlet}  ${state}`, { size: 'xxs', color: '#6C6C6C' }),
+            flexText(clip(r.headline, 28), { size: 'sm', weight: 'bold', color: '#3A3A3A' }),
+          ],
+        };
+        const url = httpsUrl(r.article_url);
+        if (url) row.action = { type: 'uri', uri: url };
+        return row;
+      })
+      : [flexText('目前沒有可跟風的媒體露出。', { size: 'sm', color: '#6C6C6C' })];
+
+    return {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: theme.header,
+        paddingAll: '14px',
+        contents: [
+          flexText(theme.label, { color: '#FFFFFF', size: 'md', weight: 'bold' }),
+          flexText('媒體露出（點卡片開原文）', { color: '#D7E8E2', size: 'xs', margin: '4px' }),
+        ],
+      },
+      body: { type: 'box', layout: 'vertical', spacing: 'none', paddingAll: '14px', contents },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'button',
+          style: 'primary',
+          height: 'sm',
+          color: theme.header,
+          action: { type: 'message', label: `${brand.name} 口吻`, text: `${brand.name}口吻` },
+        }],
+      },
+    };
+  });
+  return [carousel('媒體露出', bubbles)];
+}
+
+function voiceMessages(brands: BrandRow[]): unknown[] {
+  const bubbles = brands.map((brand) => {
+    const theme = themeOf(brand.slug);
+    const brief = EDITOR_BRIEFS[brand.slug];
+    const lines = brief?.lines ?? ['先對準這個品牌的日常場景，不要發明優惠與數字。'];
+    return {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: theme.header,
+        paddingAll: '14px',
+        contents: [
+          flexText(theme.label, { color: '#FFFFFF', size: 'md', weight: 'bold' }),
+          flexText(brief?.editor ?? '品牌小編規格', { color: '#D7E8E2', size: 'xs', margin: '4px' }),
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        paddingAll: '16px',
+        contents: lines.map((line) => flexText(`・${line}`, { size: 'sm', color: '#3A3A3A' })),
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            height: 'sm',
+            color: theme.header,
+            action: { type: 'message', label: `${brand.name} 今日發文`, text: `${brand.name}今日` },
+          },
+          {
+            type: 'button',
+            style: 'link',
+            height: 'sm',
+            action: { type: 'message', label: `${brand.name} 媒體`, text: `${brand.name}媒體` },
+          },
+        ],
+      },
+    };
+  });
+  return [carousel('小編口吻與規格', bubbles)];
+}
+
+async function assetMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> {
+  const sql = getSql(env);
+  const ids = brands.map((b) => b.id);
+  const rows = ids.length ? await sql`
+    SELECT brand_id, name, caption, image_category, usage_context
+    FROM brand_assets
+    WHERE brand_id = ANY(${ids}::uuid[])
+      AND asset_type = 'image'
+      AND asset_status = 'active'
+    ORDER BY last_used_at DESC NULLS LAST, created_at DESC
+    LIMIT 24
+  `.catch(() => []) as Array<{
+    brand_id: string; name: string; caption: string | null;
+    image_category: string | null; usage_context: string | null;
+  }> : [];
+
+  const bubbles = brands.map((brand) => {
+    const items = rows.filter((r) => r.brand_id === brand.id).slice(0, 5);
+    const lines = items.map((r) => {
+      const cat = ASSET_CATEGORY_LABEL[r.image_category ?? ''] ?? '圖片';
+      const title = r.caption || r.name || '未命名素材';
+      const hint = r.usage_context ? `｜${clip(r.usage_context, 12)}` : '';
+      return `・${cat} ${clip(title, 18)}${hint}`;
+    });
+    return listBubble(brand, '素材庫近期圖片', lines, '這個品牌素材庫目前是空的。', `${brand.name}今日`);
+  });
+  return [carousel('品牌素材庫', bubbles)];
+}
+
+async function shortsMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> {
+  const sql = getSql(env);
+  const ids = brands.map((b) => b.id);
+  const rows = (ids.length ? await sql`
+    SELECT v.title, v.status, v.strategy, v.preview_url, v.final_url, v.updated_at,
+           v.brand_id, e.title AS episode_title
+    FROM video_jobs v
+    LEFT JOIN podcast_episodes e ON e.id = v.podcast_episode_id
+    WHERE v.brand_id = ANY(${ids}::uuid[]) OR v.brand_id IS NULL
+    ORDER BY v.updated_at DESC
+    LIMIT 12
+  `.catch(() => []) : []) as Array<{
+    title: string | null; status: string; strategy: unknown;
+    preview_url: string | null; final_url: string | null; updated_at: string;
+    brand_id: string | null; episode_title: string | null;
+  }>;
+
+  const bubbles = brands.map((brand) => {
+    const theme = themeOf(brand.slug);
+    const items = rows
+      .filter((r) => r.brand_id === brand.id || (!r.brand_id && brand.id === brands[0]?.id))
+      .slice(0, 5);
+    const contents = items.length
+      ? items.map((r) => {
+        const strategy = (r.strategy && typeof r.strategy === 'object') ? r.strategy as { hook?: string; title?: string } : {};
+        const title = strategy.title || r.title || r.episode_title || '未命名短影音';
+        const hook = strategy.hook ? clip(strategy.hook, 28) : '尚無 hook';
+        const row: Record<string, unknown> = {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'xs',
+          margin: '6px',
+          paddingAll: '10px',
+          backgroundColor: '#F7F9F5',
+          cornerRadius: '8px',
+          contents: [
+            flexText(`${VIDEO_STATUS_LABEL[r.status] ?? r.status}  ${fmtTime(r.updated_at)}`, { size: 'xxs', color: '#6C6C6C' }),
+            flexText(clip(title, 24), { size: 'sm', weight: 'bold', color: '#3A3A3A' }),
+            flexText(hook, { size: 'xs', color: '#3A3A3A' }),
+          ],
+        };
+        const url = httpsUrl(r.final_url) ?? httpsUrl(r.preview_url);
+        if (url) row.action = { type: 'uri', uri: url };
+        return row;
+      })
+      : [flexText('目前沒有短影音工作。可從 Podcast 已核准集數切杯。', { size: 'sm', color: '#6C6C6C' })];
+
+    return {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: theme.header,
+        paddingAll: '14px',
+        contents: [
+          flexText(theme.label, { color: '#FFFFFF', size: 'md', weight: 'bold' }),
+          flexText('短影音工作與 hook', { color: '#D7E8E2', size: 'xs', margin: '4px' }),
+        ],
+      },
+      body: { type: 'box', layout: 'vertical', spacing: 'none', paddingAll: '14px', contents },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'button',
+          style: 'primary',
+          height: 'sm',
+          color: theme.header,
+          action: { type: 'message', label: `${brand.name} 口吻`, text: `${brand.name}口吻` },
+        }],
+      },
+    };
+  });
+  return [carousel('短影音工作', bubbles)];
+}
+
+async function messagesForIntent(env: Env, intent: OpsIntent, brands: BrandRow[]): Promise<unknown[]> {
+  switch (intent) {
+    case 'failed': return failedMessages(env, brands);
+    case 'pending': return pendingMessages(env, brands);
+    case 'today': return todayMessages(env, brands);
+    case 'schedule': return scheduleMessages(env, brands);
+    case 'press': return pressMessages(env, brands);
+    case 'voice': return voiceMessages(brands);
+    case 'assets': return assetMessages(env, brands);
+    case 'shorts': return shortsMessages(env, brands);
+    case 'kpi': return performanceMessages(env, brands);
+    case 'help': return commandMenuMessages(brands);
+    default: return commandMenuMessages(brands, MENU_UNKNOWN);
+  }
+}
+
 export async function handleLineOpsEvents(
   env: Env,
-  body: { events?: Array<{ type?: string; replyToken?: string; source?: { userId?: string }; message?: { type?: string; text?: string } }> },
+  body: { events?: LineOpsEvent[] },
 ): Promise<void> {
   if (!lineOpsConfigured(env)) return;
   await ensurePostingOpsTables(env);
   const brands = await opsBrands(env);
   for (const event of body.events ?? []) {
     const replyToken = event.replyToken;
+    if (!replyToken) continue;
+    const inGroup = isGroupSource(event.source);
     const lineUserId = event.source?.userId;
-    if (!replyToken || !lineUserId) continue;
     try {
+      if (event.type === 'join') {
+        await replyOpsMessages(env, replyToken, commandMenuMessages(brands, MENU_JOIN));
+        continue;
+      }
       if (event.type === 'follow') {
-        await replyOpsMessages(env, replyToken, await performanceMessages(env, brands, WELCOME));
+        await replyOpsMessages(env, replyToken, commandMenuMessages(brands, MENU_FOLLOW));
         continue;
       }
       if (event.type !== 'message' || event.message?.type !== 'text' || !event.message.text) continue;
-      const text = event.message.text.trim();
+
+      const raw = event.message.text;
+      const mentioned = botWasMentioned(raw, event.message.mention);
+      const text = stripLineMention(raw, event.message.mention);
+      if (inGroup && !mentioned && !isBareOpsCommand(text)) continue;
+
       const bind = text.match(/^綁定\s*(\d{6})$/);
       if (bind) {
+        if (!lineUserId) {
+          await replyOps(env, replyToken, '請先加 GO 行銷機器人好友，再傳綁定碼。');
+          continue;
+        }
         const result = await bindLineUser(env, lineUserId, bind[1]);
         if (result.startsWith('已綁定')) {
           await replyOpsMessages(env, replyToken, await performanceMessages(env, brands, result));
@@ -692,21 +1199,10 @@ export async function handleLineOpsEvents(
         }
         continue;
       }
+
+      const intent = parseOpsIntent(text);
       const scoped = scopeBrands(brands, text);
-      if (/失敗/.test(text)) {
-        await replyOpsMessages(env, replyToken, await failedMessages(env, scoped));
-      } else if (/待審/.test(text)) {
-        await replyOpsMessages(env, replyToken, await pendingMessages(env, scoped));
-      } else if (/今日|今天/.test(text) && !/成效|kpi/i.test(text)) {
-        await replyOpsMessages(env, replyToken, await todayMessages(env, scoped));
-      } else if (/成效|kpi|曝光|數據|怎麼了/i.test(text) || /你好|嗨|hi|hello/i.test(text)) {
-        const intro = /你好|嗨|hi|hello/i.test(text) ? WELCOME : undefined;
-        await replyOpsMessages(env, replyToken, await performanceMessages(env, scoped, intro));
-      } else if (/怎麼問|說明|幫助|help|指令/i.test(text)) {
-        await replyOps(env, replyToken, HELP);
-      } else {
-        await replyOps(env, replyToken, HELP);
-      }
+      await replyOpsMessages(env, replyToken, await messagesForIntent(env, intent, scoped));
     } catch (e) {
       console.error('[line-ops] 處理訊息失敗', e);
       await replyOps(env, replyToken, '查詢暫時失敗，請稍後再試。').catch(() => undefined);

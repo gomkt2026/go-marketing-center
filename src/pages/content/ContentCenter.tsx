@@ -119,8 +119,15 @@ export function ContentCenter() {
   }, [slug]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState message={error} onRetry={reload} />;
+  if (error && !data) return <ErrorState message={error} onRetry={reload} />;
+  if (!data) {
+    return (
+      <div>
+        <PageHeader title={`${brand.name} 工作台`} subtitle="正在載入待審內容…" />
+        <LoadingState label="載入工作台…" />
+      </div>
+    );
+  }
 
   const inTab = items.filter((c) => c.status === tab || (tab === 'approved' && c.status === 'published'));
   const filtered = platform === 'all' ? inTab
@@ -229,8 +236,8 @@ export function ContentCenter() {
   return (
     <div>
       <PageHeader
-        title={`${brand.name} 內容中心`}
-        subtitle="所有內容必須人工審閱:批准、修改、退回、重新生成、延期、否決"
+        title={`${brand.name} 工作台`}
+        subtitle="FB / IG / Threads / 官網都在這裡審：批准、修改、退回、重新生成、延期、否決"
         actions={
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <Button variant="primary" disabled={seoGenerating} onClick={() => void generateSeo()}>
@@ -244,7 +251,7 @@ export function ContentCenter() {
       />
       <HubShortcuts
         items={[
-          { to: `/${brand.slug}/threads`, label: 'Threads 工作台' },
+          { to: `/${brand.slug}/threads`, label: 'Threads' },
           { to: `/${brand.slug}/editor`, label: '跟小編聊' },
         ]}
       />

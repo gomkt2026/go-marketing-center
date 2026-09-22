@@ -26,10 +26,10 @@ interface OtherGroup {
 const mainItems: MainItem[] = [
   { label: '儀表板', path: '/workspace', brandScoped: true, end: true },
   {
-    label: '內容',
+    label: '工作台',
     path: '/contents',
     brandScoped: true,
-    children: [{ label: 'Threads 工作台', path: '/threads', brandScoped: true }],
+    children: [{ label: 'Threads', path: '/threads', brandScoped: true }],
   },
   {
     label: '發布',

@@ -158,8 +158,15 @@ export function Schedule() {
   }
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
-  if (loading) return <LoadingState />;
-  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
+  if (error && !data) return <ErrorState message={error} onRetry={reload} />;
+  if (!data) {
+    return (
+      <div>
+        <PageHeader title={`${brand.name} 行程表`} subtitle="正在載入本週排程…" />
+        <LoadingState label="載入行程表…" />
+      </div>
+    );
+  }
 
   const items = data.items;
   const days = Array.from({ length: 7 }, (_, i) => {

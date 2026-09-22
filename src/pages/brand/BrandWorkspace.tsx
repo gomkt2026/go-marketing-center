@@ -28,9 +28,16 @@ export function BrandWorkspace() {
   const workspaceQuery = useAsyncData(() => slug ? api.brandWorkspace(slug) : Promise.reject(new Error('no slug')), [slug]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
-  if (brandQuery.loading || workspaceQuery.loading) return <LoadingState />;
-  if (brandQuery.error || workspaceQuery.error || !workspaceQuery.data) {
+  if ((brandQuery.error || workspaceQuery.error) && !workspaceQuery.data) {
     return <ErrorState message={brandQuery.error ?? workspaceQuery.error ?? '載入失敗'} onRetry={() => { brandQuery.reload(); workspaceQuery.reload(); }} />;
+  }
+  if (!workspaceQuery.data) {
+    return (
+      <div>
+        <PageHeader title={`${brand.name} 行銷儀表板`} subtitle="正在載入發文成敗…" />
+        <LoadingState label="載入儀表板…" />
+      </div>
+    );
   }
 
   const version = brandQuery.data?.version;
@@ -57,7 +64,7 @@ export function BrandWorkspace() {
       />
       <HubShortcuts
         items={[
-          { to: `/${brand.slug}/contents`, label: '內容' },
+          { to: `/${brand.slug}/contents`, label: '工作台' },
           { to: `/${brand.slug}/threads`, label: 'Threads' },
           { to: `/${brand.slug}/publishing`, label: '發布' },
           { to: `/${brand.slug}/schedule`, label: '行程表' },

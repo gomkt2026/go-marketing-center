@@ -32,7 +32,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
            c.generation_prompt_meta->>'category' AS gen_category,
            c.generation_prompt_meta->>'audienceLane' AS audience_lane,
            c.generation_prompt_meta->>'audienceName' AS audience_name,
-           v.body, v.hashtags, a.file_url AS image_url,
+           left(v.body, 400) AS body, v.hashtags, a.file_url AS image_url,
            lg.detail AS last_log_detail
     FROM publishing_jobs pj
     JOIN contents c ON c.id = pj.content_id

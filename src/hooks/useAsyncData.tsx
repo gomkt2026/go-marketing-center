@@ -17,12 +17,14 @@ export function useAsyncData<T>(
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const cancelledRef = useRef(false);
+  const dataRef = useRef<T | null>(null);
+  dataRef.current = data;
 
   const reload = useCallback(() => setTick((n) => n + 1), []);
 
   useEffect(() => {
     cancelledRef.current = false;
-    setLoading(true);
+    setLoading((prev) => (dataRef.current == null ? true : prev));
     setError(null);
 
     loader()
@@ -54,7 +56,13 @@ export function useAsyncData<T>(
 
 export function LoadingState({ label = '載入中…' }: { label?: string }) {
   return (
-    <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>{label}</div>
+    <div className="page-loading" role="status" aria-live="polite">
+      <div className="page-loading-bar" />
+      <p>{label}</p>
+      <div className="page-loading-skel" />
+      <div className="page-loading-skel is-short" />
+      <div className="page-loading-skel" />
+    </div>
   );
 }
 

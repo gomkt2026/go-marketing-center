@@ -8,19 +8,32 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-    ...init,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = (data as { error?: string }).error
-      || (res.status >= 500 ? `伺服器忙碌（${res.status}），請再試一次` : res.statusText)
-      || `請求失敗（${res.status}）`;
-    throw new ApiError(res.status, msg);
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), 25_000);
+  try {
+    const res = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      ...init,
+      signal: init?.signal ?? ctrl.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = (data as { error?: string }).error
+        || (res.status >= 500 ? `伺服器忙碌（${res.status}），請再試一次` : res.statusText)
+        || `請求失敗（${res.status}）`;
+      throw new ApiError(res.status, msg);
+    }
+    return data as T;
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new ApiError(0, '連線逾時，請再試一次');
+    }
+    throw e;
+  } finally {
+    window.clearTimeout(timer);
   }
-  return data as T;
 }
 
 type SocialPlatform = 'facebook' | 'instagram' | 'threads';

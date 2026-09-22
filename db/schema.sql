@@ -945,6 +945,8 @@ CREATE TABLE publishing_jobs (
 );
 CREATE INDEX idx_publishing_jobs_content ON publishing_jobs(content_id);
 CREATE INDEX idx_publishing_jobs_status ON publishing_jobs(status, scheduled_at);
+CREATE INDEX idx_publishing_jobs_scheduled_at ON publishing_jobs(scheduled_at) WHERE scheduled_at IS NOT NULL;
+CREATE INDEX idx_publishing_jobs_published_at ON publishing_jobs(published_at) WHERE published_at IS NOT NULL;
 CREATE TRIGGER trg_publishing_jobs_updated_at BEFORE UPDATE ON publishing_jobs
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 

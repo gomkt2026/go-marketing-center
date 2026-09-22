@@ -2,7 +2,7 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
 import { requireAuth } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
-import { getBrandBySlug, getBrandVersion, mapBrand } from '../../_shared/queries';
+import { getBrandBySlug, getBrandVersion, mapBrand, invalidateBrandSlugCache } from '../../_shared/queries';
 import { json, error } from '../../_shared/response';
 import { applyBrandWebsiteMigration, isMissingWebsiteColumn } from '../../_shared/brand-profile';
 import { saveBrandWebsiteDestination } from '../../_shared/website-articles';
@@ -77,7 +77,8 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     });
   }
 
-  const updated = await getBrandBySlug(context.env, slug);
+  invalidateBrandSlugCache(slug);
+  const updated = await getBrandBySlug(context.env, slug, { fresh: true });
   const beforeSite = {
     websiteUrl: brand.websiteUrl ?? null,
     websiteNote: brand.websiteNote ?? null,

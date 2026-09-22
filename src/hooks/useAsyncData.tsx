@@ -17,15 +17,18 @@ export function useAsyncData<T>(
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const cancelledRef = useRef(false);
-  const dataRef = useRef<T | null>(null);
-  dataRef.current = data;
 
   const reload = useCallback(() => setTick((n) => n + 1), []);
+  const depsRef = useRef(deps);
 
   useEffect(() => {
+    const depsChanged = depsRef.current.length !== deps.length
+      || depsRef.current.some((d, i) => !Object.is(d, deps[i]));
+    depsRef.current = deps;
     cancelledRef.current = false;
-    setLoading((prev) => (dataRef.current == null ? true : prev));
     setError(null);
+    if (depsChanged) setData(null);
+    setLoading(true);
 
     loader()
       .then((result) => {

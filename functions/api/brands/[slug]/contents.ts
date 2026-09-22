@@ -29,20 +29,15 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const sql = getSql(context.env);
 
-  const countRows = await sql`
+  const countPromise = sql`
     SELECT status::text AS status, count(*)::int AS n
     FROM contents
     WHERE brand_id = ${brand.id}::uuid
     GROUP BY status
   `;
-  const counts: Record<string, number> = {};
-  for (const row of countRows as { status: string; n: number }[]) {
-    counts[row.status] = row.n;
-  }
-  counts.approved = (counts.approved ?? 0) + (counts.published ?? 0);
 
-  const listRows = status === 'approved'
-    ? await sql`
+  const listPromise = status === 'approved'
+    ? sql`
         SELECT c.id, c.campaign_id, c.content_type, c.target_platform, c.title, c.status, c.updated_at,
                v.id AS version_id, v.version_number,
                EXISTS (SELECT 1 FROM content_assets a WHERE a.content_version_id = v.id AND a.asset_type = 'image') AS has_image,
@@ -57,7 +52,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         LIMIT 300
       `
     : status
-      ? await sql`
+      ? sql`
           SELECT c.id, c.campaign_id, c.content_type, c.target_platform, c.title, c.status, c.updated_at,
                  v.id AS version_id, v.version_number,
                  EXISTS (SELECT 1 FROM content_assets a WHERE a.content_version_id = v.id AND a.asset_type = 'image') AS has_image,
@@ -71,7 +66,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           ORDER BY c.updated_at DESC
           LIMIT 200
         `
-      : await sql`
+      : sql`
           SELECT c.id, c.campaign_id, c.content_type, c.target_platform, c.title, c.status, c.updated_at,
                  v.id AS version_id, v.version_number,
                  EXISTS (SELECT 1 FROM content_assets a WHERE a.content_version_id = v.id AND a.asset_type = 'image') AS has_image,
@@ -85,6 +80,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           ORDER BY c.updated_at DESC
           LIMIT 200
         `;
+
+  const [countRows, listRows] = await Promise.all([countPromise, listPromise]);
+  const counts: Record<string, number> = {};
+  for (const row of countRows as { status: string; n: number }[]) {
+    counts[row.status] = row.n;
+  }
+  counts.approved = (counts.approved ?? 0) + (counts.published ?? 0);
 
   let contents = rowsToCamel(listRows as Record<string, unknown>[]);
   if (platform === 'seo') {

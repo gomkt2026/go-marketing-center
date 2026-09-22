@@ -58,10 +58,16 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       SELECT detail FROM publishing_logs
       WHERE publishing_job_id = pj.id
       ORDER BY created_at DESC LIMIT 1
-    ) lg ON true
+    ) lg ON pj.status = 'failed'
     WHERE c.brand_id = ${brand.id}::uuid
-      AND coalesce(pj.scheduled_at, pj.published_at, pj.created_at) >= ${from}::timestamptz
-      AND coalesce(pj.scheduled_at, pj.published_at, pj.created_at) < ${to}::timestamptz
+      AND (
+        (pj.scheduled_at >= ${from}::timestamptz AND pj.scheduled_at < ${to}::timestamptz)
+        OR (pj.published_at >= ${from}::timestamptz AND pj.published_at < ${to}::timestamptz)
+        OR (
+          pj.scheduled_at IS NULL AND pj.published_at IS NULL
+          AND pj.created_at >= ${from}::timestamptz AND pj.created_at < ${to}::timestamptz
+        )
+      )
     ORDER BY coalesce(pj.scheduled_at, pj.published_at, pj.created_at) ASC
   `;
 

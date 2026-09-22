@@ -101,7 +101,13 @@ function asStringArray(value: unknown): string[] {
   return [];
 }
 
+const USER_ROW_TTL_MS = 30_000;
+const userRowCache = new Map<string, { at: number; user: AuthUser | null }>();
+
 async function loadUserRowById(env: Env, userId: string): Promise<AuthUser | null> {
+  const hit = userRowCache.get(userId);
+  if (hit && Date.now() - hit.at < USER_ROW_TTL_MS) return hit.user;
+
   const sql = getSql(env);
   const rows = await sql`
     SELECT u.id, u.email, u.display_name, u.role, u.avatar_url,
@@ -114,12 +120,17 @@ async function loadUserRowById(env: Env, userId: string): Promise<AuthUser | nul
     GROUP BY u.id
     LIMIT 1
   `;
-  if (!rows.length) return null;
+  if (!rows.length) {
+    userRowCache.set(userId, { at: Date.now(), user: null });
+    return null;
+  }
   const row = rows[0] as Record<string, unknown>;
-  return mapUserRow(row, {
+  const user = mapUserRow(row, {
     brandIds: asStringArray(row.brand_ids),
     brandSlugs: asStringArray(row.brand_slugs),
   });
+  userRowCache.set(userId, { at: Date.now(), user });
+  return user;
 }
 
 function mapUserRow(row: Record<string, unknown>, memberships: { brandIds: string[]; brandSlugs: string[] }): AuthUser {
@@ -142,6 +153,11 @@ export function isSuperAdmin(user: AuthUser): boolean {
 export function canAccessBrand(user: AuthUser, brandId: string): boolean {
   if (isSuperAdmin(user)) return true;
   return user.brandIds.includes(brandId);
+}
+
+export function canAccessBrandSlug(user: AuthUser, slug: string): boolean {
+  if (isSuperAdmin(user)) return true;
+  return user.brandSlugs.includes(slug);
 }
 
 export function forbidden(message = 'Forbidden'): Response {

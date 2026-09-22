@@ -76,7 +76,19 @@ export async function getBrandsForUser(env: Env, user: { role: string; brandIds:
   return all.filter((b) => allowed.has(b.id));
 }
 
-export async function getBrandBySlug(env: Env, slug: string) {
+const BRAND_SLUG_TTL_MS = 60_000;
+const brandBySlugCache = new Map<string, { at: number; brand: ReturnType<typeof mapBrand> | null }>();
+
+export function invalidateBrandSlugCache(slug: string) {
+  brandBySlugCache.delete(slug);
+}
+
+export async function getBrandBySlug(env: Env, slug: string, opts?: { fresh?: boolean }) {
+  if (!opts?.fresh) {
+    const hit = brandBySlugCache.get(slug);
+    if (hit && Date.now() - hit.at < BRAND_SLUG_TTL_MS) return hit.brand;
+  }
+
   const sql = getSql(env);
   const run = () => sql`
     SELECT id, slug, name, tagline, primary_color, logo_url, website_url, website_note,
@@ -105,8 +117,9 @@ export async function getBrandBySlug(env: Env, slug: string) {
       throw e;
     }
   }
-  if (!rows.length) return null;
-  return mapBrand(rows[0] as Record<string, unknown>, env);
+  const brand = rows.length ? mapBrand(rows[0] as Record<string, unknown>, env) : null;
+  brandBySlugCache.set(slug, { at: Date.now(), brand });
+  return brand;
 }
 
 export async function getBrandVersion(env: Env, brandId: string) {

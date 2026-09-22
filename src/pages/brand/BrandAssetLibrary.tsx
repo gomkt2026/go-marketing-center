@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { HelpTip } from '@/components/ui/HelpTip';
 import { api } from '@/lib/api';
 import {
-  assetRoleLabel, assetStatusLabel, assetStatusTone, fallbackTaxonomy, imageCategoryLabel,
+  assetStatusLabel, assetStatusTone, fallbackTaxonomy, imageCategoryLabel, libraryCopy, roleLabel,
 } from '@/lib/brand-asset-library';
 import type {
   BrandAsset, BrandAssetImageCategory, BrandAssetRole, BrandAssetStatus, BrandAssetTaxonomy,
@@ -59,6 +59,7 @@ export function BrandAssetLibrary({
   onAssetsChange: (next: BrandAsset[] | ((prev: BrandAsset[]) => BrandAsset[])) => void;
 }) {
   const taxonomy: BrandAssetTaxonomy = fallbackTaxonomy(slug);
+  const copy = libraryCopy(slug);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [draft, setDraft] = useState<AssetDraft>(emptyDraft());
   const [uploading, setUploading] = useState(false);
@@ -190,7 +191,7 @@ export function BrandAssetLibrary({
                 style={{ fontSize: 12 }}
               />
               <input
-                type="text" placeholder="素材名稱，例如：報修案件詳情"
+                type="text" placeholder={copy.name}
                 value={draft.name}
                 onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
                 style={{ ...inputStyle, flex: 1, minWidth: 200 }}
@@ -224,7 +225,7 @@ export function BrandAssetLibrary({
                 {taxonomy.features.map((f) => <option key={f} value={f}>{f}</option>)}
               </select>
               <input
-                type="text" placeholder="畫面用途，例如：案件進度"
+                type="text" placeholder={copy.usage}
                 value={draft.usageContext}
                 onChange={(e) => setDraft((d) => ({ ...d, usageContext: e.target.value }))}
                 style={inputStyle}
@@ -238,7 +239,7 @@ export function BrandAssetLibrary({
               </select>
             </div>
             <textarea
-              placeholder="素材說明：這張圖在表達什麼？例如：房東查看租客報修案件、目前處理狀態與相關紀錄。"
+              placeholder={copy.caption}
               value={draft.caption}
               onChange={(e) => setDraft((d) => ({ ...d, caption: e.target.value }))}
               rows={2}
@@ -302,7 +303,7 @@ export function BrandAssetLibrary({
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                 {a.imageCategory && <Badge tone="secondary">{imageCategoryLabel[a.imageCategory] ?? a.imageCategory}</Badge>}
-                {a.assetRole && <Badge tone="default">{assetRoleLabel[a.assetRole] ?? a.assetRole}</Badge>}
+                {a.assetRole && <Badge tone="default">{roleLabel(slug, a.assetRole) ?? a.assetRole}</Badge>}
                 {a.feature && <Badge tone="default">{a.feature}</Badge>}
                 <Badge tone={assetStatusTone(status)}>{assetStatusLabel[status] ?? '現行'}</Badge>
                 <Badge tone="default">已用 {a.usedInThreadsCount ?? 0} 次</Badge>

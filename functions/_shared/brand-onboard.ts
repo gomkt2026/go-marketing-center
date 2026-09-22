@@ -82,7 +82,7 @@ async function generateSeoTopics(env: Env, input: OnboardBrandInput): Promise<Se
             `定位:${input.tagline}`,
             `產業與產品:${input.industry}`,
             input.audience ? `受眾:${input.audience}` : '',
-            '請產出 8 個官網 SEO 長文題。一半偏搜尋痛點、一半偏產品怎麼用。',
+            '請產出 4 個官網 SEO 長文題，不要一次出 8 題。一半偏搜尋痛點、一半偏產品怎麼用。之後再用「搜尋新文章」補還沒覆蓋的題。',
             '回傳 JSON:{"topics":[{"topic":"中文題目","angle":"寫作角度40-80字","primaryKeyword":"主關鍵字","relatedTerms":["相關詞"],"category":"pain|product|policy|trust|talk","searchIntent":"informational|solution","audience":"consumer|merchant"}]}',
           ].filter(Boolean).join('\n'),
         },
@@ -90,7 +90,7 @@ async function generateSeoTopics(env: Env, input: OnboardBrandInput): Promise<Se
       temperature: 0.5,
       maxTokens: 2500,
     });
-    const topics = (result.topics ?? []).filter((t) => t.topic && t.angle).slice(0, 10);
+    const topics = (result.topics ?? []).filter((t) => t.topic && t.angle).slice(0, 4);
     if (topics.length >= 4) return topics;
   } catch (e) {
     console.error('[onboard] SEO 主題生成失敗，改用後備題庫', e);

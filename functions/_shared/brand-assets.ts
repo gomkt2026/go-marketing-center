@@ -26,18 +26,64 @@ export const IMAGE_CATEGORY_LABEL: Record<BrandAssetImageCategory, string> = {
   other: '其他',
 };
 
-export const ASSET_ROLES = ['landlord', 'tenant', 'operator', 'staff', 'public', 'brand', 'none'] as const;
+export const ASSET_ROLES = [
+  'landlord', 'tenant', 'operator',
+  'crew', 'client', 'shop',
+  'customer', 'shop_owner', 'driver',
+  'staff', 'public', 'brand', 'none',
+] as const;
 export type BrandAssetRole = (typeof ASSET_ROLES)[number];
 
-export const ASSET_ROLE_LABEL: Record<BrandAssetRole, string> = {
-  landlord: '房東',
-  tenant: '房客',
-  operator: '包租代管／管理者',
-  staff: '租賃管理人員',
-  public: '一般使用者',
-  brand: '品牌',
-  none: '不適用',
-};
+type RoleOption = { value: BrandAssetRole; label: string };
+
+const HOMIGO_ROLES: RoleOption[] = [
+  { value: 'landlord', label: '房東' },
+  { value: 'tenant', label: '房客' },
+  { value: 'operator', label: '包租代管／管理者' },
+  { value: 'staff', label: '租賃管理人員' },
+  { value: 'public', label: '一般使用者' },
+  { value: 'brand', label: '品牌' },
+  { value: 'none', label: '不適用' },
+];
+
+const TASKGO_ROLES: RoleOption[] = [
+  { value: 'crew', label: '工班／師傅' },
+  { value: 'client', label: '業主' },
+  { value: 'shop', label: '工程行' },
+  { value: 'staff', label: '內勤／調度' },
+  { value: 'public', label: '一般使用者' },
+  { value: 'brand', label: '品牌' },
+  { value: 'none', label: '不適用' },
+];
+
+const WASHGO_ROLES: RoleOption[] = [
+  { value: 'customer', label: '顧客' },
+  { value: 'shop_owner', label: '店主' },
+  { value: 'driver', label: '司機' },
+  { value: 'staff', label: '門市人員' },
+  { value: 'public', label: '一般使用者' },
+  { value: 'brand', label: '品牌' },
+  { value: 'none', label: '不適用' },
+];
+
+const GENERIC_ROLES: RoleOption[] = [
+  { value: 'staff', label: '內部人員' },
+  { value: 'public', label: '一般使用者' },
+  { value: 'brand', label: '品牌' },
+  { value: 'none', label: '不適用' },
+];
+
+export function rolesForBrand(slug: string): RoleOption[] {
+  if (slug === 'homigo') return HOMIGO_ROLES;
+  if (slug === 'taskgo') return TASKGO_ROLES;
+  if (slug === 'washgo') return WASHGO_ROLES;
+  return GENERIC_ROLES;
+}
+
+export function roleLabel(slug: string, role: string | null | undefined): string | null {
+  if (!role) return null;
+  return rolesForBrand(slug).find((item) => item.value === role)?.label ?? role;
+}
 
 export const ASSET_STATUSES = ['active', 'legacy', 'disabled'] as const;
 export type BrandAssetStatus = (typeof ASSET_STATUSES)[number];
@@ -75,6 +121,10 @@ export function isAssetRole(value: string | null | undefined): value is BrandAss
   return !!value && (ASSET_ROLES as readonly string[]).includes(value);
 }
 
+export function isAllowedRole(slug: string, value: string | null | undefined): value is BrandAssetRole {
+  return !!value && rolesForBrand(slug).some((item) => item.value === value);
+}
+
 export function isAssetStatus(value: string | null | undefined): value is BrandAssetStatus {
   return !!value && (ASSET_STATUSES as readonly string[]).includes(value);
 }
@@ -82,7 +132,7 @@ export function isAssetStatus(value: string | null | undefined): value is BrandA
 export function assetTaxonomy(slug: string) {
   return {
     categories: IMAGE_CATEGORIES.map((value) => ({ value, label: IMAGE_CATEGORY_LABEL[value] })),
-    roles: ASSET_ROLES.map((value) => ({ value, label: ASSET_ROLE_LABEL[value] })),
+    roles: rolesForBrand(slug),
     features: featuresForBrand(slug),
     statuses: ASSET_STATUSES.map((value) => ({ value, label: ASSET_STATUS_LABEL[value] })),
   };
@@ -90,20 +140,35 @@ export function assetTaxonomy(slug: string) {
 
 let assetLibraryEnsured = false;
 
+async function refreshAssetLibraryConstraints(sql: ReturnType<typeof getSql>): Promise<void> {
+  await sql`ALTER TABLE brand_assets DROP CONSTRAINT IF EXISTS brand_assets_image_category_check`;
+  await sql`
+    ALTER TABLE brand_assets
+      ADD CONSTRAINT brand_assets_image_category_check
+      CHECK (image_category IS NULL OR image_category IN (
+        'system_screenshot', 'real_photo', 'people', 'scene',
+        'brand_collab', 'press_clipping', 'brand_identity', 'other'
+      ))
+  `;
+  await sql`ALTER TABLE brand_assets DROP CONSTRAINT IF EXISTS brand_assets_asset_role_check`;
+  await sql`
+    ALTER TABLE brand_assets
+      ADD CONSTRAINT brand_assets_asset_role_check
+      CHECK (asset_role IS NULL OR asset_role IN (
+        'landlord', 'tenant', 'operator',
+        'crew', 'client', 'shop',
+        'customer', 'shop_owner', 'driver',
+        'staff', 'public', 'brand', 'none'
+      ))
+  `;
+}
+
 export async function ensureBrandAssetLibrary(env: Env): Promise<void> {
   if (assetLibraryEnsured) return;
   const sql = getSql(env);
   try {
     await sql`SELECT asset_role, feature, usage_context, asset_status FROM brand_assets LIMIT 1`;
-    await sql`ALTER TABLE brand_assets DROP CONSTRAINT IF EXISTS brand_assets_image_category_check`;
-    await sql`
-      ALTER TABLE brand_assets
-        ADD CONSTRAINT brand_assets_image_category_check
-        CHECK (image_category IS NULL OR image_category IN (
-          'system_screenshot', 'real_photo', 'people', 'scene',
-          'brand_collab', 'press_clipping', 'brand_identity', 'other'
-        ))
-    `;
+    await refreshAssetLibraryConstraints(sql);
     assetLibraryEnsured = true;
     return;
   } catch {
@@ -122,23 +187,7 @@ export async function ensureBrandAssetLibrary(env: Env): Promise<void> {
     WHERE asset_status IS NULL OR asset_status = ''
   `;
   await sql`ALTER TABLE brand_assets ALTER COLUMN asset_status SET DEFAULT 'active'`;
-  await sql`ALTER TABLE brand_assets DROP CONSTRAINT IF EXISTS brand_assets_image_category_check`;
-  await sql`
-    ALTER TABLE brand_assets
-      ADD CONSTRAINT brand_assets_image_category_check
-      CHECK (image_category IS NULL OR image_category IN (
-        'system_screenshot', 'real_photo', 'people', 'scene',
-        'brand_collab', 'press_clipping', 'brand_identity', 'other'
-      ))
-  `;
-  await sql`ALTER TABLE brand_assets DROP CONSTRAINT IF EXISTS brand_assets_asset_role_check`;
-  await sql`
-    ALTER TABLE brand_assets
-      ADD CONSTRAINT brand_assets_asset_role_check
-      CHECK (asset_role IS NULL OR asset_role IN (
-        'landlord', 'tenant', 'operator', 'staff', 'public', 'brand', 'none'
-      ))
-  `;
+  await refreshAssetLibraryConstraints(sql);
   await sql`ALTER TABLE brand_assets DROP CONSTRAINT IF EXISTS brand_assets_asset_status_check`;
   await sql`
     ALTER TABLE brand_assets
@@ -325,13 +374,11 @@ export function describeAssetForPrompt(asset: {
   assetRole?: string | null;
   feature?: string | null;
   usageContext?: string | null;
-}): string {
+}, slug?: string): string {
   const category = asset.imageCategory && isImageCategory(asset.imageCategory)
     ? IMAGE_CATEGORY_LABEL[asset.imageCategory]
     : null;
-  const role = asset.assetRole && isAssetRole(asset.assetRole)
-    ? ASSET_ROLE_LABEL[asset.assetRole]
-    : null;
+  const role = slug ? roleLabel(slug, asset.assetRole) : (asset.assetRole ?? null);
   return [
     asset.name ? `素材名稱:${asset.name}` : '',
     category ? `類型:${category}` : '',

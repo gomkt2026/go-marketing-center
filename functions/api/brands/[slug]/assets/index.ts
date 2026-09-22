@@ -9,7 +9,7 @@ import { buildBrandLibraryKey, putMedia } from '../../../../_shared/media';
 import {
   assetTaxonomy,
   ensureBrandAssetLibrary,
-  isAssetRole,
+  isAllowedRole,
   isAssetStatus,
   isImageCategory,
 } from '../../../../_shared/brand-assets';
@@ -86,7 +86,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const imageCategoryRaw = String(form.get('imageCategory') ?? '').trim();
   const imageCategory = isImageCategory(imageCategoryRaw) ? imageCategoryRaw : null;
   const roleRaw = String(form.get('assetRole') ?? '').trim();
-  const assetRole = isAssetRole(roleRaw) ? roleRaw : null;
+  const assetRole = isAllowedRole(slug, roleRaw) ? roleRaw : null;
   const feature = String(form.get('feature') ?? '').trim() || null;
   const usageContext = String(form.get('usageContext') ?? '').trim() || null;
   const statusRaw = String(form.get('assetStatus') ?? 'active').trim();

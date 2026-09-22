@@ -203,7 +203,10 @@ export type BrandAssetImageCategory =
   | 'brand_collab' | 'press_clipping' | 'brand_identity' | 'other';
 
 export type BrandAssetRole =
-  | 'landlord' | 'tenant' | 'operator' | 'staff' | 'public' | 'brand' | 'none';
+  | 'landlord' | 'tenant' | 'operator'
+  | 'crew' | 'client' | 'shop'
+  | 'customer' | 'shop_owner' | 'driver'
+  | 'staff' | 'public' | 'brand' | 'none';
 
 export type BrandAssetStatus = 'active' | 'legacy' | 'disabled';
 
@@ -1427,6 +1430,8 @@ export interface SeoTopic {
   category?: string;
   searchIntent?: string;
   audience?: string;
+  coverage?: 'open' | 'draft' | 'published';
+  matchedTitle?: string;
 }
 
 export interface SeoReportPayload {

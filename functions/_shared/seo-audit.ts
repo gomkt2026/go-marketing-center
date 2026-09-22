@@ -3,7 +3,7 @@ import { getSql } from './db';
 import { rowToCamel } from './case';
 import { type SeoTopicSeed } from './prompts';
 import { defaultWebsiteDestination } from './website-articles';
-import { listSeoTopicsForBrand } from './seo-topics';
+import { classifySeoTopics, listSeoTopicsForBrand, MAX_RECOMMENDED_SEO_ARTICLES } from './seo-topics';
 
 export type SeoPriority = 'P0' | 'P1' | 'P2' | 'P3';
 export type SeoFindingCategory =
@@ -471,12 +471,13 @@ export async function runBrandSeoAudit(
   const moreUrls = sitemapLocs
     .filter((loc) => !seedUrls.includes(loc.replace(/\/$/, '')) && loc.startsWith(originOf(siteUrl)))
     .filter((loc) => /blog|article|knowledge|guide|pricing|brands|about/i.test(loc))
-    .slice(0, 3);
+    .slice(0, 8);
   const moreFetched = await Promise.all(moreUrls.map((url) => fetchUrl(url)));
 
   const htmlPages: SeoPageSnapshot[] = [];
   const pageTexts: string[] = [];
   const homePage = parsePage(siteUrl, home.status, home.finalUrl, home.body, home.error);
+  const homeText = visibleText(home.body);
   htmlPages.push(homePage);
   pageTexts.push(homeText);
 
@@ -495,7 +496,6 @@ export async function runBrandSeoAudit(
   const findings: SeoFinding[] = [];
   const counters: Record<string, number> = {};
   const homeOk = home.status === 200 && !home.error;
-  const homeText = visibleText(home.body);
 
   if (!homeOk) {
     addFinding(findings, counters, {
@@ -767,24 +767,18 @@ export async function runBrandSeoAudit(
   const articles = await loadWebsiteArticles(env, brand.id);
   const published = articles.filter((a) => a.status === 'published' || a.status === 'scheduled');
   const drafted = articles.filter((a) => a.status === 'pending_review' || a.status === 'approved');
-  const coveredText = [
-    ...pageTexts,
-    ...sitemapLocs,
-    ...articles.map((a) => `${a.title} ${a.seo.primary_keyword || ''} ${(a.seo.related_terms as string[] | undefined)?.join(' ') || ''}`),
-  ].join('\n');
 
-  const gaps: SeoContentGap[] = [];
-  for (const topic of topicBank) {
-    const needle = (topic.primaryKeyword || topic.topic).replace(/\s+/g, '');
-    const inPublished = published.some((a) =>
-      `${a.title}${a.seo.primary_keyword || ''}`.replace(/\s+/g, '').includes(needle),
-    );
-    if (inPublished) continue;
-    const onHome = coveredText.replace(/\s+/g, '').includes(needle);
-    const inDraft = drafted.some((a) =>
-      `${a.title}${a.seo.primary_keyword || ''}`.replace(/\s+/g, '').includes(needle),
-    );
-    gaps.push({
+  const classified = classifySeoTopics(topicBank, {
+    published: published.map((a) => `${a.title} ${a.seo.primary_keyword || ''}`),
+    drafts: drafted.map((a) => `${a.title} ${a.seo.primary_keyword || ''}`),
+    extraTitles: htmlPages
+      .filter((page) => /blog|article|knowledge|guide/i.test(page.url))
+      .flatMap((page) => [page.title, page.h1[0]].filter((item): item is string => !!item)),
+  });
+  const gaps: SeoContentGap[] = classified
+    .filter((topic) => topic.coverage === 'open')
+    .slice(0, MAX_RECOMMENDED_SEO_ARTICLES)
+    .map((topic) => ({
       topic: topic.topic,
       angle: topic.angle,
       primaryKeyword: topic.primaryKeyword,
@@ -792,14 +786,9 @@ export async function runBrandSeoAudit(
       category: topic.category,
       searchIntent: topic.searchIntent,
       audience: topic.audience,
-      reason: inDraft
-        ? '內容中心已有草稿，尚未發布到官網。'
-        : onHome
-          ? '首頁有提到這個詞，但沒有獨立可收錄的長文 URL。'
-          : '主題庫有這題，官網與已發布長文都還沒覆蓋。',
-      priority: inDraft ? 'P2' : onHome ? 'P1' : 'P1',
-    });
-  }
+      reason: '這題在官網與內容中心都還沒有對應長文。先寫這幾篇，不要一次把主題庫全產完。',
+      priority: 'P1' as const,
+    }));
 
   if (published.length === 0) {
     addFinding(findings, counters, {
@@ -810,7 +799,7 @@ export async function runBrandSeoAudit(
       evidence: drafted.length
         ? `內容中心有 ${drafted.length} 篇待審／已核准，但尚未 ingest 到官網。`
         : '內容中心尚無 website 頻道長文。',
-      recommendation: '從下方內容缺口產文 → 內容中心審閱 → 一鍵發布到官網。',
+      recommendation: '先按「搜尋新文章」，只產還沒寫過的 1–3 篇 → 內容中心審閱 → 一鍵發布到官網。',
       contentTopic: gaps[0]?.topic,
     });
   }
@@ -857,7 +846,7 @@ export async function runBrandSeoAudit(
   if (gaps[0]) {
     recs.push({
       title: `先補搜尋題：${gaps[0].primaryKeyword || gaps[0].topic}`,
-      detail: '用內容中心或本頁「產生這篇長文」，走 answer-first + FAQ，審核後發布到 /blog/{slug}。',
+      detail: '先搜尋官網與內容中心已有的文章，只產還沒覆蓋的題。不要把主題庫一次全產完。',
       owner: 'content',
       priority: 'P1',
     });

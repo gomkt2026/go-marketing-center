@@ -80,7 +80,7 @@ export function ContentCenter() {
   const [regenError, setRegenError] = useState<string | null>(null);
   const [publishMessage, setPublishMessage] = useState<string | null>(null);
   const [apiPublishing, setApiPublishing] = useState(false);
-  const [seoTopics, setSeoTopics] = useState<{ topic: string; angle: string }[]>([]);
+  const [seoTopics, setSeoTopics] = useState<{ topic: string; angle: string; coverage?: string }[]>([]);
   const [seoGenerating, setSeoGenerating] = useState(false);
   const [seoError, setSeoError] = useState<string | null>(null);
 
@@ -107,7 +107,10 @@ export function ContentCenter() {
     if (!slug) return;
     let cancelled = false;
     api.seoTopics(slug).then((res) => {
-      if (!cancelled) setSeoTopics(res.topics ?? []);
+      if (!cancelled) {
+        const open = (res.recommended ?? res.topics ?? []).filter((t) => (t.coverage ?? 'open') === 'open').slice(0, 3);
+        setSeoTopics(open);
+      }
     }).catch(() => {
       if (!cancelled) setSeoTopics([]);
     });
@@ -299,7 +302,7 @@ export function ContentCenter() {
               <p style={{ fontSize: 13 }}>此分類目前沒有內容</p>
               {platform === 'seo' && seoTopics.length > 0 && (
                 <div style={{ marginTop: 12 }}>
-                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>從簡報/搜尋詞產一篇:</p>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>只產還沒寫過的搜尋題（最多 3 篇）:</p>
                   {seoTopics.map((t) => (
                     <button
                       key={t.topic}

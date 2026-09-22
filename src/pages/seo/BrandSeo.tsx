@@ -65,6 +65,7 @@ export function BrandSeo() {
   const brand = slug ? brandBySlug(slug) : undefined;
   const [running, setRunning] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [discovering, setDiscovering] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [contentId, setContentId] = useState<string | null>(null);
 
@@ -82,6 +83,7 @@ export function BrandSeo() {
     setContentId(null);
     setRunning(false);
     setGenerating(null);
+    setDiscovering(false);
   }, [slug]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
@@ -144,10 +146,32 @@ export function BrandSeo() {
       });
       setContentId(res.contentId);
       setNotice(`已生成「${res.title}」，請到內容中心審閱後發布到官網。`);
+      topicsQuery.reload();
     } catch (err) {
       setNotice(err instanceof Error ? err.message : '產文失敗');
     } finally {
       setGenerating(null);
+    }
+  }
+
+  async function discoverTopics() {
+    if (!slug || discovering) return;
+    setDiscovering(true);
+    setNotice('正在搜尋官網、內容中心與還沒寫過的搜尋題…只會補最多 3 篇新題。');
+    try {
+      const res = await api.discoverSeoTopics(slug);
+      topicsQuery.reload();
+      if (res.discovered.length) {
+        setNotice(`找到 ${res.discovered.length} 個新搜尋題。請只產下面建議的幾篇，不要一次把題庫產完。`);
+      } else if ((res.recommended ?? []).length) {
+        setNotice(`現有題庫還有 ${res.recommended.length} 題沒寫過。先產這幾篇即可。`);
+      } else {
+        setNotice('官網與內容中心已覆蓋現有題庫，這次沒有新的搜尋題。');
+      }
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '搜尋新文章失敗');
+    } finally {
+      setDiscovering(false);
     }
   }
 
@@ -191,33 +215,88 @@ export function BrandSeo() {
       )}
 
       <Card style={{ marginBottom: 12 }}>
-        <strong style={{ display: 'block', marginBottom: 8 }}>SEO 主題庫</strong>
-        <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginBottom: 10, lineHeight: 1.6 }}>
-          新品牌建立時會先產出主題。選一題即可產官網長文，審閱後再發到官網。
-        </p>
-        {(topicsQuery.data?.topics ?? []).length === 0 && (
-          <p style={{ fontSize: 13 }}>尚未有主題。請到設定 → 品牌確認這個品牌已建立，或先寫完品牌智慧再回來產文。</p>
-        )}
-        <div style={{ display: 'grid', gap: 8 }}>
-          {(topicsQuery.data?.topics ?? []).map((topic) => (
-            <div key={topic.topic} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12 }}>
-              <div className="card-row" style={{ alignItems: 'flex-start', gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <strong style={{ fontSize: 14 }}>{topic.topic}</strong>
-                  <p style={{ fontSize: 12.5, marginTop: 4, lineHeight: 1.6 }}>{topic.angle}</p>
-                </div>
-                <Button
-                  variant="primary"
-                  disabled={generating !== null}
-                  style={{ fontSize: 12, padding: '4px 12px', flexShrink: 0 }}
-                  onClick={() => void generateFromGap(topic.topic)}
-                >
-                  {generating === topic.topic ? '產文中…' : '產生這篇長文'}
-                </Button>
-              </div>
-            </div>
-          ))}
+        <div className="card-row" style={{ alignItems: 'flex-start', marginBottom: 8 }}>
+          <div style={{ flex: 1 }}>
+            <strong style={{ display: 'block', marginBottom: 8 }}>SEO 主題庫</strong>
+            <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+              先搜尋官網與內容中心已有的文章，再只產還沒覆蓋的題。每次最多建議 3 篇，避免一次產太多長文。
+            </p>
+          </div>
+          <Button variant="primary" disabled={discovering || generating !== null} onClick={() => void discoverTopics()}>
+            {discovering ? '搜尋中…' : '搜尋新文章'}
+          </Button>
         </div>
+        {(topicsQuery.data?.topics ?? []).length === 0 && (
+          <p style={{ fontSize: 13 }}>尚未有主題。請到設定 → 品牌確認這個品牌已建立，或按「搜尋新文章」。 </p>
+        )}
+        {(() => {
+          const all = topicsQuery.data?.topics ?? [];
+          const recommended = (topicsQuery.data?.recommended ?? all.filter((t) => (t.coverage ?? 'open') === 'open')).slice(0, 3);
+          const covered = all.filter((t) => t.coverage === 'published' || t.coverage === 'draft');
+          const backlog = all.filter((t) => (t.coverage ?? 'open') === 'open' && !recommended.some((r) => r.topic === t.topic));
+          return (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {recommended.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>建議這次寫（最多 3 篇）</p>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {recommended.map((topic) => (
+                      <div key={topic.topic} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12 }}>
+                        <div className="card-row" style={{ alignItems: 'flex-start', gap: 12 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <strong style={{ fontSize: 14 }}>{topic.topic}</strong>
+                            <p style={{ fontSize: 12.5, marginTop: 4, lineHeight: 1.6 }}>{topic.angle}</p>
+                          </div>
+                          <Button
+                            variant="primary"
+                            disabled={generating !== null || discovering}
+                            style={{ fontSize: 12, padding: '4px 12px', flexShrink: 0 }}
+                            onClick={() => void generateFromGap(topic.topic)}
+                          >
+                            {generating === topic.topic ? '產文中…' : '產生這篇長文'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {covered.length > 0 && (
+                <details>
+                  <summary style={{ cursor: 'pointer', fontSize: 12.5, color: 'var(--color-text-muted)' }}>
+                    已有長文或草稿（{covered.length}），不再重複產
+                  </summary>
+                  <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+                    {covered.map((topic) => (
+                      <div key={topic.topic} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12, opacity: 0.85 }}>
+                        <strong style={{ fontSize: 13 }}>{topic.topic}</strong>
+                        <p style={{ fontSize: 12, marginTop: 4, color: 'var(--color-text-muted)' }}>
+                          {topic.coverage === 'draft' ? '內容中心已有草稿' : '已有長文'}
+                          {topic.matchedTitle ? `：${topic.matchedTitle}` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+              {backlog.length > 0 && (
+                <details>
+                  <summary style={{ cursor: 'pointer', fontSize: 12.5, color: 'var(--color-text-muted)' }}>
+                    其餘未寫題先收著（{backlog.length}），避免一次產太多
+                  </summary>
+                  <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+                    {backlog.map((topic) => (
+                      <div key={topic.topic} style={{ border: '1px dashed var(--color-border)', borderRadius: 10, padding: 12 }}>
+                        <strong style={{ fontSize: 13 }}>{topic.topic}</strong>
+                        <p style={{ fontSize: 12, marginTop: 4, lineHeight: 1.6, color: 'var(--color-text-muted)' }}>{topic.angle}</p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          );
+        })()}
       </Card>
 
       {!audit && (
@@ -305,8 +384,8 @@ export function BrandSeo() {
           </Card>
 
           <Card style={{ marginBottom: 12 }}>
-            <strong style={{ display: 'block', marginBottom: 10 }}>內容缺口（可直接產官網長文）</strong>
-            {audit.contentGaps.length === 0 && <p style={{ fontSize: 13 }}>主題庫主力搜尋題已有對應長文或草稿。</p>}
+            <strong style={{ display: 'block', marginBottom: 10 }}>內容缺口（每次最多 3 篇）</strong>
+            {audit.contentGaps.length === 0 && <p style={{ fontSize: 13 }}>目前沒有新的搜尋題可寫。主題庫已有對應長文、草稿，或請先按「搜尋新文章」。</p>}
             <div style={{ display: 'grid', gap: 8 }}>
               {audit.contentGaps.map((gap) => (
                 <div key={gap.topic} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12 }}>

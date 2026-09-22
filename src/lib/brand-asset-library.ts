@@ -13,16 +13,6 @@ export const IMAGE_CATEGORY_OPTIONS: { value: BrandAssetImageCategory; label: st
   { value: 'other', label: '其他' },
 ];
 
-export const ASSET_ROLE_OPTIONS: { value: BrandAssetRole; label: string }[] = [
-  { value: 'landlord', label: '房東' },
-  { value: 'tenant', label: '房客' },
-  { value: 'operator', label: '包租代管／管理者' },
-  { value: 'staff', label: '租賃管理人員' },
-  { value: 'public', label: '一般使用者' },
-  { value: 'brand', label: '品牌' },
-  { value: 'none', label: '不適用' },
-];
-
 export const ASSET_STATUS_OPTIONS: { value: BrandAssetStatus; label: string }[] = [
   { value: 'active', label: '現行' },
   { value: 'legacy', label: '舊版' },
@@ -44,14 +34,55 @@ const FEATURES_BY_SLUG: Record<string, string[]> = {
   ],
 };
 
+const ROLES_BY_SLUG: Record<string, { value: BrandAssetRole; label: string }[]> = {
+  homigo: [
+    { value: 'landlord', label: '房東' },
+    { value: 'tenant', label: '房客' },
+    { value: 'operator', label: '包租代管／管理者' },
+    { value: 'staff', label: '租賃管理人員' },
+    { value: 'public', label: '一般使用者' },
+    { value: 'brand', label: '品牌' },
+    { value: 'none', label: '不適用' },
+  ],
+  taskgo: [
+    { value: 'crew', label: '工班／師傅' },
+    { value: 'client', label: '業主' },
+    { value: 'shop', label: '工程行' },
+    { value: 'staff', label: '內勤／調度' },
+    { value: 'public', label: '一般使用者' },
+    { value: 'brand', label: '品牌' },
+    { value: 'none', label: '不適用' },
+  ],
+  washgo: [
+    { value: 'customer', label: '顧客' },
+    { value: 'shop_owner', label: '店主' },
+    { value: 'driver', label: '司機' },
+    { value: 'staff', label: '門市人員' },
+    { value: 'public', label: '一般使用者' },
+    { value: 'brand', label: '品牌' },
+    { value: 'none', label: '不適用' },
+  ],
+};
+
+const GENERIC_ROLES: { value: BrandAssetRole; label: string }[] = [
+  { value: 'staff', label: '內部人員' },
+  { value: 'public', label: '一般使用者' },
+  { value: 'brand', label: '品牌' },
+  { value: 'none', label: '不適用' },
+];
+
 export function featuresForBrand(slug: string): string[] {
   return FEATURES_BY_SLUG[slug] ?? ['產品功能', '操作畫面', '現場', ...SHARED_FEATURES];
+}
+
+export function rolesForBrand(slug: string): { value: BrandAssetRole; label: string }[] {
+  return ROLES_BY_SLUG[slug] ?? GENERIC_ROLES;
 }
 
 export function fallbackTaxonomy(slug: string): BrandAssetTaxonomy {
   return {
     categories: IMAGE_CATEGORY_OPTIONS,
-    roles: ASSET_ROLE_OPTIONS,
+    roles: rolesForBrand(slug),
     features: featuresForBrand(slug),
     statuses: ASSET_STATUS_OPTIONS,
   };
@@ -61,16 +92,46 @@ export const imageCategoryLabel: Record<string, string> = Object.fromEntries(
   IMAGE_CATEGORY_OPTIONS.map((o) => [o.value, o.label]),
 );
 
-export const assetRoleLabel: Record<string, string> = Object.fromEntries(
-  ASSET_ROLE_OPTIONS.map((o) => [o.value, o.label]),
-);
-
 export const assetStatusLabel: Record<string, string> = Object.fromEntries(
   ASSET_STATUS_OPTIONS.map((o) => [o.value, o.label]),
 );
+
+export function roleLabel(slug: string, role: string | null | undefined): string | null {
+  if (!role) return null;
+  return rolesForBrand(slug).find((item) => item.value === role)?.label ?? role;
+}
 
 export function assetStatusTone(status: string | null | undefined): 'primary' | 'secondary' | 'default' {
   if (status === 'legacy') return 'secondary';
   if (status === 'disabled') return 'default';
   return 'primary';
+}
+
+export function libraryCopy(slug: string): { name: string; usage: string; caption: string } {
+  if (slug === 'homigo') {
+    return {
+      name: '素材名稱，例如：報修案件詳情',
+      usage: '畫面用途，例如：案件進度',
+      caption: '素材說明：這張圖在表達什麼？例如：房東查看租客報修案件、目前處理狀態與相關紀錄。',
+    };
+  }
+  if (slug === 'taskgo') {
+    return {
+      name: '素材名稱，例如：場勘回報',
+      usage: '畫面用途，例如：今日進度',
+      caption: '素材說明：這張圖在表達什麼？例如：工班頭查看各案場今天做到哪、照片與待辦。',
+    };
+  }
+  if (slug === 'washgo') {
+    return {
+      name: '素材名稱，例如：送洗履歷',
+      usage: '畫面用途，例如：衣物進度',
+      caption: '素材說明：這張圖在表達什麼？例如：店主核對這件衣服的送洗履歷與目前狀態。',
+    };
+  }
+  return {
+    name: '素材名稱，例如：主畫面總覽',
+    usage: '畫面用途，例如：操作流程',
+    caption: '素材說明：這張圖在表達什麼？請用這個品牌自己的場景來寫，不要套用其他品牌的功能名稱。',
+  };
 }

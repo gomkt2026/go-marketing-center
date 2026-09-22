@@ -7,7 +7,7 @@ import { rowsToCamel } from '../../../../_shared/case';
 import { json, error } from '../../../../_shared/response';
 import {
   ensureBrandAssetLibrary,
-  isAssetRole,
+  isAllowedRole,
   isAssetStatus,
   isImageCategory,
 } from '../../../../_shared/brand-assets';
@@ -56,7 +56,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     ? (isImageCategory(String(body.imageCategory ?? '')) ? String(body.imageCategory) : null)
     : current.image_category;
   const assetRole = body.assetRole !== undefined
-    ? (isAssetRole(String(body.assetRole ?? '')) ? String(body.assetRole) : null)
+    ? (isAllowedRole(slug, String(body.assetRole ?? '')) ? String(body.assetRole) : null)
     : current.asset_role;
   const feature = body.feature !== undefined ? (String(body.feature ?? '').trim() || null) : current.feature;
   const usageContext = body.usageContext !== undefined

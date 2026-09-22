@@ -7,10 +7,16 @@ import { json, error } from '../../../_shared/response';
 import { logActivity } from '../../../_shared/activity';
 import { buildBrandContext } from '../../../_shared/prompts';
 import { generateSeoArticle, saveSeoArticle, findBrandAgent, pickSeoTopicFromList } from '../../../_shared/generate';
-import { listSeoTopicsForBrand } from '../../../_shared/seo-topics';
+import {
+  annotateSeoTopics,
+  discoverNewSeoTopics,
+  listSeoTopicsForBrand,
+  MAX_RECOMMENDED_SEO_ARTICLES,
+  recommendedSeoTopics,
+} from '../../../_shared/seo-topics';
 
-// GET  /api/brands/:slug/seo-articles → 主題庫
-// POST /api/brands/:slug/seo-articles → 官網 SEO 長文(website 頻道)
+// GET  /api/brands/:slug/seo-articles → 主題庫（含是否已有長文）
+// POST /api/brands/:slug/seo-articles → 搜尋新文章，或產一篇還沒覆蓋的官網長文
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -20,8 +26,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const brand = await getBrandBySlug(context.env, slug);
   if (!brand) return error('Brand not found', 404);
 
-  const topics = await listSeoTopicsForBrand(context.env, brand.id, slug);
-  return json({ topics });
+  const bank = await listSeoTopicsForBrand(context.env, brand.id, slug);
+  const topics = await annotateSeoTopics(context.env, brand.id, bank);
+  return json({
+    topics,
+    recommended: recommendedSeoTopics(topics),
+    maxRecommended: MAX_RECOMMENDED_SEO_ARTICLES,
+  });
 };
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -33,9 +44,25 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!brand) return error('Brand not found', 404);
 
   const body = await context.request.json().catch(() => ({})) as {
+    action?: string;
     topic?: string;
     instruction?: string;
   };
+
+  if (body.action === 'discover') {
+    try {
+      const result = await discoverNewSeoTopics(context.env, brand);
+      return json({
+        topics: result.topics,
+        recommended: recommendedSeoTopics(result.topics),
+        discovered: result.discovered,
+        siteTitles: result.siteTitles,
+        maxRecommended: MAX_RECOMMENDED_SEO_ARTICLES,
+      });
+    } catch (err) {
+      return error(err instanceof Error ? err.message : '搜尋新文章失敗', 500);
+    }
+  }
 
   const sql = getSql(context.env);
   const usedRows = await sql`
@@ -48,12 +75,25 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   `;
   const usedTitles = (usedRows as { title: string | null }[]).map((r) => r.title ?? '');
   const bank = await listSeoTopicsForBrand(context.env, brand.id, slug);
+  const annotated = await annotateSeoTopics(context.env, brand.id, bank);
+  const open = recommendedSeoTopics(annotated);
+
+  if (body.topic?.trim()) {
+    const pickedTopic = annotated.find((t) => t.topic === body.topic?.trim());
+    if (pickedTopic?.coverage === 'published') {
+      return error(`這題已有長文「${pickedTopic.matchedTitle}」，請改按「搜尋新文章」找還沒寫過的題。`, 409);
+    }
+    if (pickedTopic?.coverage === 'draft') {
+      return error(`這題在內容中心已有草稿「${pickedTopic.matchedTitle}」，請先審閱發布，不要再產一篇。`, 409);
+    }
+  }
+
   const picked = body.topic?.trim()
     ? (bank.find((t) => t.topic === body.topic?.trim()) ?? {
       topic: body.topic.trim(),
       angle: body.instruction?.trim() || '依品牌事實寫給會搜這個詞的讀者。',
     })
-    : pickSeoTopicFromList(bank, usedTitles);
+    : (open[0] ?? pickSeoTopicFromList(bank, usedTitles));
 
   const brandCtx = await buildBrandContext(context.env, brand.id);
   const agentId = await findBrandAgent(context.env, brand.id);

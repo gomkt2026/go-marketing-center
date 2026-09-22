@@ -276,7 +276,10 @@ CREATE TABLE brand_assets (
     'brand_collab', 'press_clipping', 'brand_identity', 'other'
   )),
   CHECK (asset_role IS NULL OR asset_role IN (
-    'landlord', 'tenant', 'operator', 'staff', 'public', 'brand', 'none'
+    'landlord', 'tenant', 'operator',
+    'crew', 'client', 'shop',
+    'customer', 'shop_owner', 'driver',
+    'staff', 'public', 'brand', 'none'
   )),
   CHECK (asset_status IN ('active', 'legacy', 'disabled'))
 );

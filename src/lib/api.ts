@@ -451,7 +451,23 @@ export const api = {
     request<{ contents: import('@/types').Content[] }>(`/api/brands/${slug}/contents`),
 
   seoTopics: (slug: string) =>
-    request<{ topics: { topic: string; angle: string }[] }>(`/api/brands/${slug}/seo-articles`),
+    request<{
+      topics: import('@/types').SeoTopic[];
+      recommended?: import('@/types').SeoTopic[];
+      maxRecommended?: number;
+    }>(`/api/brands/${slug}/seo-articles`),
+
+  discoverSeoTopics: (slug: string) =>
+    request<{
+      topics: import('@/types').SeoTopic[];
+      recommended: import('@/types').SeoTopic[];
+      discovered: import('@/types').SeoTopic[];
+      siteTitles: string[];
+      maxRecommended: number;
+    }>(`/api/brands/${slug}/seo-articles`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'discover' }),
+    }),
 
   generateSeoFromTopic: (slug: string, body?: { topic?: string; instruction?: string }) =>
     request<{ contentId: string; title: string; topic: string }>(`/api/brands/${slug}/seo-articles`, {

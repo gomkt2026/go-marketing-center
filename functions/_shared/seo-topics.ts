@@ -1,6 +1,18 @@
 import type { Env } from './env';
 import { getSql } from './db';
+import { chatCompleteJson } from './openai';
 import { SEO_TOPIC_BANK, type SeoTopicSeed } from './prompts';
+import { defaultWebsiteDestination } from './website-articles';
+
+/** 一次只推這幾篇新長文，避免主題庫全部變成「產生這篇長文」 */
+export const MAX_RECOMMENDED_SEO_ARTICLES = 3;
+
+export type SeoTopicCoverage = 'open' | 'draft' | 'published';
+
+export interface SeoTopicWithCoverage extends SeoTopicSeed {
+  coverage: SeoTopicCoverage;
+  matchedTitle?: string;
+}
 
 function isMissingSeoTopics(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -69,6 +81,211 @@ export async function listSeoTopicsForBrand(
   const stored = await listStoredSeoTopics(env, brandId);
   if (stored.length) return stored;
   return SEO_TOPIC_BANK[slug] ?? [];
+}
+
+function compact(text: string): string {
+  return text.replace(/\s+/g, '').replace(/[？?！!，,。、：:；;]/g, '');
+}
+
+function topicNeedles(topic: SeoTopicSeed): string[] {
+  const raw = [
+    topic.primaryKeyword,
+    topic.topic.replace(/[？?].*$/, ''),
+    ...(topic.relatedTerms ?? []).slice(0, 1),
+  ].filter((item): item is string => !!item && compact(item).length >= 4);
+  return [...new Set(raw.map(compact))];
+}
+
+export function findCoveringTitle(topic: SeoTopicSeed, titles: string[]): string | undefined {
+  const needles = topicNeedles(topic);
+  if (!needles.length) return undefined;
+  for (const title of titles) {
+    const hay = compact(title);
+    if (!hay) continue;
+    if (needles.some((needle) => hay.includes(needle))) return title;
+  }
+  return undefined;
+}
+
+export async function loadSeoContentTitles(env: Env, brandId: string): Promise<{
+  published: string[];
+  drafts: string[];
+}> {
+  const sql = getSql(env);
+  try {
+    const rows = await sql`
+      SELECT c.title, c.status, v.seo_meta
+      FROM contents c
+      JOIN LATERAL (
+        SELECT seo_meta
+        FROM content_versions
+        WHERE content_id = c.id
+        ORDER BY version_number DESC
+        LIMIT 1
+      ) v ON true
+      WHERE c.brand_id = ${brandId}::uuid
+        AND c.content_type = 'article'
+        AND (c.target_platform = 'website' OR c.target_platform IS NULL)
+      ORDER BY c.created_at DESC
+      LIMIT 80
+    `;
+    const published: string[] = [];
+    const drafts: string[] = [];
+    for (const row of rows as { title: string; status: string; seo_meta: Record<string, unknown> | null }[]) {
+      const seo = row.seo_meta ?? {};
+      const label = [row.title, seo.primary_keyword, seo.seo_title].filter(Boolean).join(' ');
+      if (row.status === 'published' || row.status === 'scheduled') published.push(label);
+      else if (row.status === 'pending_review' || row.status === 'approved') drafts.push(label);
+    }
+    return { published, drafts };
+  } catch {
+    return { published: [], drafts: [] };
+  }
+}
+
+export function classifySeoTopics(
+  topics: SeoTopicSeed[],
+  coverage: { published: string[]; drafts: string[]; extraTitles?: string[] },
+): SeoTopicWithCoverage[] {
+  const siteTitles = coverage.extraTitles ?? [];
+  return topics.map((topic) => {
+    const publishedHit = findCoveringTitle(topic, coverage.published);
+    if (publishedHit) return { ...topic, coverage: 'published', matchedTitle: publishedHit };
+    const siteHit = findCoveringTitle(topic, siteTitles);
+    if (siteHit) return { ...topic, coverage: 'published', matchedTitle: siteHit };
+    const draftHit = findCoveringTitle(topic, coverage.drafts);
+    if (draftHit) return { ...topic, coverage: 'draft', matchedTitle: draftHit };
+    return { ...topic, coverage: 'open' };
+  });
+}
+
+export async function annotateSeoTopics(
+  env: Env,
+  brandId: string,
+  topics: SeoTopicSeed[],
+): Promise<SeoTopicWithCoverage[]> {
+  const coverage = await loadSeoContentTitles(env, brandId);
+  return classifySeoTopics(topics, coverage);
+}
+
+export function recommendedSeoTopics(topics: SeoTopicWithCoverage[]): SeoTopicWithCoverage[] {
+  return topics.filter((topic) => topic.coverage === 'open').slice(0, MAX_RECOMMENDED_SEO_ARTICLES);
+}
+
+async function fetchText(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'User-Agent': 'GoMarketing-SEO-Discover/1.0',
+      },
+      signal: AbortSignal.timeout(8_000),
+    });
+    return (await res.text()).slice(0, 200_000);
+  } catch {
+    return '';
+  }
+}
+
+function sitemapLocs(xml: string, limit = 12): string[] {
+  const locs = [...xml.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)].map((m) => m[1].trim());
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const loc of locs) {
+    if (seen.has(loc)) continue;
+    seen.add(loc);
+    out.push(loc);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function htmlTitle(html: string, fallback: string): string {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = match?.[1]?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return title || fallback;
+}
+
+export async function crawlSiteArticleTitles(siteUrl: string): Promise<string[]> {
+  const origin = siteUrl.replace(/\/$/, '');
+  const titles: string[] = [];
+  const sitemap = await fetchText(`${origin}/sitemap.xml`);
+  const blogUrls = sitemapLocs(sitemap, 12).filter((loc) => /blog|article|knowledge|guide/i.test(loc)).slice(0, 4);
+  const blogIndex = await fetchText(`${origin}/blog`);
+  if (blogIndex) titles.push(htmlTitle(blogIndex, 'blog'));
+  const pages = await Promise.all(blogUrls.map((url) => fetchText(url).then((html) => htmlTitle(html, url))));
+  titles.push(...pages.filter(Boolean));
+  return [...new Set(titles)];
+}
+
+function topicKey(topic: SeoTopicSeed): string {
+  return compact(topic.primaryKeyword || topic.topic);
+}
+
+export async function discoverNewSeoTopics(
+  env: Env,
+  brand: { id: string; slug: string; name: string; blogBaseUrl?: string | null; websiteUrl?: string | null },
+): Promise<{
+  topics: SeoTopicWithCoverage[];
+  discovered: SeoTopicSeed[];
+  siteTitles: string[];
+}> {
+  const current = await listSeoTopicsForBrand(env, brand.id, brand.slug);
+  const content = await loadSeoContentTitles(env, brand.id);
+  const siteUrl = (brand.blogBaseUrl || defaultWebsiteDestination(brand.slug)?.blogBaseUrl || brand.websiteUrl || '').replace(/\/$/, '');
+  const siteTitles = siteUrl ? await crawlSiteArticleTitles(siteUrl) : [];
+  const classified = classifySeoTopics(current, {
+    published: content.published,
+    drafts: content.drafts,
+    extraTitles: siteTitles,
+  });
+  const existingKeys = new Set(classified.map(topicKey));
+  const existingTitles = [...content.published, ...content.drafts, ...siteTitles, ...classified.map((t) => t.topic)];
+
+  let discovered: SeoTopicSeed[] = [];
+  try {
+    const result = await chatCompleteJson<{ topics: SeoTopicSeed[] }>(env, {
+      messages: [
+        {
+          role: 'system',
+          content: '你是台灣生活服務／B2B 的 SEO 企劃。先看已經有的文章，只出還沒被覆蓋的新搜尋題。不可發明客戶數、市佔或保證成效。',
+        },
+        {
+          role: 'user',
+          content: [
+            `品牌:${brand.name}（${brand.slug}）`,
+            `已有長文或草稿:\n${existingTitles.slice(0, 40).map((t) => `- ${t}`).join('\n') || '- （尚無）'}`,
+            `現有題庫:\n${current.map((t) => `- ${t.topic}／${t.primaryKeyword || ''}`).join('\n')}`,
+            `請只產出最多 ${MAX_RECOMMENDED_SEO_ARTICLES} 個「新的」搜尋題，必須跟上面題目與長文明顯不同。`,
+            '優先台灣人會搜的痛點問句，不要再寫同一組收租／派工／洗衣系統說明。',
+            '回傳 JSON:{"topics":[{"topic":"中文題目","angle":"寫作角度40-80字","primaryKeyword":"主關鍵字","relatedTerms":["相關詞"],"category":"pain|product|policy|trust|talk","searchIntent":"informational|solution","audience":"consumer|merchant"}]}',
+          ].join('\n'),
+        },
+      ],
+      temperature: 0.4,
+      maxTokens: 1400,
+    });
+    discovered = (result.topics ?? [])
+      .filter((t) => t.topic && t.angle)
+      .filter((t) => !existingKeys.has(topicKey(t)) && !findCoveringTitle(t, existingTitles))
+      .slice(0, MAX_RECOMMENDED_SEO_ARTICLES);
+  } catch (err) {
+    console.error('[seo] discover topics failed', err);
+  }
+
+  if (discovered.length) {
+    await replaceBrandSeoTopics(env, brand.id, [...discovered, ...current]);
+  }
+
+  const next = discovered.length ? [...discovered, ...current] : current;
+  const topics = classifySeoTopics(next, {
+    published: content.published,
+    drafts: content.drafts,
+    extraTitles: siteTitles,
+  });
+  return { topics, discovered, siteTitles };
 }
 
 export async function replaceBrandSeoTopics(

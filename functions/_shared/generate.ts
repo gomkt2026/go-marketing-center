@@ -381,9 +381,9 @@ export async function generatePlatformPost(
     extraInstruction: [
       params.extraInstruction ?? '',
       screenshotPoster
-        ? `本篇會用品牌上傳的真實系統畫面做成痛點海報。${reusedAsset ? describeAssetForPrompt(reusedAsset) : ''}文案要對得上這張真實畫面,不要幻想不存在的 UI。`
+        ? `本篇會用品牌上傳的真實系統畫面做成痛點海報。${reusedAsset ? describeAssetForPrompt(reusedAsset, brandCtx.slug) : ''}文案要對得上這張真實畫面,不要幻想不存在的 UI。`
         : convertPhotoPoster
-          ? `本篇會把品牌上傳的真實照片轉成${brandCtx.slug === 'washgo' ? 'Washgo 可愛洗衣插畫海報' : '品牌編輯海報'}。${reusedAsset ? describeAssetForPrompt(reusedAsset) : ''}文案要對得上原照片裡真的有的細節。`
+          ? `本篇會把品牌上傳的真實照片轉成${brandCtx.slug === 'washgo' ? 'Washgo 可愛洗衣插畫海報' : '品牌編輯海報'}。${reusedAsset ? describeAssetForPrompt(reusedAsset, brandCtx.slug) : ''}文案要對得上原照片裡真的有的細節。`
           : '',
     ].filter(Boolean).join('\n'),
     brandSlug: brandCtx.slug,

@@ -200,7 +200,19 @@ export interface BrandDocument {
 
 export type BrandAssetImageCategory =
   | 'system_screenshot' | 'real_photo' | 'people' | 'scene'
-  | 'brand_collab' | 'press_clipping' | 'other';
+  | 'brand_collab' | 'press_clipping' | 'brand_identity' | 'other';
+
+export type BrandAssetRole =
+  | 'landlord' | 'tenant' | 'operator' | 'staff' | 'public' | 'brand' | 'none';
+
+export type BrandAssetStatus = 'active' | 'legacy' | 'disabled';
+
+export interface BrandAssetTaxonomy {
+  categories: { value: BrandAssetImageCategory; label: string }[];
+  roles: { value: BrandAssetRole; label: string }[];
+  features: string[];
+  statuses: { value: BrandAssetStatus; label: string }[];
+}
 
 export type PressCoverageStatus = 'inbox' | 'published' | 'syndicated' | 'dismissed';
 export type PressDiscoverySource = 'manual' | 'scheduler';
@@ -269,6 +281,10 @@ export interface BrandAsset {
   fileUrl: string | null;
   imageCategory: BrandAssetImageCategory | null;
   caption: string | null;
+  assetRole: BrandAssetRole | null;
+  feature: string | null;
+  usageContext: string | null;
+  assetStatus: BrandAssetStatus | null;
   usedInThreadsCount: number;
   lastUsedAt: string | null;
   createdAt: string;

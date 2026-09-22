@@ -936,6 +936,8 @@ const IMAGE_CATEGORY_LABEL: Record<string, string> = {
   people: '人物照片',
   scene: '場景照片',
   brand_collab: '合作品牌/異業合作照片',
+  press_clipping: '見報截圖',
+  brand_identity: '品牌素材',
   other: '其他素材',
 };
 
@@ -944,6 +946,10 @@ export function buildImageInspiredPostPrompt(params: {
   platform: 'facebook' | 'instagram' | 'threads';
   caption?: string;
   imageCategory?: string;
+  assetName?: string;
+  assetRole?: string;
+  feature?: string;
+  usageContext?: string;
   brandSlug?: string;
   audienceLane?: AudienceLane;
   audienceName?: string;
@@ -974,7 +980,10 @@ export function buildImageInspiredPostPrompt(params: {
       && ['real_photo', 'people', 'scene', 'brand_collab'].includes(params.imageCategory ?? ''));
   const overlayFields = screenshotPoster || convertPhotoPoster;
   return [
-    `這是品牌上傳的一張${categoryLabel}${params.caption ? `,說明:${params.caption}` : ''}。`,
+    `這是品牌上傳的一張${categoryLabel}${params.assetName ? `「${params.assetName}」` : ''}${params.caption ? `,說明:${params.caption}` : ''}。`,
+    params.feature || params.usageContext || params.assetRole
+      ? `素材語意:${[params.assetRole && `角色 ${params.assetRole}`, params.feature && `功能 ${params.feature}`, params.usageContext && `用途 ${params.usageContext}`].filter(Boolean).join('、')}。`
+      : '',
     `請仔細看這張圖,挑一個畫面裡真的有的細節或情境當鉤子,寫一篇 ${params.platform} 貼文。`,
     '不要憑空描述圖片裡沒有的東西,也不要寫成單純的圖片說明文;要像有人真的看到/用到這個畫面後,寫下的一則真實感想或分享。',
     screenshotPoster

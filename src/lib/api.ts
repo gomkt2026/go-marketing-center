@@ -167,19 +167,59 @@ export const api = {
     }),
 
   // -- 品牌智慧圖片素材庫(系統截圖會做成 B 端痛點海報;實拍可直接當配圖) --------
-  brandAssets: (slug: string) =>
-    request<{ assets: import('@/types').BrandAsset[] }>(`/api/brands/${slug}/assets`),
+  brandAssets: (slug: string, params?: {
+    q?: string; imageCategory?: string; role?: string; feature?: string; status?: string;
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.q) query.set('q', params.q);
+    if (params?.imageCategory) query.set('imageCategory', params.imageCategory);
+    if (params?.role) query.set('role', params.role);
+    if (params?.feature) query.set('feature', params.feature);
+    if (params?.status) query.set('status', params.status);
+    const suffix = query.toString() ? `?${query}` : '';
+    return request<{ assets: import('@/types').BrandAsset[]; taxonomy: import('@/types').BrandAssetTaxonomy }>(
+      `/api/brands/${slug}/assets${suffix}`,
+    );
+  },
 
-  uploadBrandAsset: async (slug: string, params: { file: File; caption?: string; imageCategory?: string }) => {
+  uploadBrandAsset: async (slug: string, params: {
+    file: File;
+    name?: string;
+    caption?: string;
+    imageCategory?: string;
+    assetRole?: string;
+    feature?: string;
+    usageContext?: string;
+    assetStatus?: string;
+  }) => {
     const form = new FormData();
     form.append('file', params.file);
+    if (params.name) form.append('name', params.name);
     if (params.caption) form.append('caption', params.caption);
     if (params.imageCategory) form.append('imageCategory', params.imageCategory);
+    if (params.assetRole) form.append('assetRole', params.assetRole);
+    if (params.feature) form.append('feature', params.feature);
+    if (params.usageContext) form.append('usageContext', params.usageContext);
+    if (params.assetStatus) form.append('assetStatus', params.assetStatus);
     const res = await fetch(`/api/brands/${slug}/assets`, { method: 'POST', credentials: 'include', body: form });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
-    return data as { asset: import('@/types').BrandAsset };
+    return data as { asset: import('@/types').BrandAsset; taxonomy?: import('@/types').BrandAssetTaxonomy };
   },
+
+  updateBrandAsset: (slug: string, assetId: string, body: {
+    name?: string;
+    caption?: string | null;
+    imageCategory?: string | null;
+    assetRole?: string | null;
+    feature?: string | null;
+    usageContext?: string | null;
+    assetStatus?: string;
+  }) =>
+    request<{ asset: import('@/types').BrandAsset }>(`/api/brands/${slug}/assets/${assetId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
 
   deleteBrandAsset: (slug: string, assetId: string) =>
     request<{ ok: boolean }>(`/api/brands/${slug}/assets/${assetId}`, { method: 'DELETE' }),

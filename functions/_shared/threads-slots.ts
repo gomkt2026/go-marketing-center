@@ -10,6 +10,7 @@ import {
 } from './generate';
 import { getThreadsAccount } from './threads';
 import { toPublicMediaUrl } from './media';
+import { pickBrandAsset } from './brand-assets';
 import { fetchGoogleTrendsTW } from './sources';
 import { logActivity } from './activity';
 import {
@@ -175,14 +176,18 @@ export async function generateThreadsSlot(
       `;
       const socialTopics = (socialRows as { title: string }[]).map((r) => r.title);
 
-      const imageRows = await sql`
-        SELECT id, file_url, caption, image_category FROM brand_assets
-        WHERE brand_id = ${brand.id}::uuid AND asset_type = 'image'
-        ORDER BY used_in_threads_count ASC, last_used_at ASC NULLS FIRST
-        LIMIT 1
-      `;
-      const candidateImage = imageRows.length
-        ? imageRows[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null }
+      const pickedImage = await pickBrandAsset(env, brand.id, { query: trendList || undefined }).catch(() => null);
+      const candidateImage = pickedImage
+        ? {
+          id: pickedImage.id,
+          file_url: pickedImage.fileUrl,
+          caption: pickedImage.caption,
+          image_category: pickedImage.imageCategory,
+          name: pickedImage.name,
+          asset_role: pickedImage.assetRole,
+          feature: pickedImage.feature,
+          usage_context: pickedImage.usageContext,
+        }
         : null;
 
       const hourTW = (slotAt.getUTCHours() + 8) % 24;
@@ -215,6 +220,10 @@ export async function generateThreadsSlot(
           imageUrl: publicImageUrl,
           caption: candidateImage.caption ?? undefined,
           imageCategory: candidateImage.image_category ?? undefined,
+          assetName: candidateImage.name ?? undefined,
+          assetRole: candidateImage.asset_role ?? undefined,
+          feature: candidateImage.feature ?? undefined,
+          usageContext: candidateImage.usage_context ?? undefined,
           assetId: candidateImage.id,
         });
       } else {

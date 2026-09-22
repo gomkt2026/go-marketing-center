@@ -4,6 +4,7 @@ import { requireAuth } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
 import { json, error } from '../../_shared/response';
 import { logActivity } from '../../_shared/activity';
+import { writeAgentPersona } from '../../_shared/agent-persona';
 
 // 更新 Agent 人設(僅覆寫提供的欄位,avatarUrl 由頭像生成端點管理)
 export const onRequestPut: PagesFunction<Env> = async (context) => {
@@ -11,7 +12,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const agentId = context.params.id as string;
-  const body = await context.request.json() as {
+  const body = await context.request.json().catch(() => ({})) as {
     nickname?: string;
     characterTitle?: string;
     temperament?: string;
@@ -29,24 +30,28 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     if (body[key] !== undefined) persona[key] = body[key];
   }
 
-  const updated = await sql`
-    UPDATE ai_agents SET persona = ${JSON.stringify(persona)}, updated_at = now()
-    WHERE id = ${agentId}::uuid
-    RETURNING id, display_name, persona
-  `;
+  try {
+    const updated = await writeAgentPersona(context.env, agentId, persona);
 
-  if (agent.brand_id) {
-    await logActivity(context.env, {
-      brandId: agent.brand_id,
-      actorType: 'user',
-      actorUserId: auth.id,
-      action: 'agent.persona_updated',
-      entityType: 'ai_agent',
-      entityId: agentId,
-      afterState: persona,
-    });
+    if (agent.brand_id) {
+      try {
+        await logActivity(context.env, {
+          brandId: agent.brand_id,
+          actorType: 'user',
+          actorUserId: auth.id,
+          action: 'agent.persona_updated',
+          entityType: 'ai_agent',
+          entityId: agentId,
+          afterState: persona,
+        });
+      } catch {
+        // 人設已寫入,活動紀錄失敗不擋儲存
+      }
+    }
+
+    const row = updated[0];
+    return json({ agent: { id: row.id, displayName: row.display_name, persona: row.persona } });
+  } catch (e) {
+    return error(e instanceof Error ? e.message : '儲存失敗', 500);
   }
-
-  const row = updated[0] as Record<string, unknown>;
-  return json({ agent: { id: row.id, displayName: row.display_name, persona: row.persona } });
 };

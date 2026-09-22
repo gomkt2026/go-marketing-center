@@ -95,7 +95,7 @@ export async function applyPressMigration(env: Env): Promise<string[]> {
       ADD CONSTRAINT brand_assets_image_category_check
       CHECK (image_category IS NULL OR image_category IN (
         'system_screenshot', 'real_photo', 'people', 'scene',
-        'brand_collab', 'press_clipping', 'other'
+        'brand_collab', 'press_clipping', 'brand_identity', 'other'
       ))
   `;
   steps.push('constraint:brand_assets.press_clipping');

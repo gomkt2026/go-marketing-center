@@ -5,6 +5,7 @@ import { getSql } from '../../../_shared/db';
 import { json, error } from '../../../_shared/response';
 import { generateImage } from '../../../_shared/openai';
 import { putMedia } from '../../../_shared/media';
+import { writeAgentPersona } from '../../../_shared/agent-persona';
 
 // 為 Agent 生成可愛人偶頭像,存 R2 並寫回 persona.avatarUrl
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -40,10 +41,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const avatarUrl = await putMedia(context.env, key, bytes);
 
     const newPersona = { ...persona, avatarUrl };
-    await sql`
-      UPDATE ai_agents SET persona = ${JSON.stringify(newPersona)}, updated_at = now()
-      WHERE id = ${agentId}::uuid
-    `;
+    await writeAgentPersona(context.env, agentId, newPersona);
     return json({ avatarUrl });
   } catch (e) {
     return error(`頭像生成失敗:${e instanceof Error ? e.message : '未知錯誤'}`, 502);

@@ -10,6 +10,7 @@ import { toBrandDocument } from '../../../_shared/documents';
 import { applyDocumentCollateralMigration, isMissingDocumentCollateral } from '../../../_shared/document-migrate';
 import { listBrandImagePrompts } from '../../../_shared/image-prompts';
 import { listBrandVersions } from '../../../_shared/brand-knowledge';
+import { ensureBrandAssetLibrary } from '../../../_shared/brand-assets';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -21,6 +22,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const sql = getSql(context.env);
   const brandId = brand.id;
+  await ensureBrandAssetLibrary(context.env).catch(() => undefined);
 
   let documentRows: Record<string, unknown>[] = [];
   try {

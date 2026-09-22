@@ -15,13 +15,17 @@ import {
   type GeneratedXPost, type EcosystemXAngle,
   type AudienceLane, type ImageStyleId,
 } from './prompts';
-import { buildMediaKey, getMediaBytes, mediaUrlToKey, putMedia, toPublicMediaUrl } from './media';
+import { buildMediaKey, getMediaBytes, mediaUrlToKey, putMedia } from './media';
 import { compositeLogo } from './watermark';
 import { frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
 import { X_TWEET_MAX_CHARS } from './x';
 import { burnPosterHeadline, POSTER_NO_GLYPHS_RULE } from './poster-text';
 import { loadBrandImagePromptPack } from './image-prompts';
+import {
+  describeAssetForPrompt, pickBrandAsset, pickBrandScreenshot, markAssetUsed,
+  type BrandAssetPick, type PickBrandAssetQuery,
+} from './brand-assets';
 import {
   websiteCta, websiteCtaRule, websiteAuthor, normalizeWebsiteSeoMeta,
   ensureWebsiteSeoMetaLengths,
@@ -84,66 +88,8 @@ export interface GenerationResult {
   loveAngle?: string;
 }
 
-export interface BrandAssetPick {
-  id: string;
-  fileUrl: string;
-  caption: string | null;
-  imageCategory: string | null;
-}
-
-function toAssetPick(env: Env, row: { id: string; file_url: string | null; caption: string | null; image_category: string | null }): BrandAssetPick | null {
-  const fileUrl = toPublicMediaUrl(env, row.file_url);
-  if (!fileUrl) return null;
-  return { id: row.id, fileUrl, caption: row.caption, imageCategory: row.image_category };
-}
-
-export async function pickBrandAsset(env: Env, brandId: string, preferScreenshot = false): Promise<BrandAssetPick | null> {
-  const sql = getSql(env);
-  if (preferScreenshot) {
-    const shots = await sql`
-      SELECT id, file_url, caption, image_category FROM brand_assets
-      WHERE brand_id = ${brandId}::uuid AND asset_type = 'image' AND image_category = 'system_screenshot'
-      ORDER BY used_in_threads_count ASC, last_used_at ASC NULLS FIRST
-      LIMIT 1
-    `;
-    if (shots.length) return toAssetPick(env, shots[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null });
-    // B 端不要退回吉卜力/生活插畫素材庫,沒有系統畫面就走簡報風生圖
-    return null;
-  }
-  const rows = await sql`
-    SELECT id, file_url, caption, image_category FROM brand_assets
-    WHERE brand_id = ${brandId}::uuid AND asset_type = 'image'
-    ORDER BY
-      CASE image_category
-        WHEN 'system_screenshot' THEN 0
-        WHEN 'real_photo' THEN 1
-        WHEN 'scene' THEN 2
-        WHEN 'people' THEN 3
-        ELSE 4
-      END,
-      used_in_threads_count ASC, last_used_at ASC NULLS FIRST
-    LIMIT 1
-  `;
-  if (!rows.length) return null;
-  return toAssetPick(env, rows[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null });
-}
-
-export async function pickBrandScreenshot(env: Env, brandSlug: string): Promise<BrandAssetPick | null> {
-  const sql = getSql(env);
-  const rows = await sql`
-    SELECT a.id, a.file_url, a.caption, a.image_category
-    FROM brand_assets a
-    JOIN brands b ON b.id = a.brand_id
-    WHERE b.slug = ${brandSlug} AND a.asset_type = 'image' AND a.image_category = 'system_screenshot'
-    ORDER BY a.used_in_threads_count ASC, a.last_used_at ASC NULLS FIRST
-    LIMIT 1
-  `;
-  if (!rows.length) return null;
-  const row = rows[0] as { id: string; file_url: string | null; caption: string | null; image_category: string | null };
-  const fileUrl = toPublicMediaUrl(env, row.file_url);
-  if (!fileUrl) return null;
-  return { id: row.id, fileUrl, caption: row.caption, imageCategory: row.image_category };
-}
+export type { BrandAssetPick, PickBrandAssetQuery };
+export { pickBrandAsset, pickBrandScreenshot, markAssetUsed };
 
 function isSystemScreenshot(asset: { imageCategory?: string | null } | null | undefined): boolean {
   return asset?.imageCategory === 'system_screenshot';
@@ -334,14 +280,6 @@ async function frameAssetForInstagram(env: Env, brandSlug: string, fileUrl: stri
   }
 }
 
-export async function markAssetUsed(env: Env, assetId: string): Promise<void> {
-  const sql = getSql(env);
-  await sql`
-    UPDATE brand_assets SET used_in_threads_count = used_in_threads_count + 1, last_used_at = now()
-    WHERE id = ${assetId}::uuid
-  `;
-}
-
 async function recentImageStyles(env: Env, brandId: string): Promise<ImageStyleId[]> {
   const sql = getSql(env);
   const rows = await sql`
@@ -418,7 +356,10 @@ export async function generatePlatformPost(
   // Threads 本來就不走素材庫。
   if (!params.skipImage && !params.skipAssetLookup && (platform === 'facebook' || platform === 'instagram')) {
     try {
-      reusedAsset = await pickBrandAsset(env, brandCtx.brandId, lane === 'b2b');
+      reusedAsset = await pickBrandAsset(env, brandCtx.brandId, {
+        preferScreenshot: lane === 'b2b',
+        query: params.topic,
+      });
     } catch (e) {
       console.error('[generate] 素材庫查詢失敗,改走生圖', e);
     }
@@ -440,9 +381,9 @@ export async function generatePlatformPost(
     extraInstruction: [
       params.extraInstruction ?? '',
       screenshotPoster
-        ? `本篇會用品牌上傳的系統畫面「${reusedAsset?.caption ?? '後台截圖'}」做成痛點海報。文案要對得上這張真實畫面。`
+        ? `本篇會用品牌上傳的真實系統畫面做成痛點海報。${reusedAsset ? describeAssetForPrompt(reusedAsset) : ''}文案要對得上這張真實畫面,不要幻想不存在的 UI。`
         : convertPhotoPoster
-          ? `本篇會把品牌上傳的「${reusedAsset?.imageCategory ?? '實拍'}」${reusedAsset?.caption ? `:${reusedAsset.caption}` : ''}轉成${brandCtx.slug === 'washgo' ? 'Washgo 可愛洗衣插畫海報' : '品牌編輯海報'}。文案要對得上原照片裡真的有的細節。`
+          ? `本篇會把品牌上傳的真實照片轉成${brandCtx.slug === 'washgo' ? 'Washgo 可愛洗衣插畫海報' : '品牌編輯海報'}。${reusedAsset ? describeAssetForPrompt(reusedAsset) : ''}文案要對得上原照片裡真的有的細節。`
           : '',
     ].filter(Boolean).join('\n'),
     brandSlug: brandCtx.slug,
@@ -704,6 +645,10 @@ export async function generatePostFromImage(
     imageUrl: string;
     caption?: string;
     imageCategory?: string;
+    assetName?: string;
+    assetRole?: string;
+    feature?: string;
+    usageContext?: string;
     audienceLane?: AudienceLane;
     audienceName?: string;
     assetId?: string;
@@ -715,6 +660,8 @@ export async function generatePostFromImage(
   const audienceName = params.audienceName ?? (await pickAudience(env, brandCtx.brandId, brandCtx.slug, lane)).name;
   const userPrompt = buildImageInspiredPostPrompt({
     platform, caption: params.caption, imageCategory: params.imageCategory,
+    assetName: params.assetName, assetRole: params.assetRole,
+    feature: params.feature, usageContext: params.usageContext,
     brandSlug: brandCtx.slug, audienceLane: lane, audienceName,
     extraInstruction: params.extraInstruction,
   });
@@ -830,6 +777,10 @@ export async function generateThreadsFromImage(
     imageUrl: string;
     caption?: string;
     imageCategory?: string;
+    assetName?: string;
+    assetRole?: string;
+    feature?: string;
+    usageContext?: string;
     assetId?: string;
   },
 ): Promise<GenerationResult> {

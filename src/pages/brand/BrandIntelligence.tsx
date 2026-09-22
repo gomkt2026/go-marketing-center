@@ -12,10 +12,11 @@ import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import { HelpTip } from '@/components/ui/HelpTip';
 import { VersionHistoryList } from '@/pages/brand/knowledge-version-ui';
+import { BrandAssetLibrary } from '@/pages/brand/BrandAssetLibrary';
 import type {
   BrandRule, BrandAudience, BrandPersona, BrandChannel, BrandVisual,
   BrandKeyword, BrandExample, BrandDocument, BrandVersion, VerificationStatus,
-  BrandAsset, BrandAssetImageCategory, PressCoverage, PressRelease, DiscoveredPressItem,
+  BrandAsset, PressCoverage, PressRelease, DiscoveredPressItem,
   BrandImagePrompt, BrandRuleType,
 } from '@/types';
 
@@ -29,7 +30,7 @@ const TABS = [
   { id: 'collateral', label: 'EDM／簡報', hint: '上傳 DM、簡報給小編與產文參考，也可用在客戶 LINE 資訊包。' },
   { id: 'visual', label: '視覺', hint: '色票、圖卡尺寸等視覺規定，產圖時會對齊。' },
   { id: 'image-prompt', label: '產圖 Prompt', hint: '直接改生圖風格。不用等工程師改程式。' },
-  { id: 'library', label: '素材庫', hint: '上傳系統畫面或現場照片，Threads「實績畫面」會從這裡取材。' },
+  { id: 'library', label: '素材庫', hint: '真實品牌素材。系統畫面請標角色與功能；AI 只會預設使用「現行」素材。' },
   { id: 'raw', label: '原始檢視', hint: '系統彙整後的唯讀全文，方便核對，不要當編輯區。' },
 ];
 
@@ -60,19 +61,6 @@ const ruleTypeLabel: Record<string, { label: string; tone: BadgeTone }> = {
   negative_rule: { label: '負面表列', tone: 'danger' },
 };
 
-const IMAGE_CATEGORY_OPTIONS: { value: BrandAssetImageCategory; label: string }[] = [
-  { value: 'system_screenshot', label: '系統畫面截圖' },
-  { value: 'real_photo', label: '實際拍攝照片' },
-  { value: 'people', label: '人物照片' },
-  { value: 'scene', label: '場景照片' },
-  { value: 'brand_collab', label: '合作品牌照片' },
-  { value: 'press_clipping', label: '見報截圖' },
-  { value: 'other', label: '其他' },
-];
-const imageCategoryLabel: Record<string, string> = Object.fromEntries(
-  IMAGE_CATEGORY_OPTIONS.map((o) => [o.value, o.label]),
-);
-
 export function BrandIntelligence() {
   const { brand: slug } = useParams();
   const { brandBySlug, brandsLoading } = useBrand();
@@ -86,13 +74,6 @@ export function BrandIntelligence() {
   const [rules, setRules] = useState<BrandRule[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [assets, setAssets] = useState<BrandAsset[]>([]);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadCaption, setUploadCaption] = useState('');
-  const [uploadCategory, setUploadCategory] = useState<BrandAssetImageCategory>('system_screenshot');
-  const [uploading, setUploading] = useState(false);
-  const [assetError, setAssetError] = useState<string | null>(null);
-  const [generatingAssetId, setGeneratingAssetId] = useState<string | null>(null);
-  const [generatedContentId, setGeneratedContentId] = useState<string | null>(null);
   const [coverages, setCoverages] = useState<PressCoverage[]>([]);
   const [releases, setReleases] = useState<PressRelease[]>([]);
   const [pressBusyId, setPressBusyId] = useState<string | null>(null);
@@ -269,48 +250,6 @@ export function BrandIntelligence() {
       const rule = res.item as unknown as BrandRule;
       setRules((prev) => [...prev, rule]);
       setEditingId(rule.id);
-    }
-  }
-
-  async function uploadAsset() {
-    if (!slug || !uploadFile) return;
-    setUploading(true);
-    setAssetError(null);
-    try {
-      const { asset } = await api.uploadBrandAsset(slug, {
-        file: uploadFile, caption: uploadCaption.trim() || undefined, imageCategory: uploadCategory,
-      });
-      setAssets((prev) => [asset, ...prev]);
-      setUploadFile(null);
-      setUploadCaption('');
-    } catch (e) {
-      setAssetError(e instanceof Error ? e.message : '上傳失敗');
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  async function deleteAsset(id: string) {
-    if (!slug) return;
-    await api.deleteBrandAsset(slug, id);
-    setAssets((prev) => prev.filter((a) => a.id !== id));
-  }
-
-  async function generateFromAsset(id: string, platform: 'facebook' | 'instagram' | 'threads') {
-    if (!slug) return;
-    setGeneratingAssetId(`${id}:${platform}`);
-    setAssetError(null);
-    setGeneratedContentId(null);
-    try {
-      const { contentId } = await api.generatePostFromAsset(slug, id, platform);
-      setGeneratedContentId(contentId);
-      setAssets((prev) => prev.map((a) => (a.id === id
-        ? { ...a, usedInThreadsCount: a.usedInThreadsCount + 1, lastUsedAt: new Date().toISOString() }
-        : a)));
-    } catch (e) {
-      setAssetError(e instanceof Error ? e.message : '生成失敗');
-    } finally {
-      setGeneratingAssetId(null);
     }
   }
 
@@ -1885,90 +1824,14 @@ export function BrandIntelligence() {
 
               {tab === 'library' && (
                 <div style={{ display: 'grid', gap: 24 }}>
-                  <div>
-                    <Field label="圖片素材庫(系統畫面截圖/實拍照片,FB／IG／Threads 都可直接當配圖)">
-                      <div />
-                    </Field>
-                    <div style={{ ...cardBoxStyle, marginTop: 8 }}>
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <input
-                          type="file" accept="image/*"
-                          onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-                          style={{ fontSize: 12 }}
-                        />
-                        <select
-                          value={uploadCategory}
-                          onChange={(e) => setUploadCategory(e.target.value as BrandAssetImageCategory)}
-                          style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13 }}
-                        >
-                          {IMAGE_CATEGORY_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </select>
-                        <input
-                          type="text" placeholder="說明(選填,例如:LINE 送洗履歷查詢畫面)"
-                          value={uploadCaption}
-                          onChange={(e) => setUploadCaption(e.target.value)}
-                          style={{ flex: 1, minWidth: 200, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13 }}
-                        />
-                        <Button variant="secondary" disabled={!uploadFile || uploading} onClick={() => void uploadAsset()}>
-                          {uploading ? '上傳中…' : '+ 上傳圖片'}
-                        </Button>
-                      </div>
-                      {assetError && <p style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 8 }}>{assetError}</p>}
-                      {generatedContentId && (
-                        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
-                          已生成貼文草稿(FB／IG 預設 B 端、Threads 預設 C 端),請至內容審閱頁查看(content id: {generatedContentId})。
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="grid-auto" style={{ marginTop: 12 }}>
-                      {assets.map((a) => (
-                        <div key={a.id} style={cardBoxStyle}>
-                          {a.fileUrl && (
-                            <img
-                              src={a.fileUrl} alt={a.caption ?? a.name}
-                              style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }}
-                            />
-                          )}
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                            {a.imageCategory && <Badge tone="secondary">{imageCategoryLabel[a.imageCategory] ?? a.imageCategory}</Badge>}
-                            {a.usedInThreadsCount > 0 && <Badge tone="default">已用 {a.usedInThreadsCount} 次</Badge>}
-                          </div>
-                          {a.caption && (
-                            <div style={{ fontSize: 12.5, marginBottom: 8, wordBreak: 'break-word' }}>{a.caption}</div>
-                          )}
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {(['facebook', 'instagram', 'threads'] as const).map((p) => {
-                              const busy = generatingAssetId === `${a.id}:${p}`;
-                              const label = p === 'facebook' ? 'FB' : p === 'instagram' ? 'IG' : 'Threads';
-                              return (
-                                <Button
-                                  key={p}
-                                  variant={p === 'threads' ? 'primary' : 'secondary'}
-                                  style={{ padding: '4px 10px', fontSize: 12 }}
-                                  disabled={!!generatingAssetId}
-                                  onClick={() => void generateFromAsset(a.id, p)}
-                                >
-                                  {busy ? '生成中…' : `用這張圖生成 ${label}`}
-                                </Button>
-                              );
-                            })}
-                            <Button
-                              variant="danger" style={{ padding: '4px 10px', fontSize: 12 }}
-                              onClick={() => void deleteAsset(a.id)}
-                            >
-                              刪除
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                      {assets.length === 0 && (
-                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>尚未上傳任何圖片素材</p>
-                      )}
-                    </div>
-                  </div>
+                  {slug && (
+                    <BrandAssetLibrary
+                      slug={slug}
+                      assets={assets}
+                      canEdit={canEdit}
+                      onAssetsChange={setAssets}
+                    />
+                  )}
 
                   <div>
                     <Field label="文件">

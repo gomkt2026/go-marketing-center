@@ -252,6 +252,8 @@ CREATE INDEX idx_brand_documents_brand ON brand_documents(brand_id);
 CREATE INDEX idx_brand_documents_version ON brand_documents(brand_version_id);
 
 -- 品牌資產(Logo / 圖片 / 影片 / 色票 / 字型)
+-- 圖片素材庫語意欄位見 migration 007 / 014 / 050:image_category、caption、asset_role、
+-- feature、usage_context、asset_status、used_in_threads_count。不綁 brand_versions。
 CREATE TABLE brand_assets (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   brand_id          UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
@@ -259,9 +261,29 @@ CREATE TABLE brand_assets (
   name              TEXT NOT NULL,
   file_url          TEXT,
   metadata          JSONB NOT NULL DEFAULT '{}',
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  image_category    TEXT,
+  caption           TEXT,
+  asset_role        TEXT,
+  feature           TEXT,
+  usage_context     TEXT,
+  asset_status      TEXT NOT NULL DEFAULT 'active',
+  used_in_threads_count INT NOT NULL DEFAULT 0,
+  last_used_at      TIMESTAMPTZ,
+  uploaded_by       UUID REFERENCES users(id),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (image_category IS NULL OR image_category IN (
+    'system_screenshot', 'real_photo', 'people', 'scene',
+    'brand_collab', 'press_clipping', 'brand_identity', 'other'
+  )),
+  CHECK (asset_role IS NULL OR asset_role IN (
+    'landlord', 'tenant', 'operator', 'staff', 'public', 'brand', 'none'
+  )),
+  CHECK (asset_status IN ('active', 'legacy', 'disabled'))
 );
 CREATE INDEX idx_brand_assets_brand ON brand_assets(brand_id);
+CREATE INDEX idx_brand_assets_library_search
+  ON brand_assets(brand_id, asset_status, image_category)
+  WHERE asset_type = 'image';
 
 -- 目標受眾(整體區隔,如「自管房東」)
 CREATE TABLE brand_audiences (
@@ -520,9 +542,12 @@ CREATE TABLE ai_agents (
   display_name      TEXT NOT NULL,                    -- 'Homigo AI'
   avatar_color      TEXT,
   is_active         BOOLEAN NOT NULL DEFAULT true,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_ai_agents_brand ON ai_agents(brand_id);
+CREATE TRIGGER trg_ai_agents_updated_at BEFORE UPDATE ON ai_agents
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 ALTER TABLE market_signals
   ADD CONSTRAINT fk_market_signals_agent FOREIGN KEY (discovered_by_agent_id) REFERENCES ai_agents(id);

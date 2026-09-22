@@ -36,7 +36,16 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     LIMIT 1
   `;
   if (!rows.length) return error('Asset not found', 404);
-  const asset = rowToCamel<{ id: string; fileUrl: string | null; caption: string | null; imageCategory: string | null }>(
+  const asset = rowToCamel<{
+    id: string;
+    name: string | null;
+    fileUrl: string | null;
+    caption: string | null;
+    imageCategory: string | null;
+    assetRole: string | null;
+    feature: string | null;
+    usageContext: string | null;
+  }>(
     rows[0] as Record<string, unknown>,
   );
   const publicImageUrl = toPublicMediaUrl(context.env, asset.fileUrl);
@@ -53,6 +62,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       imageUrl: publicImageUrl,
       caption: asset.caption ?? undefined,
       imageCategory: asset.imageCategory ?? undefined,
+      assetName: asset.name ?? undefined,
+      assetRole: asset.assetRole ?? undefined,
+      feature: asset.feature ?? undefined,
+      usageContext: asset.usageContext ?? undefined,
       audienceLane,
       assetId: asset.id,
     });

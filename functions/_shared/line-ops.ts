@@ -6,6 +6,7 @@ import {
   brandKeyToSlug,
   findOpsUserByLineId,
   getLineSpace,
+  isMissingRelation,
   parseSpaceBindCommand,
   recordLineSpaceEvent,
   type LineOpsSpace,
@@ -18,7 +19,6 @@ import {
   isScriptConfirm,
   isScriptUploadCommand,
   looksLikeScript,
-  seedHomigoGhostStoryScripts,
 } from './short-scripts';
 
 const LINE_API = 'https://api.line.me/v2/bot';
@@ -386,23 +386,36 @@ const MENU_NEED_GROUP_BIND = '這個群還沒指定品牌，我不會在這裡�
 const MENU_NEED_USER_BIND = '請先到 GO 行銷中心設定頁產生綁定碼，傳「綁定 123456」。外包小編請走品牌工作群，不必私訊查其他品牌。';
 const MENU_FOREIGN = (name: string) => `這個群只看 ${name}。要看別的品牌請進那個品牌的工作群，或用已綁定的總部私訊。`;
 
-export async function getBindingForUser(env: Env, userId: string) {
-  await ensurePostingOpsTables(env);
-  const sql = getSql(env);
-  const rows = await sql`
-    SELECT line_user_id, display_name, notify_review, notify_failed
-    FROM user_line_bindings WHERE user_id = ${userId}::uuid LIMIT 1
-  `;
-  const row = rows[0] as { line_user_id: string; display_name: string | null; notify_review: boolean; notify_failed: boolean } | undefined;
+function emptyLineBinding(env: Env) {
   return {
-    bound: !!row,
-    lineUserIdMasked: row ? maskLineId(row.line_user_id) : null,
-    displayName: row?.display_name ?? null,
+    bound: false,
+    lineUserIdMasked: null as string | null,
+    displayName: null as string | null,
     notifyReview: false,
     notifyFailed: false,
     configured: lineOpsConfigured(env),
     addFriendUrl: env.LINE_OPS_ADD_FRIEND_URL ?? 'https://line.me/R/ti/p/@706hmbhp',
   };
+}
+
+export async function getBindingForUser(env: Env, userId: string) {
+  const sql = getSql(env);
+  try {
+    const rows = await sql`
+      SELECT line_user_id, display_name, notify_review, notify_failed
+      FROM user_line_bindings WHERE user_id = ${userId}::uuid LIMIT 1
+    `;
+    const row = rows[0] as { line_user_id: string; display_name: string | null; notify_review: boolean; notify_failed: boolean } | undefined;
+    return {
+      ...emptyLineBinding(env),
+      bound: !!row,
+      lineUserIdMasked: row ? maskLineId(row.line_user_id) : null,
+      displayName: row?.display_name ?? null,
+    };
+  } catch (e) {
+    if (!isMissingRelation(e)) console.error('[line-ops] 讀取綁定失敗', e);
+    return emptyLineBinding(env);
+  }
 }
 
 export async function createBindCode(env: Env, userId: string): Promise<{ code: string; expiresAt: string }> {
@@ -1291,11 +1304,10 @@ async function handleSpaceBindMessage(
     lineUserId: params.lineUserId,
   });
   const label = next.displayName ? `「${next.displayName}」` : '這個群';
-  await replyOpsMessages(
+  await replyOps(
     env,
     params.replyToken,
-    await performanceMessages(env, [brand], `${label} 已綁 ${brand.name}。之後這個群只看這個品牌，交腳本也會存到這裡。`),
-    [brand],
+    `${label} 已綁 ${brand.name}。之後這個群只看這個品牌，交腳本也會存到這裡。`,
   );
   return true;
 }
@@ -1305,53 +1317,70 @@ export async function handleLineOpsEvents(
   body: { events?: LineOpsEvent[] },
 ): Promise<void> {
   if (!lineOpsConfigured(env)) return;
-  await ensurePostingOpsTables(env);
-  await seedHomigoGhostStoryScripts(env).catch((e) => console.error('[line-ops] seed scripts', e));
-  const brands = await opsBrands(env);
+  let brands: BrandRow[] | null = null;
+  const loadBrands = async () => {
+    if (!brands) brands = await opsBrands(env);
+    return brands;
+  };
+
   for (const event of body.events ?? []) {
     const inGroup = isGroupSource(event.source);
     const conversationId = event.source?.groupId || event.source?.roomId || null;
     const lineUserId = event.source?.userId;
-    if (inGroup) {
-      await recordLineSpaceEvent(env, event.source, event.type || 'message').catch((e) => {
-        console.error('[line-ops] 記錄群組失敗', e);
-      });
-    }
-
     const replyToken = event.replyToken;
-    if (event.type === 'leave' || event.type === 'unfollow') continue;
-    if (!replyToken) continue;
+    const rememberSpace = async () => {
+      if (!inGroup) return;
+      try {
+        await recordLineSpaceEvent(env, event.source, event.type || 'message');
+      } catch (e) {
+        console.error('[line-ops] 記錄群組失敗', e);
+      }
+    };
+
+    if (event.type === 'leave' || event.type === 'unfollow') {
+      await rememberSpace();
+      continue;
+    }
+    if (!replyToken) {
+      await rememberSpace();
+      continue;
+    }
 
     try {
       if (event.type === 'join') {
         await replyOpsMessages(env, replyToken, [textMsg(MENU_JOIN)], []);
+        await rememberSpace();
         continue;
       }
       if (event.type === 'follow') {
-        await replyOpsMessages(env, replyToken, commandMenuMessages(brands, MENU_FOLLOW), []);
+        await replyOpsMessages(env, replyToken, commandMenuMessages(await loadBrands(), MENU_FOLLOW), []);
         continue;
       }
-      if (event.type !== 'message' || event.message?.type !== 'text' || !event.message.text) continue;
+      if (event.type !== 'message' || event.message?.type !== 'text' || !event.message.text) {
+        await rememberSpace();
+        continue;
+      }
 
       const raw = event.message.text;
       const mentioned = botWasMentioned(raw, event.message.mention)
         || /[@＠]/.test(raw);
       const text = stripLineMention(raw, event.message.mention);
       const quoted = Boolean(event.message.quotedMessageId);
-      const sessionOpen = conversationId && lineUserId
-        ? await hasOpenScriptSession(env, conversationId, lineUserId)
-        : false;
-      const addressing = !inGroup || mentioned || quoted || isBareOpsCommand(text)
-        || Boolean(parseSpaceBindCommand(text))
+      const bindCmd = parseSpaceBindCommand(text);
+      const addressingLite = !inGroup || mentioned || quoted || isBareOpsCommand(text)
+        || Boolean(bindCmd)
         || isScriptUploadCommand(text) || looksLikeScript(text)
-        || (sessionOpen && (isScriptConfirm(text) || isScriptCancel(text) || text.length > 20));
-      if (inGroup && !addressing) continue;
+        || isScriptConfirm(text) || isScriptCancel(text);
+      if (inGroup && !addressingLite && text.length <= 20) continue;
 
       if (inGroup && conversationId) {
         const handledBind = await handleSpaceBindMessage(env, {
-          text, conversationId, lineUserId, brands, replyToken,
+          text, conversationId, lineUserId, brands: await loadBrands(), replyToken,
         });
-        if (handledBind) continue;
+        if (handledBind) {
+          await rememberSpace();
+          continue;
+        }
       }
 
       const bind = text.match(/^綁定\s*(\d{6})$/);
@@ -1361,41 +1390,37 @@ export async function handleLineOpsEvents(
           continue;
         }
         const result = await bindLineUser(env, lineUserId, bind[1]);
-        if (result.startsWith('已綁定')) {
-          await replyOpsMessages(env, replyToken, await performanceMessages(env, brands, result), brands);
-        } else {
-          await replyOps(env, replyToken, result);
-        }
+        await replyOps(env, replyToken, result);
         continue;
+      }
+
+      if (inGroup && !addressingLite) {
+        const sessionOpen = conversationId && lineUserId
+          ? await hasOpenScriptSession(env, conversationId, lineUserId)
+          : false;
+        if (!sessionOpen) continue;
       }
 
       let space: LineOpsSpace | null = null;
-      if (inGroup && conversationId) space = await getLineSpace(env, conversationId);
+      if (inGroup && conversationId) {
+        space = await getLineSpace(env, conversationId).catch(() => null);
+      }
 
       if (inGroup && !space?.brandId) {
-        const intake = await handleLineScriptIntake(env, {
-          text,
-          conversationId: conversationId || 'unknown',
-          lineUserId: lineUserId ?? null,
-          brand: null,
-          needGroupBind: true,
-        });
-        if (intake) {
-          await replyOpsMessages(env, replyToken, intake, []);
-          continue;
-        }
         await replyOpsMessages(env, replyToken, [textMsg(MENU_NEED_GROUP_BIND)], []);
+        await rememberSpace();
         continue;
       }
 
-      let scoped: BrandRow[] = brands;
+      const allBrands = await loadBrands();
+      let scoped: BrandRow[] = allBrands;
       if (inGroup && space?.brandId) {
-        const locked = brands.find((b) => b.id === space!.brandId);
+        const locked = allBrands.find((b) => b.id === space!.brandId);
         if (!locked) {
           await replyOpsMessages(env, replyToken, [textMsg(MENU_NEED_GROUP_BIND)], []);
           continue;
         }
-        if (mentionsForeignBrand(text, locked, brands)) {
+        if (mentionsForeignBrand(text, locked, allBrands)) {
           await replyOpsMessages(env, replyToken, [textMsg(MENU_FOREIGN(locked.name))], [locked]);
           continue;
         }
@@ -1411,7 +1436,7 @@ export async function handleLineOpsEvents(
           continue;
         }
         if (opsUser.role !== 'super_admin') {
-          scoped = brands.filter((b) => opsUser.brandIds.includes(b.id));
+          scoped = allBrands.filter((b) => opsUser.brandIds.includes(b.id));
           if (!scoped.length) {
             await replyOps(env, replyToken, MENU_NEED_USER_BIND);
             continue;

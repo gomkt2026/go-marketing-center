@@ -11,7 +11,7 @@ import { useMeta } from '@/context/MetaContext';
 import { useAuth } from '@/context/AuthContext';
 import { ROLE_LABELS } from '@/lib/constants';
 import { api, ApiError } from '@/lib/api';
-import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
+import { useAsyncData } from '@/hooks/useAsyncData';
 import type { User, UserRole } from '@/types';
 
 const USER_ROLE_LABELS: Record<UserRole, string> = {
@@ -201,9 +201,6 @@ function LineNotifyPanel() {
     }
   }
 
-  if (loading) return <LoadingState />;
-  if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
-
   return (
     <Card>
       <strong style={{ display: 'block', marginBottom: 8 }}>GO 行銷機器人</strong>
@@ -215,22 +212,31 @@ function LineNotifyPanel() {
         LINE Official Account 後台請允許加入群組／多人聊天；Messaging API webhook 設成
         <code>/api/webhooks/line/ops</code>。建議開啟「僅在被提及或被回覆時接收 webhook」，避免群組閒聊打進來。
       </p>
-      {!data.configured && (
+      {loading && <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 12 }}>讀取綁定狀態…</p>}
+      {error && (
+        <p style={{ fontSize: 13, color: 'var(--color-danger)', marginBottom: 12 }}>
+          {error}{' '}
+          <button type="button" onClick={reload} style={{ textDecoration: 'underline', background: 'none', border: 0, cursor: 'pointer', color: 'inherit' }}>
+            重試
+          </button>
+        </p>
+      )}
+      {data && !data.configured && (
         <p style={{ fontSize: 13, color: 'var(--color-danger)', marginBottom: 12 }}>伺服器尚未設定 Line 行銷 Bot 密鑰。</p>
       )}
-      {data.addFriendUrl && (
+      {data?.addFriendUrl && (
         <a href={data.addFriendUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>加好友 ↗</a>
       )}
       <div style={{ margin: '12px 0', fontSize: 13 }}>
-        {data.bound
+        {data?.bound
           ? `已綁定 ${data.displayName ?? data.lineUserIdMasked}`
-          : '尚未綁定'}
+          : loading ? '—' : '尚未綁定'}
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <Button variant="primary" disabled={busy} onClick={createCode}>
           {busy ? '處理中…' : '產生綁定碼'}
         </Button>
-        {data.bound && (
+        {data?.bound && (
           <Button variant="ghost" disabled={busy} onClick={() => savePrefs({ unbind: true })}>解除綁定</Button>
         )}
       </div>
@@ -240,7 +246,7 @@ function LineNotifyPanel() {
           {expiresAt ? `（${new Date(expiresAt).toLocaleTimeString('zh-TW')} 前有效）` : ''}
         </p>
       )}
-      {data.bound && (
+      {data?.bound && (
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
           問答模式：私訊給已綁定的內部帳號；群組請 @機器人 或回覆它。工作群只看綁定的那一個品牌。
         </p>
@@ -293,8 +299,14 @@ function LineSpacesPanel() {
     }
   }
 
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState message={error} onRetry={reload} />;
+  if (loading) {
+    return (
+      <Card>
+        <strong style={{ display: 'block', marginBottom: 8 }}>機器人加入的群組</strong>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>讀取群組…</p>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -302,6 +314,14 @@ function LineSpacesPanel() {
       <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12, color: 'var(--color-text-muted)' }}>
         拉進群後會出現在這裡。未指定品牌的群不能查資料。集團管理者可在此綁定；品牌負責人只能管理已綁在自己品牌下的群。
       </p>
+      {error && (
+        <p style={{ fontSize: 13, color: 'var(--color-danger)', marginBottom: 10 }}>
+          {error}{' '}
+          <button type="button" onClick={reload} style={{ textDecoration: 'underline', background: 'none', border: 0, cursor: 'pointer', color: 'inherit' }}>
+            重試
+          </button>
+        </p>
+      )}
       {message && <p style={{ fontSize: 13, marginBottom: 10 }}>{message}</p>}
       {!spaces.length && (
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>機器人還沒加入任何群組。</p>

@@ -49,6 +49,11 @@ export interface OpsLineUser {
 
 let spacesEnsured = false;
 
+export function isMissingRelation(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /does not exist/i.test(msg);
+}
+
 export async function ensureLineOpsSpaceTables(env: Env): Promise<void> {
   if (spacesEnsured) return;
   const sql = getSql(env);
@@ -105,22 +110,26 @@ function mapSpace(row: Record<string, unknown>): LineOpsSpace {
 }
 
 export async function getLineSpace(env: Env, conversationId: string): Promise<LineOpsSpace | null> {
-  await ensureLineOpsSpaceTables(env);
   const sql = getSql(env);
-  const rows = await sql`
-    SELECT
-      s.id, s.conversation_id, s.space_type, s.brand_id, s.display_name, s.picture_url,
-      s.member_count, s.status, s.bound_by_user_id, s.bound_by_line_user_id, s.bound_at,
-      s.joined_at, s.left_at, s.last_event_at, s.last_event_type, s.created_at, s.updated_at,
-      b.slug AS brand_slug, b.name AS brand_name, u.display_name AS bound_by_name
-    FROM line_ops_spaces s
-    LEFT JOIN brands b ON b.id = s.brand_id
-    LEFT JOIN users u ON u.id = s.bound_by_user_id
-    WHERE s.conversation_id = ${conversationId}
-    LIMIT 1
-  `;
-  if (!rows.length) return null;
-  return mapSpace(rows[0] as Record<string, unknown>);
+  try {
+    const rows = await sql`
+      SELECT
+        s.id, s.conversation_id, s.space_type, s.brand_id, s.display_name, s.picture_url,
+        s.member_count, s.status, s.bound_by_user_id, s.bound_by_line_user_id, s.bound_at,
+        s.joined_at, s.left_at, s.last_event_at, s.last_event_type, s.created_at, s.updated_at,
+        b.slug AS brand_slug, b.name AS brand_name, u.display_name AS bound_by_name
+      FROM line_ops_spaces s
+      LEFT JOIN brands b ON b.id = s.brand_id
+      LEFT JOIN users u ON u.id = s.bound_by_user_id
+      WHERE s.conversation_id = ${conversationId}
+      LIMIT 1
+    `;
+    if (!rows.length) return null;
+    return mapSpace(rows[0] as Record<string, unknown>);
+  } catch (e) {
+    if (!isMissingRelation(e)) throw e;
+    return null;
+  }
 }
 
 async function lineGetJson(env: Env, path: string): Promise<Record<string, unknown> | null> {
@@ -165,16 +174,13 @@ export async function refreshLineSpaceProfile(env: Env, space: {
   return { displayName, pictureUrl, memberCount };
 }
 
-export async function recordLineSpaceEvent(
+async function upsertLineSpaceEvent(
   env: Env,
-  source: LineOpsSource | undefined,
+  conversationId: string,
+  spaceType: LineSpaceType,
   eventType: string,
-): Promise<LineOpsSpace | null> {
-  const conversationId = lineConversationId(source);
-  if (!conversationId) return null;
-  await ensureLineOpsSpaceTables(env);
+): Promise<void> {
   const sql = getSql(env);
-  const spaceType = lineSpaceType(source);
   const left = eventType === 'leave';
   await sql`
     INSERT INTO line_ops_spaces (
@@ -193,54 +199,78 @@ export async function recordLineSpaceEvent(
       last_event_type = ${eventType},
       updated_at = now()
   `;
-  const space = await getLineSpace(env, conversationId);
-  if (space && (eventType === 'join' || !space.displayName)) {
-    await refreshLineSpaceProfile(env, { conversationId, spaceType }).catch(() => undefined);
-    return getLineSpace(env, conversationId);
+}
+
+export async function recordLineSpaceEvent(
+  env: Env,
+  source: LineOpsSource | undefined,
+  eventType: string,
+): Promise<LineOpsSpace | null> {
+  const conversationId = lineConversationId(source);
+  if (!conversationId) return null;
+  const spaceType = lineSpaceType(source);
+  try {
+    await upsertLineSpaceEvent(env, conversationId, spaceType, eventType);
+  } catch (e) {
+    if (!isMissingRelation(e)) throw e;
+    await ensureLineOpsSpaceTables(env);
+    await upsertLineSpaceEvent(env, conversationId, spaceType, eventType);
   }
-  return space;
+  if (eventType === 'join') {
+    await refreshLineSpaceProfile(env, { conversationId, spaceType }).catch(() => undefined);
+  }
+  return getLineSpace(env, conversationId);
 }
 
 export async function listLineSpaces(env: Env, user: AuthUser): Promise<LineOpsSpace[]> {
-  await ensureLineOpsSpaceTables(env);
   const sql = getSql(env);
-  const rows = user.role === 'super_admin'
-    ? await sql`
-        SELECT
-          s.id, s.conversation_id, s.space_type, s.brand_id, s.display_name, s.picture_url,
-          s.member_count, s.status, s.bound_by_user_id, s.bound_by_line_user_id, s.bound_at,
-          s.joined_at, s.left_at, s.last_event_at, s.last_event_type, s.created_at, s.updated_at,
-          b.slug AS brand_slug, b.name AS brand_name, u.display_name AS bound_by_name
-        FROM line_ops_spaces s
-        LEFT JOIN brands b ON b.id = s.brand_id
-        LEFT JOIN users u ON u.id = s.bound_by_user_id
-        ORDER BY s.status ASC, s.last_event_at DESC NULLS LAST, s.joined_at DESC
-      `
-    : await sql`
-        SELECT
-          s.id, s.conversation_id, s.space_type, s.brand_id, s.display_name, s.picture_url,
-          s.member_count, s.status, s.bound_by_user_id, s.bound_by_line_user_id, s.bound_at,
-          s.joined_at, s.left_at, s.last_event_at, s.last_event_type, s.created_at, s.updated_at,
-          b.slug AS brand_slug, b.name AS brand_name, u.display_name AS bound_by_name
-        FROM line_ops_spaces s
-        LEFT JOIN brands b ON b.id = s.brand_id
-        LEFT JOIN users u ON u.id = s.bound_by_user_id
-        WHERE s.brand_id = ANY(${user.brandIds}::uuid[])
-        ORDER BY s.status ASC, s.last_event_at DESC NULLS LAST, s.joined_at DESC
-      `;
-  return (rows as Record<string, unknown>[]).map(mapSpace);
+  try {
+    const rows = user.role === 'super_admin'
+      ? await sql`
+          SELECT
+            s.id, s.conversation_id, s.space_type, s.brand_id, s.display_name, s.picture_url,
+            s.member_count, s.status, s.bound_by_user_id, s.bound_by_line_user_id, s.bound_at,
+            s.joined_at, s.left_at, s.last_event_at, s.last_event_type, s.created_at, s.updated_at,
+            b.slug AS brand_slug, b.name AS brand_name, u.display_name AS bound_by_name
+          FROM line_ops_spaces s
+          LEFT JOIN brands b ON b.id = s.brand_id
+          LEFT JOIN users u ON u.id = s.bound_by_user_id
+          ORDER BY s.status ASC, s.last_event_at DESC NULLS LAST, s.joined_at DESC
+        `
+      : await sql`
+          SELECT
+            s.id, s.conversation_id, s.space_type, s.brand_id, s.display_name, s.picture_url,
+            s.member_count, s.status, s.bound_by_user_id, s.bound_by_line_user_id, s.bound_at,
+            s.joined_at, s.left_at, s.last_event_at, s.last_event_type, s.created_at, s.updated_at,
+            b.slug AS brand_slug, b.name AS brand_name, u.display_name AS bound_by_name
+          FROM line_ops_spaces s
+          LEFT JOIN brands b ON b.id = s.brand_id
+          LEFT JOIN users u ON u.id = s.bound_by_user_id
+          WHERE s.brand_id = ANY(${user.brandIds}::uuid[])
+          ORDER BY s.status ASC, s.last_event_at DESC NULLS LAST, s.joined_at DESC
+        `;
+    return (rows as Record<string, unknown>[]).map(mapSpace);
+  } catch (e) {
+    if (!isMissingRelation(e)) throw e;
+    return [];
+  }
 }
 
 export async function findOpsUserByLineId(env: Env, lineUserId: string): Promise<OpsLineUser | null> {
-  await ensureLineOpsSpaceTables(env);
   const sql = getSql(env);
-  const rows = await sql`
-    SELECT u.id, u.display_name, u.role, b.line_user_id
-    FROM user_line_bindings b
-    JOIN users u ON u.id = b.user_id
-    WHERE b.line_user_id = ${lineUserId} AND u.is_active = true
-    LIMIT 1
-  `;
+  let rows: Record<string, unknown>[];
+  try {
+    rows = await sql`
+      SELECT u.id, u.display_name, u.role, b.line_user_id
+      FROM user_line_bindings b
+      JOIN users u ON u.id = b.user_id
+      WHERE b.line_user_id = ${lineUserId} AND u.is_active = true
+      LIMIT 1
+    ` as Record<string, unknown>[];
+  } catch (e) {
+    if (!isMissingRelation(e)) throw e;
+    return null;
+  }
   if (!rows.length) return null;
   const row = rows[0] as { id: string; display_name: string; role: string; line_user_id: string };
   const mem = await sql`
@@ -272,7 +302,13 @@ export async function bindLineSpace(env: Env, params: {
   actor: OpsLineUser | AuthUser;
   lineUserId?: string | null;
 }): Promise<LineOpsSpace> {
-  await ensureLineOpsSpaceTables(env);
+  try {
+    await upsertLineSpaceEvent(env, params.conversationId, 'group', 'bind');
+  } catch (e) {
+    if (!isMissingRelation(e)) throw e;
+    await ensureLineOpsSpaceTables(env);
+    await upsertLineSpaceEvent(env, params.conversationId, 'group', 'bind');
+  }
   const space = await getLineSpace(env, params.conversationId);
   if (!space) throw new Error('還沒有這個群組的紀錄。請先把機器人拉進群，或等它回覆一次。');
   if (params.brandId) {
@@ -305,8 +341,10 @@ export function parseSpaceBindCommand(text: string): { action: 'bind' | 'unbind'
   const compact = text.replace(/\s+/g, '');
   if (/這個群解綁|解綁這個群/.test(compact)) return { action: 'unbind', brandKey: null };
   const bind = compact.match(/(?:這個群綁定?|綁定?這個群|這個群是)(.+)/i);
-  if (!bind) return null;
-  return { action: 'bind', brandKey: bind[1].trim() };
+  if (bind) return { action: 'bind', brandKey: bind[1].trim() };
+  const short = compact.match(/綁定(homigo|taskgo|washgo|小咪|匠管|阿豪|阿樂)$/i);
+  if (short) return { action: 'bind', brandKey: short[1] };
+  return null;
 }
 
 export function brandKeyToSlug(key: string, brands: Array<{ slug: string; name: string }>): string | null {

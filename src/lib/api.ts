@@ -15,7 +15,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+    const msg = (data as { error?: string }).error
+      || (res.status >= 500 ? `伺服器忙碌（${res.status}），請再試一次` : res.statusText)
+      || `請求失敗（${res.status}）`;
+    throw new ApiError(res.status, msg);
   }
   return data as T;
 }

@@ -459,17 +459,22 @@ export async function hasOpenScriptSession(env: Env, conversationId: string, lin
 }
 
 async function getScriptSession(env: Env, conversationId: string, lineUserId: string): Promise<ScriptSessionRow | null> {
-  await ensureScriptSessions(env);
   const sql = getSql(env);
-  await sql`DELETE FROM line_script_sessions WHERE expires_at < now()`;
-  const rows = await sql`
-    SELECT conversation_id, line_user_id, step, brand_slug, title, body, parsed, expires_at
-    FROM line_script_sessions
-    WHERE conversation_id = ${conversationId} AND line_user_id = ${lineUserId}
-      AND expires_at > now()
-    LIMIT 1
-  `;
-  return (rows[0] as ScriptSessionRow | undefined) ?? null;
+  try {
+    const rows = await sql`
+      SELECT conversation_id, line_user_id, step, brand_slug, title, body, parsed, expires_at
+      FROM line_script_sessions
+      WHERE conversation_id = ${conversationId} AND line_user_id = ${lineUserId}
+        AND expires_at > now()
+      LIMIT 1
+    `;
+    return (rows[0] as ScriptSessionRow | undefined) ?? null;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/does not exist/i.test(msg)) throw e;
+    await ensureScriptSessions(env);
+    return null;
+  }
 }
 
 async function saveScriptSession(env: Env, row: {

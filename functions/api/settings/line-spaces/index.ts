@@ -2,7 +2,7 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../../_shared/env';
 import { requireAuth } from '../../../_shared/auth';
 import { json, error } from '../../../_shared/response';
-import { listLineSpaces, refreshLineSpaceProfile } from '../../../_shared/line-spaces';
+import { listLineSpaces } from '../../../_shared/line-spaces';
 
 // GET /api/settings/line-spaces
 export const onRequestGet: PagesFunction<Env> = async (context) => {
@@ -13,15 +13,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
   try {
     const spaces = await listLineSpaces(context.env, auth);
-    for (const space of spaces.filter((s) => s.status === 'active' && !s.displayName).slice(0, 8)) {
-      await refreshLineSpaceProfile(context.env, {
-        conversationId: space.conversationId,
-        spaceType: space.spaceType,
-      }).catch(() => undefined);
-    }
-    const refreshed = await listLineSpaces(context.env, auth);
-    return json({ spaces: refreshed });
+    return json({ spaces });
   } catch (e) {
-    return error(e instanceof Error ? e.message : '讀取群組失敗', 500);
+    console.error('[line-spaces] list', e);
+    return json({ spaces: [] });
   }
 };

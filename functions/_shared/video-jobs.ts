@@ -17,7 +17,7 @@ export const BRAND_SHORT_COLORS: Record<string, { name: string; color: string; n
   washgo: { name: 'Washgo', color: '#A87C64', nickname: '阿樂' },
 };
 
-export type VideoSourceType = 'podcast_clip' | 'upload';
+export type VideoSourceType = 'podcast_clip' | 'upload' | 'script';
 export type VideoJobStatus =
   | 'analyzing' | 'strategy_review' | 'rendering_preview'
   | 'preview_review' | 'rendering_final' | 'ready' | 'rejected';

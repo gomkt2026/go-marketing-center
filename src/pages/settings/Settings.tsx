@@ -147,7 +147,16 @@ export function Settings() {
         </>
       )}
 
-      {tab === 'line' && <LineNotifyPanel />}
+      {tab === 'line' && (
+        <>
+          <LineNotifyPanel />
+          {(user?.role === 'super_admin' || user?.role === 'brand_manager') && (
+            <div style={{ marginTop: 16 }}>
+              <LineSpacesPanel />
+            </div>
+          )}
+        </>
+      )}
       {tab === 'brands' && isAdmin && <BrandsOnboardPanel />}
       {tab === 'accounts' && isAdmin && <BrandAccountsPanel />}
     </div>
@@ -199,9 +208,8 @@ function LineNotifyPanel() {
     <Card>
       <strong style={{ display: 'block', marginBottom: 8 }}>GO 行銷機器人</strong>
       <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12 }}>
-        加好友後會收到三個品牌近 7 天發文與成效卡片。也可把機器人拉進外包小編或短影音群組，
-        <strong>@GO行銷機器人</strong> 再下指令，例如「今日發文」「排程」「媒體」「口吻」「素材」「短影音」。
-        群組沒被 @、也不是這些指令時不會回話。不會主動推發文通知。
+        加好友後，內部人員用綁定碼才能在私訊查資料。外包小編請把機器人拉進<strong>單一品牌工作群</strong>，管理員回「這個群綁 Homigo」，之後這個群只看 Homigo。
+        群組裡 <strong>@GO行銷機器人</strong> 或回覆它的訊息，可查今日發文、排程、交腳本。指定品牌前不會回任何成效。
       </p>
       <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12, color: 'var(--color-text-muted)' }}>
         LINE Official Account 後台請允許加入群組／多人聊天；Messaging API webhook 設成
@@ -234,10 +242,142 @@ function LineNotifyPanel() {
       )}
       {data.bound && (
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-          問答模式：私訊直接傳指令，群組請 @機器人 或點卡片按鈕。系統不會主動推發文或待審訊息。
+          問答模式：私訊給已綁定的內部帳號；群組請 @機器人 或回覆它。工作群只看綁定的那一個品牌。
         </p>
       )}
       {message && <p style={{ fontSize: 13, marginTop: 10 }}>{message}</p>}
+    </Card>
+  );
+}
+
+function fmtSpaceTime(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('zh-TW', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function maskConversation(id: string): string {
+  if (id.length <= 10) return id;
+  return `${id.slice(0, 6)}…${id.slice(-4)}`;
+}
+
+function LineSpacesPanel() {
+  const { user } = useAuth();
+  const { brands } = useBrand();
+  const { data, loading, error, reload } = useAsyncData(() => api.lineSpaces(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [spaces, setSpaces] = useState<import('@/types').LineOpsSpace[]>([]);
+
+  useEffect(() => {
+    if (data?.spaces) setSpaces(data.spaces);
+  }, [data]);
+
+  const canBindUnbound = user?.role === 'super_admin';
+
+  async function bind(id: string, brandId: string | null) {
+    setBusyId(id);
+    setMessage(null);
+    try {
+      const res = await api.updateLineSpace(id, { brandId });
+      setSpaces(res.spaces);
+      setMessage(brandId ? '已綁定品牌' : '已解除品牌綁定');
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : '綁定失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (loading) return <LoadingState />;
+  if (error) return <ErrorState message={error} onRetry={reload} />;
+
+  return (
+    <Card>
+      <strong style={{ display: 'block', marginBottom: 8 }}>機器人加入的群組</strong>
+      <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12, color: 'var(--color-text-muted)' }}>
+        拉進群後會出現在這裡。未指定品牌的群不能查資料。集團管理者可在此綁定；品牌負責人只能管理已綁在自己品牌下的群。
+      </p>
+      {message && <p style={{ fontSize: 13, marginBottom: 10 }}>{message}</p>}
+      {!spaces.length && (
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>機器人還沒加入任何群組。</p>
+      )}
+      <div style={{ display: 'grid', gap: 10 }}>
+        {spaces.map((space) => {
+          const allowedBrands = canBindUnbound
+            ? brands
+            : brands.filter((b) => b.id === space.brandId || (user?.brandIds ?? []).includes(b.id));
+          return (
+            <div
+              key={space.id}
+              style={{
+                padding: 12,
+                borderRadius: 10,
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-bg-soft)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <div>
+                  <strong style={{ fontSize: 14 }}>{space.displayName || '尚未取得群名'}</strong>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                    {space.spaceType === 'room' ? '多人聊天' : '群組'} · {maskConversation(space.conversationId)}
+                    {space.memberCount != null ? ` · ${space.memberCount} 人` : ''}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                  <Badge tone={space.status === 'active' ? 'success' : 'default'}>
+                    {space.status === 'active' ? '在群裡' : '已退出'}
+                  </Badge>
+                  <Badge tone={space.brandName ? 'primary' : 'accent'}>
+                    {space.brandName ?? '未綁品牌'}
+                  </Badge>
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+                加入 {fmtSpaceTime(space.joinedAt)}
+                {space.lastEventAt ? ` · 最近活動 ${fmtSpaceTime(space.lastEventAt)}` : ''}
+                {space.lastEventType ? `（${space.lastEventType}）` : ''}
+                {space.boundByName ? ` · 綁定人 ${space.boundByName}` : ''}
+              </div>
+              {space.status === 'active' && (canBindUnbound || space.brandId) && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <select
+                    value={space.brandId ?? ''}
+                    disabled={busyId === space.id || (!canBindUnbound && !space.brandId)}
+                    onChange={(e) => bind(space.id, e.target.value || null)}
+                    style={{
+                      padding: '6px 8px',
+                      borderRadius: 8,
+                      border: '1px solid var(--color-border)',
+                      fontSize: 13,
+                      background: 'var(--color-bg)',
+                    }}
+                  >
+                    <option value="">{canBindUnbound ? '未綁品牌' : '選擇品牌'}</option>
+                    {allowedBrands.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                  {space.brandId && (
+                    <Button
+                      variant="ghost"
+                      disabled={busyId === space.id}
+                      onClick={() => bind(space.id, null)}
+                    >
+                      解綁
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </Card>
   );
 }

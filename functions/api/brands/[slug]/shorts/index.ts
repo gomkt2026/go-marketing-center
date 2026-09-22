@@ -4,6 +4,7 @@ import { requireAuth } from '../../../../_shared/auth';
 import { getBrandBySlug } from '../../../../_shared/queries';
 import { json, error } from '../../../../_shared/response';
 import { createUploadJob, listVideoJobs } from '../../../../_shared/video-jobs';
+import { seedHomigoGhostStoryScripts } from '../../../../_shared/short-scripts';
 import { logActivity } from '../../../../_shared/activity';
 
 const MAX_UPLOAD_BYTES = 80 * 1024 * 1024;
@@ -19,6 +20,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const brand = await getBrandBySlug(context.env, context.params.slug as string);
   if (!brand) return error('Brand not found', 404);
+  if (brand.slug === 'homigo') {
+    await seedHomigoGhostStoryScripts(context.env).catch(() => undefined);
+  }
   const jobs = await listVideoJobs(context.env, { brandId: brand.id });
   return json({ jobs });
 };

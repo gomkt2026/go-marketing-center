@@ -178,6 +178,44 @@ CREATE TABLE line_review_digests (
   last_notified_at   TIMESTAMPTZ
 );
 
+CREATE TABLE line_ops_spaces (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id         TEXT NOT NULL UNIQUE,
+  space_type              TEXT NOT NULL,
+  brand_id                UUID REFERENCES brands(id) ON DELETE SET NULL,
+  display_name            TEXT,
+  picture_url             TEXT,
+  member_count            INTEGER,
+  status                  TEXT NOT NULL DEFAULT 'active',
+  bound_by_user_id        UUID REFERENCES users(id) ON DELETE SET NULL,
+  bound_by_line_user_id   TEXT,
+  bound_at                TIMESTAMPTZ,
+  joined_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  left_at                 TIMESTAMPTZ,
+  last_event_at           TIMESTAMPTZ,
+  last_event_type         TEXT,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT line_ops_spaces_type_check CHECK (space_type IN ('group', 'room')),
+  CONSTRAINT line_ops_spaces_status_check CHECK (status IN ('active', 'left'))
+);
+CREATE INDEX idx_line_ops_spaces_brand ON line_ops_spaces(brand_id, status);
+CREATE TRIGGER trg_line_ops_spaces_updated_at BEFORE UPDATE ON line_ops_spaces
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE line_script_sessions (
+  conversation_id  TEXT NOT NULL,
+  line_user_id     TEXT NOT NULL,
+  step             TEXT NOT NULL,
+  brand_slug       TEXT,
+  title            TEXT,
+  body             TEXT,
+  parsed           JSONB,
+  expires_at       TIMESTAMPTZ NOT NULL,
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (conversation_id, line_user_id)
+);
+
 -- ============================================================================
 -- Brand Intelligence(品牌智慧)
 -- ============================================================================

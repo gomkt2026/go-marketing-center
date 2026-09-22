@@ -731,6 +731,27 @@ export interface LineBindingStatus {
   addFriendUrl?: string | null;
 }
 
+export interface LineOpsSpace {
+  id: string;
+  conversationId: string;
+  spaceType: 'group' | 'room';
+  brandId: string | null;
+  brandSlug: string | null;
+  brandName: string | null;
+  displayName: string | null;
+  pictureUrl: string | null;
+  memberCount: number | null;
+  status: 'active' | 'left';
+  boundByUserId: string | null;
+  boundByName: string | null;
+  boundByLineUserId: string | null;
+  boundAt: string | null;
+  joinedAt: string;
+  leftAt: string | null;
+  lastEventAt: string | null;
+  lastEventType: string | null;
+}
+
 /** 行程表頁面:排程/發布狀態項目(讀取 publishing_jobs,依 scheduled_at 排序) */
 export interface ScheduleItem {
   id: string;
@@ -1028,7 +1049,7 @@ export interface PodcastAgentInfo {
   brandName: string;
 }
 
-export type VideoSourceType = 'podcast_clip' | 'upload';
+export type VideoSourceType = 'podcast_clip' | 'upload' | 'script';
 export type VideoJobStatus =
   | 'analyzing' | 'strategy_review' | 'rendering_preview'
   | 'preview_review' | 'rendering_final' | 'ready' | 'rejected';
@@ -1077,6 +1098,25 @@ export interface VideoEdlSegment {
   chunkLines?: VideoEdlChunkLine[];
 }
 
+export interface ShortScriptScene {
+  order: number;
+  speaker: string;
+  line: string;
+  visual?: string;
+  sfx?: string;
+}
+
+export interface ShortScriptDoc {
+  kind: 'short_script';
+  title: string;
+  series?: string;
+  hook: string;
+  cta: string;
+  scenes: ShortScriptScene[];
+  rawText: string;
+  source?: 'web' | 'line' | 'seed';
+}
+
 export interface VideoJob {
   id: string;
   sourceType: VideoSourceType;
@@ -1091,6 +1131,7 @@ export interface VideoJob {
   candidates: VideoClipCandidate[];
   selectedCandidateId: string | null;
   strategy: VideoStrategy | null;
+  transcript?: ShortScriptDoc | unknown;
   edl: VideoEdlSegment[] | null;
   srt: string | null;
   previewUrl: string | null;

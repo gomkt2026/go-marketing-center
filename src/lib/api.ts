@@ -550,6 +550,15 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  lineSpaces: () =>
+    request<{ spaces: import('@/types').LineOpsSpace[] }>('/api/settings/line-spaces'),
+
+  updateLineSpace: (id: string, body: { brandId: string | null }) =>
+    request<{ space: import('@/types').LineOpsSpace; spaces: import('@/types').LineOpsSpace[] }>(
+      `/api/settings/line-spaces/${id}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
   analytics: (slug: string) =>
     request<import('@/types').AnalyticsPayload>(`/api/brands/${slug}/analytics`),
 
@@ -1212,6 +1221,17 @@ export const api = {
 
   brandShorts: (slug: string) =>
     request<{ jobs: import('@/types').VideoJob[] }>(`/api/brands/${slug}/shorts`),
+
+  createBrandShortScripts: (slug: string, body: { text: string; title?: string; replace?: boolean }) =>
+    request<{
+      jobs: import('@/types').VideoJob[];
+      titles: string[];
+      created: number;
+      updated: number;
+    }>(`/api/brands/${slug}/shorts/scripts`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   uploadBrandShort: async (slug: string, params: { file: File; consentScribe: boolean }) => {
     const form = new FormData();

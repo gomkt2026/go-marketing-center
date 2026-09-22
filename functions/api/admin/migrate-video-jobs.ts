@@ -16,7 +16,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   try {
     await sql`DO $$ BEGIN
-      CREATE TYPE video_source_type AS ENUM ('podcast_clip', 'upload');
+      CREATE TYPE video_source_type AS ENUM ('podcast_clip', 'upload', 'script');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`;
     steps.push('type:video_source_type');
 
@@ -58,6 +58,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `;
+    try {
+      await sql`ALTER TYPE video_source_type ADD VALUE IF NOT EXISTS 'script'`;
+      steps.push('enum:video_source_type.script');
+    } catch {
+      steps.push('enum:video_source_type.script (exists)');
+    }
+
     steps.push('table:video_jobs');
 
     await sql`CREATE INDEX IF NOT EXISTS idx_video_jobs_status ON video_jobs(status, created_at DESC)`;

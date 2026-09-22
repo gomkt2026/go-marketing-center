@@ -1,6 +1,25 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { ensurePostingOpsTables } from './posting-slots';
+import {
+  bindLineSpace,
+  brandKeyToSlug,
+  findOpsUserByLineId,
+  getLineSpace,
+  parseSpaceBindCommand,
+  recordLineSpaceEvent,
+  type LineOpsSpace,
+} from './line-spaces';
+import {
+  handleLineScriptIntake,
+  hasOpenScriptSession,
+  inferBrandSlug,
+  isScriptCancel,
+  isScriptConfirm,
+  isScriptUploadCommand,
+  looksLikeScript,
+  seedHomigoGhostStoryScripts,
+} from './short-scripts';
 
 const LINE_API = 'https://api.line.me/v2/bot';
 
@@ -38,13 +57,13 @@ export type LineOpsEvent = {
   type?: string;
   replyToken?: string;
   source?: LineOpsSource;
-  message?: { type?: string; text?: string; mention?: LineMention; quotedMessageId?: string };
+  message?: { type?: string; text?: string; mention?: LineMention; quotedMessageId?: string; id?: string };
 };
 
 type OpsIntent =
   | 'bind' | 'kpi' | 'today' | 'failed' | 'pending'
   | 'schedule' | 'press' | 'voice' | 'assets' | 'shorts'
-  | 'help' | 'unknown';
+  | 'upload_script' | 'help' | 'unknown';
 
 const BRAND_THEME: Record<string, { header: string; accent: string; label: string }> = {
   homigo: { header: '#2F6F5E', accent: '#8CAA71', label: 'Homigo 包租管家' },
@@ -101,6 +120,11 @@ const VIDEO_STATUS_LABEL: Record<string, string> = {
   rejected: '已打回',
 };
 
+function videoJobLabel(status: string, sourceType?: string): string {
+  if (sourceType === 'script' && (status === 'strategy_review' || status === 'analyzing')) return '腳本待拍';
+  return VIDEO_STATUS_LABEL[status] ?? status;
+}
+
 const ASSET_CATEGORY_LABEL: Record<string, string> = {
   system_screenshot: '系統畫面',
   real_photo: '實拍',
@@ -136,8 +160,13 @@ async function linePost(env: Env, path: string, body: unknown): Promise<void> {
   }
 }
 
-async function replyOpsMessages(env: Env, replyToken: string, messages: unknown[]): Promise<void> {
-  await linePost(env, '/message/reply', { replyToken, messages: withQuickReply(messages) });
+async function replyOpsMessages(
+  env: Env,
+  replyToken: string,
+  messages: unknown[],
+  brands?: BrandRow[],
+): Promise<void> {
+  await linePost(env, '/message/reply', { replyToken, messages: withQuickReply(messages, brands) });
 }
 
 export async function replyOps(env: Env, replyToken: string, text: string): Promise<void> {
@@ -221,7 +250,7 @@ function themeOf(slug: string) {
   return BRAND_THEME[slug] ?? { header: '#3A3A3A', accent: '#8CAA71', label: slug };
 }
 
-const BARE_COMMAND_RE = /^(homigo|taskgo|washgo|小咪|匠管|阿豪|阿樂)?(成效|kpi|今日發文|今日|今天|失敗|待審|排程|待發|檔期|行程|媒體|新聞|露出|報導|口吻|人設|怎麼寫|規格|素材|短影音|影片|shorts|腳本|怎麼問|說明|幫助|help|指令|選單|菜單|你好|嗨|hi|hello)$/i;
+const BARE_COMMAND_RE = /^(homigo|taskgo|washgo|小咪|匠管|阿豪|阿樂)?(成效|kpi|今日發文|今日|今天|失敗|待審|排程|待發|檔期|行程|媒體|新聞|露出|報導|口吻|人設|怎麼寫|規格|素材|短影音|影片|shorts|腳本|交腳本|上傳腳本|怎麼問|說明|幫助|help|指令|選單|菜單|你好|嗨|hi|hello)$/i;
 
 export function isGroupSource(source?: LineOpsSource): boolean {
   return source?.type === 'group' || source?.type === 'room'
@@ -263,6 +292,7 @@ export function isBareOpsCommand(text: string): boolean {
 
 export function parseOpsIntent(text: string): OpsIntent {
   if (/^綁定\s*\d{6}$/.test(text)) return 'bind';
+  if (isScriptUploadCommand(text)) return 'upload_script';
   if (/失敗/.test(text)) return 'failed';
   if (/待審/.test(text)) return 'pending';
   if (/短影音|shorts|腳本|影片/.test(text)) return 'shorts';
@@ -283,33 +313,74 @@ function httpsUrl(value: string | null | undefined): string | null {
   return value.trim();
 }
 
-function quickReplyItems() {
+function qrItem(label: string, text: string) {
+  return { type: 'action', action: { type: 'message', label, text } };
+}
+
+function quickReplyItems(brands?: BrandRow[]) {
+  if (brands && brands.length === 0) {
+    return [
+      qrItem('綁 Homigo', '這個群綁 Homigo'),
+      qrItem('綁 TaskGo', '這個群綁 TaskGo'),
+      qrItem('綁 Washgo', '這個群綁 Washgo'),
+      qrItem('指令集', '指令'),
+    ];
+  }
+  if (brands?.length === 1) {
+    const name = brands[0].name;
+    return [
+      qrItem('今日發文', `${name}今日發文`),
+      qrItem('排程', `${name}排程`),
+      qrItem('媒體露出', `${name}媒體`),
+      qrItem('短影音', `${name}短影音`),
+      qrItem('交腳本', '交腳本'),
+      qrItem('口吻規格', `${name}口吻`),
+      qrItem('素材', `${name}素材`),
+      qrItem('待審', `${name}待審`),
+      qrItem('成效', `${name}成效`),
+      qrItem('指令集', '指令'),
+    ];
+  }
   return [
-    { type: 'action', action: { type: 'message', label: '今日發文', text: '今日發文' } },
-    { type: 'action', action: { type: 'message', label: '排程', text: '排程' } },
-    { type: 'action', action: { type: 'message', label: '媒體露出', text: '媒體' } },
-    { type: 'action', action: { type: 'message', label: '短影音', text: '短影音' } },
-    { type: 'action', action: { type: 'message', label: '口吻規格', text: '口吻' } },
-    { type: 'action', action: { type: 'message', label: '素材', text: '素材' } },
-    { type: 'action', action: { type: 'message', label: '三品牌成效', text: '成效' } },
-    { type: 'action', action: { type: 'message', label: 'Homigo', text: 'Homigo成效' } },
-    { type: 'action', action: { type: 'message', label: 'TaskGo', text: 'TaskGo成效' } },
-    { type: 'action', action: { type: 'message', label: 'Washgo', text: 'Washgo成效' } },
-    { type: 'action', action: { type: 'message', label: '待審', text: '待審' } },
-    { type: 'action', action: { type: 'message', label: '指令集', text: '指令' } },
+    qrItem('今日發文', '今日發文'),
+    qrItem('排程', '排程'),
+    qrItem('媒體露出', '媒體'),
+    qrItem('短影音', '短影音'),
+    qrItem('交腳本', '交腳本'),
+    qrItem('口吻規格', '口吻'),
+    qrItem('素材', '素材'),
+    qrItem('三品牌成效', '成效'),
+    qrItem('Homigo', 'Homigo成效'),
+    qrItem('TaskGo', 'TaskGo成效'),
+    qrItem('Washgo', 'Washgo成效'),
+    qrItem('待審', '待審'),
+    qrItem('指令集', '指令'),
   ];
 }
 
-function withQuickReply(messages: unknown[]): unknown[] {
+function withQuickReply(messages: unknown[], brands?: BrandRow[]): unknown[] {
   if (!messages.length) return messages;
-  const last = messages[messages.length - 1];
+  const last = messages[messages.length - 1] as Record<string, unknown> | null;
   if (!last || typeof last !== 'object') return messages;
-  return [...messages.slice(0, -1), { ...last, quickReply: { items: quickReplyItems() } }];
+  if (last.quickReply) return messages;
+  return [...messages.slice(0, -1), { ...last, quickReply: { items: quickReplyItems(brands) } }];
 }
 
 const MENU_UNKNOWN = '這句我還沒學會。點下面一項就好。';
-const MENU_JOIN = '已加入這個群組。之後 @我，再點下面指令。';
-const MENU_FOLLOW = '加好友成功。點下面一項就好，不用背指令。';
+const MENU_JOIN = [
+  '已加入這個群。請管理員先指定品牌，之後這個群就只看那一個品牌。',
+  '',
+  '已在 GO 行銷中心綁定 LINE 的管理員請回：',
+  '這個群綁 Homigo',
+  '這個群綁 TaskGo',
+  '這個群綁 Washgo',
+  '',
+  '指定前我不會在這裡查成效、素材或腳本。',
+].join('\n');
+const MENU_FOLLOW = '加好友成功。內部人員請先到設定頁產生綁定碼，傳「綁定 123456」。外包小編請在品牌工作群 @我，這個群只會看到該品牌。';
+const MENU_NEED_GROUP_BIND = '這個群還沒指定品牌，我不會在這裡查其他品牌的資料。管理員請回「這個群綁 Homigo」。';
+const MENU_NEED_USER_BIND = '請先到 GO 行銷中心設定頁產生綁定碼，傳「綁定 123456」。外包小編請走品牌工作群，不必私訊查其他品牌。';
+const MENU_FOREIGN = (name: string) => `這個群只看 ${name}。要看別的品牌請進那個品牌的工作群，或用已綁定的總部私訊。`;
 
 export async function getBindingForUser(env: Env, userId: string) {
   await ensurePostingOpsTables(env);
@@ -782,13 +853,13 @@ function commandMenuMessages(brands: BrandRow[], intro?: string): unknown[] {
     menuRow(['媒體露出', cmd('媒體')], ['寫文規格', cmd('口吻')]),
     menuRow(['素材庫', cmd('素材')], ['待審稿', cmd('待審')]),
     menuSection('短影音'),
-    menuRow(['短影音工作', cmd('短影音')], ['寫文規格', cmd('口吻')]),
+    menuRow(['短影音工作', cmd('短影音')], ['交腳本', '交腳本']),
   ];
 
   if (scoped) {
     body.push(menuSection('成效'));
     body.push(menuRow(['近 7 天成效', cmd('成效')], ['失敗單', cmd('失敗')], headerColor));
-  } else {
+  } else if (brands.length > 1) {
     body.push(menuSection('指定品牌今日'));
     body.push(menuRow(['Homigo', 'Homigo今日'], ['TaskGo', 'TaskGo今日']));
     body.push(menuRow(['Washgo', 'Washgo今日'], ['三品牌成效', '成效'], headerColor));
@@ -814,7 +885,7 @@ function commandMenuMessages(brands: BrandRow[], intro?: string): unknown[] {
   if (intro) messages.push(textMsg(intro));
   messages.push({
     type: 'flex',
-    altText: scoped ? `${scoped.name} 指令：今日發文、排程、媒體、口吻、短影音` : '點指令：今日發文、排程、媒體、口吻、短影音、成效',
+    altText: scoped ? `${scoped.name} 指令：今日發文、排程、媒體、口吻、短影音、交腳本` : '點指令：今日發文、排程、媒體、口吻、短影音、交腳本、成效',
     contents: bubble,
   });
   return messages;
@@ -1069,7 +1140,7 @@ async function shortsMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> 
   const ids = brands.map((b) => b.id);
   const rows = (ids.length ? await sql`
     SELECT v.title, v.status, v.strategy, v.preview_url, v.final_url, v.updated_at,
-           v.brand_id, e.title AS episode_title
+           v.brand_id, v.source_type, e.title AS episode_title
     FROM video_jobs v
     LEFT JOIN podcast_episodes e ON e.id = v.podcast_episode_id
     WHERE v.brand_id = ANY(${ids}::uuid[]) OR v.brand_id IS NULL
@@ -1078,7 +1149,7 @@ async function shortsMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> 
   `.catch(() => []) : []) as Array<{
     title: string | null; status: string; strategy: unknown;
     preview_url: string | null; final_url: string | null; updated_at: string;
-    brand_id: string | null; episode_title: string | null;
+    brand_id: string | null; source_type?: string; episode_title: string | null;
   }>;
 
   const bubbles = brands.map((brand) => {
@@ -1100,7 +1171,7 @@ async function shortsMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> 
           backgroundColor: '#F7F9F5',
           cornerRadius: '8px',
           contents: [
-            flexText(`${VIDEO_STATUS_LABEL[r.status] ?? r.status}  ${fmtTime(r.updated_at)}`, { size: 'xxs', color: '#6C6C6C' }),
+            flexText(`${videoJobLabel(r.status, r.source_type)}  ${fmtTime(r.updated_at)}`, { size: 'xxs', color: '#6C6C6C' }),
             flexText(clip(title, 24), { size: 'sm', weight: 'bold', color: '#3A3A3A' }),
             flexText(hook, { size: 'xs', color: '#3A3A3A' }),
           ],
@@ -1109,7 +1180,7 @@ async function shortsMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> 
         if (url) row.action = { type: 'uri', uri: url };
         return row;
       })
-      : [flexText('目前沒有短影音工作。可從 Podcast 已核准集數切杯。', { size: 'sm', color: '#6C6C6C' })];
+      : [flexText('目前沒有短影音工作。可在這裡交腳本，或從 Podcast 已核准集數切杯。', { size: 'sm', color: '#6C6C6C' })];
 
     return {
       type: 'bubble',
@@ -1121,7 +1192,7 @@ async function shortsMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> 
         paddingAll: '14px',
         contents: [
           flexText(theme.label, { color: '#FFFFFF', size: 'md', weight: 'bold' }),
-          flexText('短影音工作與 hook', { color: '#D7E8E2', size: 'xs', margin: '4px' }),
+          flexText('短影音工作與腳本', { color: '#D7E8E2', size: 'xs', margin: '4px' }),
         ],
       },
       body: { type: 'box', layout: 'vertical', spacing: 'none', paddingAll: '14px', contents },
@@ -1133,7 +1204,7 @@ async function shortsMessages(env: Env, brands: BrandRow[]): Promise<unknown[]> 
           style: 'primary',
           height: 'sm',
           color: theme.header,
-          action: { type: 'message', label: `${brand.name} 口吻`, text: `${brand.name}口吻` },
+          action: { type: 'message', label: '交腳本', text: '交腳本' },
         }],
       },
     };
@@ -1151,10 +1222,78 @@ async function messagesForIntent(env: Env, intent: OpsIntent, brands: BrandRow[]
     case 'voice': return voiceMessages(brands);
     case 'assets': return assetMessages(env, brands);
     case 'shorts': return shortsMessages(env, brands);
+    case 'upload_script': return shortsMessages(env, brands);
     case 'kpi': return performanceMessages(env, brands);
     case 'help': return commandMenuMessages(brands);
     default: return commandMenuMessages(brands, MENU_UNKNOWN);
   }
+}
+
+function mentionsForeignBrand(text: string, allowed: BrandRow, all: BrandRow[]): boolean {
+  if (/三品牌|全部品牌|所有品牌/.test(text)) return true;
+  const hit = all.find((b) => {
+    if (b.slug === allowed.slug) return false;
+    const lower = text.toLowerCase();
+    if (lower.includes(b.slug) || text.includes(b.name)) return true;
+    if (b.slug === 'homigo' && /小咪/.test(text)) return true;
+    if (b.slug === 'taskgo' && /阿豪|匠管/.test(text)) return true;
+    if (b.slug === 'washgo' && /阿樂/.test(text)) return true;
+    return false;
+  });
+  return Boolean(hit);
+}
+
+async function handleSpaceBindMessage(
+  env: Env,
+  params: {
+    text: string;
+    conversationId: string;
+    lineUserId: string | undefined;
+    brands: BrandRow[];
+    replyToken: string;
+  },
+): Promise<boolean> {
+  const parsed = parseSpaceBindCommand(params.text);
+  if (!parsed) return false;
+  if (!params.lineUserId) {
+    await replyOps(env, params.replyToken, '請先加 GO 行銷機器人好友，再綁這個群。');
+    return true;
+  }
+  const actor = await findOpsUserByLineId(env, params.lineUserId);
+  if (!actor) {
+    await replyOps(env, params.replyToken, '請管理員先到設定頁綁定 LINE，再回「這個群綁 Homigo」。');
+    return true;
+  }
+  if (parsed.action === 'unbind') {
+    const next = await bindLineSpace(env, {
+      conversationId: params.conversationId,
+      brandId: null,
+      actor,
+      lineUserId: params.lineUserId,
+    });
+    await replyOpsMessages(env, params.replyToken, [textMsg(`已解除 ${next.displayName || '這個群'} 的品牌綁定。指定前我不會在這裡查資料。`)], []);
+    return true;
+  }
+  const slug = parsed.brandKey ? brandKeyToSlug(parsed.brandKey, params.brands) : null;
+  const brand = slug ? params.brands.find((b) => b.slug === slug) : null;
+  if (!brand) {
+    await replyOps(env, params.replyToken, '請寫「這個群綁 Homigo」或 TaskGo、Washgo。');
+    return true;
+  }
+  const next = await bindLineSpace(env, {
+    conversationId: params.conversationId,
+    brandId: brand.id,
+    actor,
+    lineUserId: params.lineUserId,
+  });
+  const label = next.displayName ? `「${next.displayName}」` : '這個群';
+  await replyOpsMessages(
+    env,
+    params.replyToken,
+    await performanceMessages(env, [brand], `${label} 已綁 ${brand.name}。之後這個群只看這個品牌，交腳本也會存到這裡。`),
+    [brand],
+  );
+  return true;
 }
 
 export async function handleLineOpsEvents(
@@ -1163,19 +1302,29 @@ export async function handleLineOpsEvents(
 ): Promise<void> {
   if (!lineOpsConfigured(env)) return;
   await ensurePostingOpsTables(env);
+  await seedHomigoGhostStoryScripts(env).catch((e) => console.error('[line-ops] seed scripts', e));
   const brands = await opsBrands(env);
   for (const event of body.events ?? []) {
-    const replyToken = event.replyToken;
-    if (!replyToken) continue;
     const inGroup = isGroupSource(event.source);
+    const conversationId = event.source?.groupId || event.source?.roomId || null;
     const lineUserId = event.source?.userId;
+    if (inGroup) {
+      await recordLineSpaceEvent(env, event.source, event.type || 'message').catch((e) => {
+        console.error('[line-ops] 記錄群組失敗', e);
+      });
+    }
+
+    const replyToken = event.replyToken;
+    if (event.type === 'leave' || event.type === 'unfollow') continue;
+    if (!replyToken) continue;
+
     try {
       if (event.type === 'join') {
-        await replyOpsMessages(env, replyToken, commandMenuMessages(brands, MENU_JOIN));
+        await replyOpsMessages(env, replyToken, [textMsg(MENU_JOIN)], []);
         continue;
       }
       if (event.type === 'follow') {
-        await replyOpsMessages(env, replyToken, commandMenuMessages(brands, MENU_FOLLOW));
+        await replyOpsMessages(env, replyToken, commandMenuMessages(brands, MENU_FOLLOW), []);
         continue;
       }
       if (event.type !== 'message' || event.message?.type !== 'text' || !event.message.text) continue;
@@ -1183,7 +1332,22 @@ export async function handleLineOpsEvents(
       const raw = event.message.text;
       const mentioned = botWasMentioned(raw, event.message.mention);
       const text = stripLineMention(raw, event.message.mention);
-      if (inGroup && !mentioned && !isBareOpsCommand(text)) continue;
+      const quoted = Boolean(event.message.quotedMessageId);
+      const sessionOpen = conversationId && lineUserId
+        ? await hasOpenScriptSession(env, conversationId, lineUserId)
+        : false;
+      const addressing = !inGroup || mentioned || quoted || isBareOpsCommand(text)
+        || Boolean(parseSpaceBindCommand(text))
+        || isScriptUploadCommand(text) || looksLikeScript(text)
+        || (sessionOpen && (isScriptConfirm(text) || isScriptCancel(text) || text.length > 20));
+      if (inGroup && !addressing) continue;
+
+      if (inGroup && conversationId) {
+        const handledBind = await handleSpaceBindMessage(env, {
+          text, conversationId, lineUserId, brands, replyToken,
+        });
+        if (handledBind) continue;
+      }
 
       const bind = text.match(/^綁定\s*(\d{6})$/);
       if (bind) {
@@ -1193,16 +1357,83 @@ export async function handleLineOpsEvents(
         }
         const result = await bindLineUser(env, lineUserId, bind[1]);
         if (result.startsWith('已綁定')) {
-          await replyOpsMessages(env, replyToken, await performanceMessages(env, brands, result));
+          await replyOpsMessages(env, replyToken, await performanceMessages(env, brands, result), brands);
         } else {
           await replyOps(env, replyToken, result);
         }
         continue;
       }
 
+      let space: LineOpsSpace | null = null;
+      if (inGroup && conversationId) space = await getLineSpace(env, conversationId);
+
+      if (inGroup && !space?.brandId) {
+        const intake = await handleLineScriptIntake(env, {
+          text,
+          conversationId: conversationId || 'unknown',
+          lineUserId: lineUserId ?? null,
+          brand: null,
+          needGroupBind: true,
+        });
+        if (intake) {
+          await replyOpsMessages(env, replyToken, intake, []);
+          continue;
+        }
+        await replyOpsMessages(env, replyToken, [textMsg(MENU_NEED_GROUP_BIND)], []);
+        continue;
+      }
+
+      let scoped: BrandRow[] = brands;
+      if (inGroup && space?.brandId) {
+        const locked = brands.find((b) => b.id === space!.brandId);
+        if (!locked) {
+          await replyOpsMessages(env, replyToken, [textMsg(MENU_NEED_GROUP_BIND)], []);
+          continue;
+        }
+        if (mentionsForeignBrand(text, locked, brands)) {
+          await replyOpsMessages(env, replyToken, [textMsg(MENU_FOREIGN(locked.name))], [locked]);
+          continue;
+        }
+        scoped = [locked];
+      } else if (!inGroup) {
+        const opsUser = lineUserId ? await findOpsUserByLineId(env, lineUserId) : null;
+        if (!opsUser) {
+          if (parseOpsIntent(text) === 'help') {
+            await replyOpsMessages(env, replyToken, commandMenuMessages([], MENU_NEED_USER_BIND), []);
+          } else {
+            await replyOps(env, replyToken, MENU_NEED_USER_BIND);
+          }
+          continue;
+        }
+        if (opsUser.role !== 'super_admin') {
+          scoped = brands.filter((b) => opsUser.brandIds.includes(b.id));
+          if (!scoped.length) {
+            await replyOps(env, replyToken, MENU_NEED_USER_BIND);
+            continue;
+          }
+        }
+        scoped = scopeBrands(scoped, text);
+      }
+
+      const inferred = inferBrandSlug(text);
+      const intakeBrand = scoped.length === 1
+        ? scoped[0]
+        : (inferred ? scoped.find((b) => b.slug === inferred) ?? null : null);
+
+      const intake = await handleLineScriptIntake(env, {
+        text,
+        conversationId: conversationId || (lineUserId ? `dm:${lineUserId}` : 'unknown'),
+        lineUserId: lineUserId ?? null,
+        brand: intakeBrand,
+        needGroupBind: false,
+      });
+      if (intake) {
+        await replyOpsMessages(env, replyToken, intake, scoped);
+        continue;
+      }
+
       const intent = parseOpsIntent(text);
-      const scoped = scopeBrands(brands, text);
-      await replyOpsMessages(env, replyToken, await messagesForIntent(env, intent, scoped));
+      await replyOpsMessages(env, replyToken, await messagesForIntent(env, intent, scoped), scoped);
     } catch (e) {
       console.error('[line-ops] 處理訊息失敗', e);
       await replyOps(env, replyToken, '查詢暫時失敗，請稍後再試。').catch(() => undefined);

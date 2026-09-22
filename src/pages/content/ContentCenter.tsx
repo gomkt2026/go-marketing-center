@@ -353,6 +353,7 @@ export function ContentCenter() {
                     key={a.id}
                     src={a.fileUrl}
                     alt="AI 生成配圖"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     style={{ maxWidth: 320, width: '100%', borderRadius: 12, marginBottom: 14, border: '1px solid var(--color-border)' }}
                   />
                 ))}

@@ -3,7 +3,7 @@ import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
-import type { VideoJob, VideoJobStatus } from '@/types';
+import type { VideoJob, VideoJobStatus, ShortScriptDoc } from '@/types';
 
 function speakerLabel(speakers: unknown): string {
   const list = Array.isArray(speakers)
@@ -22,6 +22,18 @@ const STATUS_META: Record<VideoJobStatus, { label: string; tone: BadgeTone }> = 
   rejected: { label: '已打回', tone: 'danger' },
 };
 
+function asScript(job: VideoJob): ShortScriptDoc | null {
+  const t = job.transcript;
+  if (t && typeof t === 'object' && (t as ShortScriptDoc).kind === 'short_script') return t as ShortScriptDoc;
+  return null;
+}
+
+function sourceLabel(sourceType: string): string {
+  if (sourceType === 'podcast_clip') return 'Podcast 切杯';
+  if (sourceType === 'script') return '腳本';
+  return '上傳精華';
+}
+
 export function VideoJobPanel({
   job,
   onChange,
@@ -38,7 +50,10 @@ export function VideoJobPanel({
   const previewInput = useRef<HTMLInputElement>(null);
   const finalInput = useRef<HTMLInputElement>(null);
 
-  const status = STATUS_META[job.status] ?? { label: job.status, tone: 'default' as BadgeTone };
+  const status = job.sourceType === 'script' && job.status === 'strategy_review'
+    ? { label: '腳本待拍', tone: 'accent' as BadgeTone }
+    : (STATUS_META[job.status] ?? { label: job.status, tone: 'default' as BadgeTone });
+  const script = asScript(job);
 
   const run = async (fn: () => Promise<VideoJob>) => {
     setBusy(true);
@@ -60,10 +75,12 @@ export function VideoJobPanel({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <h3 style={{ fontSize: 15 }}>{job.title ?? '短影音工作'}</h3>
             <Badge tone={status.tone}>{status.label}</Badge>
-            <Badge tone="default">{job.sourceType === 'podcast_clip' ? 'Podcast 切杯' : '上傳精華'}</Badge>
+            <Badge tone="default">{sourceLabel(job.sourceType)}</Badge>
           </div>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-            30 秒 · 9:16 · 策略核准後才渲染預覽，預覽核准後才出正式檔
+            {job.sourceType === 'script'
+              ? '30 秒 · 9:16 · 腳本已進工作台，實拍後可直接上傳預覽或成片'
+              : '30 秒 · 9:16 · 策略核准後才渲染預覽，預覽核准後才出正式檔'}
           </p>
         </div>
         {job.status !== 'rejected' && job.status !== 'ready' && (
@@ -78,6 +95,30 @@ export function VideoJobPanel({
       )}
       {errorMsg && (
         <p style={{ fontSize: 12, color: '#B85454', marginBottom: 10 }}>{errorMsg}</p>
+      )}
+
+      {script && (
+        <div style={{
+          marginBottom: 14,
+          padding: 12,
+          borderRadius: 10,
+          background: 'var(--color-bg-soft)',
+          border: '1px solid var(--color-border)',
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>分鏡腳本</div>
+          {script.hook && (
+            <p style={{ fontSize: 13, marginBottom: 8, lineHeight: 1.6 }}>Hook：{script.hook}</p>
+          )}
+          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.65 }}>
+            {script.scenes.map((scene) => (
+              <li key={scene.order} style={{ marginBottom: 4 }}>
+                <strong>{scene.speaker}</strong>：{scene.line}
+                {scene.visual ? <span style={{ color: 'var(--color-text-muted)' }}>　畫面：{scene.visual}</span> : null}
+                {scene.sfx ? <span style={{ color: 'var(--color-text-muted)' }}>　{scene.sfx}</span> : null}
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
       {job.candidates.length > 0 && (
@@ -113,7 +154,7 @@ export function VideoJobPanel({
         </div>
       )}
 
-      {job.candidates.find((c) => c.id === selectedId)?.strategy && (
+      {job.sourceType !== 'script' && job.candidates.find((c) => c.id === selectedId)?.strategy && (
         <p style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 12, whiteSpace: 'pre-wrap' }}>
           {job.candidates.find((c) => c.id === selectedId)?.strategy}
         </p>
@@ -135,7 +176,7 @@ export function VideoJobPanel({
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-        {(job.status === 'strategy_review' || job.status === 'preview_review' || job.status === 'rendering_preview') && selectedId && (
+        {(job.sourceType !== 'script' && (job.status === 'strategy_review' || job.status === 'preview_review' || job.status === 'rendering_preview') && selectedId) && (
           <Button
             disabled={busy}
             onClick={() => run(async () => (await api.approveVideoStrategy(job.id, {
@@ -159,7 +200,7 @@ export function VideoJobPanel({
         </Button>
       </div>
 
-      {(job.status === 'rendering_preview' || job.status === 'preview_review' || job.status === 'rendering_final' || job.status === 'ready') && (
+      {(job.status === 'rendering_preview' || job.status === 'preview_review' || job.status === 'rendering_final' || job.status === 'ready' || job.sourceType === 'script') && (
         <div style={{ marginBottom: 12 }}>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
             本機渲染：<code>python3 scripts/render-short-video.py --job {job.id} --mode preview</code>

@@ -17,6 +17,8 @@ export function Shorts() {
   const [jobs, setJobs] = useState<VideoJob[]>([]);
   const [consent, setConsent] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [scriptText, setScriptText] = useState('');
+  const [savingScript, setSavingScript] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { loading, error, reload } = useAsyncData(
@@ -50,7 +52,7 @@ export function Shorts() {
     <div>
       <PageHeader
         title="短影音工作台"
-        subtitle={`${brand.name} · 上傳長影片或音檔，剪成 30 秒 9:16。策略與預覽都要人工核准。`}
+        subtitle={`${brand.name} · 可貼上分鏡腳本，或上傳長影片／音檔剪成 30 秒 9:16。策略與預覽都要人工核准。`}
       />
 
       {errorMsg && (
@@ -58,6 +60,53 @@ export function Shorts() {
           {errorMsg}
         </Card>
       )}
+
+      <Card style={{ marginBottom: 16 }}>
+        <h3 style={{ fontSize: 14, marginBottom: 8 }}>貼上分鏡腳本</h3>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 12 }}>
+          標題用《》包起來。一次可貼多支。LINE 品牌工作群也可以直接貼給機器人。
+        </p>
+        <textarea
+          value={scriptText}
+          onChange={(e) => setScriptText(e.target.value)}
+          placeholder={'《標題》\n開頭：「…」\n下一秒：\n📱「…」'}
+          rows={8}
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            borderRadius: 10,
+            border: '1px solid var(--color-border)',
+            fontSize: 13,
+            background: 'var(--color-bg-soft)',
+            outline: 'none',
+            resize: 'vertical',
+            lineHeight: 1.6,
+            marginBottom: 12,
+            fontFamily: 'inherit',
+          }}
+        />
+        <Button
+          disabled={savingScript || !scriptText.trim()}
+          onClick={async () => {
+            setSavingScript(true);
+            setErrorMsg(null);
+            try {
+              const { jobs: saved } = await api.createBrandShortScripts(slug, { text: scriptText });
+              setJobs((prev) => {
+                const next = [...saved, ...prev.filter((j) => !saved.some((s) => s.id === j.id))];
+                return next;
+              });
+              setScriptText('');
+            } catch (e) {
+              setErrorMsg(e instanceof Error ? e.message : '儲存腳本失敗');
+            } finally {
+              setSavingScript(false);
+            }
+          }}
+        >
+          {savingScript ? '儲存中…' : '存進工作台'}
+        </Button>
+      </Card>
 
       <Card style={{ marginBottom: 16 }}>
         <h3 style={{ fontSize: 14, marginBottom: 8 }}>上傳實拍 / 口播</h3>
@@ -92,7 +141,7 @@ export function Shorts() {
 
       {!loading && jobs.length === 0 && (
         <Card style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-          這個品牌還沒有短影音工作。也可以從 Podcast 已核准集數切杯。
+          這個品牌還沒有短影音工作。可貼上腳本，或從 Podcast 已核准集數切杯。
         </Card>
       )}
 

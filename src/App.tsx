@@ -24,6 +24,7 @@ const Campaigns = lazyPage(() => import('@/pages/campaign/Campaigns'), 'Campaign
 const ContentCenter = lazyPage(() => import('@/pages/content/ContentCenter'), 'ContentCenter');
 const Podcast = lazyPage(() => import('@/pages/podcast/Podcast'), 'Podcast');
 const Shorts = lazyPage(() => import('@/pages/shorts/Shorts'), 'Shorts');
+const HomigoTutorials = lazyPage(() => import('@/pages/shorts/HomigoTutorials'), 'HomigoTutorials');
 const Publishing = lazyPage(() => import('@/pages/publishing/Publishing'), 'Publishing');
 const Schedule = lazyPage(() => import('@/pages/publishing/Schedule'), 'Schedule');
 const ThreadsReplies = lazyPage(() => import('@/pages/publishing/ThreadsReplies'), 'ThreadsReplies');
@@ -70,6 +71,7 @@ function AppRoutes() {
         <Route path="/:brand/events/:id" element={<EventDetail />} />
         <Route path="/:brand/contents" element={<ContentCenter />} />
         <Route path="/:brand/shorts" element={<Shorts />} />
+        <Route path="/:brand/tutorials" element={<HomigoTutorials />} />
         <Route path="/:brand/publishing" element={<Publishing />} />
         <Route path="/:brand/schedule" element={<Schedule />} />
         <Route path="/:brand/threads" element={<ThreadsDesk />} />

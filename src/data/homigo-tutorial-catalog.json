@@ -1,0 +1,149 @@
+{
+  "brand": "homigo",
+  "items": [
+    {
+      "slug": "add-property",
+      "title": "我要怎麼新增物件？",
+      "role": "landlord",
+      "paths": ["/properties", "/properties/new"],
+      "helpDoc": "docs/help/homigo/landlord-add-property.md",
+      "status": "done"
+    },
+    {
+      "slug": "invite-tenant",
+      "title": "我要怎麼邀請房客、審核綁定？",
+      "role": "landlord",
+      "paths": ["/tenants"],
+      "helpDoc": "docs/help/homigo/landlord-invite-tenant.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "lease-sign",
+      "title": "我要怎麼建立租約與電子簽名？",
+      "role": "landlord",
+      "paths": ["/leases", "/signatures"],
+      "helpDoc": "docs/help/homigo/landlord-lease-sign.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "rent-review",
+      "title": "我要怎麼看收租、審核繳租？",
+      "role": "landlord",
+      "paths": ["/rent-overview", "/payments"],
+      "helpDoc": "docs/help/homigo/landlord-rent-review.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "landlord-repair",
+      "title": "房客報修後我要怎麼處理？",
+      "role": "landlord",
+      "paths": ["/maintenance", "/equipment-events"],
+      "helpDoc": "docs/help/homigo/landlord-repair.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "movein-moveout",
+      "title": "入住點交與退租怎麼走？",
+      "role": "landlord",
+      "paths": ["/properties", "/leases"],
+      "helpDoc": "docs/help/homigo/landlord-movein-moveout.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "pay-rent",
+      "title": "我要怎麼繳租、上傳憑證？",
+      "role": "tenant",
+      "paths": ["/payment"],
+      "helpDoc": "docs/help/homigo/tenant-pay-rent.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "tenant-repair",
+      "title": "我要怎麼報修、看進度？",
+      "role": "tenant",
+      "paths": ["/maintenance", "/equipment-events"],
+      "helpDoc": "docs/help/homigo/tenant-repair.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "meter",
+      "title": "電表怎麼抄、怎麼上傳？",
+      "role": "tenant",
+      "paths": ["/meter"],
+      "helpDoc": "docs/help/homigo/tenant-meter.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "tenant-movein",
+      "title": "入住確認與起租拍照怎麼做？",
+      "role": "tenant",
+      "paths": ["/check-in", "/move-in-photos"],
+      "helpDoc": "docs/help/homigo/tenant-movein.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "tenant-moveout",
+      "title": "退租結算怎麼確認？",
+      "role": "tenant",
+      "paths": ["/move-out-agreement", "/move-out-progress"],
+      "helpDoc": "docs/help/homigo/tenant-moveout.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "messages",
+      "title": "怎麼留言、回覆續約？",
+      "role": "tenant",
+      "paths": ["/messages"],
+      "helpDoc": "docs/help/homigo/tenant-messages.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "cc-login",
+      "title": "指揮中心怎麼用 LINE 登入？",
+      "role": "manager",
+      "paths": ["/login"],
+      "helpDoc": "docs/help/homigo/manager-cc-login.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "manager-rent",
+      "title": "收租審核與催收在哪裡做？",
+      "role": "manager",
+      "paths": ["/rent"],
+      "helpDoc": "docs/help/homigo/manager-rent.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "manager-repair",
+      "title": "報修案件怎麼看、怎麼派？",
+      "role": "manager",
+      "paths": ["/repair"],
+      "helpDoc": "docs/help/homigo/manager-repair.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "listing",
+      "title": "招租刊登與帶看在哪裡？",
+      "role": "manager",
+      "paths": ["/listing"],
+      "helpDoc": "docs/help/homigo/manager-listing.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "manager-moveout",
+      "title": "退租中心怎麼處理？",
+      "role": "manager",
+      "paths": ["/moveout-center"],
+      "helpDoc": "docs/help/homigo/manager-moveout.md",
+      "status": "proposed"
+    },
+    {
+      "slug": "team",
+      "title": "怎麼加團隊成員？",
+      "role": "manager",
+      "paths": ["/team"],
+      "helpDoc": "docs/help/homigo/manager-team.md",
+      "status": "proposed"
+    }
+  ]
+}

@@ -12,6 +12,7 @@ interface MenuItem {
   path: string;
   brandScoped?: boolean;
   end?: boolean;
+  onlySlug?: string;
 }
 
 interface MainItem extends MenuItem {
@@ -55,6 +56,7 @@ const otherGroups: OtherGroup[] = [
     items: [
       { label: 'Podcast 節目', path: '/podcast' },
       { label: '短影音', path: '/shorts', brandScoped: true },
+      { label: '教學 Short', path: '/tutorials', brandScoped: true, onlySlug: 'homigo' },
       { label: '官網 SEO', path: '/seo', brandScoped: true },
       { label: '行銷活動', path: '/campaigns', brandScoped: true },
       { label: '活動報名', path: '/events', brandScoped: true },
@@ -150,7 +152,13 @@ export function Sidebar() {
   const scopedBrand = currentBrand ?? brands[0];
   const scopedSlug = scopedBrand?.slug;
 
-  const otherActive = otherGroups.some((group) =>
+  const visibleGroups = otherGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.onlySlug || item.onlySlug === scopedSlug),
+    }))
+    .filter((group) => group.items.length > 0);
+  const otherActive = visibleGroups.some((group) =>
     group.items.some((item) => pathMatches(pathname, resolveTo(item, scopedSlug), item.end)),
   );
   const [otherOpen, setOtherOpen] = useState(otherActive);
@@ -215,7 +223,7 @@ export function Sidebar() {
               其他
               <span aria-hidden>{otherOpen ? '▴' : '▾'}</span>
             </button>
-            {otherOpen && otherGroups.map((group) => (
+            {otherOpen && visibleGroups.map((group) => (
               <div key={group.title} className="app-sidebar-more-group">
                 <div className="app-sidebar-group-title">{group.title}</div>
                 {group.items.map((item) => (

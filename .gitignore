@@ -17,6 +17,10 @@ Thumbs.db
 # 短影音本機渲染產物(原始素材不進這裡)
 edit/
 
+# Homigo 教學 Short 側錄與成片（清單在 src/data，大檔不進 git）
+videos/shorts/tutorials/**/*.mp4
+videos/shorts/tutorials/**/raw/
+
 # 操作 SOP 教學片產物(來源錄影不進 git)
 sop-assets/**/voice/
 sop-assets/**/preview.mp4

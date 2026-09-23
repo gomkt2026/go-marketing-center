@@ -42,3 +42,26 @@ export function getSql(env: Env): SqlTag {
   sqlCache.set(env, sql);
   return sql;
 }
+
+export function isTransientDbError(err: unknown): boolean {
+  const msg = err instanceof Error ? eMessage(err) : String(err);
+  return /HTTP status (429|500|502|503|504|520|522|523|524)|error code: 52\d|Too many connections|Connection terminated|fetch failed|network/i.test(msg);
+}
+
+function eMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+export async function withDbRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      if (!isTransientDbError(e) || i === attempts - 1) throw e;
+      await new Promise((resolve) => setTimeout(resolve, 180 * (i + 1)));
+    }
+  }
+  throw last;
+}

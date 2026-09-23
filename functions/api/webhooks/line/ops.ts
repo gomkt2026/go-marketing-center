@@ -25,6 +25,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return new Response('invalid json', { status: 400 });
   }
 
-  context.waitUntil(handleLineOpsEvents(context.env, body));
+  context.waitUntil(
+    handleLineOpsEvents(context.env, body).catch((e) => {
+      console.error('[line-ops] webhook waitUntil 失敗', e);
+    }),
+  );
   return new Response('OK');
 };

@@ -1,5 +1,5 @@
 import type { Env } from './env';
-import { getSql } from './db';
+import { getSql, withDbRetry } from './db';
 import type { AuthUser } from './auth';
 import { rowToCamel } from './case';
 
@@ -112,20 +112,22 @@ function mapSpace(row: Record<string, unknown>): LineOpsSpace {
 export async function getLineSpace(env: Env, conversationId: string): Promise<LineOpsSpace | null> {
   const sql = getSql(env);
   try {
-    const rows = await sql`
-      SELECT
-        s.id, s.conversation_id, s.space_type, s.brand_id, s.display_name, s.picture_url,
-        s.member_count, s.status, s.bound_by_user_id, s.bound_by_line_user_id, s.bound_at,
-        s.joined_at, s.left_at, s.last_event_at, s.last_event_type, s.created_at, s.updated_at,
-        b.slug AS brand_slug, b.name AS brand_name, u.display_name AS bound_by_name
-      FROM line_ops_spaces s
-      LEFT JOIN brands b ON b.id = s.brand_id
-      LEFT JOIN users u ON u.id = s.bound_by_user_id
-      WHERE s.conversation_id = ${conversationId}
-      LIMIT 1
-    `;
-    if (!rows.length) return null;
-    return mapSpace(rows[0] as Record<string, unknown>);
+    return await withDbRetry(async () => {
+      const rows = await sql`
+        SELECT
+          s.id, s.conversation_id, s.space_type, s.brand_id, s.display_name, s.picture_url,
+          s.member_count, s.status, s.bound_by_user_id, s.bound_by_line_user_id, s.bound_at,
+          s.joined_at, s.left_at, s.last_event_at, s.last_event_type, s.created_at, s.updated_at,
+          b.slug AS brand_slug, b.name AS brand_name, u.display_name AS bound_by_name
+        FROM line_ops_spaces s
+        LEFT JOIN brands b ON b.id = s.brand_id
+        LEFT JOIN users u ON u.id = s.bound_by_user_id
+        WHERE s.conversation_id = ${conversationId}
+        LIMIT 1
+      `;
+      if (!rows.length) return null;
+      return mapSpace(rows[0] as Record<string, unknown>);
+    });
   } catch (e) {
     if (!isMissingRelation(e)) throw e;
     return null;

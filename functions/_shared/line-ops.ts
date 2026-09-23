@@ -158,6 +158,24 @@ async function linePost(env: Env, path: string, body: unknown): Promise<void> {
   }
 }
 
+function isUsedReplyToken(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /LINE API .*失敗 \(400\).*token|Invalid reply token|reply token/i.test(msg);
+}
+
+function isTransientLineReply(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /LINE API .*失敗 \(5\d\d\)/.test(msg);
+}
+
+function friendlyOpsError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/HTTP status 52\d|error code: 52\d|失敗 \(5\d\d\)/.test(msg)) {
+    return '系統忙碌，請再 @我 一次，或再點「交腳本」。';
+  }
+  return '查詢暫時失敗，請再試一次。';
+}
+
 async function replyOpsMessages(
   env: Env,
   replyToken: string,
@@ -168,14 +186,23 @@ async function replyOpsMessages(
   try {
     await linePost(env, '/message/reply', { replyToken, messages: packed });
   } catch (e) {
+    if (isUsedReplyToken(e) || isTransientLineReply(e)) {
+      console.error('[line-ops] LINE 回覆未重試', e);
+      return;
+    }
     console.error('[line-ops] LINE 卡片發送失敗，改傳文字', e);
     const fallback = packed.map((m) => {
       const row = m as { type?: string; text?: string; altText?: string };
       if (row.type === 'text' && row.text) return textMsg(String(row.text).slice(0, 4500));
       if (row.altText) return textMsg(String(row.altText).slice(0, 4500));
-      return textMsg('查詢完成，但卡片發送失敗。請再問一次，或回「交腳本」。');
+      return textMsg('查詢完成，但卡片發送失敗。請再問一次。');
     });
-    await linePost(env, '/message/reply', { replyToken, messages: withQuickReply(fallback, brands).slice(0, 5) });
+    try {
+      await linePost(env, '/message/reply', { replyToken, messages: fallback.slice(0, 5) });
+    } catch (e2) {
+      if (isUsedReplyToken(e2) || isTransientLineReply(e2)) return;
+      throw e2;
+    }
   }
 }
 
@@ -1469,7 +1496,11 @@ export async function handleLineOpsEvents(
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
       console.error('[line-ops] 處理訊息失敗', detail, e);
-      await replyOps(env, replyToken, `查詢暫時失敗：${clip(detail, 80)}。請再試一次，或回「交腳本」。`).catch(() => undefined);
+      if (isUsedReplyToken(e) || isTransientLineReply(e)) return;
+      await linePost(env, '/message/reply', {
+        replyToken,
+        messages: [{ type: 'text', text: friendlyOpsError(e) }],
+      }).catch(() => undefined);
     }
   }
 }

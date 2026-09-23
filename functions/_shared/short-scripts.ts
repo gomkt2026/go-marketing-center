@@ -1,5 +1,5 @@
 import type { Env } from './env';
-import { getSql } from './db';
+import { getSql, withDbRetry } from './db';
 import { logActivity } from './activity';
 import {
   mapVideoJob,
@@ -155,22 +155,24 @@ export async function ensureVideoScriptType(env: Env): Promise<void> {
 
 export async function ensureScriptSessions(env: Env): Promise<void> {
   if (scriptSessionsEnsured) return;
-  const sql = getSql(env);
-  await sql`
-    CREATE TABLE IF NOT EXISTS line_script_sessions (
-      conversation_id  TEXT NOT NULL,
-      line_user_id     TEXT NOT NULL,
-      step             TEXT NOT NULL,
-      brand_slug       TEXT,
-      title            TEXT,
-      body             TEXT,
-      parsed           JSONB,
-      expires_at       TIMESTAMPTZ NOT NULL,
-      updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-      PRIMARY KEY (conversation_id, line_user_id)
-    )
-  `;
-  await sql`CREATE INDEX IF NOT EXISTS idx_line_script_sessions_exp ON line_script_sessions(expires_at)`;
+  await withDbRetry(async () => {
+    const sql = getSql(env);
+    await sql`
+      CREATE TABLE IF NOT EXISTS line_script_sessions (
+        conversation_id  TEXT NOT NULL,
+        line_user_id     TEXT NOT NULL,
+        step             TEXT NOT NULL,
+        brand_slug       TEXT,
+        title            TEXT,
+        body             TEXT,
+        parsed           JSONB,
+        expires_at       TIMESTAMPTZ NOT NULL,
+        updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (conversation_id, line_user_id)
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_line_script_sessions_exp ON line_script_sessions(expires_at)`;
+  });
   scriptSessionsEnsured = true;
 }
 
@@ -461,14 +463,16 @@ export async function hasOpenScriptSession(env: Env, conversationId: string, lin
 async function getScriptSession(env: Env, conversationId: string, lineUserId: string): Promise<ScriptSessionRow | null> {
   const sql = getSql(env);
   try {
-    const rows = await sql`
-      SELECT conversation_id, line_user_id, step, brand_slug, title, body, parsed, expires_at
-      FROM line_script_sessions
-      WHERE conversation_id = ${conversationId} AND line_user_id = ${lineUserId}
-        AND expires_at > now()
-      LIMIT 1
-    `;
-    return (rows[0] as ScriptSessionRow | undefined) ?? null;
+    return await withDbRetry(async () => {
+      const rows = await sql`
+        SELECT conversation_id, line_user_id, step, brand_slug, title, body, parsed, expires_at
+        FROM line_script_sessions
+        WHERE conversation_id = ${conversationId} AND line_user_id = ${lineUserId}
+          AND expires_at > now()
+        LIMIT 1
+      `;
+      return (rows[0] as ScriptSessionRow | undefined) ?? null;
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!/does not exist/i.test(msg)) throw e;
@@ -489,7 +493,7 @@ async function saveScriptSession(env: Env, row: {
   await ensureScriptSessions(env);
   const sql = getSql(env);
   const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-  await sql`
+  await withDbRetry(() => sql`
     INSERT INTO line_script_sessions (
       conversation_id, line_user_id, step, brand_slug, title, body, parsed, expires_at, updated_at
     ) VALUES (
@@ -505,7 +509,7 @@ async function saveScriptSession(env: Env, row: {
       parsed = EXCLUDED.parsed,
       expires_at = EXCLUDED.expires_at,
       updated_at = now()
-  `;
+  `);
 }
 
 async function clearScriptSession(env: Env, conversationId: string, lineUserId: string): Promise<void> {
@@ -522,11 +526,19 @@ function textMsg(text: string) {
 
 function scriptQuickReply(extra: Array<{ label: string; text: string }> = []) {
   const items = [
-    ...extra.map((x) => ({ type: 'action', action: { type: 'message', label: x.label, text: x.text } })),
-    { type: 'action', action: { type: 'message', label: '短影音', text: '短影音' } },
-    { type: 'action', action: { type: 'message', label: '取消', text: '取消' } },
+    ...extra.map((x) => ({ type: 'action', action: { type: 'postback', label: x.label, data: x.text } })),
+    { type: 'action', action: { type: 'postback', label: '短影音', data: '短影音' } },
+    { type: 'action', action: { type: 'postback', label: '取消', data: '取消' } },
   ];
   return { items: items.slice(0, 13) };
+}
+
+function pasteScriptPrompt(brandName: string) {
+  return {
+    type: 'text',
+    text: `好，把 ${brandName} 的腳本貼過來就行。標題用《》包起來最好，一次貼多支也可以。`,
+    quickReply: scriptQuickReply([{ label: '取消', text: '取消' }]),
+  };
 }
 
 function confirmCard(scripts: ShortScriptDoc[], brandName: string) {
@@ -574,6 +586,27 @@ export async function handleLineScriptIntake(env: Env, params: {
   brand: { id: string; slug: string; name: string } | null;
   needGroupBind: boolean;
 }): Promise<unknown[] | null> {
+  try {
+    return await handleLineScriptIntakeInner(env, params);
+  } catch (e) {
+    console.error('[short-scripts] intake 失敗', e);
+    if (params.brand && isScriptUploadCommand(params.text)) {
+      return [pasteScriptPrompt(params.brand.name)];
+    }
+    if (params.brand && looksLikeScript(params.text)) {
+      return [textMsg('腳本有收到，但暫時存不進工作台。請再貼一次。')];
+    }
+    throw e;
+  }
+}
+
+async function handleLineScriptIntakeInner(env: Env, params: {
+  text: string;
+  conversationId: string;
+  lineUserId: string | null;
+  brand: { id: string; slug: string; name: string } | null;
+  needGroupBind: boolean;
+}): Promise<unknown[] | null> {
   const lineUserId = params.lineUserId || 'unknown';
   const session = await getScriptSession(env, params.conversationId, lineUserId);
   const uploadCmd = isScriptUploadCommand(params.text);
@@ -593,17 +626,17 @@ export async function handleLineScriptIntake(env: Env, params: {
   }
 
   if (uploadCmd && !looks) {
-    await saveScriptSession(env, {
-      conversationId: params.conversationId,
-      lineUserId,
-      step: 'awaiting_script',
-      brandSlug: params.brand.slug,
-    });
-    return [{
-      type: 'text',
-      text: `好，把 ${params.brand.name} 的腳本貼過來就行。標題用《》包起來最好，一次貼多支也可以。`,
-      quickReply: scriptQuickReply([{ label: '取消', text: '取消' }]),
-    }];
+    try {
+      await saveScriptSession(env, {
+        conversationId: params.conversationId,
+        lineUserId,
+        step: 'awaiting_script',
+        brandSlug: params.brand.slug,
+      });
+    } catch (e) {
+      console.error('[short-scripts] 建立交腳本工作階段失敗', e);
+    }
+    return [pasteScriptPrompt(params.brand.name)];
   }
 
   if (looks) {

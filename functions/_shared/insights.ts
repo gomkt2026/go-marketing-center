@@ -1,10 +1,10 @@
 import type { Env } from './env';
 import { getSql } from './db';
-import { getThreadsAccount } from './threads';
+import { getThreadsAccount, threadsCtx, THREADS_API, type ThreadsAccount } from './threads';
+import { threadsFetch, type ThreadsCallContext } from './threads-api-log';
 import { getMetaAccount, resolvePageToken, type MetaAccount } from './meta';
 import { getXAccount, refreshXToken } from './x';
 
-const THREADS_API = 'https://graph.threads.net/v1.0';
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 const X_API = 'https://api.x.com/2';
 
@@ -102,18 +102,23 @@ function mapInsights(data: InsightMetric[]): Record<string, number> {
   return out;
 }
 
-async function fetchJson(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
-  const res = await fetch(url, init);
+async function fetchJson(
+  url: string,
+  init?: RequestInit,
+  threadsCtxForLog?: ThreadsCallContext,
+): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+  const res = threadsCtxForLog ? await threadsFetch(threadsCtxForLog, url, init) : await fetch(url, init);
   const data = await res.json().catch(() => ({})) as Record<string, unknown>;
   return { ok: res.ok, status: res.status, data };
 }
 
-async function fetchThreadsInsights(account: { accessToken: string }, postId: string): Promise<NormalizedMetrics> {
+async function fetchThreadsInsights(account: ThreadsAccount, postId: string): Promise<NormalizedMetrics> {
+  const logCtx = threadsCtx(account, 'insights');
   const params = new URLSearchParams({
     metric: 'views,likes,replies,reposts,quotes',
     access_token: account.accessToken,
   });
-  const insights = await fetchJson(`${THREADS_API}/${encodeURIComponent(postId)}/insights?${params}`);
+  const insights = await fetchJson(`${THREADS_API}/${encodeURIComponent(postId)}/insights?${params}`, undefined, logCtx);
   if (insights.ok) {
     const mapped = mapInsights((insights.data.data as InsightMetric[]) ?? []);
     const metrics = {
@@ -135,7 +140,7 @@ async function fetchThreadsInsights(account: { accessToken: string }, postId: st
     fields: 'like_count,reply_count,repost_count,quote_count,view_count',
     access_token: account.accessToken,
   });
-  const media = await fetchJson(`${THREADS_API}/${encodeURIComponent(postId)}?${fields}`);
+  const media = await fetchJson(`${THREADS_API}/${encodeURIComponent(postId)}?${fields}`, undefined, logCtx);
   if (!media.ok) {
     throw new Error(`Threads 成效回收失敗 (${insights.status}): ${JSON.stringify(insights.data).slice(0, 220)}`);
   }
@@ -337,11 +342,12 @@ function parseFacebookGraphId(url: string): string | null {
 async function fetchPermalinkMap(
   url: string,
   permalinkField: 'permalink' | 'permalink_url',
+  threadsCtxForLog?: ThreadsCallContext,
 ): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   let next: string | null = url;
   for (let page = 0; page < 3 && next; page++) {
-    const res = await fetchJson(next);
+    const res = await fetchJson(next, undefined, threadsCtxForLog);
     if (!res.ok) break;
     const items = (res.data.data as { id?: string; permalink?: string; permalink_url?: string }[]) ?? [];
     for (const item of items) {
@@ -372,6 +378,7 @@ async function resolveMediaId(job: PublishedJob, accounts: AccountBundle): Promi
       accounts.permalinkIds.threads = await fetchPermalinkMap(
         `${THREADS_API}/${encodeURIComponent(accounts.threads.threadsUserId)}/threads?fields=id,permalink&limit=50&access_token=${encodeURIComponent(accounts.threads.accessToken)}`,
         'permalink',
+        threadsCtx(accounts.threads, 'insights'),
       );
     }
     const id = accounts.permalinkIds.threads.get(key);

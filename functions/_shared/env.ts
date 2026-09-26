@@ -41,6 +41,11 @@ export interface Env {
   /** X(Twitter) OAuth2 App 的 Client ID / Client Secret(Go 生態系共用帳號 token 續期用) */
   X_CLIENT_ID?: string;
   X_CLIENT_SECRET?: string;
+  /** Threads OAuth(WashgoMarketing App 的 Threads 應用程式編號／密鑰,不是 Facebook App Secret) */
+  THREADS_APP_ID?: string;
+  THREADS_APP_SECRET?: string;
+  /** 選填:OAuth callback 完整網址,預設 `${PUBLIC_BASE_URL 或請求來源}/api/threads-oauth/callback`;必須登記在 Meta App 的重新導向 URI */
+  THREADS_OAUTH_REDIRECT?: string;
   /** R2 bucket:AI 生成圖片等媒體檔案 */
   MEDIA?: R2Bucket;
   /** 選填:站台公開網址(組媒體絕對 URL 給 Meta API 抓圖用),預設 Pages 網域 */

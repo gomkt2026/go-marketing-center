@@ -586,6 +586,60 @@ export interface SocialAccount {
   tokenExpiresAt?: string | null;
   /** X(Twitter) OAuth2 才需要:是否已存有 refresh token */
   hasRefreshToken?: boolean;
+  /** Threads:實際授權範圍(null = 尚未偵測) */
+  grantedScopes?: string[] | null;
+  scopesSource?: 'debug_token' | 'probe' | null;
+  scopesCheckedAt?: string | null;
+  lastRefreshedAt?: string | null;
+  connectedVia?: 'oauth' | 'manual';
+  isPrimary?: boolean;
+  paused?: boolean;
+  /** null = 沿用組織預設 */
+  dailyActionBudget?: number | null;
+  usage?: {
+    calls24h: number;
+    failed24h: number;
+    blocked24h: number;
+    actionsToday: number;
+    dailyBudget: number;
+  };
+}
+
+export interface ThreadsScopeInfo {
+  scope: string;
+  label: string;
+  feature: string;
+  required: boolean;
+  caveat?: string;
+}
+
+export interface SocialSafetyPolicy {
+  orgPaused: boolean;
+  dailyActionBudget: number;
+  duplicateWindowHours: number;
+  authorCooldownSeconds: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface ThreadsConnectionMeta {
+  oauthAvailable: boolean;
+  scopeCatalog: ThreadsScopeInfo[];
+  policy: SocialSafetyPolicy;
+}
+
+export interface SocialApiRequest {
+  id: string;
+  action: string;
+  method: string;
+  endpoint: string | null;
+  httpStatus: number | null;
+  errorCode: number | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+  blockedReason: string | null;
+  counted: boolean;
+  createdAt: string;
 }
 
 export type ThreadsReplyStatus = 'pending' | 'approved' | 'replied' | 'skipped' | 'failed';

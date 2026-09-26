@@ -71,7 +71,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const accRows = await sql`
       SELECT auto_reply, reply_daily_cap, reply_hourly_cap, access_token_enc, status, account_name
       FROM brand_social_accounts
-      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads'
+      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads' AND is_primary
       LIMIT 1
     `;
     acc = (accRows[0] ?? {}) as typeof acc;
@@ -194,7 +194,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const sql = getSql(context.env);
     const accRows = await sql`
       SELECT id, access_token_enc FROM brand_social_accounts
-      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads'
+      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads' AND is_primary
       LIMIT 1
     `;
     if (!accRows.length || !(accRows[0] as { access_token_enc: string | null }).access_token_enc) {
@@ -280,7 +280,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         reviewedByUserId: auth.id,
         replyTextOverride: replyText,
       });
-      if (!result.ok) return error(result.error ?? '發布失敗', 500);
+      if (!result.ok) return error(result.error ?? '發布失敗', result.blocked ? 409 : 500);
       return json({
         ok: true,
         status: 'replied',
@@ -306,7 +306,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       reviewedByUserId: auth.id,
       replyTextOverride: replyText,
     });
-    if (!result.ok) return error(result.error ?? '發布失敗', 500);
+    if (!result.ok) return error(result.error ?? '發布失敗', result.blocked ? 409 : 500);
     return json({
       ok: true,
       status: 'replied',
@@ -362,6 +362,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     reviewedByUserId: auth.id,
     replyTextOverride: body.replyText?.trim() || undefined,
   });
-  if (!result.ok) return error(result.error ?? '發布失敗', 500);
+  if (!result.ok) return error(result.error ?? '發布失敗', result.blocked ? 409 : 500);
   return json({ ok: true, status: 'replied', permalink: result.replyPermalink ?? null });
 };

@@ -429,7 +429,7 @@ export async function promoteDueThreadsSafetyNet(env: Env): Promise<number> {
     JOIN content_versions v ON v.content_id = c.id
       AND v.version_number = (SELECT max(version_number) FROM content_versions WHERE content_id = c.id)
     JOIN brand_social_accounts acc
-      ON acc.brand_id = c.brand_id AND acc.platform = 'threads'
+      ON acc.brand_id = c.brand_id AND acc.platform = 'threads' AND acc.is_primary
     WHERE c.target_platform = 'threads'
       AND c.status = 'pending_review'
       AND coalesce(c.generation_prompt_meta->>'skipped', 'false') <> 'true'

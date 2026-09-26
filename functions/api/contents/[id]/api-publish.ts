@@ -5,6 +5,7 @@ import { getSql } from '../../../_shared/db';
 import { getThreadsAccount, publishThreadsPost } from '../../../_shared/threads';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage } from '../../../_shared/meta';
 import { toPublicMediaUrl } from '../../../_shared/media';
+import { isThreadsSafetyBlocked } from '../../../_shared/social-safety';
 import { logActivity } from '../../../_shared/activity';
 import { json, error } from '../../../_shared/response';
 import {
@@ -170,6 +171,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       }
     }
   } catch (e) {
+    if (isThreadsSafetyBlocked(e)) return error(e.message, 409);
     return error(e instanceof Error ? e.message : `${PLATFORM_LABELS[platform]} 發布失敗`, 502);
   }
 

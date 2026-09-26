@@ -859,14 +859,47 @@ export const api = {
 
   // -- 社群帳號串接 ----------------------------------------------------------
   socialAccounts: (slug: string) =>
-    request<{ accounts: import('@/types').SocialAccount[] }>(`/api/brands/${slug}/social-accounts`),
+    request<{
+      accounts: import('@/types').SocialAccount[];
+      threads?: import('@/types').ThreadsConnectionMeta;
+    }>(`/api/brands/${slug}/social-accounts`),
 
   saveSocialAccount: (slug: string, body: {
-    platform: string; accountName?: string; externalId?: string;
+    platform: string; accountId?: string; createNew?: boolean; accountName?: string; externalId?: string;
     accessToken?: string; clearToken?: boolean; notes?: string; autoPublish?: boolean;
     autoReply?: boolean; replyDailyCap?: number; replyHourlyCap?: number;
+    paused?: boolean; dailyActionBudget?: number | null;
   }) =>
     request<{ account: import('@/types').SocialAccount }>(`/api/brands/${slug}/social-accounts`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  revokeSocialAccount: (slug: string, accountId: string, remove = false) =>
+    request<{ ok: boolean }>(
+      `/api/brands/${slug}/social-accounts?accountId=${encodeURIComponent(accountId)}${remove ? '&remove=1' : ''}`,
+      { method: 'DELETE' },
+    ),
+
+  setPrimarySocialAccount: (slug: string, accountId: string) =>
+    request<{ ok: boolean }>(`/api/brands/${slug}/social-accounts/primary`, {
+      method: 'POST',
+      body: JSON.stringify({ accountId }),
+    }),
+
+  socialAccountRequests: (slug: string, accountId: string) =>
+    request<{ requests: import('@/types').SocialApiRequest[] }>(
+      `/api/brands/${slug}/social-accounts/requests?accountId=${encodeURIComponent(accountId)}`,
+    ),
+
+  threadsOAuthStartUrl: (slug: string) => `/api/brands/${slug}/threads-oauth/start`,
+
+  socialSafetyPolicy: () =>
+    request<{ policy: import('@/types').SocialSafetyPolicy; canEdit: boolean }>('/api/settings/social-safety'),
+
+  saveSocialSafetyPolicy: (body: Partial<Pick<import('@/types').SocialSafetyPolicy,
+    'orgPaused' | 'dailyActionBudget' | 'duplicateWindowHours' | 'authorCooldownSeconds'>>) =>
+    request<{ policy: import('@/types').SocialSafetyPolicy; canEdit: boolean }>('/api/settings/social-safety', {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
@@ -960,10 +993,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  testSocialAccount: (slug: string, platform: string) =>
-    request<{ ok: boolean; status: string; detail: string }>(`/api/brands/${slug}/social-accounts/test`, {
+  testSocialAccount: (slug: string, platform: string, accountId?: string) =>
+    request<{ ok: boolean; status: string; detail: string; scopes?: string[] | null }>(`/api/brands/${slug}/social-accounts/test`, {
       method: 'POST',
-      body: JSON.stringify({ platform }),
+      body: JSON.stringify({ platform, accountId }),
     }),
 
   // -- Collaboration 範圍的社群帳號(目前僅 Go 生態系共用 X 帳號) --------------

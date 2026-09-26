@@ -149,6 +149,9 @@ async function autoPublishPendingReplies(
       remaining -= 1;
       published += 1;
       console.log(`[replies] ${params.brandSlug} 已自動回覆:${result.replyPermalink ?? result.replyPostId}`);
+    } else if (result.blocked) {
+      console.log(`[replies] ${params.brandSlug} ${result.error}`);
+      break;
     } else {
       console.error(`[replies] ${params.brandSlug} 自動回覆失敗:${result.error}`);
       break;

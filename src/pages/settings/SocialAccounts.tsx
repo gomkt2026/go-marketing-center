@@ -1,5 +1,5 @@
-import { useState, type CSSProperties } from 'react';
-import { useParams, Navigate, Link } from 'react-router-dom';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { useParams, Navigate, Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -8,11 +8,11 @@ import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { SocialAccount, SocialAccountStatus } from '@/types';
+import { ThreadsAccountsPanel } from './ThreadsAccountsPanel';
 
-const PLATFORMS: { id: 'facebook' | 'instagram' | 'threads'; label: string; hint: string }[] = [
+const PLATFORMS: { id: 'facebook' | 'instagram'; label: string; hint: string }[] = [
   { id: 'facebook', label: 'Facebook 粉絲專頁', hint: '必須存粉絲專頁權杖(Page Access Token),不要存個人 User Token。新版粉專體驗用 User Token 回收成效會出現 OAuth 190 / 2069032。自動發文需粉專發文權限;成效回收另需 pages_read_engagement、pages_read_user_content' },
   { id: 'instagram', label: 'Instagram 商業帳號', hint: '需要 IG 商業帳號 ID(與 FB 粉專綁定)與相同的 Page Token。成效回收另需 instagram_manage_insights，否則曝光會是 0' },
-  { id: 'threads', label: 'Threads', hint: '需要 Threads App 的 access token(threads_basic / threads_content_publish;自動回覆需 threads_keyword_search 與 threads_manage_replies;成效回收需 threads_manage_insights)' },
 ];
 
 const statusTone: Record<SocialAccountStatus, BadgeTone> = {
@@ -66,14 +66,14 @@ function brandMetaApp(slug: string): { app: string; page: string } {
 }
 
 function TokenHowTo({ brandName, brandSlug }: { brandName: string; brandSlug: string }) {
-  const [open, setOpen] = useState<'fb' | 'threads' | null>('fb');
+  const [open, setOpen] = useState<'fb' | 'threads' | null>(null);
   const linkStyle: CSSProperties = { color: 'var(--color-primary)', wordBreak: 'break-all' };
   const listStyle: CSSProperties = { fontSize: 13, lineHeight: 1.85, paddingLeft: 18, margin: '8px 0 0' };
   const { app, page } = brandMetaApp(brandSlug);
 
   return (
-    <Card style={{ marginBottom: 14, borderLeft: '4px solid var(--color-primary)' }}>
-      <strong style={{ fontSize: 14 }}>今天要恢復主動發文：Token 從這裡拿</strong>
+    <Card style={{ marginTop: 14, borderLeft: '4px solid var(--color-primary)' }}>
+      <strong style={{ fontSize: 14 }}>手動 Token 教學：FB／IG 粉專權杖，以及 Threads 授權視窗不能用時的備援</strong>
       <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 6 }}>
         Meta「主控板」沒有產生按鈕。請看該頁<strong>最上方</strong>選單的「工具」，不要找左側欄。
         {brandName} 的 Facebook / Instagram 用同一把粉專權杖；Threads 是另一把。
@@ -129,6 +129,9 @@ function TokenHowTo({ brandName, brandSlug }: { brandName: string; brandSlug: st
 
       {open === 'threads' && (
         <ol style={listStyle}>
+          <li>
+            一般情況請直接用上方「連線 Threads 帳號」，授權視窗會自動換長效 Token。以下步驟只在授權視窗不能用時使用。
+          </li>
           <li>Threads 不能用上面的 Graph API 探索工具。回到 Meta App，左側「使用案例」→ 新增或打開 <strong>Threads API</strong>。</li>
           <li>
             基本資料裡會有 <strong>Threads 應用程式密鑰</strong>（跟 Facebook App Secret 不同）。
@@ -158,7 +161,7 @@ function TokenHowTo({ brandName, brandSlug }: { brandName: string; brandSlug: st
           <li>
             重新走授權視窗，權限一定要勾 <code>threads_basic</code>、<code>threads_content_publish</code>、<code>threads_keyword_search</code>、<code>threads_manage_replies</code>，換成 60 天長效 token。
           </li>
-          <li>回到本頁貼上新 token，按「測試連線」。測試會試建一篇（不發布）並探測關鍵字搜尋能不能看到別人的文。</li>
+          <li>回到本頁 Threads 區塊的「備援：手動新增帳號」或該帳號的「設定」貼上新 token。系統會試建一篇（不發布）、偵測授權範圍，並探測關鍵字搜尋能不能看到別人的文。</li>
         </ol>
       )}
     </Card>
@@ -174,16 +177,33 @@ export function SocialAccounts() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const { data, loading, error, reload } = useAsyncData(
     () => slug ? api.socialAccounts(slug) : Promise.reject(new Error('no slug')),
     [slug],
   );
 
+  useEffect(() => {
+    const result = searchParams.get('threads_oauth');
+    if (!result) return;
+    if (result === 'ok') {
+      const missing = searchParams.get('missing');
+      setMessage(`已連線 Threads 帳號 @${searchParams.get('account') ?? ''}。${missing ? `注意:授權缺少 ${missing.split(',').join('、')},相關功能暫時不能用。` : '7 項授權都已具備。'}`);
+    } else {
+      setMessage(`Threads 連線失敗:${searchParams.get('message') ?? '未知錯誤'}`);
+    }
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? '載入失敗'} onRetry={reload} />;
 
-  const accountByPlatform = new Map<string, SocialAccount>(data.accounts.map((a) => [a.platform, a]));
+  const accountByPlatform = new Map<string, SocialAccount>(
+    data.accounts.filter((a) => a.platform !== 'threads').map((a) => [a.platform, a]),
+  );
+  const threadsAccounts = data.accounts.filter((a) => a.platform === 'threads');
 
   function startEdit(platform: string) {
     const acc = accountByPlatform.get(platform);
@@ -249,7 +269,7 @@ export function SocialAccounts() {
     <div>
       <PageHeader
         title={`${brand.name} 社群帳號串接`}
-        subtitle="Token 在 Meta 產生、在這一頁貼上。主控板與行程表都不會產生權杖。"
+        subtitle="Threads 用授權視窗一鍵連線;FB／IG 粉專權杖在 Meta 產生、在這一頁貼上。"
       />
 
       <Card style={{ marginBottom: 14, borderLeft: '4px solid var(--color-primary)' }}>
@@ -267,14 +287,21 @@ export function SocialAccounts() {
         </div>
       </Card>
 
-      <TokenHowTo brandName={brand.name} brandSlug={brand.slug} />
-
       {message && (
         <Card style={{ marginBottom: 12, borderLeft: '4px solid var(--color-primary)' }}>
           <p style={{ fontSize: 13 }}>{message}</p>
         </Card>
       )}
 
+      <ThreadsAccountsPanel
+        slug={brand.slug}
+        accounts={threadsAccounts}
+        meta={data.threads}
+        notify={setMessage}
+        reload={reload}
+      />
+
+      <h3 style={{ fontSize: 15, margin: '22px 0 10px' }}>Facebook／Instagram</h3>
       <div style={{ display: 'grid', gap: 14 }}>
         {PLATFORMS.map((p) => {
           const acc = accountByPlatform.get(p.id);
@@ -299,12 +326,7 @@ export function SocialAccounts() {
                           {tokenExpiryLabel(acc.tokenExpiresAt, p.id, status)}
                         </div>
                       )}
-                      {acc.autoPublish && (
-                        <div>{p.id === 'threads' ? '到期安全網:已開啟(工作台沒人批准時,到點仍會發)' : '排程自動發布:已開啟'}</div>
-                      )}
-                      {acc.autoReply && (
-                        <div>💬 自動回覆熱門貼文:已開啟(每小時 {acc.replyHourlyCap ?? 5} 則 / 每日 {acc.replyDailyCap ?? 12} 則)</div>
-                      )}
+                      {acc.autoPublish && <div>排程自動發布:已開啟</div>}
                       {acc.notes && (
                         <div style={{ color: status === 'error' ? 'var(--color-danger, #b42318)' : 'var(--color-text-muted)', fontSize: 12 }}>
                           {acc.notes}
@@ -335,7 +357,7 @@ export function SocialAccounts() {
                     />
                   </label>
                   <label style={{ fontSize: 12.5 }}>
-                    平台 ID({p.id === 'facebook' ? 'Page ID' : p.id === 'instagram' ? 'IG 商業帳號 ID' : 'Threads User ID'},選填)
+                    平台 ID({p.id === 'facebook' ? 'Page ID' : 'IG 商業帳號 ID'},選填)
                     <input
                       style={inputStyle}
                       value={form.externalId}
@@ -352,58 +374,14 @@ export function SocialAccounts() {
                       placeholder="貼上 token 後會加密儲存"
                     />
                   </label>
-                  {(p.id === 'facebook' || p.id === 'instagram') && (
-                    <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={form.autoPublish}
-                        onChange={(e) => setForm((f) => ({ ...f, autoPublish: e.target.checked }))}
-                      />
-                      排程自動發布(每日早晚主題圖文生成後直接透過 API 發布,不經人工審核;需已填入平台 ID 與有效 token{p.id === 'instagram' ? ';IG 必須有配圖,無圖時會留待人工審核' : ''})
-                    </label>
-                  )}
-                  {p.id === 'threads' && (
-                    <>
-                      <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={form.autoPublish}
-                          onChange={(e) => setForm((f) => ({ ...f, autoPublish: e.target.checked }))}
-                        />
-                        到期安全網(每天 00/06/09/12/18/21 六檔先到 Threads 工作台待批准;勾選後若到期還沒人審,仍會自動發出。需已填入有效 token)
-                      </label>
-                      <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={form.autoReply}
-                          onChange={(e) => setForm((f) => ({ ...f, autoReply: e.target.checked }))}
-                        />
-                        自動回覆熱門貼文(每 30 分鐘掃熱門相關貼文,在小時/日上限內自動發布;關閉則全部進 Threads 工作台待審核。token 需具備 threads_keyword_search 與 threads_manage_replies)
-                      </label>
-                      <label style={{ fontSize: 12.5 }}>
-                        每小時回覆上限(建議 3-5,硬頂 20)
-                        <input
-                          style={{ ...inputStyle, maxWidth: 120 }}
-                          type="number"
-                          min={1}
-                          max={20}
-                          value={form.replyHourlyCap}
-                          onChange={(e) => setForm((f) => ({ ...f, replyHourlyCap: Math.max(1, Math.min(20, Number(e.target.value) || 5)) }))}
-                        />
-                      </label>
-                      <label style={{ fontSize: 12.5 }}>
-                        每日回覆上限(建議 10-15,避免被平台判定為 spam)
-                        <input
-                          style={{ ...inputStyle, maxWidth: 120 }}
-                          type="number"
-                          min={1}
-                          max={50}
-                          value={form.replyDailyCap}
-                          onChange={(e) => setForm((f) => ({ ...f, replyDailyCap: Math.max(1, Math.min(50, Number(e.target.value) || 12)) }))}
-                        />
-                      </label>
-                    </>
-                  )}
+                  <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={form.autoPublish}
+                      onChange={(e) => setForm((f) => ({ ...f, autoPublish: e.target.checked }))}
+                    />
+                    排程自動發布(每日早晚主題圖文生成後直接透過 API 發布,不經人工審核;需已填入平台 ID 與有效 token{p.id === 'instagram' ? ';IG 必須有配圖,無圖時會留待人工審核' : ''})
+                  </label>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <Button variant="primary" disabled={busy} onClick={() => void save(p.id)}>{busy ? '儲存中...' : '儲存'}</Button>
                     <Button variant="ghost" onClick={() => setEditing(null)}>取消</Button>
@@ -414,6 +392,8 @@ export function SocialAccounts() {
           );
         })}
       </div>
+
+      <TokenHowTo brandName={brand.name} brandSlug={brand.slug} />
 
       <Card style={{ marginTop: 16, background: 'var(--color-bg-soft)' }}>
         <strong style={{ fontSize: 13 }}>手動發布流程(Meta App 審核通過前)</strong>

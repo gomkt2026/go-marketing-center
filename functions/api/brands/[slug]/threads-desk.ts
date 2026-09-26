@@ -90,7 +90,7 @@ async function loadThreadsAccount(env: Env, brandId: string): Promise<DeskAccoun
     const accRows = await sql`
       SELECT auto_reply, auto_publish, reply_daily_cap, reply_hourly_cap, access_token_enc, status, account_name
       FROM brand_social_accounts
-      WHERE brand_id = ${brandId}::uuid AND platform = 'threads'
+      WHERE brand_id = ${brandId}::uuid AND platform = 'threads' AND is_primary
       LIMIT 1
     `;
     return (accRows[0] ?? {}) as DeskAccount;
@@ -312,7 +312,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (typeof body.autoReply !== 'boolean') return error('需要 autoReply: true / false', 400);
     const accRows = await sql`
       SELECT id, access_token_enc FROM brand_social_accounts
-      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads' LIMIT 1
+      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads' AND is_primary LIMIT 1
     `;
     if (!accRows.length || !(accRows[0] as { access_token_enc: string | null }).access_token_enc) {
       return error('請先在社群帳號貼上 Threads token', 400);
@@ -338,7 +338,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (typeof body.autoPublish !== 'boolean') return error('需要 autoPublish: true / false', 400);
     const accRows = await sql`
       SELECT id, access_token_enc FROM brand_social_accounts
-      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads' LIMIT 1
+      WHERE brand_id = ${brand.id}::uuid AND platform = 'threads' AND is_primary LIMIT 1
     `;
     if (!accRows.length || !(accRows[0] as { access_token_enc: string | null }).access_token_enc) {
       return error('請先在社群帳號貼上 Threads token', 400);
@@ -414,7 +414,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       reviewedByUserId: auth.id,
       replyTextOverride: body.replyText?.trim() || undefined,
     });
-    if (!published.ok) return error(published.error ?? '發布失敗', 500);
+    if (!published.ok) return error(published.error ?? '發布失敗', published.blocked ? 409 : 500);
     return ok({ ok: true, status: 'replied', permalink: published.replyPermalink ?? null });
   }
 

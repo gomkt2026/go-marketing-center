@@ -20,7 +20,9 @@ import {
   THREADS_POST_HOURS_TW, THREADS_OFFTOPIC_HOURS_TW,
 } from '../../../functions/_shared/threads-slots';
 import { listAllPostingSlots, isHourlyFamily, isOfftopicFamily, isThreadsSlotKind, type PostingSlot } from '../../../functions/_shared/posting-slots';
-import { getThreadsAccount, publishThreadsPost, isThreadsAccessBlocked, THREADS_ACCESS_BLOCKED_NOTE } from '../../../functions/_shared/threads';
+import { getThreadsAccount, publishThreadsPost, isThreadsAccessBlocked, THREADS_ACCESS_BLOCKED_NOTE, THREADS_API, refreshThreadsAccountScopes } from '../../../functions/_shared/threads';
+import { isThreadsSafetyBlocked } from '../../../functions/_shared/social-safety';
+import { threadsFetch } from '../../../functions/_shared/threads-api-log';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, metaTokenInvalidNoteFromMessage } from '../../../functions/_shared/meta';
 import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '../../../functions/_shared/x';
 import { toPublicMediaUrl } from '../../../functions/_shared/media';
@@ -394,7 +396,7 @@ async function threadsReplyRound(env: Env): Promise<void> {
            (SELECT max(t.created_at) FROM threads_reply_targets t WHERE t.brand_id = b.id) AS last_at
     FROM brands b
     LEFT JOIN brand_social_accounts a
-      ON a.brand_id = b.id AND a.platform = 'threads'
+      ON a.brand_id = b.id AND a.platform = 'threads' AND a.is_primary
     WHERE b.is_active = true
     ORDER BY COALESCE(a.auto_reply, false) DESC, last_at ASC NULLS FIRST
   `;
@@ -1261,6 +1263,7 @@ async function publishDueJobs(env: Env): Promise<void> {
   const sql = getSql(env);
   const rows = await sql`
     SELECT pj.id AS job_id, pj.content_id, pj.content_version_id, pj.platform,
+           to_jsonb(pj)->>'social_account_id' AS social_account_id,
            c.brand_id, c.collaboration_id, b.slug AS brand_slug,
            cv.body, cv.hashtags,
            c.generation_prompt_meta,
@@ -1284,19 +1287,22 @@ async function publishDueJobs(env: Env): Promise<void> {
 
   for (const row of rows as {
     job_id: string; content_id: string; content_version_id: string; platform: SocialPlatform | 'x';
+    social_account_id: string | null;
     brand_id: string | null; collaboration_id: string | null; brand_slug: string | null;
     body: string | null; hashtags: string[] | null; generation_prompt_meta: unknown;
     image_url: string | null; video_url: string | null;
   }[]) {
     const label = row.brand_slug ?? 'go-ecosystem';
+    let threadsAccountId: string | null = null;
     try {
       await sql`UPDATE publishing_jobs SET status = 'publishing' WHERE id = ${row.job_id}::uuid`;
       if (!row.body) throw new Error('內容缺少貼文全文(content_versions.body 為空)');
 
       let published: { postId: string; permalink: string | null };
       if (row.platform === 'threads' && row.brand_id) {
-        const account = await getThreadsAccount(env, row.brand_id);
+        const account = await getThreadsAccount(env, row.brand_id, row.social_account_id);
         if (!account) throw new Error('Threads 帳號未連線或憑證失效');
+        threadsAccountId = account.accountId;
         published = await publishThreadsPost(account, {
           text: row.body,
           imageUrl: toPublicMediaUrl(env, row.image_url),
@@ -1340,6 +1346,11 @@ async function publishDueJobs(env: Env): Promise<void> {
           external_post_id = ${published.postId}
         WHERE id = ${row.job_id}::uuid
       `;
+      if (threadsAccountId && !row.social_account_id) {
+        try {
+          await sql`UPDATE publishing_jobs SET social_account_id = ${threadsAccountId}::uuid WHERE id = ${row.job_id}::uuid`;
+        } catch { /* 057 migration 前沒有這個欄位 */ }
+      }
       await sql`UPDATE contents SET status = 'published', updated_at = now() WHERE id = ${row.content_id}::uuid`;
       await sql`
         INSERT INTO publishing_logs (publishing_job_id, event, detail)
@@ -1348,17 +1359,34 @@ async function publishDueJobs(env: Env): Promise<void> {
       console.log(`[publish] ${label}/${row.platform} 已發布:${published.permalink ?? published.postId}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      if (isThreadsSafetyBlocked(e)) {
+        await sql`UPDATE publishing_jobs SET status = 'cancelled' WHERE id = ${row.job_id}::uuid`;
+        await sql`
+          INSERT INTO publishing_logs (publishing_job_id, event, detail)
+          VALUES (${row.job_id}::uuid, 'blocked', ${msg.slice(0, 500)})
+        `;
+        console.log(`[publish] ${label}/${row.platform} ${msg}`);
+        continue;
+      }
       await sql`UPDATE publishing_jobs SET status = 'failed' WHERE id = ${row.job_id}::uuid`;
       await sql`
         INSERT INTO publishing_logs (publishing_job_id, event, detail)
         VALUES (${row.job_id}::uuid, 'failed', ${msg.slice(0, 500)})
       `;
       if (row.platform === 'threads' && row.brand_id && isThreadsAccessBlocked(msg)) {
-        await sql`
-          UPDATE brand_social_accounts
-          SET status = 'error', notes = ${THREADS_ACCESS_BLOCKED_NOTE}, updated_at = now()
-          WHERE brand_id = ${row.brand_id}::uuid AND platform = 'threads'
-        `;
+        if (threadsAccountId) {
+          await sql`
+            UPDATE brand_social_accounts
+            SET status = 'error', notes = ${THREADS_ACCESS_BLOCKED_NOTE}, updated_at = now()
+            WHERE id = ${threadsAccountId}::uuid
+          `;
+        } else {
+          await sql`
+            UPDATE brand_social_accounts
+            SET status = 'error', notes = ${THREADS_ACCESS_BLOCKED_NOTE}, updated_at = now()
+            WHERE brand_id = ${row.brand_id}::uuid AND platform = 'threads'
+          `;
+        }
         console.error(`[publish] ${label} Threads API access blocked,已暫停自動發文`);
       }
       if ((row.platform === 'facebook' || row.platform === 'instagram') && row.brand_id && isMetaTokenInvalid(msg)) {
@@ -1388,12 +1416,10 @@ async function publishDueJobs(env: Env): Promise<void> {
 //   續期本身只需帶著現有 token 呼叫 th_refresh_token,不需要 App Secret。
 //   策略:token_expires_at 距今 < 10 天,或完全未知(NULL,且已建立超過 24 小時)→ 嘗試續期。
 // ============================================================================
-const THREADS_API = 'https://graph.threads.net/v1.0';
-
 async function refreshThreadsTokens(env: Env): Promise<void> {
   const sql = getSql(env);
   const rows = await sql`
-    SELECT a.id, a.access_token_enc, b.slug
+    SELECT a.id, a.brand_id, a.access_token_enc, b.slug
     FROM brand_social_accounts a
     JOIN brands b ON b.id = a.brand_id
     WHERE a.platform = 'threads' AND a.access_token_enc IS NOT NULL
@@ -1403,10 +1429,13 @@ async function refreshThreadsTokens(env: Env): Promise<void> {
       )
       AND a.updated_at < now() - interval '24 hours'
   `;
-  for (const row of rows as { id: string; access_token_enc: string; slug: string }[]) {
+  for (const row of rows as { id: string; brand_id: string; access_token_enc: string; slug: string }[]) {
     try {
       const token = await decryptToken(env, row.access_token_enc);
-      const res = await fetch(`${THREADS_API}/refresh_access_token?grant_type=th_refresh_token&access_token=${encodeURIComponent(token)}`);
+      const res = await threadsFetch(
+        { env, accountId: row.id, brandId: row.brand_id, action: 'refresh' },
+        `${THREADS_API}/refresh_access_token?grant_type=th_refresh_token&access_token=${encodeURIComponent(token)}`,
+      );
       if (!res.ok) {
         const text = await res.text().catch(() => '');
         console.error(`[token-refresh] ${row.slug} threads 續期失敗 (${res.status}): ${text.slice(0, 200)}`);
@@ -1421,6 +1450,10 @@ async function refreshThreadsTokens(env: Env): Promise<void> {
             status = 'connected', notes = NULL, updated_at = now()
         WHERE id = ${row.id}::uuid
       `;
+      try {
+        await sql`UPDATE brand_social_accounts SET last_refreshed_at = now() WHERE id = ${row.id}::uuid`;
+      } catch { /* 057 migration 前沒有這個欄位 */ }
+      await refreshThreadsAccountScopes(env, row.id, row.brand_id, data.access_token);
       console.log(`[token-refresh] ${row.slug} threads token 已續期,效期 ${(data.expires_in / 86400).toFixed(1)} 天`);
     } catch (e) {
       console.error(`[token-refresh] ${row.slug} 處理失敗`, e);
@@ -1432,6 +1465,15 @@ async function refreshThreadsTokens(env: Env): Promise<void> {
 // 主流程 3:清理超過 31 天的 R2 生成圖片,控制儲存成長
 // ============================================================================
 async function cleanupOldMedia(env: Env): Promise<void> {
+  try {
+    const sql = getSql(env);
+    const removed = await sql`
+      DELETE FROM social_api_requests WHERE created_at < now() - interval '90 days' RETURNING 1
+    `;
+    if (removed.length) console.log(`[cleanup] 已刪除 ${removed.length} 筆超過 90 天的 API 請求紀錄`);
+  } catch (e) {
+    console.warn('[cleanup] 清理 social_api_requests 失敗', e instanceof Error ? e.message : e);
+  }
   if (!env.MEDIA) return;
   const cutoff = Date.now() - 31 * 24 * 60 * 60 * 1000;
   let cursor: string | undefined;

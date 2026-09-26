@@ -2,6 +2,7 @@ import type { Env } from './env';
 import { getSql } from './db';
 import { getThreadsAccount, replyToThreadsPost, diagnoseThreadsKeywordSearch, type ThreadsAccount } from './threads';
 import { logActivity } from './activity';
+import { isThreadsSafetyBlocked } from './social-safety';
 import { chatCompleteJson } from './openai';
 import { getBrandVoice, ANTI_AI_RULES } from './prompts';
 
@@ -380,6 +381,8 @@ export async function generateThreadsReplyDrafts(env: Env, params: {
 
 export interface PublishReplyResult {
   ok: boolean;
+  /** 被安全閘門擋下(不算失敗,留在待審佇列) */
+  blocked?: boolean;
   error?: string;
   replyPostId?: string;
   replyPermalink?: string | null;
@@ -420,7 +423,9 @@ export async function publishReplyTarget(
   if (!account) return { ok: false, error: '品牌尚未連接 Threads 帳號' };
 
   try {
-    const published = await replyToThreadsPost(account, { text: replyText, replyToId: row.target_post_id });
+    const published = await replyToThreadsPost(account, {
+      text: replyText, replyToId: row.target_post_id, targetUsername: row.target_username,
+    });
     await sql`
       UPDATE threads_reply_targets SET
         status = 'replied',
@@ -432,6 +437,9 @@ export async function publishReplyTarget(
         error_message = NULL
       WHERE id = ${row.id}::uuid
     `;
+    try {
+      await sql`UPDATE threads_reply_targets SET social_account_id = ${account.accountId}::uuid WHERE id = ${row.id}::uuid`;
+    } catch { /* 057 migration 前沒有這個欄位 */ }
     await logActivity(env, {
       brandId: row.brand_id,
       actorType: params.reviewedByUserId ? 'user' : 'ai_agent',
@@ -445,6 +453,15 @@ export async function publishReplyTarget(
     return { ok: true, replyPostId: published.postId, replyPermalink: published.permalink };
   } catch (e) {
     const message = e instanceof Error ? e.message : '發布失敗';
+    if (isThreadsSafetyBlocked(e)) {
+      await sql`
+        UPDATE threads_reply_targets
+        SET status = CASE WHEN status = 'approved' THEN 'pending' ELSE status END,
+            error_message = ${message.slice(0, 500)}
+        WHERE id = ${row.id}::uuid
+      `;
+      return { ok: false, blocked: true, error: message };
+    }
     await sql`
       UPDATE threads_reply_targets SET status = 'failed', error_message = ${message.slice(0, 500)}
       WHERE id = ${row.id}::uuid

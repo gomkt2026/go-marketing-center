@@ -11,7 +11,9 @@ pages_build_output_dir = "dist"
 # / HOMIGO_INGEST_KEY / TASKGO_INGEST_KEY / WASHGO_INGEST_KEY
 # / LINE_NETWORK_CHANNEL_ACCESS_TOKEN / ELEVENLABS_API_KEY
 # / ELEVENLABS_WASHGO_AGENT_ID / ELEVENLABS_HOMIGO_AGENT_ID
-# / ELEVENLABS_TASKGO_AGENT_ID / ELEVENLABS_TOOL_SECRET / CESIUM_ION_TOKEN 皆以 secret 管理
+# / ELEVENLABS_TASKGO_AGENT_ID / ELEVENLABS_TOOL_SECRET / CESIUM_ION_TOKEN
+# / THREADS_APP_ID / THREADS_APP_SECRET 皆以 secret 管理
+# THREADS_OAUTH_REDIRECT 選填,預設 {站台網址}/api/threads-oauth/callback(需登記在 Meta App 的 Threads 重新導向 URI)
 # 本機開發請在 .env 或 .dev.vars 設定,正式環境請用 `wrangler pages secret put`
 # LINE_NETWORK_BRAND_SLUG 預設 fixercowork
 

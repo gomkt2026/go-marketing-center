@@ -28,7 +28,7 @@ import {
 } from './brand-assets';
 import {
   websiteCta, websiteCtaRule, websiteAuthor, normalizeWebsiteSeoMeta,
-  ensureWebsiteSeoMetaLengths,
+  ensureWebsiteSeoMetaLengths, reconcilePolicyCategory,
   applyWebsiteArticleMigration, isMissingWebsiteArticleSchema,
   type WebsiteSeoMeta,
 } from './website-articles';
@@ -1095,7 +1095,7 @@ export async function generateSeoArticle(
           audience ? `受眾:${audience}` : '',
           params.extraInstruction ?? '',
           '',
-          '回傳 JSON:{"title":"12-60字 H1","description":"40-160字列表摘要不含空白至少40字","body":"500-1800字 markdown 正文,至少3個H2,不含答案區與FAQ","outline":["H2"],"answer_box":"80-150字","primary_keyword":"恰好1個","related_terms":["相關詞"],"search_intent":"informational或solution","category":"pain|product|policy|trust|talk","audience":"consumer或merchant","faq":[{"question":"","answer":""}],"cta":"文末行動","editorial_qa":["需人工核實的點"],"seoMeta":{"slug":"english-slug","seo_title":"含主關鍵字","seo_description":"70-160字 meta 摘要,不可少於70字","schema_recommendation":["Article","FAQPage"]}}',
+          `回傳 JSON:{"title":"12-60字 H1","description":"40-160字列表摘要不含空白至少40字","body":"500-1800字 markdown 正文,至少3個H2,不含答案區與FAQ","outline":["H2"],"answer_box":"80-150字","primary_keyword":"恰好1個","related_terms":["相關詞"],"search_intent":"informational或solution","category":"${params.marketSignalId ? 'pain|product|policy|trust|talk' : 'pain|product|trust|talk'}","audience":"consumer或merchant","faq":[{"question":"","answer":""}],"cta":"文末行動","editorial_qa":["需人工核實的點"],"seoMeta":{"slug":"english-slug","seo_title":"含主關鍵字","seo_description":"70-160字 meta 摘要,不可少於70字","schema_recommendation":["Article","FAQPage"]}}`,
         ].filter(Boolean).join('\n'),
       },
     ],
@@ -1106,7 +1106,7 @@ export async function generateSeoArticle(
   article.cta = cta;
   const relatedRaw = article.related_terms?.length ? article.related_terms : [];
   const related = [...relatedRaw, ...(seed?.relatedTerms ?? [])];
-  const seoMeta = ensureWebsiteSeoMetaLengths(normalizeWebsiteSeoMeta({
+  const seoMeta = reconcilePolicyCategory(ensureWebsiteSeoMetaLengths(normalizeWebsiteSeoMeta({
     ...(article.seoMeta ?? {}),
     slug: article.seoMeta?.slug,
     title: article.seoMeta?.seo_title || article.seoMeta?.title || article.title,
@@ -1130,7 +1130,7 @@ export async function generateSeoArticle(
     editorial_qa: article.editorial_qa?.length
       ? article.editorial_qa
       : ['核實文中產品步驟是否與現況一致', '確認沒有發明客戶數、滿意度或保證效果'],
-  }, slug), article.title, article.body, slug);
+  }, slug), article.title, article.body, slug));
   return {
     title: article.title,
     description: seoMeta.description || article.description || '',

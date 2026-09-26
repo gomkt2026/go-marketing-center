@@ -481,6 +481,13 @@ export function normalizeWebsiteSeoMeta(input: Partial<WebsiteSeoMeta> & Record<
   }, seoTitle, '', slug);
 }
 
+/** policy 必須綁市場情報；沒有來源 signal 的文章改為 talk，避免官網 ingest 拒收。 */
+export function reconcilePolicyCategory(seoMeta: WebsiteSeoMeta, fallbackSignalId?: string | null): WebsiteSeoMeta {
+  if (seoMeta.category !== 'policy' || seoMeta.market_signal_id) return seoMeta;
+  if (fallbackSignalId) return { ...seoMeta, market_signal_id: fallbackSignalId };
+  return { ...seoMeta, category: 'talk' };
+}
+
 export function validateWebsitePayload(params: {
   slug: string;
   title: string;

@@ -88,6 +88,7 @@ const otherGroups: OtherGroup[] = [
       { label: '社群帳號', path: '/social', brandScoped: true },
       { label: '小編人設', path: '/personas' },
       { label: 'Threads 申請手冊', path: '/settings/meta-threads' },
+      { label: '遊戲排行榜', path: '/settings/game' },
       { label: '設定', path: '/settings', end: true },
     ],
   },

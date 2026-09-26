@@ -1466,3 +1466,56 @@ export const checkinApi = {
       { method: 'POST', body: JSON.stringify({ staffToken, qrToken }) },
     ),
 };
+
+// -- 遊戲排行榜後台(僅集團管理者) ---------------------------------------------
+export interface GameSeason {
+  id: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  prize: string;
+  topN: number;
+  isActive: boolean;
+}
+
+export interface GameSeasonInput {
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  prize: string;
+  topN: number;
+  isActive: boolean;
+}
+
+export interface GameBoardEntry {
+  rank: number;
+  playerId: string;
+  nickname: string;
+  phone: string;
+  score: number;
+  plays: number;
+  achievedAt: string;
+  isBlocked: boolean;
+  isWinner: boolean;
+  winnerNote: string;
+}
+
+export const gameAdminApi = {
+  seasons: () => request<{ seasons: GameSeason[] }>('/api/admin/game/seasons'),
+  createSeason: (body: GameSeasonInput) =>
+    request<{ ok: boolean; id: string }>('/api/admin/game/seasons', { method: 'POST', body: JSON.stringify(body) }),
+  updateSeason: (id: string, body: GameSeasonInput) =>
+    request<{ ok: boolean }>(`/api/admin/game/seasons/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteSeason: (id: string) =>
+    request<{ ok: boolean }>(`/api/admin/game/seasons/${id}`, { method: 'DELETE' }),
+  leaderboard: (seasonId: string | 'all') =>
+    request<{ season: GameSeason | null; entries: GameBoardEntry[] }>(`/api/admin/game/seasons/${seasonId}/leaderboard`),
+  setWinner: (seasonId: string, playerId: string, isWinner: boolean, note = '') =>
+    request<{ ok: boolean }>(`/api/admin/game/seasons/${seasonId}/winners`, {
+      method: 'POST', body: JSON.stringify({ playerId, isWinner, note }),
+    }),
+  setBlocked: (playerId: string, isBlocked: boolean) =>
+    request<{ ok: boolean }>(`/api/admin/game/players/${playerId}`, {
+      method: 'PATCH', body: JSON.stringify({ isBlocked }),
+    }),
+};

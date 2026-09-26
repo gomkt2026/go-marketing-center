@@ -10,6 +10,7 @@ import { LoadingState } from '@/hooks/useAsyncData';
 import { lazyPage } from '@/lib/lazy-page';
 import { Login } from '@/pages/Login';
 import { HomeRedirect } from '@/pages/HomeRedirect';
+import { useAuth } from '@/context/AuthContext';
 
 const Dashboard = lazyPage(() => import('@/pages/Dashboard'), 'Dashboard');
 const BrandWorkspace = lazyPage(() => import('@/pages/brand/BrandWorkspace'), 'BrandWorkspace');
@@ -49,12 +50,26 @@ const BrandEditorDesk = lazyPage(() => import('@/pages/editor/BrandEditorDesk'),
 const BrandGeo = lazyPage(() => import('@/pages/geo/BrandGeo'), 'BrandGeo');
 const BrandSeo = lazyPage(() => import('@/pages/seo/BrandSeo'), 'BrandSeo');
 const PostingTimes = lazyPage(() => import('@/pages/brand/PostingTimes'), 'PostingTimes');
+const Landing = lazyPage(() => import('@/pages/public/Landing'), 'Landing');
+const GameSeasons = lazyPage(() => import('@/pages/settings/GameSeasons'), 'GameSeasons');
+
+/** 未登入看公開首頁；已登入沿用原本的品牌工作台導向。 */
+function RootGate() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingState />;
+  if (user) return <Navigate to="/home" replace />;
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <Landing />
+    </Suspense>
+  );
+}
 
 function AppRoutes() {
   return (
     <Suspense fallback={<LoadingState />}>
       <Routes>
-        <Route path="/" element={<HomeRedirect />} />
+        <Route path="/home" element={<HomeRedirect />} />
         <Route path="/overview" element={<Dashboard />} />
         <Route path="/trending" element={<Trending />} />
 
@@ -92,6 +107,7 @@ function AppRoutes() {
         <Route path="/timeline" element={<Timeline />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/meta-threads" element={<MetaThreadsPlaybook />} />
+        <Route path="/settings/game" element={<GameSeasons />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -105,6 +121,15 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/" element={<RootGate />} />
+          <Route
+            path="/welcome"
+            element={(
+              <Suspense fallback={<LoadingState />}>
+                <Landing />
+              </Suspense>
+            )}
+          />
 
           <Route
             path="/e/:slug"

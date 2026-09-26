@@ -5,3 +5,10 @@
 /legal/*
   X-Robots-Tag: index, follow
   Cache-Control: public, max-age=300
+
+/game/*
+  X-Robots-Tag: index, follow
+  Cache-Control: public, max-age=300
+
+/game/vendor/*
+  Cache-Control: public, max-age=31536000, immutable

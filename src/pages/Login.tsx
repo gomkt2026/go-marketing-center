@@ -8,7 +8,7 @@ import { ApiError } from '@/lib/api';
 export function Login() {
   const { user, login } = useAuth();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? '/';
+  const from = (location.state as { from?: string } | null)?.from ?? '/home';
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +17,7 @@ export function Login() {
 
   if (user) {
     if (user.role !== 'super_admin') {
-      const home = user.brandSlugs?.[0] ? `/${user.brandSlugs[0]}/workspace` : '/';
+      const home = user.brandSlugs?.[0] ? `/${user.brandSlugs[0]}/workspace` : '/home';
       const allowed = user.brandSlugs?.some((s) => from.startsWith(`/${s}/`));
       return <Navigate to={allowed ? from : home} replace />;
     }

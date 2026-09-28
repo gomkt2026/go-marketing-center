@@ -19,8 +19,9 @@ interface GameSeason {
 }
 
 interface GameStats {
-  live: { count: number };
+  live: { count: number; players: { name: string; score: number; seconds: number }[] };
   totals: { plays: number; minutes: number; players: number };
+  topPlayers: { nickname: string; phoneMasked: string; plays: number; minutes: number }[];
 }
 
 interface LeaderboardResponse {
@@ -93,10 +94,16 @@ function formatDate(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+function formatStay(seconds: number): string {
+  if (seconds < 60) return `${seconds} 秒`;
+  return `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+}
+
 function Leaderboard() {
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [failed, setFailed] = useState(false);
   const [stats, setStats] = useState<GameStats | null>(null);
+  const [tab, setTab] = useState<'rank' | 'live' | 'loyal'>('rank');
 
   useEffect(() => {
     let alive = true;
@@ -135,13 +142,19 @@ function Leaderboard() {
           <div><b className="lp-live">{stats.live.count}</b><small>正在上工</small></div>
           <div><b>{stats.totals.plays.toLocaleString('en-US')}</b><small>累計遊玩（局）</small></div>
           <div><b>{stats.totals.minutes.toLocaleString('en-US')}</b><small>累計上工（分鐘）</small></div>
+          <div><b>{stats.totals.players.toLocaleString('en-US')}</b><small>玩家人數</small></div>
         </div>
       )}
-      {season?.prize && <div className="lp-prize">{season.prize}</div>}
-      {failed && <p className="lp-muted">排行榜暫時載入失敗，請稍後再試。</p>}
-      {!failed && !data && <p className="lp-muted">載入中…</p>}
-      {data && data.entries.length === 0 && <p className="lp-muted">還沒有人上榜，第一名等你來拿。</p>}
-      {data && data.entries.length > 0 && (
+      <div className="lp-tabs" role="tablist">
+        {([['rank', '排行榜'], ['live', '正在玩'], ['loyal', '最常上工']] as const).map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </div>
+      {season?.prize && tab === 'rank' && <div className="lp-prize">{season.prize}</div>}
+      {tab === 'rank' && failed && <p className="lp-muted">排行榜暫時載入失敗，請稍後再試。</p>}
+      {tab === 'rank' && !failed && !data && <p className="lp-muted">載入中…</p>}
+      {tab === 'rank' && data && data.entries.length === 0 && <p className="lp-muted">還沒有人上榜，第一名等你來拿。</p>}
+      {tab === 'rank' && data && data.entries.length > 0 && (
         <ol className="lp-rank">
           {data.entries.map((e) => (
             <li key={`${e.rank}-${e.nickname}`}>
@@ -154,6 +167,36 @@ function Leaderboard() {
             </li>
           ))}
         </ol>
+      )}
+      {tab === 'live' && (
+        (stats?.live.players.length ?? 0) === 0
+          ? <p className="lp-muted">現在沒有人在跑單。</p>
+          : (
+            <ol className="lp-rank">
+              {stats!.live.players.map((p, i) => (
+                <li key={`${p.name}-${i}`}>
+                  <span className={`lp-rank-no${i < 3 ? ' top' : ''}`}>{i + 1}</span>
+                  <span className="lp-rank-name">{p.name}<small>已上工 {formatStay(p.seconds)}</small></span>
+                  <span className="lp-rank-score">NT$ {p.score.toLocaleString('en-US')}</span>
+                </li>
+              ))}
+            </ol>
+          )
+      )}
+      {tab === 'loyal' && (
+        (stats?.topPlayers.length ?? 0) === 0
+          ? <p className="lp-muted">還沒有常客。玩完送出成績後會出現在這裡。</p>
+          : (
+            <ol className="lp-rank">
+              {stats!.topPlayers.map((p, i) => (
+                <li key={p.phoneMasked}>
+                  <span className={`lp-rank-no${i < 3 ? ' top' : ''}`}>{i + 1}</span>
+                  <span className="lp-rank-name">{p.nickname}<small>{p.phoneMasked}・{p.minutes} 分鐘</small></span>
+                  <span className="lp-rank-score">{p.plays} 局</span>
+                </li>
+              ))}
+            </ol>
+          )
       )}
       <a className="lp-link" href="/legal/game-rules/">活動辦法與領獎方式</a>
     </div>
@@ -372,7 +415,10 @@ const LANDING_CSS = `
 .lp-board{background:#fff;border:1px solid #E6E8E2;border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:12px}
 .lp-board-head p{margin:4px 0 0}
 .lp-prize{background:#FDEBD3;color:#8a4b00;border-radius:12px;padding:10px 14px;font-size:14px;line-height:1.6;white-space:pre-line}
-.lp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lp-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.lp-tabs{display:flex;gap:4px;background:#F7F9F5;border-radius:12px;padding:3px}
+.lp-tabs button{flex:1;border:0;background:transparent;border-radius:9px;padding:7px 4px;font:700 13px inherit;color:var(--muted);cursor:pointer}
+.lp-tabs button[aria-selected=true]{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .lp-stats div{background:#F7F9F5;border-radius:12px;padding:8px;text-align:center}
 .lp-stats b{display:block;font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums}
 .lp-stats small{font-size:12px;color:var(--muted)}

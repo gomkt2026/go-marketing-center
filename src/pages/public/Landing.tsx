@@ -18,6 +18,11 @@ interface GameSeason {
   topN: number;
 }
 
+interface GameStats {
+  live: { count: number };
+  totals: { plays: number; minutes: number; players: number };
+}
+
 interface LeaderboardResponse {
   season: GameSeason | null;
   entries: LeaderboardEntry[];
@@ -91,6 +96,18 @@ function formatDate(iso: string): string {
 function Leaderboard() {
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [failed, setFailed] = useState(false);
+  const [stats, setStats] = useState<GameStats | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => fetch('/api/public/game/stats')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: GameStats | null) => { if (alive && d) setStats(d); })
+      .catch(() => {});
+    void load();
+    const timer = window.setInterval(load, 20000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -113,6 +130,13 @@ function Leaderboard() {
           </p>
         )}
       </div>
+      {stats && (
+        <div className="lp-stats">
+          <div><b className="lp-live">{stats.live.count}</b><small>正在上工</small></div>
+          <div><b>{stats.totals.plays.toLocaleString('en-US')}</b><small>累計遊玩（局）</small></div>
+          <div><b>{stats.totals.minutes.toLocaleString('en-US')}</b><small>累計上工（分鐘）</small></div>
+        </div>
+      )}
       {season?.prize && <div className="lp-prize">{season.prize}</div>}
       {failed && <p className="lp-muted">排行榜暫時載入失敗，請稍後再試。</p>}
       {!failed && !data && <p className="lp-muted">載入中…</p>}
@@ -348,6 +372,11 @@ const LANDING_CSS = `
 .lp-board{background:#fff;border:1px solid #E6E8E2;border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:12px}
 .lp-board-head p{margin:4px 0 0}
 .lp-prize{background:#FDEBD3;color:#8a4b00;border-radius:12px;padding:10px 14px;font-size:14px;line-height:1.6;white-space:pre-line}
+.lp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lp-stats div{background:#F7F9F5;border-radius:12px;padding:8px;text-align:center}
+.lp-stats b{display:block;font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums}
+.lp-stats small{font-size:12px;color:var(--muted)}
+.lp-live{color:#1fae78 !important}
 .lp-rank{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .lp-rank li{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px dashed #eee}
 .lp-rank-no{width:26px;height:26px;border-radius:50%;background:#f0f0f0;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}

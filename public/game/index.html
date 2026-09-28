@@ -199,6 +199,15 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
 .lb li span small{color:var(--ink2);font-weight:500;margin-left:6px;font-size:11px}
 .lb li b{font-family:var(--disp);font-weight:400;font-size:14px;font-variant-numeric:tabular-nums}
 .lb .empty{font-size:12.5px;color:var(--ink2);font-weight:500;margin:0}
+.lb-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.lb-stats div{background:#f4f6f8;border-radius:10px;padding:6px 8px;text-align:center}
+.lb-stats b{display:block;font-family:var(--disp);font-weight:400;font-size:18px;line-height:1.1;font-variant-numeric:tabular-nums}
+.lb-stats small{font-size:11px;color:var(--ink2);font-weight:700}
+.lb-live{display:inline-flex;align-items:center;gap:5px;color:var(--hm)}
+.lb-live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--hm);animation:pulse 1.2s infinite}
+.lb-tabs{display:flex;gap:4px;background:#f4f6f8;border-radius:10px;padding:3px}
+.lb-tabs button{appearance:none;border:0;flex:1;background:transparent;border-radius:8px;padding:6px 4px;font:700 12.5px var(--body);color:var(--ink2);cursor:pointer}
+.lb-tabs button[aria-selected=true]{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(27,34,51,.12)}
 .lbf{background:#fff;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
 .lbf .lb-h{margin-bottom:2px}
 .lbf input[type=text],.lbf input[type=tel]{width:100%;box-sizing:border-box;font:500 15px var(--body);padding:9px 11px;border-radius:10px;border:1.5px solid rgba(27,34,51,.2);background:#fff;color:var(--ink);-webkit-user-select:text;user-select:text}
@@ -279,10 +288,31 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
     <button class="go-btn" id="btnStart" disabled>載入城市中…</button>
     <div class="meta"><span id="ctrlHint"></span><span>最佳紀錄 <b id="bestTitle">—</b></span></div>
     <div class="lb" id="titleBoard" hidden>
-      <div class="lb-h"><span id="lbTitle">排行榜</span><a href="/legal/game-rules/" target="_blank" rel="noopener">活動辦法</a></div>
-      <div class="lb-prize" id="lbPrize" hidden></div>
-      <ol id="lbList"></ol>
-      <p class="empty" id="lbEmpty" hidden>還沒有人上榜，第一名等你來拿。</p>
+      <div class="lb-h"><span class="lb-live" id="lbLive">正在上工 0 人</span><a href="/legal/game-rules/" target="_blank" rel="noopener">活動辦法</a></div>
+      <div class="lb-stats">
+        <div><b id="stPlays">0</b><small>累計遊玩（局）</small></div>
+        <div><b id="stMinutes">0</b><small>累計上工（分鐘）</small></div>
+        <div><b id="stPlayers">0</b><small>玩家人數</small></div>
+      </div>
+      <div class="lb-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="rank" aria-selected="true">排行榜</button>
+        <button type="button" role="tab" data-tab="live" aria-selected="false">正在玩</button>
+        <button type="button" role="tab" data-tab="loyal" aria-selected="false">最常上工</button>
+      </div>
+      <div data-pane="rank">
+        <div class="lb-prize" id="lbPrize" hidden></div>
+        <p class="empty" id="lbTitle" style="margin:4px 0"></p>
+        <ol id="lbList"></ol>
+        <p class="empty" id="lbEmpty" hidden>還沒有人上榜，第一名等你來拿。</p>
+      </div>
+      <div data-pane="live" hidden>
+        <ol id="liveList"></ol>
+        <p class="empty" id="liveEmpty">現在沒有人在跑單，趁機搶頭香。</p>
+      </div>
+      <div data-pane="loyal" hidden>
+        <ol id="loyalList"></ol>
+        <p class="empty" id="loyalEmpty">還沒有常客，玩完送出成績就會出現在這裡。</p>
+      </div>
     </div>
   </div>
 </section>
@@ -964,7 +994,7 @@ function beginPlay(){state='play';setTimeout(()=>{$('#count').hidden=true;},650)
   pending.push({at:9,type:'homigo'});nextSpawn=16;}
 function pauseGame(){if(state!=='play')return;state='pause';AU.stopMusic();joy.active=false;joyEl.hidden=true;showScreen('#pauseScr');}
 function resumeGame(){if(state!=='pause')return;AU.init();state='play';showScreen(null);AU.startMusic();}
-function toTitle(){state='title';$('#hud').hidden=true;showScreen('#title');showBest();loadBoard();AU.stopMusic();orders=[];renderOrders();clearEdges();$('#work').hidden=true;nav.visible=false;setDay(.2);}
+function toTitle(){ping(true);state='title';$('#hud').hidden=true;showScreen('#title');showBest();loadBoard();loadStats();AU.stopMusic();orders=[];renderOrders();clearEdges();$('#work').hidden=true;nav.visible=false;setDay(.2);}
 function clearEdges(){edgePool.forEach(e=>e.el.style.display='none');}
 const RANKS=[[0,'見習師傅','LINE 通知還不太熟，下一班會更順。'],[9000,'熟手師傅','路線抓得不錯，客戶開始指名找你。'],[17000,'資深職人','報修、收送、交屋一把抓，代管公司搶著合作。'],[26000,'匠級達人','整座城的工單都靠你撐住了。']];
 let lastShot=null,lastRank='';
@@ -979,7 +1009,7 @@ function endGame(){state='over';AU.stopMusic();AU.done();joy.active=false;joyEl.
   const rows=[['taskgo','報修結案',`施工照 ${stats.taskgo*3} 張`,stats.taskgo,'件'],['homigo','新房客入住',stats.homigo?`亮了 ${stats.homigo} 盞燈`:'還在等房客',stats.homigo,'戶'],['washgo','衣物收送','LINE 接單',stats.washgo,'袋']];
   $('#stats').innerHTML=rows.map(([k,a,b,n,u])=>`<div class="stat" style="--c:${BR[k].color}"><div class="top2">${chipHTML(k)}<div class="n">${n}<small>${u}</small></div></div><div class="d"><b>${a}</b>${b}</div></div>`).join('');
   $('#lineNote').textContent=`這一班騎了 ${(player.dist*.002).toFixed(1)} 公里，完成 ${total} 張工單，最高連單 ×${stats.maxCombo.toFixed(1)}${stats.expired?`，逾時 ${stats.expired} 張`:''}。三個品牌的通知都從 LINE 進來，現場人員不用另外裝 App。`;
-  prepareSubmit();showScreen('#over');const fs=$('#finalScore');const t0=performance.now();(function cnt(){const k=Math.min(1,(performance.now()-t0)/1100);fs.textContent=fmt(score*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(cnt);})();}
+  ping(true);prepareSubmit();showScreen('#over');const fs=$('#finalScore');const t0=performance.now();(function cnt(){const k=Math.min(1,(performance.now()-t0)/1100);fs.textContent=fmt(score*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(cnt);})();}
 $('#btnStart').addEventListener('click',startGame);$('#btnAgain').addEventListener('click',startGame);
 $('#btnHome').addEventListener('click',toTitle);$('#btnPause').addEventListener('click',pauseGame);
 $('#btnResume').addEventListener('click',resumeGame);$('#btnQuit').addEventListener('click',toTitle);
@@ -992,16 +1022,41 @@ function getProfile(){try{const p=JSON.parse(localStorage.getItem(PROFILE_KEY)||
 function setProfile(p){try{if(p)localStorage.setItem(PROFILE_KEY,JSON.stringify(p));else localStorage.removeItem(PROFILE_KEY);}catch(e){}}
 const maskPhone=p=>p.slice(0,4)+'***'+p.slice(-3);
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function beginRun(){run=null;submitted=false;if(!CONFIG.api)return;
-  fetch(CONFIG.api+'/start',{method:'POST'}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.runId)run=d;}).catch(()=>{});}
+const DEVICE_KEY='jiangcheng-device-v1';
+function deviceId(){try{let d=localStorage.getItem(DEVICE_KEY);if(!d){d=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,12));localStorage.setItem(DEVICE_KEY,d);}return d;}catch(e){return null;}}
+let pingTimer=0,runEnded=false;
+function ping(ended){if(!run||runEnded)return;if(ended){runEnded=true;clearInterval(pingTimer);}
+  const body=JSON.stringify({runId:run.runId,token:run.token,score,ended:!!ended});
+  if(ended&&navigator.sendBeacon){navigator.sendBeacon(CONFIG.api+'/heartbeat',body);return;}
+  fetch(CONFIG.api+'/heartbeat',{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true}).catch(()=>{});}
+function startPings(){clearInterval(pingTimer);pingTimer=setInterval(()=>{if(state==='play')ping(false);},10000);}
+addEventListener('pagehide',()=>{if(state==='play'||state==='pause'||state==='count')ping(true);});
+function beginRun(){if(run&&!runEnded)ping(true);run=null;runEnded=false;submitted=false;clearInterval(pingTimer);if(!CONFIG.api)return;
+  const prof=getProfile();
+  fetch(CONFIG.api+'/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceId:deviceId(),nickname:prof?prof.nickname:''})}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.runId){run=d;startPings();}}).catch(()=>{});}
 function loadBoard(){if(!CONFIG.api)return;
   fetch(CONFIG.api+'/leaderboard?limit=10').then(r=>r.ok?r.json():null).then(d=>{if(!d)return;
     const box=$('#titleBoard');box.hidden=false;
-    $('#lbTitle').textContent=d.season?d.season.name+' 排行榜':'排行榜';
+    $('#lbTitle').textContent=d.season?d.season.name:'總排行';
     const pz=$('#lbPrize');pz.hidden=!(d.season&&d.season.prize);if(d.season&&d.season.prize)pz.textContent='前 '+d.season.topN+' 名：'+d.season.prize.split('\n')[0];
     const list=d.entries||[];$('#lbEmpty').hidden=list.length>0;
     $('#lbList').innerHTML=list.map(e=>`<li><i>${e.rank}</i><span>${esc(e.nickname)}<small>${esc(e.phoneMasked)}</small></span><b>NT$ ${fmt(e.score)}</b></li>`).join('');
   }).catch(()=>{});}
+const fmtSec=s=>s<60?s+' 秒':Math.floor(s/60)+' 分 '+(s%60)+' 秒';
+function loadStats(){if(!CONFIG.api)return;
+  fetch(CONFIG.api+'/stats').then(r=>r.ok?r.json():null).then(d=>{if(!d)return;
+    $('#titleBoard').hidden=false;
+    $('#lbLive').textContent='正在上工 '+fmt(d.live.count)+' 人';
+    $('#stPlays').textContent=fmt(d.totals.plays);$('#stMinutes').textContent=fmt(d.totals.minutes);$('#stPlayers').textContent=fmt(d.totals.players);
+    const live=d.live.players||[];$('#liveEmpty').hidden=live.length>0;
+    $('#liveList').innerHTML=live.map((p,i)=>`<li><i>${i+1}</i><span>${esc(p.name)}<small>已上工 ${fmtSec(p.seconds)}</small></span><b>NT$ ${fmt(p.score)}</b></li>`).join('')+(d.live.count>live.length?`<li><span><small>還有 ${d.live.count-live.length} 位師傅在跑單</small></span></li>`:'');
+    const loyal=d.topPlayers||[];$('#loyalEmpty').hidden=loyal.length>0;
+    $('#loyalList').innerHTML=loyal.map((p,i)=>`<li><i>${i+1}</i><span>${esc(p.nickname)}<small>${esc(p.phoneMasked)}・${fmt(p.minutes)} 分鐘</small></span><b>${fmt(p.plays)} 局</b></li>`).join('');
+  }).catch(()=>{});}
+document.querySelectorAll('.lb-tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.lb-tabs button').forEach(x=>x.setAttribute('aria-selected',x===b?'true':'false'));
+  document.querySelectorAll('[data-pane]').forEach(p=>p.hidden=p.dataset.pane!==b.dataset.tab);}));
+setInterval(()=>{if((state==='title'||state==='over')&&!document.hidden)loadStats();},15000);
 function lbMsg(t,cls){const m=$('#lbMsg');m.textContent=t;m.className='msg'+(cls?' '+cls:'');}
 function renderProfile(){const p=getProfile();$('#lbSaved').hidden=!p;$('#lbFields').hidden=!!p;
   if(p){$('#lbSaved').innerHTML=`以「${esc(p.nickname)}」${maskPhone(p.phone)} 送出<button type="button" id="lbEdit">改資料</button>`;$('#lbConsent').checked=true;
@@ -1024,7 +1079,7 @@ $('#lbForm').addEventListener('submit',e=>{e.preventDefault();if(!run||submitted
       lbMsg(d.rank?(d.isBest?`登上${where}第 ${d.rank} 名！`:`已記錄。你在${where}的最佳成績 NT$ ${fmt(d.best)}，目前第 ${d.rank} 名。`):'已記錄成績。','ok');
       track('leaderboard_submit',{score,rank:d.rank||0});
     }).catch(()=>{b.disabled=false;b.textContent='送出成績';lbMsg('網路不穩，請再按一次','err');});});
-loadBoard();
+loadBoard();loadStats();
 
 /* ================= day cycle ================= */
 const C1={sun:new THREE.Color('#fff6e6'),sky:new THREE.Color('#e2f1ff'),gnd:new THREE.Color('#8a9a60'),bg:new THREE.Color('#cfe6ee')};

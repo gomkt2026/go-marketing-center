@@ -61,7 +61,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const season = await getCurrentSeason(env);
 
     const claimed = await withGameSchema(env, () => sql`
-      UPDATE game_runs SET submitted_at = now()
+      UPDATE game_runs SET submitted_at = now(), ended_at = COALESCE(ended_at, last_seen_at, now())
       WHERE id = ${runId}::uuid AND submitted_at IS NULL
       RETURNING started_at
     `);
@@ -84,6 +84,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     await sql`
       INSERT INTO game_scores (run_id, player_id, season_id, score, stats)
       VALUES (${runId}::uuid, ${player.id}::uuid, ${season?.id ?? null}::uuid, ${score}, ${JSON.stringify(stats)})
+    `;
+
+    await sql`
+      UPDATE game_runs SET player_id = ${player.id}::uuid, nickname = ${nickname}
+      WHERE id = ${runId}::uuid
+         OR (player_id IS NULL AND device_id IS NOT NULL
+             AND device_id = (SELECT device_id FROM game_runs WHERE id = ${runId}::uuid))
     `;
 
     const seasonId = season?.id ?? null;

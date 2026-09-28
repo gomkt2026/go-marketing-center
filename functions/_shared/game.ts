@@ -45,7 +45,8 @@ export interface LeaderboardRow {
 
 export function isMissingGameSchema(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return /relation ["']?game_(seasons|players|runs|scores|winners)["']? does not exist/i.test(msg);
+  return /relation ["']?game_(seasons|players|runs|scores|winners)["']? does not exist/i.test(msg)
+    || /column ["']?[a-z_.]*(device_id|nickname|player_id|last_seen_at|last_score|ended_at)["']? (of relation ["']?game_runs["']? )?does not exist/i.test(msg);
 }
 
 export async function applyGameMigration(env: Env): Promise<string[]> {
@@ -114,6 +115,20 @@ export async function applyGameMigration(env: Env): Promise<string[]> {
     )
   `;
   steps.push('game_winners');
+  await sql`ALTER TABLE game_runs ADD COLUMN IF NOT EXISTS device_id TEXT`;
+  await sql`ALTER TABLE game_runs ADD COLUMN IF NOT EXISTS nickname TEXT`;
+  await sql`ALTER TABLE game_runs ADD COLUMN IF NOT EXISTS player_id UUID REFERENCES game_players(id) ON DELETE SET NULL`;
+  await sql`ALTER TABLE game_runs ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE game_runs ADD COLUMN IF NOT EXISTS last_score INTEGER NOT NULL DEFAULT 0`;
+  await sql`ALTER TABLE game_runs ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_game_runs_live ON game_runs (last_seen_at) WHERE ended_at IS NULL`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_game_runs_player ON game_runs (player_id) WHERE player_id IS NOT NULL`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_game_runs_device ON game_runs (device_id) WHERE device_id IS NOT NULL`;
+  await sql`
+    UPDATE game_runs r SET player_id = s.player_id
+    FROM game_scores s WHERE s.run_id = r.id AND r.player_id IS NULL
+  `;
+  steps.push('game_runs.engagement');
   return steps;
 }
 
@@ -309,6 +324,88 @@ export async function decryptPhone(env: Env, phoneEnc: string): Promise<string> 
   } catch {
     return '';
   }
+}
+
+/** 暱稱規則與上榜相同；不合格就當匿名。 */
+export function cleanNickname(input: unknown): string | null {
+  const name = String(input ?? '').replace(/\s+/g, ' ').trim();
+  if (!name || [...name].length > 12 || /https?:|www\.|<|>/i.test(name)) return null;
+  return name;
+}
+
+export function cleanDeviceId(input: unknown): string | null {
+  const id = String(input ?? '');
+  return /^[a-z0-9-]{8,64}$/i.test(id) ? id : null;
+}
+
+/** 超過這麼久沒心跳就不算在線。 */
+export const GAME_LIVE_WINDOW_SEC = 25;
+
+export interface GameEngagement {
+  live: { count: number; players: { name: string; score: number; seconds: number }[] };
+  totals: { plays: number; completed: number; minutes: number; players: number; todayPlays: number };
+  topPlayers: { nickname: string; phoneMasked: string; plays: number; minutes: number }[];
+}
+
+export async function loadEngagement(env: Env): Promise<GameEngagement> {
+  const sql = getSql(env);
+  return withGameSchema(env, async () => {
+    const [live, totals, top] = await Promise.all([
+      sql`
+        SELECT COALESCE(p.nickname, r.nickname) AS name, r.last_score, r.started_at
+        FROM game_runs r LEFT JOIN game_players p ON p.id = r.player_id
+        WHERE r.ended_at IS NULL AND r.last_seen_at > now() - make_interval(secs => ${GAME_LIVE_WINDOW_SEC})
+          AND (p.id IS NULL OR NOT p.is_blocked)
+        ORDER BY r.last_score DESC, r.started_at ASC
+      `,
+      sql`
+        SELECT
+          COUNT(*) AS plays,
+          COUNT(*) FILTER (WHERE ended_at IS NOT NULL OR submitted_at IS NOT NULL) AS completed,
+          COALESCE(SUM(CASE WHEN COALESCE(ended_at, last_seen_at, submitted_at) IS NULL THEN 0
+            ELSE LEAST(1800, EXTRACT(EPOCH FROM (COALESCE(ended_at, last_seen_at, submitted_at) - started_at))) END), 0) AS seconds,
+          COUNT(DISTINCT COALESCE(player_id::text, device_id, ip_hash)) AS players,
+          COUNT(*) FILTER (WHERE started_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Taipei') AT TIME ZONE 'Asia/Taipei') AS today_plays
+        FROM game_runs
+      `,
+      sql`
+        SELECT p.nickname, p.phone_masked, COUNT(*) AS plays,
+          COALESCE(SUM(CASE WHEN COALESCE(r.ended_at, r.last_seen_at, r.submitted_at) IS NULL THEN 0
+            ELSE LEAST(1800, EXTRACT(EPOCH FROM (COALESCE(r.ended_at, r.last_seen_at, r.submitted_at) - r.started_at))) END), 0) AS seconds
+        FROM game_runs r JOIN game_players p ON p.id = r.player_id
+        WHERE NOT p.is_blocked
+        GROUP BY p.id, p.nickname, p.phone_masked
+        ORDER BY plays DESC, seconds DESC
+        LIMIT 5
+      `,
+    ]);
+    const now = Date.now();
+    const liveRows = live as { name: string | null; last_score: number; started_at: string }[];
+    const t = (totals[0] ?? {}) as Record<string, unknown>;
+    return {
+      live: {
+        count: liveRows.length,
+        players: liveRows.slice(0, 12).map((r) => ({
+          name: r.name || '匿名師傅',
+          score: Number(r.last_score) || 0,
+          seconds: Math.max(0, Math.round((now - new Date(r.started_at).getTime()) / 1000)),
+        })),
+      },
+      totals: {
+        plays: Number(t.plays) || 0,
+        completed: Number(t.completed) || 0,
+        minutes: Math.round((Number(t.seconds) || 0) / 60),
+        players: Number(t.players) || 0,
+        todayPlays: Number(t.today_plays) || 0,
+      },
+      topPlayers: (top as Record<string, unknown>[]).map((r) => ({
+        nickname: String(r.nickname),
+        phoneMasked: String(r.phone_masked),
+        plays: Number(r.plays),
+        minutes: Math.round(Number(r.seconds) / 60),
+      })),
+    };
+  });
 }
 
 export const leaderboardCacheKey = (seasonId: string | null, limit: number) => `game:board:${seasonId ?? 'all'}:${limit}`;

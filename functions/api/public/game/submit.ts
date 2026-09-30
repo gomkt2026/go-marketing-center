@@ -6,8 +6,8 @@ import { encryptToken } from '../../../_shared/crypto';
 import { cacheDelete } from '../../../_shared/cache';
 import { isValidTaiwanMobile, normalizePhone } from '../../../_shared/token';
 import {
-  GAME_MAX_RUN_MS, GAME_MIN_RUN_MS, checkScorePlausible, getCurrentSeason, hashIp, hashPhone,
-  hitRateLimit, leaderboardCacheKey, loadLeaderboard, maskPhone, parseGameStats, verifyRunToken,
+  GAME_MAX_RUN_MS, allBoardCacheKeys, checkScorePlausible, getCurrentSeason, hashIp, hashPhone,
+  hitRateLimit, loadLeaderboard, maskPhone, minRunMs, parseGameStats, toGameMap, verifyRunToken,
   withGameSchema,
 } from '../../../_shared/game';
 
@@ -53,21 +53,27 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const stats = parseGameStats(body.stats);
   const score = Number(body.score);
   if (!stats) return error('成績資料不完整', 400);
-  const implausible = checkScorePlausible(score, stats);
-  if (implausible) return error(`成績未通過驗證：${implausible}`, 400);
 
   const sql = getSql(env);
   try {
+    const runRows = await withGameSchema(env, () => sql`
+      SELECT map FROM game_runs WHERE id = ${runId}::uuid AND submitted_at IS NULL
+    `);
+    if (!runRows.length) return error('這一局已經送出過了', 409);
+    const map = toGameMap((runRows[0] as { map: string }).map);
+    const implausible = checkScorePlausible(score, stats, map);
+    if (implausible) return error(`成績未通過驗證：${implausible}`, 400);
+
     const season = await getCurrentSeason(env);
 
-    const claimed = await withGameSchema(env, () => sql`
+    const claimed = await sql`
       UPDATE game_runs SET submitted_at = now(), ended_at = COALESCE(ended_at, last_seen_at, now())
       WHERE id = ${runId}::uuid AND submitted_at IS NULL
       RETURNING started_at
-    `);
+    `;
     if (!claimed.length) return error('這一局已經送出過了', 409);
     const elapsed = Date.now() - new Date((claimed[0] as { started_at: string }).started_at).getTime();
-    if (elapsed < GAME_MIN_RUN_MS) return error('成績未通過驗證：遊戲時間不足', 400);
+    if (elapsed < minRunMs(map)) return error('成績未通過驗證：遊戲時間不足', 400);
     if (elapsed > GAME_MAX_RUN_MS) return error('這一局已過期，請重新開一局', 400);
 
     const phoneHash = await hashPhone(env, phone);
@@ -82,8 +88,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (player.is_blocked) return error('此手機號碼已被取消參賽資格', 403);
 
     await sql`
-      INSERT INTO game_scores (run_id, player_id, season_id, score, stats)
-      VALUES (${runId}::uuid, ${player.id}::uuid, ${season?.id ?? null}::uuid, ${score}, ${JSON.stringify(stats)})
+      INSERT INTO game_scores (run_id, player_id, season_id, map, score, stats)
+      VALUES (${runId}::uuid, ${player.id}::uuid, ${season?.id ?? null}::uuid, ${map}, ${score}, ${JSON.stringify(stats)})
     `;
 
     await sql`
@@ -94,17 +100,20 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     `;
 
     const seasonId = season?.id ?? null;
-    await cacheDelete(env, leaderboardCacheKey(seasonId, 10), leaderboardCacheKey(seasonId, 50));
+    await cacheDelete(env, ...allBoardCacheKeys(seasonId));
 
-    const board = await loadLeaderboard(env, seasonId, 500);
+    const board = await loadLeaderboard(env, seasonId, map, 500);
     const idx = board.findIndex((r) => r.playerId === player.id);
     const best = idx >= 0 ? board[idx].score : score;
     return json({
       ok: true,
+      map,
       rank: idx >= 0 ? idx + 1 : null,
+      total: board.length,
       best,
       isBest: best === score,
-      season: season ? { id: season.id, name: season.name, topN: season.topN } : null,
+      isPrizeMap: season ? season.prizeMap === map : false,
+      season: season ? { id: season.id, name: season.name, topN: season.topN, prizeMap: season.prizeMap } : null,
     }, 201);
   } catch (e) {
     console.error('[game/submit]', e);

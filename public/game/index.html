@@ -187,39 +187,6 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
 .row{display:flex;gap:10px;align-items:center}
 .row .go-btn{flex:1}
 .loading{font-size:13px;color:var(--ink2);font-weight:700;text-align:center}
-.lb{background:#fff;border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
-.lb-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;font-weight:900;letter-spacing:.08em;color:var(--ink2)}
-.lb-h a{color:var(--ink2);font-weight:700;letter-spacing:0}
-.lb-prize{font-size:12.5px;line-height:1.45;color:#8a4b00;background:#fdebd3;border-radius:10px;padding:6px 10px;font-weight:700}
-.lb ol{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:168px;overflow-y:auto}
-.lb li{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:3px 0}
-.lb li i{font-style:normal;width:20px;height:20px;border-radius:50%;background:#eef0f3;display:grid;place-items:center;font-size:11px;flex:none}
-.lb li:nth-child(-n+3) i{background:var(--gold)}
-.lb li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lb li span small{color:var(--ink2);font-weight:500;margin-left:6px;font-size:11px}
-.lb li b{font-family:var(--disp);font-weight:400;font-size:14px;font-variant-numeric:tabular-nums}
-.lb .empty{font-size:12.5px;color:var(--ink2);font-weight:500;margin:0}
-.lb-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.lb-stats div{background:#f4f6f8;border-radius:10px;padding:6px 8px;text-align:center}
-.lb-stats b{display:block;font-family:var(--disp);font-weight:400;font-size:18px;line-height:1.1;font-variant-numeric:tabular-nums}
-.lb-stats small{font-size:11px;color:var(--ink2);font-weight:700}
-.lb-live{display:inline-flex;align-items:center;gap:5px;color:var(--hm)}
-.lb-live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--hm);animation:pulse 1.2s infinite}
-.lb-tabs{display:flex;gap:4px;background:#f4f6f8;border-radius:10px;padding:3px}
-.lb-tabs button{appearance:none;border:0;flex:1;background:transparent;border-radius:8px;padding:6px 4px;font:700 12.5px var(--body);color:var(--ink2);cursor:pointer}
-.lb-tabs button[aria-selected=true]{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(27,34,51,.12)}
-.lbf{background:#fff;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
-.lbf .lb-h{margin-bottom:2px}
-.lbf input[type=text],.lbf input[type=tel]{width:100%;box-sizing:border-box;font:500 15px var(--body);padding:9px 11px;border-radius:10px;border:1.5px solid rgba(27,34,51,.2);background:#fff;color:var(--ink);-webkit-user-select:text;user-select:text}
-.lbf .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.lbf label.ck{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--ink2);font-weight:500}
-.lbf label.ck input{margin-top:2px;flex:none}
-.lbf label.ck a{color:var(--ink)}
-.lbf .saved{font-size:13px;font-weight:700;color:var(--ink)}
-.lbf .saved button{appearance:none;border:0;background:none;color:var(--ink2);text-decoration:underline;font:inherit;font-weight:500;cursor:pointer;padding:0;margin-left:6px}
-.lbf .go-btn{font-size:18px;padding:11px 16px 12px}
-.lbf .msg{font-size:13px;font-weight:700;margin:0;min-height:1.2em;color:var(--ink2)}
-.lbf .msg.ok{color:var(--hm)}.lbf .msg.err{color:#c0392b}
 
 @media (min-width:900px){
   .screen{align-items:flex-start;padding-left:max(48px,6vw);
@@ -230,6 +197,165 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
 }
 @media (max-height:640px){ h1{font-size:44px} .lead{font-size:13.5px} .brow{padding-block:6px} .panel{gap:10px} }
 
+/* profile / garage / rewards */
+.coin{display:inline-block;width:16px;height:16px;border-radius:50%;flex:none;background:radial-gradient(circle at 35% 35%,#ffe58a,#f5b800 58%,#c98f00);box-shadow:inset 0 0 0 2px rgba(120,80,0,.18)}
+.coinpill{display:inline-flex;align-items:center;gap:6px;background:#fff;border-radius:999px;padding:5px 12px 5px 7px;font-weight:900;color:var(--ink);font-size:14px;box-shadow:0 1px 0 rgba(27,34,51,.08);font-variant-numeric:tabular-nums;white-space:nowrap}
+.prof{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;font-weight:700;color:var(--ink2)}
+.mini{appearance:none;border:2px solid var(--ink);background:#fff;color:var(--ink);border-radius:999px;padding:6px 14px;font-weight:900;font-size:13px;cursor:pointer;margin-left:auto;white-space:nowrap;box-shadow:0 3px 0 var(--ink)}
+.mini:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.daily{display:flex;align-items:center;gap:10px;background:#fff;border-radius:14px;padding:9px 12px;font-size:13px;font-weight:700;line-height:1.4}
+.daily .dl{font-size:11px;font-weight:900;letter-spacing:.08em;color:var(--tg);white-space:nowrap}
+.daily em{margin-left:auto;font-style:normal;color:#a87800;font-weight:900;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.daily.ok em{color:var(--hm)}
+.reward{background:#fff;border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.rw-top{display:flex;align-items:center;gap:8px}
+.rw-top b{font-family:var(--disp);font-weight:400;font-size:24px;line-height:1}
+.rw-top span{margin-left:auto;font-size:12.5px;color:var(--ink2);font-weight:700}
+.rw-lines{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:12.5px;color:var(--ink2);font-weight:500}
+.rw-lines li{display:flex;justify-content:space-between;gap:10px}
+.rw-lines li span{color:#a87800;font-weight:900;white-space:nowrap}
+.rw-ach{display:flex;flex-wrap:wrap;gap:6px}
+.rw-ach span{background:var(--ink);color:#fff;font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;animation:pop2 .5s cubic-bezier(.2,1.6,.4,1) both}
+.rw-next{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;line-height:1.45;border-top:1.5px dashed rgba(27,34,51,.14);padding-top:9px}
+.rw-next.can{color:var(--hm)}
+.ord.rush{box-shadow:0 0 0 2.5px var(--gold),0 10px 24px -8px rgba(27,34,51,.28)}
+.rt{display:inline-block;background:var(--gold);color:var(--ink);font-size:10.5px;font-weight:900;border-radius:5px;padding:0 5px;margin-right:4px;vertical-align:1px}
+#garage{position:fixed;inset:0;pointer-events:none;z-index:5}
+.gsheet{pointer-events:auto;position:absolute;left:0;right:0;bottom:0;height:min(57%,560px);background:var(--paper);border-radius:22px 22px 0 0;
+  box-shadow:0 -14px 40px -14px rgba(27,34,51,.4);display:flex;flex-direction:column;gap:10px;box-sizing:border-box;
+  padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 14px);animation:sheet .45s cubic-bezier(.2,1.1,.3,1) both}
+.ghead{display:flex;align-items:center;gap:10px}
+.ghead h2{margin:0;font-family:var(--disp);font-weight:400;font-size:26px;line-height:1.1}
+.ghead .coinpill{margin-left:auto}
+.ghead .ibtn{width:40px;height:40px;font-size:22px;font-weight:700;line-height:1}
+.tabs{display:flex;gap:4px;background:var(--paper2);padding:4px;border-radius:12px}
+.tabs button{flex:1;border:0;background:transparent;padding:8px 6px;border-radius:9px;font-weight:900;font-size:14px;cursor:pointer;color:var(--ink2)}
+.tabs button.on{background:#fff;color:var(--ink);box-shadow:0 1px 0 rgba(27,34,51,.1)}
+.gbody{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-content:start;padding:3px;margin:-3px}
+.item{border:0;background:#fff;border-radius:14px;padding:11px 6px 9px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;position:relative;
+  box-shadow:0 1px 0 rgba(27,34,51,.08);font:inherit;color:var(--ink);min-width:0}
+.item.sel{outline:3px solid var(--tg);outline-offset:-3px}
+.item .sw{width:46px;height:46px;border-radius:50%;box-shadow:inset 0 0 0 3px rgba(255,255,255,.75),0 2px 6px rgba(27,34,51,.22)}
+.item b{font-size:12.5px;line-height:1.25;text-align:center}
+.item small{font-size:11px;color:var(--ink2);font-weight:700;display:flex;align-items:center;gap:3px;white-space:nowrap}
+.item small .coin{width:11px;height:11px}
+.item.lock .sw{filter:grayscale(.55);opacity:.7}
+.item .tag{position:absolute;top:6px;right:6px;font-size:10px;font-weight:900;background:var(--hm);color:#fff;border-radius:6px;padding:1px 5px}
+.gfoot{display:flex;flex-direction:column;gap:8px}
+#gInfo{font-size:12.5px;color:var(--ink2);font-weight:500;line-height:1.45;min-height:2.9em}
+#gInfo b{color:var(--ink);font-size:15px;display:block;font-weight:900}
+.gfoot .go-btn{font-size:19px;padding:12px 16px 13px}
+.achrow{grid-column:1/-1;display:flex;gap:10px;align-items:center;background:#fff;border-radius:12px;padding:9px 12px}
+.achrow .st{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--paper2)}
+.achrow .st img{width:18px;height:18px}
+.achrow.done .st{background:var(--hm)}
+.achrow b{font-size:13.5px;display:block}
+.achrow span{font-size:12px;color:var(--ink2);font-weight:500;line-height:1.4;display:block}
+.achrow em{margin-left:auto;font-style:normal;font-weight:900;font-size:12.5px;color:#a87800;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.achrow.done em{color:var(--hm)}
+@media (min-width:900px){.gsheet{left:max(32px,4vw);right:auto;top:32px;bottom:32px;height:auto;max-height:680px;width:420px;border-radius:22px;margin:auto 0;animation:rise .5s cubic-bezier(.2,1.1,.3,1) both}}
+/* share buttons + sync */
+.socials{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.soc{appearance:none;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-decoration:none;color:var(--ink);font:700 12px var(--body);padding:4px 0}
+.soc i{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-style:normal;color:#fff;font:900 22px/1 var(--body);box-shadow:0 4px 0 rgba(27,34,51,.18)}
+.soc:active i{transform:translateY(3px);box-shadow:0 1px 0 rgba(27,34,51,.18)}
+.soc i svg{width:26px;height:26px}
+.sm img#shareImg{max-height:44vh;width:auto;max-width:100%;margin:0 auto}
+.syncbox{grid-column:1/-1;background:#fff;border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;line-height:1.5;color:var(--ink2);font-weight:500}
+.syncbox b{color:var(--ink);font-size:13.5px}
+.syncbox input{width:100%;box-sizing:border-box;font:500 12px var(--body);padding:8px 10px;border-radius:10px;border:1.5px solid rgba(27,34,51,.2);-webkit-user-select:text;user-select:text}
+.syncbox .mini{margin-left:0;align-self:flex-start}
+/* maps + leaderboard */
+.mapsh{display:flex;align-items:center;gap:8px}
+.mapsh .mini{margin-left:auto}
+.maps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mapc{appearance:none;border:0;background:#fff;border-radius:14px;padding:10px 9px 10px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;
+  font:inherit;color:var(--ink);box-shadow:0 1px 0 rgba(27,34,51,.08);position:relative;min-width:0}
+.mapc .mg{display:grid;gap:2px;width:28px;height:28px;margin-bottom:5px}
+.mapc .mg i{border-radius:2px;background:var(--c)}
+.mapc b{font-family:var(--disp);font-weight:400;font-size:18px;line-height:1.1}
+.mapc span{font-size:11.5px;color:var(--ink2);font-weight:700}
+.mapc small{font-size:11px;color:var(--ink2);font-weight:500;line-height:1.35}
+.mapc.on{outline:3px solid var(--tg);outline-offset:-3px}
+.mapc.lock{background:var(--paper2)}
+.mapc.lock .mg{filter:grayscale(1);opacity:.45}
+.mapc .pb{height:4px;border-radius:2px;background:rgba(27,34,51,.1);overflow:hidden;margin-top:3px}
+.mapc .pb i{display:block;height:100%;background:var(--gold)}
+.mapc .pass{position:absolute;top:6px;right:6px;font-size:10px;font-weight:900;background:var(--ink);color:#fff;border-radius:6px;padding:1px 5px}
+.mapc.shake{animation:wob .4s 2}
+.maphint{margin:0;font-size:12.5px;font-weight:700;color:var(--danger);min-height:0}
+.maphint:empty{display:none}
+#board{position:fixed;inset:0;pointer-events:none;z-index:6}
+.tabs.small button{padding:6px;font-size:13px}
+.lb{display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:9px 12px}
+.lb .no{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-family:var(--disp);font-size:16px;background:var(--paper2);flex:none}
+.lb:nth-child(1) .no{background:#f5b800}.lb:nth-child(2) .no{background:#cfd6dd}.lb:nth-child(3) .no{background:#e0a176}
+.lb .nm{flex:1;min-width:0;font-weight:900;font-size:14px;overflow-wrap:anywhere;line-height:1.3}
+.lb .nm span{display:block;font-size:11.5px;color:var(--ink2);font-weight:500}
+.lb .sc{font-family:var(--disp);font-size:18px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.lb.me{outline:2.5px solid var(--tg);outline-offset:-2.5px}
+.lbnote{font-size:12.5px;line-height:1.55;color:var(--ink2);font-weight:500;padding:4px 2px}
+.lbnote b{color:var(--ink)}
+.submit{background:#fff;border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.sb-h{display:flex;align-items:center;gap:8px}.sb-h b{font-size:14px}.sb-h .mini{margin-left:auto}
+.sb-row{display:flex;gap:8px}
+.sb-row input{flex:1;min-width:0;font:700 15px var(--body);padding:10px 12px;border-radius:12px;border:2px solid rgba(27,34,51,.18);background:var(--paper);color:var(--ink);-webkit-user-select:text;user-select:text}
+.sb-row input:focus{outline:none;border-color:var(--tg)}
+.sb-go{font-size:17px!important;padding:10px 16px 11px!important;border-radius:12px!important}
+.sb-msg{margin:0;font-size:13px;font-weight:700;color:var(--ink2);line-height:1.5}
+.sb-msg.ok{color:var(--hm)}.sb-msg.err{color:var(--danger)}
+.sb-ck{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--ink2);font-weight:500}
+.sb-ck input{margin-top:3px;flex:none}.sb-ck a,.prizeline a{color:var(--ink2)}
+.sb-saved{font-size:13px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sb-saved button{appearance:none;border:0;background:none;color:var(--ink2);text-decoration:underline;font:700 12.5px var(--body);cursor:pointer;padding:0}
+.livebar{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink2);flex-wrap:wrap}
+.livebar b{color:var(--hm);display:inline-flex;align-items:center;gap:5px}
+.livebar b::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--hm);animation:pulse 1.2s infinite}
+.livebar button{appearance:none;border:0;background:none;color:var(--ink2);text-decoration:underline;font:700 12.5px var(--body);cursor:pointer;padding:0;margin-left:auto}
+.prizeline{margin:0;font-size:12.5px;line-height:1.45;color:#8a4b00;background:#fdebd3;border-radius:10px;padding:6px 10px;font-weight:700}
+.lbprize{font-size:12.5px;line-height:1.5;color:#8a4b00;background:#fdebd3;border-radius:12px;padding:8px 12px;font-weight:700;white-space:pre-line}
+.lbstats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.lbstats div{background:#fff;border-radius:12px;padding:8px;text-align:center}
+.lbstats b{display:block;font-family:var(--disp);font-size:20px;line-height:1.1;font-variant-numeric:tabular-nums}
+.lbstats small{font-size:11px;color:var(--ink2);font-weight:700}
+/* Taiwan hidden map + invite */
+.twc{grid-column:1/-1;display:flex;align-items:center;gap:12px;background:linear-gradient(120deg,#1b2233,#2d3a52);color:#fff;border-radius:16px;padding:12px 14px;position:relative;overflow:hidden}
+.twc.on{outline:3px solid var(--tg);outline-offset:-3px}
+.twc .mg{width:44px;height:44px;flex:none;margin:0;display:grid;gap:1px}
+.twc .mg i{border-radius:1.5px;background:var(--c)}
+.twc .tx{flex:1;min-width:0}
+.twc b{display:block;font-family:var(--disp);font-weight:400;font-size:19px;line-height:1.15}
+.twc b em{font-style:normal;font-family:var(--body);font-size:10.5px;font-weight:900;background:var(--gold);color:var(--ink);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:3px}
+.twc span{display:block;font-size:12px;line-height:1.45;color:rgba(255,255,255,.78);font-weight:500}
+.twc .mini{margin-left:0;flex:none;background:var(--gold);border-color:var(--gold);box-shadow:0 3px 0 #a87800;color:var(--ink)}
+.twc .mini.alt{background:#fff;border-color:#fff;box-shadow:0 3px 0 rgba(0,0,0,.35)}
+#invite{position:fixed;inset:0;z-index:21;background:rgba(27,34,51,.74);display:flex;align-items:center;justify-content:center;
+  padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 16px);box-sizing:border-box;overflow-y:auto}
+.inv-top{display:flex;align-items:center;gap:12px}
+.inv-top h2{margin:0;font-family:var(--disp);font-weight:400;font-size:28px;line-height:1.1}
+.inv-top .mg{width:56px;height:56px;display:grid;gap:1px;flex:none}.inv-top .mg i{border-radius:2px;background:var(--c)}
+.inv-p{margin:0;font-size:13.5px;line-height:1.6;color:var(--ink2);font-weight:500}
+.inv-steps{margin:0;padding:0;list-style:none;display:grid;gap:6px;counter-reset:st}
+.inv-steps li{counter-increment:st;display:flex;gap:10px;align-items:flex-start;background:#fff;border-radius:12px;padding:9px 12px;font-size:12.5px;line-height:1.45;color:var(--ink2);font-weight:500}
+.inv-steps li::before{content:counter(st);width:22px;height:22px;border-radius:50%;background:var(--paper2);color:var(--ink);display:grid;place-items:center;font-weight:900;font-size:12px;flex:none}
+.inv-steps li.ok::before{content:"✓";background:var(--hm);color:#fff}
+.inv-steps b{display:block;color:var(--ink);font-size:13.5px}
+/* weather + events + moments */
+#wxCard{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 40px);transform:translateX(-50%);display:flex;align-items:center;gap:12px;
+  background:rgba(255,248,236,.97);border-radius:18px;padding:12px 18px 12px 14px;box-shadow:0 14px 34px -12px rgba(27,34,51,.45);width:min(360px,calc(100% - 32px));box-sizing:border-box;animation:rise .5s both;pointer-events:none}
+#wxCard .wxi{font-size:38px;line-height:1}
+#wxCard b{display:block;font-family:var(--disp);font-weight:400;font-size:20px;line-height:1.2}
+#wxCard small{display:block;font-size:12.5px;color:var(--ink2);font-weight:500;line-height:1.45}
+.wxh{font-size:11.5px;font-weight:900;color:var(--ink2);margin-top:1px}
+.moments{background:#fff;border-radius:16px;padding:12px 12px 12px 14px;display:flex;flex-direction:column;gap:8px}
+.moments .mh{display:flex;align-items:baseline;gap:8px}.moments .mh b{font-size:14px}.moments .mh span{font-size:12px;color:var(--ink2);font-weight:500}
+.mrow{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory}
+.mo{flex:0 0 46%;scroll-snap-align:start;appearance:none;border:0;padding:0;background:var(--ink);border-radius:12px;overflow:hidden;cursor:pointer;position:relative;text-align:left;color:#fff;font:inherit}
+.mo img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover}
+.mo span{position:absolute;left:0;right:0;bottom:0;padding:22px 8px 8px;font-size:12.5px;font-weight:900;line-height:1.35;background:linear-gradient(transparent,rgba(27,34,51,.92))}
+.lmchips{display:flex;flex-wrap:wrap;gap:6px}.lmchips span{font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--paper2);color:var(--ink2)}.lmchips span.on{background:var(--tg);color:#fff}
+@keyframes sheet{from{transform:translateY(100%)}}
+@keyframes pop2{from{transform:scale(.6);opacity:0}}
 @keyframes tin{from{transform:translateY(-24px) scale(.94);opacity:0}}
 @keyframes tout{to{transform:translateY(-14px);opacity:0}}
 @keyframes oin{from{transform:translateY(20px) scale(.9);opacity:0}}
@@ -251,6 +377,7 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
       <div class="lbl">今日營收</div>
       <div id="score"><small>NT$</small>0</div>
       <div id="combo">連單 ×1.0</div>
+      <div class="wxh" id="wxHud"></div>
     </div>
     <div class="clock" id="clock">
       <svg viewBox="0 0 86 86"><circle cx="43" cy="43" r="40" fill="none" stroke="rgba(27,34,51,.12)" stroke-width="5"/>
@@ -277,6 +404,7 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
 <div id="joy" hidden><i></i></div>
 <div id="flash"></div>
 <div id="count" hidden></div>
+<div id="wxCard" hidden><span class="wxi">☀️</span><div><b>今日天氣</b><small></small></div></div>
 
 <section class="screen" id="title">
   <div class="panel">
@@ -284,36 +412,16 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
     <h1>匠城出任務</h1>
     <p class="lead">一個班從 09:00 跑到 18:00。LINE 一響就出發，幫三個品牌的客戶把事情辦好。</p>
     <div class="challenge" id="challenge" hidden></div>
-    <div class="brands" id="brandList"></div>
+    <div class="prof"><span class="coinpill"><i class="coin"></i><span id="coinTitle">0</span> 匠幣</span><span id="streakTitle"></span><button class="mini" id="btnGarage">車庫・換造型</button></div>
+    <div class="daily" id="dailyTitle"></div>
+    <div class="mapsh"><span class="eyebrow">選擇地圖</span><button class="mini" id="btnBoard" type="button">排行榜</button></div>
+    <div class="maps" id="maps" role="radiogroup" aria-label="選擇地圖"></div>
+    <p class="maphint" id="mapHint"></p>
     <button class="go-btn" id="btnStart" disabled>載入城市中…</button>
-    <div class="meta"><span id="ctrlHint"></span><span>最佳紀錄 <b id="bestTitle">—</b></span></div>
-    <div class="lb" id="titleBoard" hidden>
-      <div class="lb-h"><span class="lb-live" id="lbLive">正在上工 0 人</span><a href="/legal/game-rules/" target="_blank" rel="noopener">活動辦法</a></div>
-      <div class="lb-stats">
-        <div><b id="stPlays">0</b><small>累計遊玩（局）</small></div>
-        <div><b id="stMinutes">0</b><small>累計上工（分鐘）</small></div>
-        <div><b id="stPlayers">0</b><small>玩家人數</small></div>
-      </div>
-      <div class="lb-tabs" role="tablist">
-        <button type="button" role="tab" data-tab="rank" aria-selected="true">排行榜</button>
-        <button type="button" role="tab" data-tab="live" aria-selected="false">正在玩</button>
-        <button type="button" role="tab" data-tab="loyal" aria-selected="false">最常上工</button>
-      </div>
-      <div data-pane="rank">
-        <div class="lb-prize" id="lbPrize" hidden></div>
-        <p class="empty" id="lbTitle" style="margin:4px 0"></p>
-        <ol id="lbList"></ol>
-        <p class="empty" id="lbEmpty" hidden>還沒有人上榜，第一名等你來拿。</p>
-      </div>
-      <div data-pane="live" hidden>
-        <ol id="liveList"></ol>
-        <p class="empty" id="liveEmpty">現在沒有人在跑單，趁機搶頭香。</p>
-      </div>
-      <div data-pane="loyal" hidden>
-        <ol id="loyalList"></ol>
-        <p class="empty" id="loyalEmpty">還沒有常客，玩完送出成績就會出現在這裡。</p>
-      </div>
-    </div>
+    <div class="meta"><span id="ctrlHint"></span><span>本圖最佳 <b id="bestTitle">—</b></span></div>
+    <div class="livebar" id="liveBar" hidden><b id="liveTxt">正在上工 0 人</b><span id="liveTotals"></span><button type="button" id="btnLive">誰在玩</button></div>
+    <p class="prizeline" id="prizeLine" hidden></p>
+    <div class="brands" id="brandList"></div>
   </div>
 </section>
 
@@ -330,7 +438,7 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
 <section class="screen" id="over" hidden>
   <div class="panel">
     <div class="res-top">
-      <div><div class="eyebrow">18:00 收工</div><h2>今日結算</h2></div>
+      <div><div class="eyebrow" id="overMap">18:00 收工</div><h2>今日結算</h2></div>
       <div class="rank"><span>師傅等級</span><b id="rankName">見習師傅</b></div>
     </div>
     <div>
@@ -338,18 +446,17 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
       <p class="rank-note" id="rankNote"></p>
     </div>
     <div class="stats" id="stats"></div>
+    <div class="moments" id="moments" hidden><div class="mh"><b>今日名場面</b><span>點照片就能分享這張糗照</span></div><div class="mrow" id="mrow"></div></div>
+    <div class="submit" id="submitBox" hidden>
+      <div class="sb-h"><b id="sbTitle">登上排行榜</b><button class="mini" id="btnBoard2" type="button">看排行榜</button></div>
+      <div class="sb-saved" id="sbSaved" hidden></div>
+      <div class="sb-row" id="sbRow"><input id="nick" maxlength="12" placeholder="暱稱（排行榜顯示）" autocomplete="nickname" aria-label="暱稱"><input id="phone" type="tel" maxlength="12" inputmode="numeric" placeholder="手機（領獎聯絡用）" autocomplete="tel" aria-label="手機"></div>
+      <label class="sb-ck" id="sbCk"><input type="checkbox" id="consent">我同意主辦單位蒐集暱稱與手機，只用於排行榜顯示（手機會遮罩）與得獎聯繫，詳見<a href="/legal/game-rules/" target="_blank" rel="noopener">活動辦法</a>。</label>
+      <button class="go-btn sb-go" id="btnSubmit" type="button">送出成績</button>
+      <p class="sb-msg" id="sbMsg"></p>
+    </div>
+    <div class="reward" id="reward"></div>
     <p class="line-note" id="lineNote"></p>
-    <form class="lbf" id="lbForm" hidden novalidate>
-      <div class="lb-h"><span id="lbFormTitle">登上排行榜</span><a href="/legal/game-rules/" target="_blank" rel="noopener">活動辦法</a></div>
-      <div class="saved" id="lbSaved" hidden></div>
-      <div class="two" id="lbFields">
-        <input type="text" id="lbNick" maxlength="12" placeholder="暱稱（排行榜顯示）" autocomplete="nickname">
-        <input type="tel" id="lbPhone" maxlength="12" placeholder="手機（領獎聯絡用）" autocomplete="tel" inputmode="numeric">
-      </div>
-      <label class="ck"><input type="checkbox" id="lbConsent">我同意主辦單位蒐集暱稱與手機，只用於排行榜顯示（手機會遮罩）與得獎聯繫，詳見<a href="/legal/game-rules/" target="_blank" rel="noopener">活動辦法</a>。</label>
-      <button class="go-btn" type="submit" id="lbSubmit">送出成績</button>
-      <p class="msg" id="lbMsg"></p>
-    </form>
     <div class="row"><button class="go-btn" id="btnAgain">再跑一班</button><button class="btn2" id="btnShare">分享成績</button></div>
     <div class="cta-h">把遊戲裡的順暢，帶回真實工作</div>
     <div class="cta" id="cta"></div>
@@ -357,10 +464,54 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
   </div>
 </section>
 
+<section id="garage" hidden>
+  <div class="gsheet" role="dialog" aria-label="車庫">
+    <div class="ghead"><div><div class="eyebrow">匠城車庫</div><h2>換上你的造型</h2></div>
+      <span class="coinpill"><i class="coin"></i><span id="coinGarage">0</span></span>
+      <button class="ibtn card" id="btnCloseGarage" aria-label="關閉車庫">×</button></div>
+    <div class="tabs" role="tablist"><button data-tab="bike" class="on" role="tab">機車</button><button data-tab="outfit" role="tab">服裝</button><button data-tab="ach" role="tab">成就</button></div>
+    <div class="gbody" id="gbody"></div>
+    <div class="gfoot" id="gfoot"><div id="gInfo"></div><button class="go-btn" id="gAction">裝備</button></div>
+  </div>
+</section>
+
+<section id="board" hidden>
+  <div class="gsheet" role="dialog" aria-label="排行榜">
+    <div class="ghead"><div><div class="eyebrow">匠城排行榜</div><h2 id="boardTitle">小地圖</h2></div>
+      <button class="ibtn card" id="btnCloseBoard" aria-label="關閉排行榜" style="margin-left:auto">×</button></div>
+    <div class="tabs" id="boardMaps" role="tablist"><button data-m="s" class="on">小地圖</button><button data-m="m">中地圖</button><button data-m="l">大地圖</button><button data-m="t">台灣</button></div>
+    <div class="tabs small" id="boardPeriod" role="tablist"><button data-p="season" class="on">本季</button><button data-p="all">總榜</button><button data-p="live">正在上工</button><button data-p="loyal">最常上工</button></div>
+    <div class="gbody" id="boardBody" style="grid-template-columns:1fr"></div>
+  </div>
+</section>
+
+<div id="invite" hidden>
+  <div class="sm" role="dialog" aria-modal="true" aria-label="解鎖隱藏版台灣地圖">
+    <div class="inv-top"><span class="mg" id="invIcon"></span><div><div class="eyebrow">隱藏版地圖</div><h2>台灣地圖</h2></div></div>
+    <p class="inv-p">從台北 101 騎到鵝鑾鼻燈塔，沿路經過台中歌劇院、日月潭、阿里山、安平古堡、高雄愛河，騎過就能 GPS 打卡收集地標；三大城市還有高鐵站可以瞬間移動。</p>
+    <ol class="inv-steps"><li id="invS1"><div><b>分享給朋友</b>按下面任一個按鈕，馬上送你 1 次體驗</div></li><li id="invS2"><div><b>朋友從你的連結玩完一班</b>台灣地圖就永久解鎖（<span id="invCount">0</span>/1）</div></li></ol>
+    <div class="socials">
+      <a class="soc" id="inThreads" href="#" target="_blank" rel="noopener"><i style="background:#101010;font-size:24px">@</i>Threads</a>
+      <a class="soc" id="inFb" href="#" target="_blank" rel="noopener"><i style="background:#1877f2;font-size:28px;font-family:Arial,sans-serif">f</i>Facebook</a>
+      <a class="soc" id="inLine" href="#" target="_blank" rel="noopener"><i style="background:#06c755;font-size:13px;font-family:Arial,sans-serif">LINE</i>LINE</a>
+      <button class="soc" id="inCopy" type="button"><i style="background:var(--ink);font-size:15px">🔗</i>複製連結</button>
+    </div>
+    <input id="invLink" readonly aria-label="邀請連結">
+    <p class="done" id="invDone"></p>
+    <button class="ghost" id="btnCloseInvite">關閉</button>
+  </div>
+</div>
+
 <div id="shareModal" hidden>
   <div class="sm" role="dialog" aria-modal="true" aria-label="分享成績">
     <img id="shareImg" alt="我的匠城出任務成績圖" width="1080" height="1350">
-    <p class="tip">手機長按圖片就能存到相簿，再貼到 IG、FB、Threads 或 LINE</p>
+    <div class="socials">
+      <a class="soc" id="shThreads" href="#" target="_blank" rel="noopener"><i style="background:#101010"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round"><path d="M16.5 11.2c-.3-2.6-2-3.9-4.3-3.9-2.6 0-4.3 1.9-4.3 4.7s1.7 4.8 4.4 4.8c2.2 0 3.6-1.3 3.6-3.1 0-1.7-1.3-2.7-3.3-2.7-1.8 0-2.9.9-2.9 2.1s1 1.9 2.3 1.9c2.4 0 3.9-1.8 3.9-5 0-4.2-2.8-6.5-6.4-6.5C6.4 3.5 3.5 6.8 3.5 12s2.9 8.5 8.1 8.5c2.6 0 4.6-.8 5.9-2.2"/></svg></i>Threads</a>
+      <a class="soc" id="shFb" href="#" target="_blank" rel="noopener"><i style="background:#1877f2;font-size:28px;font-family:Arial,sans-serif">f</i>Facebook</a>
+      <a class="soc" id="shLine" href="#" target="_blank" rel="noopener"><i style="background:#06c755;font-size:13px;letter-spacing:.02em;font-family:Arial,sans-serif">LINE</i>LINE</a>
+      <button class="soc" id="shIg" type="button"><i style="background:radial-gradient(circle at 30% 110%,#ffd600 0 18%,#ff7a00 30%,#ff0069 55%,#d300c5 75%,#7638fa 100%)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17" cy="7" r="1" fill="#fff" stroke="none"/></svg></i>IG 限動</button>
+    </div>
+    <p class="tip" id="shareTip">點上面的按鈕直接分享；也可以長按圖片存到相簿</p>
     <div class="acts"><button class="go-btn" id="btnNativeShare">分享</button><button class="btn2" id="btnCopy">複製挑戰連結</button></div>
     <a class="btn2" id="btnDownload" download="匠城出任務成績.png" href="#" hidden>下載成績圖</a>
     <input id="linkBox" readonly aria-label="挑戰連結">
@@ -386,12 +537,16 @@ const fmt=n=>Math.round(n).toLocaleString('en-US');
 const CONFIG={
   // 遊戲正式網址：分享連結與挑戰連結會用它。自架時會自動讀取 <meta property="og:url">
   siteUrl:'https://go-marketing-center.pages.dev/game/',
-  // 排行榜 API；留空字串就關閉排行榜與上榜功能
+  // 排行榜 API（開局、心跳、上榜、賽季、正在玩統計、邀請解鎖）。沒有部署時遊戲會自動改成只顯示本機紀錄
   api:'/api/public/game',
+  // 台灣地圖上的 TaskGo 服務進度看板（live:true 顯示橘色「服務中」樣式）
+  regions:[{city:'高雄',status:'服務中',live:true},{city:'台中',status:'已開始接單',live:true},{city:'台北',status:'10 月中團隊到位',live:false}],
   links:{
     taskgo:{url:'https://app.taskgo.com.tw/register',title:'TaskGo 免費試用 14 天',sub:'讓工程專案管理更簡單、更智能'},
-    homigo:{url:'https://www.homigo.com.tw',title:'Homigo 免費開始，不綁信用卡',sub:'不是管理房子，而是讓房子自己運作'},
-    washgo:{url:'https://washgo.com.tw',title:'Washgo 官網',sub:'衣物送洗，交給 Washgo'}
+    homigo:{url:'https://www.homigo.com.tw',title:'Homigo 免費開始，不綁信用卡',sub:'不是管理房子，而是讓房子自己運作',
+      line:'https://line.me/R/ti/p/%40933pdush',lineTitle:'加 Homigo LINE 好友',lineSub:'免費開始，不綁信用卡'},
+    washgo:{url:'https://washgo.com.tw',title:'Washgo 官網',sub:'衣物送洗，交給 Washgo',
+      line:'https://line.me/R/ti/p/%40washgo',lineTitle:'加 Washgo LINE 好友，直接下單',lineSub:'衣物送洗，交給 Washgo'}
   }
 };
 const SHARE_URL=(()=>{const m=document.querySelector('meta[property="og:url"]');return (m&&m.content)||CONFIG.siteUrl;})();
@@ -399,7 +554,30 @@ function track(ev,params){params=params||{};
   try{if(typeof window.gtag==='function')window.gtag('event',ev,params);}catch(e){}
   try{if(typeof window.fbq==='function')window.fbq('trackCustom',ev,params);}catch(e){}
   try{(window.dataLayer=window.dataLayer||[]).push(Object.assign({event:ev},params));}catch(e){}}
-let challenge=0;try{const q=+new URLSearchParams(location.search).get('s');if(q>0&&q<300000)challenge=Math.round(q);}catch(e){}
+let challenge=0,challengeMap=null;try{const qs=new URLSearchParams(location.search);const q=+qs.get('s');if(q>0&&q<300000)challenge=Math.round(q);
+  const qm=qs.get('m');if(challenge&&['s','m','l'].includes(qm))challengeMap=qm;else if(challenge)challengeMap='s';}catch(e){}
+const MAPS={
+  s:{id:'s',name:'小地圖',sub:'巷弄 3×3',n:3,dur:90,maxo:4,spawn:[7.5,6],durMul:1,unlock:0,ranks:[0,9000,17000,26000],
+    layout:[['apt','hq','apt'],['houses','park','wash'],['houses','store','apt']]},
+  m:{id:'m',name:'中地圖',sub:'市區 4×4',n:4,dur:120,maxo:5,spawn:[6.5,5.4],durMul:1.2,unlock:300,ranks:[0,13000,25000,38000],
+    layout:[['houses','apt','work','apt'],['apt','hq','store','houses'],['houses','park','wash','apt'],['apt','store','houses','work']]},
+  l:{id:'l',name:'大地圖',sub:'全區 5×5',n:5,dur:150,maxo:6,spawn:[6,4.8],durMul:1.4,unlock:500,ranks:[0,18000,34000,52000],
+    layout:[['apt','houses','work','houses','apt'],['houses','store','apt','wash','houses'],['work','hq','park','store','apt'],['houses','wash','apt','houses','work'],['apt','houses','store','apt','houses']]},
+  t:{id:'t',name:'台灣地圖',sub:'隱藏版・全台',n:9,dur:180,maxo:6,spawn:[5.2,4.3],durMul:1.6,unlock:Infinity,hidden:true,ocean:true,ranks:[0,20000,38000,58000],
+    layout:[
+      ['.','.','.','.','.','tower','houses','.','.'],
+      ['.','.','.','.','houses','apt','work','field','.'],
+      ['.','.','.','field','wash','mount','mount','field','.'],
+      ['.','.','.','apt','mount','mount','taroko','.','.'],
+      ['.','.','hq','opera','peak','sunmoon','houses','.','.'],
+      ['.','.','wash','houses','alishan','mount','field','.','.'],
+      ['.','.','anping','work','mount','houses','.','.','.'],
+      ['.','.','apt','park','loveriver','wash','.','.','.'],
+      ['.','.','.','.','podium','.','.','.','.']],
+    labels:[['台北',5,1],['宜蘭',7,1],['台中',2,4],['花蓮',6,4],['嘉義',3,5],['台南',2,6],['台東',5,6],['高雄',2,7],['墾丁',4,8]],turtle:[8,1,3,2],
+    regionCells:{'台北':[5,1],'台中':[2,5],'高雄':[2,7]},
+    pads:[['台北',4,1],['台中',2,4],['高雄',2,7]],ship:[2,7,-26]}
+};
 
 /* ================= brands & icons ================= */
 const BR={
@@ -431,6 +609,11 @@ function drawGlyph(g,type){
       rr(g,2.6,7.4,18.8,12.8,2.8);g.fill();g.fillRect(8,4.6,8,3.6);
       g.globalCompositeOperation='destination-out';g.beginPath();g.arc(12,13.6,3.9,0,TAU);g.fill();
       g.globalCompositeOperation='source-over';g.beginPath();g.arc(12,13.6,2.1,0,TAU);g.fill();break;
+    case 'bolt':
+      g.beginPath();g.moveTo(13.5,2);g.lineTo(5,13.5);g.lineTo(11,13.5);g.lineTo(9.5,22);g.lineTo(19,9.5);g.lineTo(13,9.5);g.closePath();g.fill();break;
+    case 'siren':
+      g.beginPath();g.arc(12,13,6.5,PI,0);g.lineTo(18.5,17);g.lineTo(5.5,17);g.closePath();g.fill();rr(g,3.5,17.5,17,3.5,1.2);g.fill();
+      g.lineWidth=2;g.beginPath();g.moveTo(12,2.5);g.lineTo(12,4.5);g.moveTo(4,6);g.lineTo(5.5,7.3);g.moveTo(20,6);g.lineTo(18.5,7.3);g.stroke();break;
     case 'bag':
       rr(g,5,9.4,14,11.6,3.4);g.fill();g.beginPath();g.moveTo(8.6,9.8);g.lineTo(12,4.2);g.lineTo(15.4,9.8);g.closePath();g.fill();break;
   }
@@ -439,21 +622,30 @@ function rr(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.lineTo(x+w-r,y);g.quadr
   g.quadraticCurveTo(x+w,y+h,x+w-r,y+h);g.lineTo(x+r,y+h);g.quadraticCurveTo(x,y+h,x,y+h-r);g.lineTo(x,y+r);g.quadraticCurveTo(x,y,x+r,y);g.closePath();}
 function glyphCanvas(type,col,size){const c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d');
   g.scale(size/24,size/24);g.fillStyle=col;g.strokeStyle=col;drawGlyph(g,type);return c;}
-const ICON={};['wrench','key','shirt','check','camera','bag'].forEach(t=>ICON[t]=glyphCanvas(t,'#fff',64).toDataURL());
+const ICON={};['wrench','key','shirt','check','camera','bag','bolt','siren'].forEach(t=>ICON[t]=glyphCanvas(t,'#fff',64).toDataURL());
 const chipHTML=(brand,icon)=>`<span class="chip" style="--c:${BR[brand]?BR[brand].color:brand}"><img alt="" src="${ICON[icon||BR[brand].icon]}"></span>`;
 
 $('#brandList').innerHTML=Object.keys(BR).map(k=>{const b=BR[k];return `<div class="brow" style="--c:${b.color}">${chipHTML(k)}<div><b>${b.name}<span>${b.role}</span></b><p>${b.desc}</p></div></div>`;}).join('');
-if(challenge){const c=$('#challenge');c.hidden=false;c.innerHTML=`朋友在匠城跑一個班賺了<b>NT$ ${fmt(challenge)}</b>，換你來挑戰！`;}
-$('#cta').innerHTML=Object.keys(CONFIG.links).map(k=>{const l=CONFIG.links[k];return `<a href="${l.url}" target="_blank" rel="noopener" data-brand="${k}" style="--c:${BR[k].color}">${chipHTML(k)}<div>${l.title}<span>${l.sub}</span></div></a>`;}).join('');
-$('#cta').addEventListener('click',e=>{const a=e.target.closest('a');if(a)track('brand_click',{brand:a.dataset.brand});});
+if(challenge){const c=$('#challenge');c.hidden=false;c.innerHTML=`朋友在${MAPS[challengeMap].name}跑一個班賺了<b>NT$ ${fmt(challenge)}</b>，換你來挑戰！`;}
+/* ---------- in-app browser detection (LINE / IG / FB / Threads) ---------- */
+const UA=navigator.userAgent||'';
+const ENV={line:/\bLine\//i.test(UA),ig:/Instagram/i.test(UA),fb:/FBAN|FBAV|FB_IAB|FB4A/i.test(UA),threads:/Barcelona/i.test(UA)};
+ENV.inApp=ENV.line||ENV.ig||ENV.fb||ENV.threads;ENV.name=ENV.line?'line':ENV.ig?'instagram':ENV.threads?'threads':ENV.fb?'facebook':(isTouch?'mobile':'desktop');
+const useLineOA=isTouch||ENV.line;
+$('#cta').innerHTML=Object.keys(CONFIG.links).map(k=>{const l=CONFIG.links[k];const L=useLineOA&&l.line;
+  return `<a href="${L?l.line:l.url}" target="_blank" rel="noopener" data-brand="${k}" data-kind="${L?'line_oa':'web'}" style="--c:${BR[k].color}">${chipHTML(k)}<div>${L?l.lineTitle:l.title}<span>${L?l.lineSub:l.sub}</span></div></a>`;}).join('');
+$('#cta').addEventListener('click',e=>{const a=e.target.closest('a');if(a)track('brand_click',{brand:a.dataset.brand,kind:a.dataset.kind,env:ENV.name});});
+// stop the page from scrolling / bouncing while steering (iOS in-app browsers)
+document.addEventListener('touchmove',e=>{if(state==='play'||state==='count')e.preventDefault();},{passive:false});
+document.addEventListener('gesturestart',e=>e.preventDefault());
 $('#ctrlHint').innerHTML=isTouch?'按住畫面任意處拖曳來騎車':'<span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> 或方向鍵騎車，也能用滑鼠拖曳';
 
 /* ================= persistence ================= */
 const BEST_KEY='jiangcheng-best-v1';
-function getBest(){try{return +localStorage.getItem(BEST_KEY)||0;}catch(e){return 0;}}
-function setBest(v){try{localStorage.setItem(BEST_KEY,String(v));}catch(e){}}
+function legacyBest(){try{return +localStorage.getItem(BEST_KEY)||0;}catch(e){return 0;}}
+function getBest(m){m=m||(MAP?MAP.id:'s');return (prof.best&&prof.best[m])||0;}
+function setBest(v,m){m=m||MAP.id;prof.best=prof.best||{};prof.best[m]=v;saveProf();if(m==='s'){try{localStorage.setItem(BEST_KEY,String(v));}catch(e){}}}
 function showBest(){const b=getBest();$('#bestTitle').textContent=b?'NT$ '+fmt(b):'還沒有';}
-showBest();
 
 /* ================= audio ================= */
 const AU={ctx:null,master:null,music:null,muted:false,seqTimer:null,step:0,nextT:0,tempo:112,
@@ -576,53 +768,61 @@ function groundFloor(g,type,x,y,w,h,o){
 function texMat(t){return new THREE.MeshLambertMaterial({map:t});}
 
 /* ================= world layout ================= */
-const ROADS=[-30,-10,10,30], RH=3.5, BLK=6.5, LIMIT=33;
-const blockCenters=[-20,0,20];
+const RH=3.5, BLK=6.5;
+let ROADS=[-30,-10,10,30],blockCenters=[-20,0,20],LIMIT=33,HALF=33.5,EXT=40,SHOW={x:0,z:40};
+let CITY=new THREE.Group();scene.add(CITY);
 const colliders=[];const buildings=[];
 function addCollider(x,z,w,d,h,group){const b={minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2,h:h||3};colliders.push(b);
   if(group){b.mats=[];group.traverse(o=>{if(o.isMesh){o.material=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone();
       (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>b.mats.push(m));}});b.op=1;buildings.push(b);}
   return b;}
+const nearestBlock=v=>blockCenters.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a,blockCenters[0]);
 
 /* ---------- ground ---------- */
-function makeGround(){
-  const S=isTouch?1024:2048,R=40,k=S/(2*R),X=v=>(v+R)*k;const c=cvs(S,S),g=c.getContext('2d');
-  g.fillStyle='#8cbf62';g.fillRect(0,0,S,S);
-  for(let i=0;i<S*5;i++){g.fillStyle=Math.random()<.5?'rgba(255,255,230,.06)':'rgba(20,70,10,.07)';g.fillRect(Math.random()*S,Math.random()*S,k*.25,k*.25);}
+let LAYOUT=null;
+const isLandType=t=>!!t&&t!=='.';
+const LAND=(c,r)=>!!LAYOUT&&r>=0&&c>=0&&r<LAYOUT.length&&c<LAYOUT[r].length&&isLandType(LAYOUT[r][c]);
+const roadV=(i,j)=>LAND(i-1,j)||LAND(i,j);   // vertical road i (x=ROADS[i]) along block row j
+const roadH=(i,j)=>LAND(i,j-1)||LAND(i,j);   // horizontal road j (z=ROADS[j]) along block column i
+const cross=(i,j)=>roadV(i,j-1)||roadV(i,j)||roadH(i-1,j)||roadH(i,j);
+function walkable(x,z){const b0=blockCenters[0];const ci=Math.round((x-b0)/20),cj=Math.round((z-b0)/20);
+  for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const c=ci+di,r=cj+dj;if(LAND(c,r)&&Math.abs(x-(b0+c*20))<=13.4&&Math.abs(z-(b0+r*20))<=13.4)return true;}return false;}
+function makeGround(ocean){
+  const R=EXT,S=isTouch&&R<45?1024:2048,k=S/(2*R),X=v=>(v+R)*k;const c=cvs(S,S),g=c.getContext('2d');const n=ROADS.length-1;
+  if(ocean){g.fillStyle='#3f9fd0';g.fillRect(0,0,S,S);g.strokeStyle='rgba(255,255,255,.12)';g.lineWidth=Math.max(1,k*.15);
+    for(let i=0;i<S/6;i++){const x=Math.random()*S,y=Math.random()*S;g.beginPath();g.moveTo(x,y);g.quadraticCurveTo(x+k*1.2,y-k*.5,x+k*2.4,y);g.stroke();}
+    const cells=[];for(let r=0;r<n;r++)for(let q=0;q<n;q++)if(LAND(q,r))cells.push([blockCenters[q],blockCenters[r]]);
+    [['#8fd3e8',19.5],['#ecd9a8',17],['#8cbf62',15.2]].forEach(([col,rad])=>{g.fillStyle=col;cells.forEach(([x,z])=>{g.beginPath();g.arc(X(x),X(z),rad*k,0,TAU);g.fill();});});
+  }else{g.fillStyle='#8cbf62';g.fillRect(0,0,S,S);}
+  for(let i=0;i<S*4;i++){const x=Math.random()*S,y=Math.random()*S;if(ocean)continue;g.fillStyle=Math.random()<.5?'rgba(255,255,230,.06)':'rgba(20,70,10,.07)';g.fillRect(x,y,k*.25,k*.25);}
+  // road surfaces (only next to land)
   g.fillStyle='#4d525e';
-  ROADS.forEach(r=>{g.fillRect(X(r-RH),X(-33.5),7*k,67*k);g.fillRect(X(-33.5),X(r-RH),67*k,7*k);});
-  const onRoad=(x,z)=>(Math.abs(x)<33.5&&Math.abs(z)<33.5)&&(ROADS.some(r=>Math.abs(x-r)<RH)||ROADS.some(r=>Math.abs(z-r)<RH));
-  for(let i=0;i<S*8;i++){const x=rnd(-34,34),z=rnd(-34,34);if(!onRoad(x,z))continue;g.fillStyle=Math.random()<.5?'rgba(255,255,255,.05)':'rgba(0,0,0,.08)';g.fillRect(X(x),X(z),k*.18,k*.18);}
-  const segs=[[-26.5,-13.5],[-6.5,6.5],[13.5,26.5]];
+  for(let i=0;i<=n;i++)for(let j=0;j<n;j++){if(roadV(i,j))g.fillRect(X(ROADS[i]-RH),X(ROADS[j]-RH),7*k,(20+7)*k);if(roadH(j,i))g.fillRect(X(ROADS[j]-RH),X(ROADS[i]-RH),(20+7)*k,7*k);}
+  const onRoad=(x,z)=>walkable(x,z)&&(ROADS.some(r=>Math.abs(x-r)<RH)||ROADS.some(r=>Math.abs(z-r)<RH));
+  for(let i=0;i<S*8;i++){const x=rnd(-HALF,HALF),z=rnd(-HALF,HALF);if(!onRoad(x,z))continue;g.fillStyle=Math.random()<.5?'rgba(255,255,255,.05)':'rgba(0,0,0,.08)';g.fillRect(X(x),X(z),k*.18,k*.18);}
   g.fillStyle='rgba(246,244,236,.92)';
-  ROADS.forEach(r=>segs.forEach(([a,b])=>{
-    for(let t=a+2.6;t<b-2.6;t+=3){g.fillRect(X(r-.08),X(t),.16*k,1.5*k);g.fillRect(X(t),X(r-.08),1.5*k,.16*k);}
-    [-3.1,3.1].forEach(o=>{g.fillRect(X(r+o-.06),X(a),.12*k,(b-a)*k);g.fillRect(X(a),X(r+o-.06),(b-a)*k,.12*k);});
-  }));
-  // crosswalks
-  ROADS.forEach(rx=>ROADS.forEach(rz=>{
-    [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dx,dz])=>{
-      if(dz){const z0=rz+dz*(RH+.4),z1=rz+dz*(RH+2.4);if(Math.abs(z1)>33.5)return;
-        for(let sx=rx-3.1;sx<rx+3.1;sx+=.95)g.fillRect(X(sx),X(Math.min(z0,z1)),.5*k,2*k);}
-      else{const x0=rx+dx*(RH+.4),x1=rx+dx*(RH+2.4);if(Math.abs(x1)>33.5)return;
-        for(let sz=rz-3.1;sz<rz+3.1;sz+=.95)g.fillRect(X(Math.min(x0,x1)),X(sz),2*k,.5*k);}
-    });
-  }));
-  // 機車待轉區 + 慢
+  for(let i=0;i<=n;i++)for(let j=0;j<n;j++){const a=ROADS[j]+RH,b=ROADS[j+1]-RH,r=ROADS[i];
+    if(roadV(i,j)){for(let t=a+2.6;t<b-2.6;t+=3)g.fillRect(X(r-.08),X(t),.16*k,1.5*k);[-3.1,3.1].forEach(o=>g.fillRect(X(r+o-.06),X(a),.12*k,(b-a)*k));}
+    if(roadH(j,i)){for(let t=a+2.6;t<b-2.6;t+=3)g.fillRect(X(t),X(r-.08),1.5*k,.16*k);[-3.1,3.1].forEach(o=>g.fillRect(X(a),X(r+o-.06),(b-a)*k,.12*k));}}
+  for(let i=0;i<=n;i++)for(let j=0;j<=n;j++){if(!cross(i,j))continue;const rx=ROADS[i],rz=ROADS[j];
+    if(roadV(i,j-1))for(let sx=rx-3.1;sx<rx+3.1;sx+=.95)g.fillRect(X(sx),X(rz-RH-2.4),.5*k,2*k);
+    if(roadV(i,j))for(let sx=rx-3.1;sx<rx+3.1;sx+=.95)g.fillRect(X(sx),X(rz+RH+.4),.5*k,2*k);
+    if(roadH(i-1,j))for(let sz=rz-3.1;sz<rz+3.1;sz+=.95)g.fillRect(X(rx-RH-2.4),X(sz),2*k,.5*k);
+    if(roadH(i,j))for(let sz=rz-3.1;sz<rz+3.1;sz+=.95)g.fillRect(X(rx+RH+.4),X(sz),2*k,.5*k);}
   g.strokeStyle='rgba(246,244,236,.92)';g.lineWidth=.12*k;g.font=`${.62*k}px "Noto Sans TC", sans-serif`;g.textAlign='center';g.textBaseline='middle';
-  [[-10,-10],[10,-10],[-10,10],[10,10]].forEach(([rx,rz])=>{g.strokeRect(X(rx+.6),X(rz+.7),2.4*k,1.5*k);g.fillText('待轉',X(rx+1.8),X(rz+1.45));});
+  for(let i=1;i<n;i++)for(let j=1;j<n;j++){if(!(roadV(i,j-1)&&roadV(i,j)&&roadH(i-1,j)&&roadH(i,j)))continue;const rx=ROADS[i],rz=ROADS[j];g.strokeRect(X(rx+.6),X(rz+.7),2.4*k,1.5*k);g.fillText('待轉',X(rx+1.8),X(rz+1.45));}
   g.font=`bold ${1.5*k}px "Noto Sans TC", sans-serif`;g.fillStyle='rgba(246,244,236,.85)';
-  [[-8.3,-20],[8.3,20],[-20,11.7],[20,-8.3],[-28.3,0],[28.3,0],[0,-31.7],[0,31.7]].forEach(([x,z])=>g.fillText('慢',X(x),X(z)));
+  for(let i=0;i<=n;i++)for(let j=0;j<n;j++){if((i+j)%3!==0)continue;const m=(ROADS[j]+ROADS[j+1])/2;if(roadV(i,j))g.fillText('慢',X(ROADS[i]-1.7),X(m));if(roadH(j,i))g.fillText('慢',X(m),X(ROADS[i]+1.7));}
   const t=ctex(c);t.anisotropy=maxAniso;
-  const plane=new THREE.Mesh(new THREE.PlaneGeometry(80,80),new THREE.MeshLambertMaterial({map:t}));plane.rotation.x=-PI/2;plane.receiveShadow=true;scene.add(plane);
-  const far=new THREE.Mesh(new THREE.PlaneGeometry(600,600),mat('#8cbf62'));far.rotation.x=-PI/2;far.position.y=-.02;far.receiveShadow=true;scene.add(far);
+  const seg=Math.max(8,Math.round(R/5));const plane=new THREE.Mesh(new THREE.PlaneGeometry(2*R,2*R,seg,seg),new THREE.MeshLambertMaterial({map:t}));plane.rotation.x=-PI/2;plane.receiveShadow=true;CITY.add(plane);
+  const far=new THREE.Mesh(new THREE.PlaneGeometry(3000,3000),new THREE.MeshLambertMaterial({color:ocean?'#3f9fd0':'#8cbf62'}));far.rotation.x=-PI/2;far.position.y=ocean?-.6:-.05;far.receiveShadow=true;CITY.add(far);
 }
 
 /* ---------- props ---------- */
-function tree(x,z,s,p){p=p||scene;s=s||1;const g=new THREE.Group();cyl(g,.16*s,.22*s,1.3*s,'#8a5a3b',0,0,0,6);
+function tree(x,z,s,p){p=p||CITY;s=s||1;const g=new THREE.Group();cyl(g,.16*s,.22*s,1.3*s,'#8a5a3b',0,0,0,6);
   const m=new THREE.Mesh(new THREE.IcosahedronGeometry(1.25*s,0),mat(pick(['#4e9a45','#5aa84c','#3f8f47','#67b057'])));
   m.position.y=2.1*s;m.rotation.set(rnd(0,3),rnd(0,3),0);m.castShadow=true;g.add(m);g.position.set(x,0,z);p.add(g);return g;}
-function palm(x,z,h,p){p=p||scene;const g=new THREE.Group();let px=0,pz=0;const lean=rnd(0,TAU),seg=6,sh=h/seg;
+function palm(x,z,h,p){p=p||CITY;const g=new THREE.Group();let px=0,pz=0;const lean=rnd(0,TAU),seg=6,sh=h/seg;
   for(let i=0;i<seg;i++){cyl(g,.15,.19,sh+.02,i%2?'#9b7a55':'#8a6b48',px,i*sh,pz,7);px+=Math.cos(lean)*.07*i;pz+=Math.sin(lean)*.07*i;}
   const top=new THREE.Group();top.position.set(px,h,pz);g.add(top);
   for(let i=0;i<7;i++){const f=new THREE.Group();f.rotation.y=i*TAU/7+rnd(-.2,.2);top.add(f);
@@ -634,27 +834,49 @@ const lampGlows=[];
 function lamp(x,z,dir){const g=new THREE.Group();cyl(g,.07,.1,4.2,'#5c626c',0,0,0,6);const arm=box(g,.1,.1,1.1,'#5c626c',0,4.1,.5*dir);
   const h=new THREE.Mesh(BOX,lampHeadMat);h.scale.set(.35,.16,.55);h.position.set(0,4.05,1.05*dir);g.add(h);
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0}));
-  s.position.set(0,3.9,1.05*dir);s.scale.set(3.4,3.4,1);g.add(s);lampGlows.push(s);g.position.set(x,.25,z);scene.add(g);}
+  s.position.set(0,3.9,1.05*dir);s.scale.set(3.4,3.4,1);g.add(s);lampGlows.push(s);g.position.set(x,.25,z);CITY.add(g);}
 function cone(p,x,z){const m=new THREE.Mesh(new THREE.ConeGeometry(.26,.7,10),mat('#ff6b1a'));m.position.set(x,.35,z);m.castShadow=true;p.add(m);
   const b=new THREE.Mesh(new THREE.CylinderGeometry(.14,.18,.12,10),mat('#ffffff'));b.position.set(x,.42,z);p.add(b);}
 
 /* ---------- scooter ---------- */
-function makeScooter(body,trim,rider){
+let alohaTex=null;
+function getAloha(){if(alohaTex)return alohaTex;const c=cvs(128,128),g=c.getContext('2d');g.fillStyle='#d8342c';g.fillRect(0,0,128,128);
+  for(let i=0;i<14;i++){const x=rnd(0,128),y=rnd(0,128),r=rnd(6,11);g.fillStyle=i%3?'#fff3d6':'#ffd23a';for(let k=0;k<5;k++){const a=k/5*TAU;g.beginPath();g.arc(x+Math.cos(a)*r*.6,y+Math.sin(a)*r*.6,r*.45,0,TAU);g.fill();}
+    g.fillStyle='#f5b800';g.beginPath();g.arc(x,y,r*.28,0,TAU);g.fill();g.fillStyle='#2f8f4e';g.beginPath();g.ellipse(x+r,y+r*.8,r*.6,r*.25,.6,0,TAU);g.fill();}
+  alohaTex=ctex(c);alohaTex.wrapS=alohaTex.wrapT=THREE.RepeatWrapping;return alohaTex;}
+function makeScooter(body,trim,rider,opt){opt=opt||{};
   const root=new THREE.Group(),tilt=new THREE.Group();root.add(tilt);
   box(tilt,.62,.38,1.7,body,0,.3,0);box(tilt,.66,.95,.26,body,0,.45,.72);box(tilt,.5,.12,.9,trim,0,.66,-.15);
-  box(tilt,.54,.22,.78,'#2a2d34',0,.78,-.32);box(tilt,.95,.07,.07,'#2a2d34',0,1.38,.74);box(tilt,.1,.52,.1,'#2a2d34',0,.9,.8);
-  const hl=new THREE.Mesh(BOX,new THREE.MeshBasicMaterial({color:'#fff6d8'}));hl.scale.set(.3,.14,.06);hl.position.set(0,1.2,.88);tilt.add(hl);
+  box(tilt,.54,.22,.78,opt.seat||'#2a2d34',0,.78,-.32);box(tilt,.95,.07,.07,'#2a2d34',0,1.38,.74);box(tilt,.1,.52,.1,'#2a2d34',0,.9,.8);
+  const hlm=new THREE.MeshBasicMaterial({color:'#fff6d8'});
+  if(opt.round){const hl=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,.07,18),hlm);hl.rotation.x=PI/2;hl.position.set(0,1.18,.88);tilt.add(hl);
+    const rim=new THREE.Mesh(new THREE.TorusGeometry(.17,.035,8,20),mat('#d9dde2'));rim.position.set(0,1.18,.91);tilt.add(rim);}
+  else{const hl=new THREE.Mesh(BOX,hlm);hl.scale.set(.3,.14,.06);hl.position.set(0,1.2,.88);tilt.add(hl);}
+  if(opt.mirrors)[-1,1].forEach(sd=>{box(tilt,.03,.28,.03,'#d9dde2',.4*sd,1.4,.72);const m=new THREE.Mesh(new THREE.SphereGeometry(.08,10,8),mat('#d9dde2'));m.position.set(.4*sd,1.72,.72);m.scale.z=.4;tilt.add(m);});
+  if(opt.screen){const w=new THREE.Mesh(BOX,new THREE.MeshLambertMaterial({color:'#bfe3ff',transparent:true,opacity:.5}));w.scale.set(.6,.46,.035);w.position.set(0,1.64,.7);w.rotation.x=-.38;tilt.add(w);}
+  if(opt.glow)[-.325,.325].forEach(x=>{const g=new THREE.Mesh(BOX,new THREE.MeshBasicMaterial({color:opt.glow}));g.scale.set(.02,.05,1.45);g.position.set(x,.5,0);tilt.add(g);});
   box(tilt,.62,.05,.52,'#3a3f48',0,1,-.9);
+  let rackY=1.05;
+  if(opt.box){box(tilt,.66,.5,.58,opt.box,0,1.03,-.92);box(tilt,.7,.08,.62,trim,0,1.5,-.92);rackY=1.58;}
   const wheels=[];[.68,-.68].forEach(z=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,.18,14),mat('#23262c'));w.rotation.z=PI/2;w.position.set(0,.3,z);w.castShadow=true;tilt.add(w);wheels.push(w);});
   let r=null;
   if(rider){r=new THREE.Group();tilt.add(r);r.position.set(0,.9,-.28);
-    cyl(r,.24,.3,.72,rider.shirt,0,0,0,10);
-    const vest=cyl(r,.265,.315,.4,rider.vest,0,.18,0,10);
+    const shirtM=rider.pattern?new THREE.MeshLambertMaterial({map:getAloha()}):mat(rider.shirt);
+    const torso=new THREE.Mesh(new THREE.CylinderGeometry(.24,.3,.72,10),shirtM);torso.position.y=.36;torso.castShadow=true;r.add(torso);
+    if(rider.vest)cyl(r,.265,.315,.4,rider.vest,0,.18,0,10);
+    if(rider.style==='suit'){box(r,.2,.09,.05,'#ffffff',0,.62,.25);box(r,.07,.34,.04,'#d8342c',0,.3,.28);}
     const head=new THREE.Mesh(new THREE.SphereGeometry(.22,14,10),mat('#f1c9a5'));head.position.y=.98;head.castShadow=true;r.add(head);
-    const helm=new THREE.Mesh(new THREE.SphereGeometry(.27,14,10,0,TAU,0,PI*.55),mat(rider.helmet));helm.position.y=1.02;helm.castShadow=true;r.add(helm);
-    box(r,.4,.05,.14,rider.helmet,0,.98,.22);
-    [-1,1].forEach(s=>{const a=box(r,.12,.12,.7,rider.shirt,.3*s,.48,.3);a.rotation.x=-.35;});}
-  return {root,tilt,wheels,rider:r};}
+    if(rider.full){const helm=new THREE.Mesh(new THREE.SphereGeometry(.29,16,12),mat(rider.helmet));helm.position.y=1.0;helm.castShadow=true;r.add(helm);
+      const vis=new THREE.Mesh(new THREE.SphereGeometry(.292,16,8,-PI*.32,PI*.64,PI*.3,PI*.26),new THREE.MeshLambertMaterial({color:'#20283a'}));vis.position.y=1.0;r.add(vis);}
+    else{const helm=new THREE.Mesh(new THREE.SphereGeometry(.27,14,10,0,TAU,0,PI*.55),mat(rider.helmet));helm.position.y=1.02;helm.castShadow=true;r.add(helm);
+      box(r,.4,.05,.14,rider.helmet,0,.98,.22);}
+    const armM=rider.pattern?shirtM:mat(rider.shirt);
+    [-1,1].forEach(s=>{const a=new THREE.Mesh(BOX,armM);a.scale.set(.12,.12,.7);a.position.set(.3*s,.54,.3);a.rotation.x=-.35;a.castShadow=true;r.add(a);});
+    if(rider.style==='rain'){const pm=new THREE.MeshLambertMaterial({color:rider.shirt,side:THREE.DoubleSide});
+      const pon=new THREE.Mesh(new THREE.ConeGeometry(.62,1.05,14,1,true),pm);pon.position.set(0,.36,.12);pon.castShadow=true;r.add(pon);
+      const hood=new THREE.Mesh(new THREE.SphereGeometry(.3,12,8,0,TAU,0,PI*.62),pm);hood.position.y=.99;r.add(hood);}
+  }
+  return {root,tilt,wheels,rider:r,rackY};}
 function makeCar(color,taxi){const root=new THREE.Group();
   box(root,1.9,.72,3.7,color,0,.3,0);box(root,1.72,.62,2,'#34495e',0,1.02,-.25);box(root,1.76,.1,2.04,color,0,1.62,-.25);
   if(taxi){box(root,.7,.28,.34,'#fff',0,1.72,-.2);}
@@ -665,7 +887,7 @@ function makeCar(color,taxi){const root=new THREE.Group();
 
 /* ---------- buildings ---------- */
 const S={}; // sites
-function place(g,x,z){g.position.set(x,.25,z);scene.add(g);}
+function place(g,x,z){g.position.set(x,.25,z);CITY.add(g);}
 function roofStuff(g,w,d,H,o){o=o||{};
   [[w,.5,.22,0,d/2-.11],[w,.5,.22,0,-d/2+.11],[.22,.5,d,w/2-.11,0],[.22,.5,d,-w/2+.11,0]].forEach(a=>box(g,a[0],a[1],a[2],o.parapet||'#d9d2c3',a[3],H,a[4]));
   const n=o.tanks==null?2:o.tanks;for(let i=0;i<n;i++){const tx=-w/2+1.4+i*1.6,tz=-d/2+1.5;box(g,1.2,.5,1.2,'#8c9098',tx,H,tz);cyl(g,.55,.55,1.1,'#d5dbe1',tx,H+.5,tz,14);}
@@ -692,11 +914,11 @@ function makeHouse(o){const g=new THREE.Group(),fh=2.4,H=o.floors*fh,w=o.w,d=o.d
   box(g,w,.4,.18,'#d9d2c3',0,H,d/2-.09);
   cyl(g,.45,.45,.9,'#d5dbe1',w/2-.8,H,d*.3,12);
   return {g,H:H+2};}
-function makeWash(){const g=new THREE.Group(),w=10,d=9,H=6.4;
+function makeWash(label){const g=new THREE.Group(),w=10,d=9,H=6.4;
   const fr=facade({w,h:H,floors:2,wall:'#f4f7fb',ground:'wash',band:'#3a8dde',cols:4}),sd=facade({w:d,h:H,floors:2,wall:'#f4f7fb',band:'#3a8dde',cols:3});
   const body=new THREE.Mesh(BOX,[texMat(sd),texMat(sd),mat('#dfe6ee'),mat('#999'),texMat(fr),texMat(fr)]);body.scale.set(w,H,d);body.position.y=H/2;body.castShadow=body.receiveShadow=true;g.add(body);
   box(g,w+.2,.3,1.2,'#3a8dde',0,3.1,d/2+.6);
-  const sg=signMesh('Washgo 洗衣中心','#3a8dde','#fff',6.6,1.25);sg.position.set(0,4,d/2+.02);sg.position.z=d/2+.03;sg.position.y=4.6;g.add(sg);
+  const sg=signMesh(label||'Washgo 洗衣中心','#3a8dde','#fff',6.6,1.25);sg.position.set(0,4,d/2+.02);sg.position.z=d/2+.03;sg.position.y=4.6;g.add(sg);
   roofStuff(g,w,d,H,{tanks:0,parapet:'#e6ecf2'});
   // giant washer on roof
   const wm=new THREE.Group();wm.position.set(0,H,.4);g.add(wm);
@@ -741,58 +963,137 @@ function makeBase(){const g=new THREE.Group();const w=6.4,h=2.7,d=2.6;
   cone(g,w/2+.6,1.6);cone(g,w/2+1.3,1.4);cone(g,-w/2-.4,1.8);
   return {g,H:h+1};}
 
-function buildCity(){
-  makeGround();
-  // block slabs
-  blockCenters.forEach(bx=>blockCenters.forEach(bz=>{
-    box(scene,13,.25,13,'#d7cfbf',bx,0,bz,true);
-    const inner=bx===0&&bz===0?'#86bf5c':'#cbc3b3';
-    box(scene,11.6,.02,11.6,inner,bx,.25,bz,true);
-  }));
-  const add=(id,short,x,z,obj,w,d)=>{place(obj.g,x,z);const b=addCollider(x,z,w,d,obj.H,obj.g);
-    if(id){const bc=Math.round(z/20)*20;S[id]={id,short,x,z,dx:x,dz:bc+BLK+1.8,obj,b};}return obj;};
-  add('A','社宅A',-20,-20,makeApt({w:10,d:9,floors:7,wall:'#ece4d4',rail:'#b7c7bd',accent:'#1fae78',sign:'Homigo 社宅 A'}),10,9);
-  const hq=add('HQ','代管中心',0,-20,makeHQ(),9.5,8);
-  add('B','社宅B',20,-20,makeApt({w:10,d:9,floors:6,wall:'#e3e9e6',rail:'#9fb9ad',accent:'#1fae78',sign:'Homigo 社宅 B'}),10,9);
-  const houseWalls=[['#e8d8c2','#4f86c6','#e05a47'],['#d7e2e8','#58a07a','#f0b43a'],['#efe2cd','#c95b4a','#3f7cc4'],['#e4d1c8','#4a8fc2','#58a07a'],['#dfe3cf','#d0843b','#4f86c6']];
-  const mkH=(i,floors)=>{const [wall,tin,awn]=houseWalls[i];return makeHouse({w:5.4,d:7,floors,wall,tin,tinLine:'#ffffff',awning:awn});};
-  add('h1','林宅',-23.4,0,mkH(0,3),5.4,7);
-  add('h2','王宅',-16.6,0,mkH(1,4),5.4,7);
-  const wash=add('W','洗衣中心',20,0,makeWash(),10,9);
-  add('h3','張宅',-23.4,20,mkH(2,4),5.4,7);
-  add('h4','黃宅',-16.6,20,mkH(3,3),5.4,7);
-  add(null,'',-3.6,20,makeStore(),5.6,5);
-  add(null,'',.2,23.4,makeBetel(),1.5,1.5);
-  add('h5','吳宅',4,20,mkH(4,3),5,7);
-  S.h5.obj.g.scale.x=5/5.4;
-  add('C','社宅C',20,20,makeApt({w:10,d:9,floors:8,wall:'#efe6dc',rail:'#c2b7a8',accent:'#1fae78',sign:'Homigo 社宅 C'}),10,9);
-  const base=makeBase();place(base.g,0,3.4);addCollider(0,3.4,6.4,2.6,3.7,base.g);addCollider(-4.4,3.4,1.4,2.6,.8);
-  // park
-  const pk=new THREE.Group();pk.position.y=.27;scene.add(pk);
+function makeWorksite(){const g=new THREE.Group(),w=9,d=8;
+  for(let f=0;f<3;f++)box(g,w-1.4,.25,d-1.4,'#bdb7aa',0,f*2.7,0);
+  box(g,(w-1.4)*.55,.25,d-1.4,'#bdb7aa',-(w-1.4)*.22,8.1,0);
+  [[-1,-1],[1,-1],[-1,1],[1,1],[0,-1],[0,1]].forEach(([a,b])=>box(g,.36,8.1,.36,'#a8a296',a*(w/2-1),0,b*(d/2-1)));
+  box(g,w-1.4,5.4,.25,'#cfc8bb',0,0,-(d/2-.8));
+  const sc='#e0a100';for(let i=0;i<8;i++){const x=-w/2+.7+i*(w-1.4)/7;box(g,.08,8.4,.08,sc,x,0,d/2-.3,true);}
+  for(let f=1;f<4;f++){box(g,w-1.2,.08,.08,sc,0,f*2.7-.1,d/2-.3,true);box(g,w-1.2,.06,.7,'#c9a15a',0,f*2.7-.3,d/2-.6,true);}
+  box(g,3.1,1.7,.1,'#f4f1ea',-2.95,0,d/2+.4);box(g,3.1,1.7,.1,'#f4f1ea',2.95,0,d/2+.4);
+  box(g,3.1,.18,.12,'#ff6b1a',-2.95,1.1,d/2+.41,true);box(g,3.1,.18,.12,'#ff6b1a',2.95,1.1,d/2+.41,true);
+  const sg=signMesh('TaskGo 智慧工地','#ff6b1a','#fff',3.8,.8);sg.position.set(0,2.2,d/2+.47);g.add(sg);box(g,.1,2.2,.1,'#555',-1.6,0,d/2+.42);box(g,.1,2.2,.1,'#555',1.6,0,d/2+.42);
+  const tx=w/2-.4,tz=-d/2+.6;box(g,.7,15,.7,'#f5c518',tx,0,tz);for(let y=1;y<15;y+=1.5)box(g,.74,.08,.74,'#c99a00',tx,y,tz,true);
+  const jib=new THREE.Group();jib.position.set(tx,15,tz);g.add(jib);box(jib,11,.5,.5,'#f5c518',3.5,0,0);box(jib,3.2,.5,.5,'#f5c518',-2.6,0,0);
+  box(jib,1.2,1,1,'#7d8288',-3.6,-.9,0);box(jib,.9,.9,.9,'#e8eef2',0,-.9,.6);
+  box(jib,.05,5,.05,'#333',7.2,-5,0,true);box(jib,.5,.4,.5,'#ff6b1a',7.2,-5.4,0);
+  for(let i=0;i<3;i++)cone(g,-w/2+1+i*.8,d/2+1.1);
+  return {g,H:9,jib};}
+function buildPark(bx,bz){const base=makeBase();place(base.g,bx,bz+3.4);addCollider(bx,bz+3.4,6.4,2.6,3.7,base.g);addCollider(bx-4.4,bz+3.4,1.4,2.6,.8);
+  const pk=new THREE.Group();pk.position.set(bx,.27,bz);CITY.add(pk);
   box(pk,11.6,.02,1.6,'#d9cfbd',0,0,-1.8,true);box(pk,1.6,.02,11.6,'#d9cfbd',0,0,0,true);
   cyl(pk,1.9,2.1,.55,'#c9c0b0',0,0,-1.8,20);const water=cyl(pk,1.65,1.65,.05,'#6fc3e6',0,.5,-1.8,20);water.material=new THREE.MeshLambertMaterial({color:'#6fc3e6'});
-  const spout=cyl(pk,.18,.3,1.1,'#c9c0b0',0,.5,-1.8,10);
-  addCollider(0,-1.8,4,4,1);
+  const spout=cyl(pk,.18,.3,1.1,'#c9c0b0',0,.5,-1.8,10);addCollider(bx,bz-1.8,4,4,1);
   [[-4.6,-4.6],[4.6,-4.6],[-4.6,.4],[4.6,.4]].forEach(([x,z])=>tree(x,z,1,pk));
   [[-2.4,-4.9],[2.4,-4.9]].forEach(([x,z])=>{box(pk,1.8,.1,.55,'#a0714f',x,.45,z);box(pk,.1,.45,.5,'#555',x-.8,0,z);box(pk,.1,.45,.5,'#555',x+.8,0,z);});
-  S._park={water,spout};
-  // palms & trees around town
-  [[-34.5,-12],[-34.5,12],[34.5,-12],[34.5,12],[-12,-34.5],[12,-34.5],[-12,34.5],[12,34.5],[-26,-15.4],[26,15],[-5.8,-25.8],[5.8,-14.2]].forEach(([x,z],i)=>palm(x,z,rnd(4.5,6)));
-  for(let i=0;i<70;i++){let x,z;do{x=rnd(-48,48);z=rnd(-48,48);}while(Math.max(Math.abs(x),Math.abs(z))<35.5);tree(x,z,rnd(.9,1.5));}
-  [[-26,-26],[-14,-26],[14,-26],[26,-26],[-26,-5.6],[26,-4],[-26,14],[14.2,26]].forEach(([x,z])=>tree(x,z,rnd(.75,.95)));
-  // lamps
-  blockCenters.forEach(bx=>blockCenters.forEach(bz=>{lamp(bx-5.9,bz+6,1);lamp(bx+5.9,bz-6,-1);}));
-  // street signs
-  [['中華路 × 四維路',-6.2,-13.9],['林森路 × 三多路',13.8,6.2],['中華路 × 三多路',-13.8,6.2]].forEach(([t,x,z])=>{const g=new THREE.Group();cyl(g,.07,.07,3.2,'#5c626c',0,0,0,6);
-    const s=signMesh(t,'#1f7a4d','#fff',2.8,.55,{round:6});s.position.set(0,3.1,.05);g.add(s);g.position.set(x,.25,z);scene.add(g);});
-  // parked scooters
+  S._park={water,spout,bx,bz};S.BASE={id:'BASE',short:'工務所',kind:'base',x:bx,z:bz+3.4,dx:bx,dz:bz+BLK+1.8,obj:{},b:null};}
+let paddyTex=null;
+function getPaddy(){if(paddyTex)return paddyTex;const c=cvs(128,128),g=c.getContext('2d');g.fillStyle='#9ccc65';g.fillRect(0,0,128,128);
+  for(let y=4;y<128;y+=8){g.fillStyle='rgba(60,110,40,.35)';g.fillRect(0,y,128,3);}g.fillStyle='#b99a6b';g.fillRect(0,62,128,4);g.fillRect(62,0,4,128);
+  paddyTex=ctex(c);return paddyTex;}
+function makeField(){const g=new THREE.Group();const m=new THREE.Mesh(new THREE.PlaneGeometry(11.4,11.4),new THREE.MeshLambertMaterial({map:getPaddy()}));m.rotation.x=-PI/2;m.position.y=.03;m.receiveShadow=true;g.add(m);
+  box(g,3.2,2,2.6,'#efe6d6',3,0,-3.2);const roof=box(g,3.6,.35,3,'#c0392b',3,2,-3.2);roof.rotation.x=.08;return {g,H:3};}
+function makeMountain(peak){const g=new THREE.Group();const cols=['#5d8f4e','#6f9d57','#4f7f45'];
+  const specs=peak?[[0,0,6.2,14],[-3.5,3,4,8],[3.6,2.6,3.8,7]]:[[-2,-1,5,rnd(7,10)],[3,2,4.2,rnd(6,8)],[-1.5,3.4,3.4,5]];
+  specs.forEach(([x,z,r,h],i)=>{const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,7),mat(cols[i%3]));m.position.set(x,h/2,z);m.rotation.y=rnd(0,3);m.castShadow=true;m.receiveShadow=true;g.add(m);
+    if(i===0&&(peak||h>8.5)){const cap=new THREE.Mesh(new THREE.ConeGeometry(r*.32,h*.3,7),mat('#f4f6f8'));cap.position.set(x,h*.86,z);cap.rotation.y=m.rotation.y;g.add(cap);}});
+  if(peak){const sg=signMesh('玉山 3,952m','#1f7a4d','#fff',3.4,.7,{round:6});sg.position.set(0,1.5,5.9);g.add(sg);box(g,.1,1.2,.1,'#555',-1.2,0,5.85);box(g,.1,1.2,.1,'#555',1.2,0,5.85);}
+  return {g,H:peak?14:10};}
+function makeTower(){const g=new THREE.Group();box(g,7,4,7,'#8fb3ad',0,0,0);box(g,4.2,6,4.2,'#7fa7a0',0,4,0);
+  const segM=mat('#86b0a8');for(let i=0;i<8;i++){const m=new THREE.Mesh(new THREE.CylinderGeometry(2.55,1.95,2.6,4),segM);m.rotation.y=PI/4;m.position.y=10+i*2.6+1.3;m.castShadow=true;g.add(m);}
+  box(g,2.4,2.2,2.4,'#7fa7a0',0,30.8,0);cyl(g,.35,.5,5,'#c9d3d6',0,33,0,8);return {g,H:38};}
+function makeShip(){const g=new THREE.Group();box(g,12,1.6,3.4,'#a8322d',0,-.9,0);box(g,12.4,.25,3.6,'#2d3440',0,.7,0);
+  const cc=['#3a8dde','#ff6b1a','#1fae78','#f5c518','#e5484d','#8fb3c9'];for(let i=0;i<5;i++)for(let k=0;k<2;k++)box(g,1.8,1.1,1.4,pick(cc),-4+i*2,.95+k*1.1,0,true);
+  box(g,2,2.6,3,'#f4f6f8',5,.95,0);box(g,.4,1.2,.4,'#2d3440',5.4,3.5,0);return g;}
+const HOUSE_NAMES=['林宅','王宅','張宅','黃宅','吳宅','陳宅','李宅','蔡宅','劉宅','許宅','楊宅','鄭宅','謝宅','洪宅','郭宅','曾宅','周宅','葉宅','蘇宅','莊宅','呂宅','江宅'];
+const HOUSE_COLS=[['#e8d8c2','#4f86c6','#e05a47'],['#d7e2e8','#58a07a','#f0b43a'],['#efe2cd','#c95b4a','#3f7cc4'],['#e4d1c8','#4a8fc2','#58a07a'],['#dfe3cf','#d0843b','#4f86c6'],['#ece6da','#5b8fc7','#d8342c'],['#e2dccd','#7a9e7e','#f0b43a']];
+const APT_WALLS=[['#ece4d4','#b7c7bd'],['#e3e9e6','#9fb9ad'],['#efe6dc','#c2b7a8'],['#e6e0d2','#b9b0a0'],['#dfe7ea','#a9bcc4']];
+const ROAD_NAMES=['中華路','四維路','林森路','三多路','民族路','自由路','建國路','成功路','博愛路','光華路','五福路','七賢路'];
+let cranes=[],washIds=[];
+let pads=[],ships=[],cityLabels=[];
+function buildCity(map){
+  const n=map.n;blockCenters=Array.from({length:n},(_,i)=>(i-(n-1)/2)*20);ROADS=Array.from({length:n+1},(_,i)=>(i-n/2)*20);LAYOUT=map.layout;
+  HALF=n*10+3.5;LIMIT=HALF-.5;EXT=HALF+6.5;SHOW={x:0,z:HALF+7};cranes=[];washIds=[];pads=[];ships=[];cityLabels=[];landmarks=[];lmAnim=[];lmLive=[];
+  scene.fog.near=HALF*2.5;scene.fog.far=HALF*5.4;camera.far=Math.max(400,HALF*9);camera.near=map.ocean?1:.5;camera.updateProjectionMatrix();
+  makeGround(map.ocean);
+  let hN=0,aN=0,wN=0,gN=0;const LET='ABCDEFGHIJKL';
+  const add=(id,short,kind,x,z,obj,w,d)=>{place(obj.g,x,z);const b=addCollider(x,z,w,d,obj.H,obj.g);
+    if(id)S[id]={id,short,kind,x,z,dx:x,dz:nearestBlock(z)+BLK+1.8,obj,b};return obj;};
   const pc=['#e9ecef','#d8342c','#2d3440','#8fb3c9','#f0c24b','#ffffff','#7a9e7e'];
-  const park=(x,z,rot)=>{const s=makeScooter(pick(pc),'#2a2d34',null);s.root.position.set(x,.25,z);s.root.rotation.y=rot;s.root.traverse(o=>{if(o.isMesh)o.castShadow=true;});scene.add(s.root);};
-  for(let i=0;i<5;i++)park(-6+i*.95,25.4,0);for(let i=0;i<4;i++)park(-25.6+i*.95,4.9,0);for(let i=0;i<4;i++)park(2+i*.95,25.4,0);
-  for(let i=0;i<3;i++)park(-17.8+i*.95,-14.6,PI);
-  return {hq,wash};
+  const parkRow=(x,z,cnt,rot)=>{for(let i=0;i<cnt;i++){const g=new THREE.Group();const c=pick(pc);
+      box(g,.6,.4,1.6,c,0,.25,0);box(g,.64,.9,.24,c,0,.4,.68,true);box(g,.52,.2,.74,'#2a2d34',0,.66,-.3,true);box(g,.9,.07,.07,'#2a2d34',0,1.3,.7,true);box(g,.2,.5,1.5,'#23262c',0,0,0,true);
+      g.position.set(x+i*.95,.25,z);g.rotation.y=rot||0;CITY.add(g);}};
+  const house=(x,z,w)=>{const i=hN++;const c=HOUSE_COLS[i%HOUSE_COLS.length];const o=makeHouse({w:5.4,d:7,floors:pick([3,3,4]),wall:c[0],tin:c[1],tinLine:'#ffffff',awning:c[2]});
+    if(w)o.g.scale.x=w/5.4;add('h'+(i+1),HOUSE_NAMES[i%HOUSE_NAMES.length],'house',x,z,o,w||5.4,7);};
+  map.layout.forEach((row,j)=>row.forEach((type,i)=>{const bx=blockCenters[i],bz=blockCenters[j];if(!isLandType(type))return;
+    const natural=type==='mount'||type==='peak'||type==='alishan'||type==='sunmoon'||type==='taroko';
+    if(!natural){box(CITY,13,.25,13,'#d7cfbf',bx,0,bz,true);if(type!=='field')box(CITY,11.6,.02,11.6,type==='park'||type==='podium'?'#86bf5c':'#cbc3b3',bx,.25,bz,true);}
+    else box(CITY,13,.2,13,'#7fae5c',bx,0,bz,true);
+    if(type==='apt'){const k=aN++;const [wall,rail]=APT_WALLS[k%APT_WALLS.length];add(LET[k],'社宅'+LET[k],'apt',bx,bz,makeApt({w:10,d:9,floors:ri(6,8),wall,rail,accent:'#1fae78',sign:'Homigo 社宅 '+LET[k]}),10,9);
+      if(k%2===0)parkRow(bx+2.2,bz+5.5,3,0);}
+    else if(type==='hq')add('HQ','代管中心','hq',bx,bz,makeHQ(),9.5,8);
+    else if(type==='wash'){const id=wN?'W'+(wN+1):'W';add(id,wN?'洗衣二店':'洗衣中心','wash',bx,bz,makeWash(wN?'Washgo 洗衣二店':'Washgo 洗衣中心'),10,9);washIds.push(id);wN++;}
+    else if(type==='houses'){house(bx-3.4,bz);house(bx+3.4,bz);parkRow(bx-5.6,bz+4.9,4,0);}
+    else if(type==='store'){add(null,'','deco',bx-3.6,bz,makeStore(),5.6,5);add(null,'','deco',bx+.2,bz+3.4,makeBetel(),1.5,1.5);house(bx+4,bz,5);parkRow(bx-6,bz+5.4,5,0);}
+    else if(type==='park')buildPark(bx,bz);
+    else if(type==='work'){const k=gN++;const o=add('g'+(k+1),k?'整修工地':'新建工地','work',bx,bz,makeWorksite(),9,8);cranes.push(o.jib);}
+    else if(type==='field'){place(makeField().g,bx,bz);}
+    else if(type==='mount'||type==='peak'){const o=makeMountain(type==='peak');o.g.position.set(bx,.2,bz);CITY.add(o.g);addCollider(bx,bz,11.4,11.4,o.H);
+      for(let t=0;t<3;t++)tree(bx+rnd(-5,5),bz+rnd(4.2,5.6),rnd(.8,1.1));}
+    else if(type==='tower'){add(null,'','deco',bx,bz,makeTower(),7,7);parkRow(bx-5.6,bz+5.4,4,0);addLandmark('台北101',bx,bz,38.5);}
+    else if(type==='podium'){SHOW={x:bx,z:bz};if(map.ocean){const lh=makeLighthouse();lh.g.position.set(bx+4.4,.25,bz-4);CITY.add(lh.g);addCollider(bx+4.4,bz-4,2.4,2.4,9);lmAnim.push(t=>{lh.rot.rotation.y=t*.8;});lmLive.push(lh.rot);addLandmark('鵝鑾鼻燈塔',bx+4.4,bz-4,10.5);}}
+    else if(buildLandmarkBlock(type,bx,bz,add)){}
+    if(!natural&&type!=='field'&&type!=='podium'){lamp(bx-5.9,bz+6,1);lamp(bx+5.9,bz-6,-1);}
+  }));
+  if(map.ocean){let pc=0;map.layout.forEach((row,j)=>row.forEach((t,i)=>{if(!isLandType(t)||pc>16)return;[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dz])=>{
+      if(!LAND(i+dx,j+dz)&&Math.random()<.55&&pc<=16){pc++;palm(blockCenters[i]+dx*15.5+rnd(-3,3)*Math.abs(dz),blockCenters[j]+dz*15.5+rnd(-3,3)*Math.abs(dx),rnd(4.5,6));}});}));
+    (map.labels||[]).forEach(([t,c,r])=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:labelTex(t),depthTest:false,transparent:true}));sp.scale.set(9,2.5,1);sp.renderOrder=18;
+      sp.position.set(blockCenters[c],17,blockCenters[r]);CITY.add(sp);cityLabels.push(sp);});
+    (CONFIG.regions||[]).forEach(rg=>{const cell=(map.regionCells||{})[rg.city];if(!cell)return;const bx=blockCenters[cell[0]],bz=blockCenters[cell[1]];const g=new THREE.Group();
+      box(g,.18,9,.18,'#5c626c',-3.6,0,0);box(g,.18,9,.18,'#5c626c',3.6,0,0);const sg=signMesh(`TaskGo ${rg.city}・${rg.status}`,rg.live?'#ff6b1a':'#1b2233','#fff',8.4,1.5);sg.position.set(0,9.6,.12);g.add(sg);
+      g.position.set(bx+.5,.25,bz-7.4);CITY.add(g);});
+    (map.pads||[]).forEach(([name,c,r])=>{const x=blockCenters[c]+10,z=blockCenters[r];const g=new THREE.Group();g.position.set(x,0,z);CITY.add(g);
+      cyl(g,2.3,2.4,.14,'#2d3440',0,0,0,28);const ring=new THREE.Mesh(new THREE.TorusGeometry(2.1,.12,8,40),new THREE.MeshBasicMaterial({color:'#6fd3ff'}));ring.rotation.x=PI/2;ring.position.y=.2;g.add(ring);
+      const beam=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.8,7,20,1,true),new THREE.MeshBasicMaterial({color:'#6fd3ff',map:beamTex,transparent:true,opacity:.5,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));beam.position.y=3.5;g.add(beam);
+      const lb=new THREE.Sprite(new THREE.SpriteMaterial({map:labelTex('高鐵'+name+'站'),depthTest:false,transparent:true}));lb.scale.set(4.6,1.3,1);lb.position.y=6.6;lb.renderOrder=19;g.add(lb);
+      pads.push({name,x,z,g,ring,beam});});
+    if(map.turtle){const ti=makeTurtleIsland();const tx=blockCenters[map.turtle[0]]+map.turtle[2],tz=blockCenters[map.turtle[1]]+map.turtle[3];ti.position.set(tx,-.4,tz);CITY.add(ti);addLandmark('龜山島',tx,tz,6,16);}
+    if(map.ship){const sh=makeShip();sh.position.set(blockCenters[map.ship[0]]+map.ship[2],.4,blockCenters[map.ship[1]]);sh.rotation.y=PI/2;CITY.add(sh);ships.push(sh);
+      for(let b=0;b<2;b++){const fb=new THREE.Group();box(fb,3,.8,1.2,'#f4f6f8',0,-.3,0);box(fb,1,.9,.9,'#3a8dde',-.4,.5,0);fb.position.set(blockCenters[map.ship[0]]+map.ship[2]+rnd(-6,6),.3,blockCenters[map.ship[1]]+(b?-26:24));CITY.add(fb);ships.push(fb);}}
+  }else{
+    const P=HALF+1;[[-P,-12],[-P,12],[P,-12],[P,12],[-12,-P],[12,-P],[-12,P],[12,P]].forEach(([x,z])=>palm(x,z,rnd(4.5,6)));
+    const cnt=Math.round(70*n/3);for(let i=0;i<cnt;i++){let x,z;do{x=rnd(-HALF-15,HALF+15);z=rnd(-HALF-15,HALF+15);}while(Math.max(Math.abs(x),Math.abs(z))<HALF+2||Math.hypot(x-SHOW.x,z-SHOW.z)<9);tree(x,z,rnd(.9,1.5));}
+  }
+  podium=new THREE.Group();podium.position.set(SHOW.x,map.ocean?.25:0,SHOW.z);CITY.add(podium);
+  cyl(podium,2.6,2.8,.3,'#fff8ec',0,0,0,40);const rim=new THREE.Mesh(new THREE.TorusGeometry(2.7,.07,8,48),new THREE.MeshBasicMaterial({color:'#ff6b1a'}));rim.rotation.x=PI/2;rim.position.y=.3;podium.add(rim);
+  for(let i=0;i<3;i++)box(podium,.9,.02,.2,[BR.taskgo.color,BR.homigo.color,BR.washgo.color][i],-1+i*1,.3,1.9,true);
+  const inner=ROADS.slice(1,-1),names=ROAD_NAMES.slice();for(let k=0;k<Math.min(4,inner.length*inner.length);k++){const rx=pick(inner),rz=pick(inner);if(!walkable(rx-4.2,rz-3.9)||map.ocean)continue;
+    const g=new THREE.Group();cyl(g,.07,.07,3.2,'#5c626c',0,0,0,6);const sgn=signMesh(`${names[k%names.length]} × ${names[(k+5)%names.length]}`,'#1f7a4d','#fff',2.8,.55,{round:6});sgn.position.set(0,3.1,.05);g.add(sgn);g.position.set(rx-4.2,.25,rz-3.9);CITY.add(g);}
 }
+function disposeCity(){const keep=new Set([BOX,beamTex,glowTex,alohaTex,paddyTex,lampHeadMat,...Object.values(matC)]);
+  CITY.traverse(o=>{if(o.geometry&&!o.isSprite&&!keep.has(o.geometry))o.geometry.dispose();const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];
+    ms.forEach(m=>{if(keep.has(m))return;if(m.map&&!keep.has(m.map))m.map.dispose();m.dispose();});});
+  scene.remove(CITY);CITY=new THREE.Group();scene.add(CITY);
+  colliders.length=0;buildings.length=0;traffic.length=0;lampGlows.length=0;for(const k in S)delete S[k];}
+function loopOK(i1,i2,j1,j2){for(let c=i1;c<i2;c++)if(!roadH(c,j1)||!roadH(c,j2))return false;for(let r=j1;r<j2;r++)if(!roadV(i1,r)||!roadV(i2,r))return false;return true;}
+let trafficLoops=[];
+function spawnTraffic(){const n=MAP.n;const loops=[];trafficLoops=loops;if(loopOK(0,n,0,n))loops.push(rectLoop(ROADS[0],ROADS[n],ROADS[0],ROADS[n]));
+  for(let k=0;k<200&&loops.length<n+2;k++){const i1=ri(0,n-1),i2=ri(i1+1,Math.min(n,i1+3)),j1=ri(0,n-1),j2=ri(j1+1,Math.min(n,j1+3));if(loopOK(i1,i2,j1,j2))loops.push(rectLoop(ROADS[i1],ROADS[i2],ROADS[j1],ROADS[j2]));}
+  if(!loops.length)return;const count=Math.min(n*2+1,12);for(let c=0;c<count;c++){const loop=loops[c%loops.length],ph=(c*.37)%1;let mesh=null,tilt=null,r=1.7;
+    if(c%3===2){const sc=makeScooter(pick(['#d8342c','#2d3440','#8fb3c9']),'#2a2d34',{shirt:pick(['#6a8caf','#c0504d','#3b3b3b']),vest:pick(['#e9e2d0','#34495e']),helmet:pick(['#ffffff','#e5484d','#3a8dde'])});
+      sc.root.traverse(o=>{if(o.isMesh)o.castShadow=true;});mesh=sc.root;tilt=sc.tilt;r=1;}
+    else mesh=makeCar(pick(['#f7c948','#e9ecef','#d8342c','#5b7fa6','#f7c948','#3d4a5c']),Math.random()<.35);
+    const v=addVehicle(loop,mesh,rnd(7,9),ph,r);v.tilt=tilt;}}
+let MAP=null,lmLive=[];
+function loadMap(id){const m=MAPS[id]||MAPS.s;if(MAP&&MAP.id===m.id&&CITY.children.length)return;disposeCity();MAP=m;
+  buildCity(m);makeMarkers();spawnTraffic();DUR=m.dur;MAXO=m.maxo;lampsOn=null;setDay(.2);freezeStatic();}
+// static city parts never move: compute their matrices once instead of every frame
+function freezeStatic(){CITY.updateMatrixWorld(true);CITY.traverse(o=>{o.matrixAutoUpdate=false;});
+  const live=[podium,...cranes,...traffic.map(v=>v.mesh),...Object.values(S).filter(x=>x&&x.mk).map(x=>x.mk.grp)];
+  washIds.forEach(id=>{const w=S[id];if(w){live.push(w.obj.clothes);}});live.push(...ships,...pads.map(p=>p.g));if(S.HQ)live.push(S.HQ.obj.logo);if(S._park)live.push(S._park.spout);
+  live.forEach(o=>o&&o.traverse(c=>{c.matrixAutoUpdate=true;}));lmLive.forEach(o=>o&&o.traverse(c=>{c.matrixAutoUpdate=true;}));}
 
+let podium=null;
 /* ================= markers (rings, beams, icons) ================= */
 const beamTex=(()=>{const c=cvs(4,128),g=c.getContext('2d');const gr=g.createLinearGradient(0,0,0,128);gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(1,'rgba(255,255,255,.75)');g.fillStyle=gr;g.fillRect(0,0,4,128);return ctex(c);})();
 function iconTex(type,color){const c=cvs(128,128),g=c.getContext('2d');g.fillStyle='#fff';g.beginPath();g.arc(64,64,62,0,TAU);g.fill();
@@ -801,7 +1102,7 @@ function labelTex(text){const c=cvs(256,72),g=c.getContext('2d');g.font='40px Hu
   const w=Math.min(248,g.measureText(text).width+36);g.fillStyle='rgba(27,34,51,.9)';rr(g,(256-w)/2,6,w,60,30);g.fill();
   g.fillStyle='#fff';g.textAlign='center';g.textBaseline='middle';g.fillText(text,128,38);return ctex(c);}
 function makeMarkers(){Object.values(S).forEach(s=>{if(!s.id)return;
-  const grp=new THREE.Group();grp.position.set(s.dx,0,s.dz);grp.visible=false;scene.add(grp);
+  const grp=new THREE.Group();grp.position.set(s.dx,0,s.dz);grp.visible=false;CITY.add(grp);
   const ringM=new THREE.MeshBasicMaterial({color:'#fff',transparent:true,opacity:.95,depthWrite:false});
   const ring=new THREE.Mesh(new THREE.RingGeometry(2.05,2.45,48),ringM);ring.rotation.x=-PI/2;ring.position.y=.07;grp.add(ring);
   const discM=new THREE.MeshBasicMaterial({color:'#fff',transparent:true,opacity:.18,depthWrite:false});
@@ -839,7 +1140,7 @@ const bubG=new THREE.SphereGeometry(.3,10,8);
 const traffic=[];
 function rectLoop(x0,x1,z0,z1){const i=1.75;return [[x0+i,z0+i],[x1-i,z0+i],[x1-i,z1-i],[x0+i,z1-i]];}
 function addVehicle(loop,mesh,speed,phase,r){const segs=[];let L=0;for(let i=0;i<loop.length;i++){const a=loop[i],b=loop[(i+1)%loop.length];const l=Math.hypot(b[0]-a[0],b[1]-a[1]);segs.push({a,b,l,s:L});L+=l;}
-  const v={mesh,segs,L,d:phase*L,speed,base:speed,r,x:0,z:0,h:0,honk:0};scene.add(mesh);traffic.push(v);return v;}
+  const v={mesh,segs,L,d:phase*L,speed,base:speed,r,x:0,z:0,h:0,honk:0};CITY.add(mesh);traffic.push(v);return v;}
 function updTraffic(dt){traffic.forEach(v=>{let want=v.base;const fx=Math.sin(v.h),fz=Math.cos(v.h);
     traffic.forEach(o=>{if(o===v)return;const dx=o.x-v.x,dz=o.z-v.z,ah=dx*fx+dz*fz;if(ah>0&&ah<5.5&&Math.abs(dx*fz-dz*fx)<1.6)want=Math.min(want,o.speed*.9*(ah/5.5));});
     if(state==='play'||state==='count'){const dx=player.x-v.x,dz=player.z-v.z,ah=dx*fx+dz*fz;if(ah>0&&ah<5&&Math.abs(dx*fz-dz*fx)<1.7){want=0;if(v.honk<=0&&ah<3.6&&state==='play'){AU.horn();v.honk=3;}}}
@@ -850,22 +1151,106 @@ function updTraffic(dt){traffic.forEach(v=>{let want=v.base;const fx=Math.sin(v.
 
 /* ================= player ================= */
 const player={x:-4,z:8.3,y:0,h:-PI/2,v:0,lean:0,items:[],dist:0,bumpCd:0,dustT:0};
-const PS=makeScooter('#ffffff','#ff6b1a',{shirt:'#2d3a52',vest:'#ff6b1a',helmet:'#ffcf3a'});
-PS.root.traverse(o=>{if(o.isMesh)o.castShadow=true;});scene.add(PS.root);
+
+/* ---------- cosmetics catalog ---------- */
+const BIKES=[
+  {id:'std',name:'工務小白',desc:'TaskGo 師傅的標準配備，白車配橘色腳踏墊。',body:'#ffffff',trim:'#ff6b1a',price:0},
+  {id:'retro',name:'復古奶茶',desc:'圓形大燈加後照鏡，巷口阿伯最愛的那台。',body:'#e9d8b8',trim:'#8a5a3b',seat:'#6b4a33',round:true,mirrors:true,price:120},
+  {id:'night',name:'夜市紅',desc:'停在夜市口最顯眼，朋友一眼就認出你。',body:'#d8342c',trim:'#1b2233',price:180},
+  {id:'matte',name:'消光黑',desc:'加裝風鏡，跑外環道也不怕。',body:'#2d3038',trim:'#ff6b1a',screen:true,price:260},
+  {id:'cargo',name:'收送專用車',desc:'Washgo 藍配大後箱，衣袋疊得更高。',body:'#3a8dde',trim:'#ffffff',box:'#1d4f8c',price:320},
+  {id:'ev',name:'電動小白',desc:'安靜省電，側邊燈條會發光。',body:'#eef3f7',trim:'#9fb4c4',glow:'#3ff0ff',price:420},
+  {id:'gold',name:'金色傳說',desc:'只頒給一班營收破 NT$26,000 的匠級達人。',body:'#d9a92b',trim:'#fff3c4',seat:'#5a3d10',screen:true,round:true,mirrors:true,ach:'master'}
+];
+const OUTFITS=[
+  {id:'vest',name:'工務背心',desc:'反光橘背心加黃色工地帽。',shirt:'#2d3a52',vest:'#ff6b1a',helmet:'#ffcf3a',price:0},
+  {id:'coverall',name:'藍色工作服',desc:'水電師傅的經典款，耐髒又好動。',shirt:'#2f5d9e',helmet:'#ffffff',price:100},
+  {id:'homigo',name:'Homigo 管家',desc:'綠色 Polo 衫，交屋看起來最專業。',shirt:'#1fae78',helmet:'#e8f7ef',price:150},
+  {id:'washgo',name:'Washgo 小藍',desc:'收送司機制服，配全罩安全帽。',shirt:'#3a8dde',helmet:'#1d4f8c',full:true,price:150},
+  {id:'rain',name:'機車雨衣',desc:'午後雷陣雨必備，一穿就是台灣騎士。',shirt:'#f5c518',helmet:'#ffffff',style:'rain',price:200},
+  {id:'aloha',name:'夏日花襯衫',desc:'收工直接去海產攤。',shirt:'#d8342c',pattern:true,helmet:'#1b2233',price:240},
+  {id:'boss',name:'老闆西裝',desc:'老闆也下來跑一班，累計跑完 10 班解鎖。',shirt:'#1b2233',helmet:'#1b2233',style:'suit',full:true,ach:'runs10'},
+  {id:'legend',name:'金安全帽',desc:'連單加成衝到 ×2.0 才拿得到。',shirt:'#2d3a52',vest:'#d9a92b',helmet:'#d9a92b',full:true,ach:'combo2'}
+];
+const ACH=[
+  {id:'first',name:'第一次收工',desc:'完成第一個班',coins:50,test:c=>true},
+  {id:'fullload',name:'整車送洗',desc:'一次載 3 袋以上回洗衣中心',coins:60,test:c=>c.stats.batch3>0},
+  {id:'rush',name:'急件剋星',desc:'一班完成 2 張急件',coins:80,test:c=>c.stats.rush>=2},
+  {id:'fixer',name:'報修達人',desc:'一班完成 5 件報修',coins:100,test:c=>c.stats.taskgo>=5},
+  {id:'landlord',name:'滿租',desc:'一班完成 3 戶入住',coins:100,test:c=>c.stats.homigo>=3},
+  {id:'clean',name:'零客訴',desc:'完成 6 張以上工單，而且零逾時',coins:120,test:c=>c.total>=6&&c.stats.expired===0},
+  {id:'combo2',name:'連單王',desc:'連單加成達到 ×2.0',coins:100,test:c=>c.stats.maxCombo>=2,unlock:'金安全帽'},
+  {id:'rich',name:'兩萬俱樂部',desc:'一班營收破 NT$20,000',coins:150,test:c=>c.score>=20000},
+  {id:'master',name:'匠級達人',desc:'一班營收破 NT$26,000',coins:200,test:c=>c.score>=26000,unlock:'金色傳說'},
+  {id:'streak3',name:'連續上工',desc:'連續 3 天都來跑一班',coins:100,test:c=>c.streak>=3},
+  {id:'rival',name:'下剋上',desc:'贏過朋友的挑戰分數',coins:80,test:c=>c.challenge>0&&c.score>c.challenge},
+  {id:'hsr',name:'高鐵通勤',desc:'台灣地圖一班搭 3 次高鐵',coins:100,test:c=>(c.stats.hsr||0)>=3},
+  {id:'dogs',name:'土狗的好朋友',desc:'被土狗大隊包圍一次',coins:60,test:c=>c.stats.dogsCaught>0},
+  {id:'lawful',name:'守法好市民',desc:'遇到臨檢乖乖停車受檢',coins:60,test:c=>c.stats.lawful>0},
+  {id:'snowrun',name:'雪地師傅',desc:'下雪天完成 5 張以上工單',coins:120,test:c=>c.wx==='snow'&&c.total>=5},
+  {id:'tea2',name:'手搖飲成癮',desc:'一班喝 2 杯手搖飲',coins:60,test:c=>c.stats.tea>=2},
+  {id:'tour5',name:'環島打卡王',desc:'台灣地圖一班打卡 5 個地標',coins:150,test:c=>c.stats.checkins>=5},
+  {id:'runs10',name:'老師傅',desc:'累計跑完 10 班',coins:150,test:c=>c.runs>=10,unlock:'老闆西裝'}
+];
+const DAILY=[
+  {text:'一班完成 3 件報修',coins:60,test:c=>c.stats.taskgo>=3},
+  {text:'一班完成 2 戶入住',coins:60,test:c=>c.stats.homigo>=2},
+  {text:'一班收送 4 袋衣物',coins:60,test:c=>c.stats.washgo>=4},
+  {text:'連單加成達到 ×1.5',coins:60,test:c=>c.stats.maxCombo>=1.5},
+  {text:'一班營收破 NT$12,000',coins:80,test:c=>c.score>=12000},
+  {text:'完成 1 張急件',coins:60,test:c=>c.stats.rush>=1}
+];
+const dayNum=()=>{const d=new Date();return Math.floor((d.getTime()-d.getTimezoneOffset()*60000)/86400000);};
+const dailyMission=()=>DAILY[((dayNum()%DAILY.length)+DAILY.length)%DAILY.length];
+const PKEY='jiangcheng-profile-v1';
+function newPid(){const a=new Uint8Array(12);try{crypto.getRandomValues(a);}catch(e){for(let i=0;i<12;i++)a[i]=Math.random()*256|0;}return Array.from(a,b=>(b%36).toString(36)).join('')+Date.now().toString(36);}
+function loadProf(){let d={coins:0,runs:0,owned:[],bike:'std',outfit:'vest',ach:[],streak:0,lastDay:-99,dailyDone:-99};
+  try{const s=JSON.parse(localStorage.getItem(PKEY)||'null');if(s&&typeof s==='object')d=Object.assign(d,s);}catch(e){}
+  if(!d.best)d.best={s:legacyBest()};if(!Array.isArray(d.landmarks))d.landmarks=[];if(!d.tw||typeof d.tw!=='object')d.tw={trial:0,shared:false,unlocked:false,friends:0};
+  if(!d.refCode||!/^[a-z0-9]{8,16}$/.test(d.refCode))d.refCode=newPid().slice(0,10);if(!d.map||!MAPS[d.map])d.map='s';if(!d.pid)d.pid=newPid();if(typeof d.name!=='string')d.name='';
+  if(typeof d.earned!=='number'){const spent=[...BIKES,...OUTFITS].filter(x=>d.owned.includes(x.id)).reduce((a,x)=>a+(x.price||0),0);d.earned=d.coins+spent;}
+  return d;}
+function saveProf(){try{localStorage.setItem(PKEY,JSON.stringify(prof));}catch(e){}}
+let prof=loadProf();
+function hashStr(s){let h=2166136261;for(const ch of s+'|jc'){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return (h>>>0).toString(36);}
+function progCode(){const j=JSON.stringify({lm:prof.landmarks,tw:prof.tw,rc:prof.refCode,c:prof.coins,e:prof.earned,r:prof.runs,o:prof.owned,a:prof.ach,b:prof.bike,f:prof.outfit,s:prof.streak,l:prof.lastDay,d:prof.dailyDone,bs:prof.best,n:prof.name,p:prof.pid});
+  const b=btoa(unescape(encodeURIComponent(j))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');return b+'.'+hashStr(b);}
+let imported=false,refIncoming=null;
+try{const pq=new URLSearchParams(location.search).get('p');if(pq){const [b,h]=pq.split('.');if(b&&hashStr(b)===h){
+  const d=JSON.parse(decodeURIComponent(escape(atob(b.replace(/-/g,'+').replace(/_/g,'/')))));
+  prof.coins=Math.max(prof.coins,+d.c||0);prof.runs=Math.max(prof.runs,+d.r||0);
+  prof.owned=[...new Set([...prof.owned,...(d.o||[])])];prof.ach=[...new Set([...prof.ach,...(d.a||[])])];
+  if(d.b)prof.bike=d.b;if(d.f)prof.outfit=d.f;if((+d.l||0)>=prof.lastDay){prof.lastDay=+d.l;prof.streak=+d.s||0;prof.dailyDone=Math.max(prof.dailyDone,+d.d||-99);}
+  prof.earned=Math.max(prof.earned,+d.e||0);if(d.bs)['s','m','l'].forEach(k=>{if((+d.bs[k]||0)>(prof.best[k]||0))prof.best[k]=+d.bs[k];});
+  if(d.n&&!prof.name)prof.name=String(d.n).slice(0,12);if(d.rc&&/^[a-z0-9]{8,16}$/.test(d.rc))prof.refCode=d.rc;
+  if(Array.isArray(d.lm))prof.landmarks=[...new Set([...prof.landmarks,...d.lm])];
+  if(d.tw){prof.tw.unlocked=prof.tw.unlocked||!!d.tw.unlocked;prof.tw.shared=prof.tw.shared||!!d.tw.shared;prof.tw.trial=Math.max(prof.tw.trial,+d.tw.trial||0);}if(d.p)prof.pid=String(d.p).slice(0,40);saveProf();imported=true;track('progress_import',{env:ENV.name});}
+  try{const u=new URL(location.href);u.searchParams.delete('p');history.replaceState(null,'',u.pathname+u.search);}catch(e){}}}catch(e){}
+try{const rf=new URLSearchParams(location.search).get('ref');if(rf&&/^[a-z0-9]{8,16}$/.test(rf)&&rf!==prof.refCode){refIncoming=rf;if(!prof.refBy){prof.refBy=rf;saveProf();}}}catch(e){}
+const findBike=id=>BIKES.find(x=>x.id===id)||BIKES[0],findOutfit=id=>OUTFITS.find(x=>x.id===id)||OUTFITS[0];
+const isOwned=it=>it.price===0||prof.owned.includes(it.id)||(!!it.ach&&prof.ach.includes(it.ach));
+let PS=null;
+function buildPlayer(bikeId,outfitId){const b=findBike(bikeId),o=findOutfit(outfitId);const n=makeScooter(b.body,b.trim,o,b);
+  n.root.traverse(m=>{if(m.isMesh)m.castShadow=true;});
+  if(PS){scene.remove(PS.root);player.items.forEach(it=>{PS.tilt.remove(it.m);n.tilt.add(it.m);});}
+  PS=n;scene.add(PS.root);}
+if(!isOwned(findBike(prof.bike)))prof.bike='std';if(!isOwned(findOutfit(prof.outfit)))prof.outfit='vest';
+buildPlayer(prof.bike,prof.outfit);
 const navGeo=(()=>{const sh=new THREE.Shape();sh.moveTo(0,.95);sh.lineTo(.62,-.35);sh.lineTo(0,-.05);sh.lineTo(-.62,-.35);sh.closePath();const g=new THREE.ShapeGeometry(sh);g.rotateX(-PI/2);g.rotateY(PI);return g;})();
 const navM=new THREE.MeshBasicMaterial({color:'#ff6b1a',transparent:true,opacity:.95,depthWrite:false});
 const nav=new THREE.Mesh(navGeo,navM);nav.renderOrder=5;scene.add(nav);nav.visible=false;
 const shadowBlob=new THREE.Mesh(new THREE.CircleGeometry(1,20),new THREE.MeshBasicMaterial({color:'#000',transparent:true,opacity:.18,depthWrite:false}));
 shadowBlob.rotation.x=-PI/2;scene.add(shadowBlob);
 const itemGeo={bag:new THREE.BoxGeometry(.56,.42,.46),key:new THREE.TorusGeometry(.16,.06,8,16)};
-function makeItem(type){if(type==='bag'){const g=new THREE.Group();const b=new THREE.Mesh(itemGeo.bag,mat('#3a8dde'));b.castShadow=true;g.add(b);
+function makeItem(type){if(type==='tool'){const g=new THREE.Group();box(g,.6,.34,.36,'#e5484d',0,-.17,0);box(g,.3,.08,.08,'#2d3440',0,.17,0);box(g,.06,.14,.06,'#2d3440',-.13,.1,0);box(g,.06,.14,.06,'#2d3440',.13,.1,0);return g;}
+  if(type==='bag'){const g=new THREE.Group();const b=new THREE.Mesh(itemGeo.bag,mat('#3a8dde'));b.castShadow=true;g.add(b);
     const t=new THREE.Mesh(BOX,mat('#ffffff'));t.scale.set(.58,.08,.48);t.position.y=.08;g.add(t);return g;}
   const g=new THREE.Group();const r=new THREE.Mesh(itemGeo.key,mat('#f5b800'));r.rotation.x=PI/2;g.add(r);const s=box(g,.08,.08,.42,'#f5b800',0,-.04,.34);
   const tag=box(g,.26,.04,.34,'#1fae78',.28,-.02,0);return g;}
 
 /* ================= state & HUD ================= */
 let state='loading',gt=0,DUR=90,score=0,combo=1,orders=[],oid=0,nextSpawn=0,pending=[],stats,camShake=0;
-const MAXO=4;
+let MAXO=4;
 const ISSUES=['浴室漏水','冷氣不冷','外牆防水','牆面油漆','插座跳電','磁磚裂縫','水龍頭滴水','紗窗破洞','熱水器沒熱水'];
 const NAMES=['陳小姐','林先生','黃同學','王媽媽','張大哥','吳小姐','李伯伯','蔡小姐','劉先生','許同學'];
 const unitStr=()=>`${ri(2,7)}F-${ri(1,4)}`;
@@ -880,33 +1265,39 @@ function floatText(text,x,y,z,color,cls){const el=document.createElement('div');
   floaters.push({el,x,y,z,t:0});}
 const curTarget=o=>o.targets[o.stage];
 function orderSub(o){const s=S[curTarget(o)];
-  if(o.type==='taskgo')return `${s.short}・${o.prog>0?'施工中':'前往現場'}`;
+  if(o.type==='taskgo')return curTarget(o)==='BASE'?`先回工務所拿扳手，再去${S[o.site].short}`:`${s.short}・${o.prog>0?'施工中':'前往現場'}`;
   if(o.type==='homigo')return o.stage===0?'先到代管中心拿鑰匙':`送到 ${s.short} ${o.unit}`;
-  return o.stage===0?`到 ${s.short} 收衣`:'載回洗衣中心';}
+  return o.stage===0?`到 ${s.short} 收衣`:`載回${s.short}`;}
 function renderOrders(){ordersEl.innerHTML='';orders.forEach(o=>{const el=document.createElement('div');el.className='ord card';el.style.setProperty('--c',BR[o.type].color);
-  el.innerHTML=`${chipHTML(o.type,o.type==='washgo'&&o.stage===1?'bag':o.type==='homigo'&&o.stage===1?'key':null)}<div class="tx"><b>${o.title}</b><small>${orderSub(o)}</small></div><span class="bar"><i></i></span>`;
-  ordersEl.appendChild(el);o.el=el;o.bar=el.querySelector('.bar i');o.sub=el.querySelector('small');});}
+  el.innerHTML=`${chipHTML(o.type,o.type==='washgo'&&o.stage===1?'bag':o.type==='homigo'&&o.stage===1?'key':null)}<div class="tx"><b>${o.rush?'<span class="rt">急件 ×1.8</span>':''}${o.title}</b><small>${orderSub(o)}</small></div><span class="bar"><i></i></span>`;
+  if(o.rush)el.classList.add('rush');ordersEl.appendChild(el);o.el=el;o.bar=el.querySelector('.bar i');o.sub=el.querySelector('small');});}
 const edgePool=[];
 function edgeEl(i){if(!edgePool[i]){const el=document.createElement('div');el.className='edge';el.innerHTML='<span class="ar"></span><img alt="">';edgesEl.appendChild(el);edgePool[i]={el,ar:el.firstChild,img:el.lastChild,type:null};}return edgePool[i];}
 
+const siteIds=kinds=>Object.values(S).filter(x=>x.id&&kinds.includes(x.kind)).map(x=>x.id);
+const WORK_ISSUES=['外牆防水','鷹架檢查','水電配管','磁磚鋪設','結構補強','模板驗收'];
+const nearestWash=id=>{const a=S[id];return washIds.slice().sort((p,q)=>Math.hypot(S[p].dx-a.dx,S[p].dz-a.dz)-Math.hypot(S[q].dx-a.dx,S[q].dz-a.dz))[0];};
 function spawn(type,opt){opt=opt||{};if(orders.length>=MAXO&&!opt.force)return false;
-  const o={id:++oid,type,stage:0,t0:gt,prog:0,workSnd:0};
+  const o={id:++oid,type,stage:0,t0:gt,prog:0,workSnd:0};const pre=opt.rush?'【急件・報酬 ×1.8】':'';
   if(type==='taskgo'){const busy=new Set(orders.filter(x=>x.type==='taskgo').map(x=>x.site));
-    const pool=['h1','h2','h3','h4','h5','A','B','C'].filter(s=>!busy.has(s));if(!pool.length)return false;
-    o.site=opt.site&&!busy.has(opt.site)?opt.site:pick(pool);o.issue=opt.issue||pick(ISSUES);o.title=o.issue;o.targets=[o.site];o.dur=opt.dur||34;
-    if(opt.chain)toast('homigo',`${S[o.site].short} ${opt.unit} 的${opt.name}用 LINE 報修「${o.issue}」，已自動派工給 TaskGo 師傅`);
-    else toast('taskgo',`新派工：${S[o.site].short}「${o.issue}」，地址與照片需求已傳到你的 LINE`);}
-  else if(type==='homigo'){const busy=new Set(orders.filter(x=>x.type==='homigo').map(x=>x.site));const pool=['A','B','C'].filter(s=>!busy.has(s));if(!pool.length)return false;
+    const pool=siteIds(['house','apt','work']).filter(s=>!busy.has(s));if(!pool.length)return false;
+    o.site=opt.site&&!busy.has(opt.site)?opt.site:pick(pool);o.issue=opt.issue||pick(S[o.site].kind==='work'?WORK_ISSUES:ISSUES);o.title=o.issue;o.targets=[o.site];o.dur=opt.dur||34;
+    if(opt.chain)toast('homigo',`${pre}${S[o.site].short} ${opt.unit} 的${opt.name}用 LINE 報修「${o.issue}」，已自動派工給 TaskGo 師傅`);
+    else toast('taskgo',`${pre}新派工：${S[o.site].short}「${o.issue}」，地址與照片需求已傳到你的 LINE`);}
+  else if(type==='homigo'){const busy=new Set(orders.filter(x=>x.type==='homigo').map(x=>x.site));const pool=siteIds(['apt']).filter(s=>!busy.has(s));if(!pool.length)return false;
     o.site=pick(pool);o.unit=unitStr();o.name=pick(NAMES);o.title='新房客入住';o.targets=['HQ',o.site];o.dur=40;
-    toast('homigo',`${S[o.site].short} ${o.unit} 線上簽約完成，請把鑰匙送給新房客${o.name}`);}
-  else{const busy=new Set(orders.filter(x=>x.type==='washgo').map(x=>x.site));const pool=(opt.site?[opt.site]:['h1','h2','h3','h4','h5','A','B','C']).filter(s=>!busy.has(s));if(!pool.length)return false;
-    o.site=pick(pool);o.name=pick(NAMES);o.title='收衣送洗';o.targets=[o.site,'W'];o.dur=42;
-    toast('washgo',`${S[o.site].short}的${o.name}預約到府收衣，司機請前往收件`);}
-  orders.push(o);renderOrders();AU.notify();buzz(20);return true;}
+    toast('homigo',`${pre}${S[o.site].short} ${o.unit} 線上簽約完成，請把鑰匙送給新房客${o.name}`);}
+  else{const busy=new Set(orders.filter(x=>x.type==='washgo').map(x=>x.site));const pool=(opt.site?[opt.site]:siteIds(['house','apt'])).filter(s=>!busy.has(s));if(!pool.length)return false;
+    o.site=pick(pool);o.name=pick(NAMES);o.title='收衣送洗';o.targets=[o.site,nearestWash(o.site)];o.dur=42;
+    toast('washgo',`${pre}${S[o.site].short}的${o.name}預約到府收衣，收件後送${S[o.targets[1]].short}`);}
+  o.dur=Math.round(o.dur*MAP.durMul);if(opt.rush){o.rush=true;o.dur=Math.round(o.dur*.62);}
+  orders.push(o);renderOrders();AU.notify();if(o.rush)AU.tone(1760,.12,'square',.05,null,.22);buzz(o.rush?[20,40,20]:20);return true;}
 function spawnRandom(){const active=new Set(orders.map(o=>o.type));const missing=Object.keys(BR).filter(k=>!active.has(k));
-  const t=missing.length&&Math.random()<.75?pick(missing):pick(['taskgo','taskgo','washgo','washgo','homigo']);return spawn(t)||spawn(pick(['taskgo','washgo','homigo']));}
+  const t=missing.length&&Math.random()<.75?pick(missing):pick(['taskgo','taskgo','washgo','washgo','homigo']);
+  const rush=gt>14&&!orders.some(o=>o.rush)&&Math.random()<.3;
+  return spawn(t,{rush})||spawn(pick(['taskgo','washgo','homigo']));}
 
-function reward(o,base){const rem=clamp(1-(gt-o.t0)/o.dur,0,1);const v=base*(1+.4*rem)*combo;return Math.round(v/10)*10;}
+function reward(o,base){const rem=clamp(1-(gt-o.t0)/o.dur,0,1);if(o.rush)stats.rush++;const v=base*(1+.4*rem)*combo*(o.rush?1.8:1);return Math.round(v/10)*10;}
 function addScore(v,x,z,color){score+=v;floatText('+NT$'+fmt(v),x,3.4,z,color,'big');bumpScoreUI();}
 let scoreBump=0;function bumpScoreUI(){scoreBump=1;}
 function completeFx(site,brand){const s=S[site];const c=BR[brand].color;emit(s.dx,1,s.dz,40,[c,'#ffffff','#f5b800'],{smin:2,smax:6,vmin:6,vmax:11,szmin:.14,szmax:.3});
@@ -924,15 +1315,17 @@ function processSite(id,dt){const here=orders.filter(o=>curTarget(o)===id);let c
   here.forEach(o=>{
     if(o.type==='washgo'&&o.stage===0){o.stage=1;const m=makeItem('bag');PS.tilt.add(m);player.items.push({o,m,t:0});AU.pickup();
       floatText('收件 +1 袋',S[id].dx,2.6,S[id].dz,BR.washgo.color);emit(S[id].dx,1,S[id].dz,10,['#3a8dde','#ffffff'],{vmin:3,vmax:6});changed=true;o.t0=Math.min(o.t0+6,gt);}
+    else if(o.type==='taskgo'&&id==='BASE'){o.stage=1;const m=makeItem('tool');PS.tilt.add(m);player.items.push({o,m,t:0});AU.pickup();
+      floatText('找到扳手了！',S[id].dx,2.6,S[id].dz,BR.taskgo.color);toastEv('工具到手','拿到工具箱，趕快回現場！','#ff6b1a','🧰');changed=true;}
     else if(o.type==='homigo'&&o.stage===0){o.stage=1;const m=makeItem('key');PS.tilt.add(m);player.items.push({o,m,t:0});AU.pickup();
       floatText('鑰匙到手',S[id].dx,2.6,S[id].dz,BR.homigo.color);changed=true;o.t0=Math.min(o.t0+6,gt);}
   });
   // deliveries
-  const wDel=here.filter(o=>o.type==='washgo'&&o.stage===1&&id==='W');
+  const wDel=here.filter(o=>o.type==='washgo'&&o.stage===1&&S[id].kind==='wash');const WS=S[id];
   if(wDel.length){let tot=0;wDel.forEach(o=>{tot+=reward(o,380);dropItem(o);incCombo();stats.washgo++;});
-    if(wDel.length>=3){tot+=600;floatText('整車送洗 +NT$600',S.W.dx,5.2,S.W.dz,BR.washgo.color);}
-    orders=orders.filter(o=>!wDel.includes(o));addScore(tot,S.W.dx,S.W.dz,BR.washgo.color);completeFx('W','washgo');
-    for(let i=0;i<14;i++)spawnBubble(S.W.dx+rnd(-2,2),rnd(1,3),S.W.dz+rnd(-1,1),true);
+    if(wDel.length>=3){tot+=600;stats.batch3++;floatText('整車送洗 +NT$600',WS.dx,5.2,WS.dz,BR.washgo.color);}
+    orders=orders.filter(o=>!wDel.includes(o));addScore(tot,WS.dx,WS.dz,BR.washgo.color);completeFx(id,'washgo');
+    for(let i=0;i<14;i++)spawnBubble(WS.dx+rnd(-2,2),rnd(1,3),WS.dz+rnd(-1,1),true);
     toast('washgo',`${wDel.length} 袋衣物已送達洗衣中心，顧客都收到 LINE 進度通知`,'check');changed=true;}
   const hDel=here.filter(o=>o.type==='homigo'&&o.stage===1&&id===o.site);
   hDel.forEach(o=>{const v=reward(o,1500);dropItem(o);incCombo();stats.homigo++;orders=orders.filter(x=>x!==o);addScore(v,S[id].dx,S[id].dz,BR.homigo.color);completeFx(id,'homigo');
@@ -940,9 +1333,10 @@ function processSite(id,dt){const here=orders.filter(o=>curTarget(o)===id);let c
     toast('homigo',`${o.name}入住完成，租約到期與繳租提醒已自動排程`,'check');
     if(Math.random()<.85)pending.push({at:gt+rnd(5,8),type:'taskgo',site:id,chain:true,unit:o.unit,name:o.name});changed=true;});
   // repairs
-  const rep=here.find(o=>o.type==='taskgo');
+  let rep=here.find(o=>o.type==='taskgo'&&curTarget(o)===o.site);
+  if(rep&&rep.prog===0&&maybeForgetTools(rep))rep=null;
   if(rep){rep.prog+=dt/1.8;rep.workSnd-=dt;if(rep.workSnd<=0){AU.work();rep.workSnd=.22;emit(S[id].dx+rnd(-1,1),1.2,S[id].dz-1.5,4,['#ffd23a','#ff6b1a','#ffffff'],{smin:1,smax:3,vmin:3,vmax:6,szmin:.08,szmax:.15});}
-    if(rep.prog>=1){const v=reward(rep,1200);incCombo();stats.taskgo++;orders=orders.filter(x=>x!==rep);addScore(v,S[id].dx,S[id].dz,BR.taskgo.color);completeFx(id,'taskgo');
+    if(rep.prog>=1){const v=reward(rep,1200);incCombo();stats.taskgo++;dropItem(rep);orders=orders.filter(x=>x!==rep);addScore(v,S[id].dx,S[id].dz,BR.taskgo.color);completeFx(id,'taskgo');
       flash();AU.shutter();tenantPop(id,'#6aa3d8','師傅效率好高！');
       toast('taskgo',`結案！GPS 打卡、3 張施工照片、客戶電子簽名都已存檔`,'camera');changed=true;}
     else if(rep.el&&rep.sub)rep.sub.textContent=orderSub(rep);}
@@ -958,7 +1352,7 @@ function spawnBubble(x,y,z,burst){let b=bubbles.find(b=>!b.visible);if(!b){if(bu
 
 /* ================= input ================= */
 const keys={};const joy={active:false,id:null,ox:0,oy:0,x:0,y:0};const joyEl=$('#joy'),knob=joyEl.firstChild;let moved=0;
-addEventListener('keydown',e=>{if(e.target&&/^(INPUT|TEXTAREA)$/.test(e.target.tagName))return;keys[e.code]=true;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
+addEventListener('keydown',e=>{keys[e.code]=true;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
   if((e.code==='Escape'||e.code==='KeyP')){if(state==='play')pauseGame();else if(state==='pause')resumeGame();}
   if((e.code==='Enter'||e.code==='Space')&&state==='title'&&!$('#btnStart').disabled)startGame();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
@@ -978,121 +1372,312 @@ function readInput(){let x=0,y=0;if(keys.KeyA||keys.ArrowLeft)x-=1;if(keys.KeyD|
 
 /* ================= game flow ================= */
 function resetWorld(){orders=[];pending=[];oid=0;gt=0;score=0;combo=1;camShake=0;
-  stats={taskgo:0,homigo:0,washgo:0,expired:0,maxCombo:1};
-  player.items.forEach(it=>PS.tilt.remove(it.m));player.items=[];Object.assign(player,{x:-4,z:8.3,y:0,h:-PI/2,v:0,lean:0,dist:0});clockMin=-1;secLast=-1;
+  stats={taskgo:0,homigo:0,washgo:0,expired:0,maxCombo:1,rush:0,batch3:0,hsr:0,dogsCaught:0,dogsEscaped:0,tickets:0,lawful:0,battery:0,garbage:0,tea:0,tools:0,checkins:0};
+  player.vx=player.vz=0;player.stun=0;player.boost=0;player.slipSaid=false;landmarks.forEach(l=>{l.hit=false;});
+  player.items.forEach(it=>PS.tilt.remove(it.m));player.items=[];const pk=S._park||{bx:0,bz:0};Object.assign(player,{x:pk.bx-4,z:pk.bz+8.3,y:0,h:-PI/2,v:0,lean:0,dist:0});clockMin=-1;secLast=-1;
   winLights.forEach(w=>w.g.remove(w.m));winLights.length=0;toastsEl.innerHTML='';floaters.forEach(f=>f.el.remove());floaters.length=0;
   renderOrders();AU.tempo=112;}
 function showScreen(id){['#title','#pauseScr','#over'].forEach(s=>$(s).hidden=s!==id);}
+const coinSVG='<i class="coin"></i>';
+function renderProfile(){$('#coinTitle').textContent=fmt(prof.coins);$('#coinGarage').textContent=fmt(prof.coins);
+  const today=dayNum();const active=prof.lastDay>=today-1&&prof.streak>0;
+  $('#streakTitle').textContent=active?(prof.lastDay===today?`連續上工 ${prof.streak} 天`:`連續 ${prof.streak} 天，今天也來跑`):(prof.runs?'今天還沒上工':'第一次上工');
+  const dm=dailyMission(),done=prof.dailyDone===today;const d=$('#dailyTitle');d.classList.toggle('ok',done);
+  d.innerHTML=`<span class="dl">今日任務</span><span>${dm.text}</span><em>${done?'已完成 ✓':coinSVG+'+'+dm.coins}</em>`;}
+function grantRewards(){const today=dayNum();
+  prof.runs++;if(prof.lastDay===today-1)prof.streak++;else if(prof.lastDay!==today)prof.streak=1;prof.lastDay=today;
+  const c={wx:weather.id,stats,score,total:stats.taskgo+stats.homigo+stats.washgo,challenge:challengeMap===MAP.id?challenge:0,runs:prof.runs,streak:prof.streak};
+  const lines=[];let coins=Math.floor(score/100);lines.push(['營收換算（每 NT$100 換 1 枚）',coins]);
+  if(prof.streak>=2){const b=10*Math.min(prof.streak,7);coins+=b;lines.push([`連續上工第 ${prof.streak} 天`,b]);}
+  const dm=dailyMission();if(prof.dailyDone!==today&&dm.test(c)){prof.dailyDone=today;coins+=dm.coins;lines.push([`每日任務：${dm.text}`,dm.coins]);}
+  const newAch=ACH.filter(a=>!prof.ach.includes(a.id)&&a.test(c));let achSum=0;newAch.forEach(a=>{prof.ach.push(a.id);achSum+=a.coins;track('achievement',{id:a.id});});
+  if(newAch.length){coins+=achSum;lines.push([newAch.length===1?`成就「${newAch[0].name}」`:`達成 ${newAch.length} 個新成就`,achSum]);}
+  const before=prof.earned;prof.coins+=coins;prof.earned+=coins;
+  const newMaps=['m','l'].filter(k=>before<MAPS[k].unlock&&prof.earned>=MAPS[k].unlock);saveProf();return {coins,lines,newAch,newMaps};}
+function nextUnlock(){const all=[...BIKES.map(x=>['機車',x]),...OUTFITS.map(x=>['服裝',x])].filter(([,x])=>!isOwned(x)&&x.price);
+  const can=all.filter(([,x])=>x.price<=prof.coins).sort((a,b)=>b[1].price-a[1].price)[0];if(can)return {can:true,kind:can[0],it:can[1]};
+  const nx=all.sort((a,b)=>a[1].price-b[1].price)[0];return nx?{can:false,kind:nx[0],it:nx[1]}:null;}
+function renderReward(r){const nu=nextUnlock();
+  let h=`<div class="rw-top"><i class="coin"></i><b>+${fmt(r.coins)} 匠幣</b><span>目前共 ${fmt(prof.coins)} 枚</span></div>`;
+  h+=`<ul class="rw-lines">${r.lines.map(([t,v])=>`<li>${t}<span>+${v}</span></li>`).join('')}</ul>`;
+  if(r.newMaps&&r.newMaps.length)h+=`<div class="rw-ach">${r.newMaps.map(k=>`<span style="background:var(--tg)">🗺️ 解鎖${MAPS[k].name}！</span>`).join('')}</div>`;
+  if(r.newAch.length)h+=`<div class="rw-ach">${r.newAch.map((a,i)=>`<span style="animation-delay:${.2+i*.12}s">🏅 ${a.name}${a.unlock?`・解鎖${a.unlock}`:''}</span>`).join('')}</div>`;
+  if(nu)h+=`<div class="rw-next${nu.can?' can':''}"><span>${nu.can?`匠幣夠了！可以解鎖${nu.kind}「${nu.it.name}」`:`再 ${fmt(nu.it.price-prof.coins)} 匠幣，就能解鎖${nu.kind}「${nu.it.name}」`}</span><button class="mini" data-garage="1">去車庫</button></div>`;
+  else h+=`<div class="rw-next"><span>商店的造型都收集齊了，去成就頁看看還差哪些。</span><button class="mini" data-garage="1">去車庫</button></div>`;
+  const nm=['m','l'].find(k=>prof.earned<MAPS[k].unlock);
+  if(nm)h+=`<div class="rw-next"><span>再累積 ${fmt(MAPS[nm].unlock-prof.earned)} 匠幣，就能解鎖${MAPS[nm].name}（${MAPS[nm].dur} 秒・${MAPS[nm].sub}）</span></div>`;
+  $('#reward').innerHTML=h;}
+$('#reward').addEventListener('click',e=>{if(e.target.closest('[data-garage]'))openGarage();});
+
+/* ---------- garage ---------- */
+let gTab='bike',gSel={bike:null,outfit:null},gPrev='title',gAng=0,gDrag=null;
+const swatch=(t,it)=>t==='bike'?`background:linear-gradient(135deg,${it.body} 0 58%,${it.trim} 58% 100%)`:(it.pattern?`background:radial-gradient(circle at 30% 70%,#fff3d6 0 12%,transparent 13%),radial-gradient(circle at 70% 78%,#ffd23a 0 10%,transparent 11%),linear-gradient(180deg,${it.helmet} 0 44%,${it.shirt} 44% 100%)`:`background:linear-gradient(180deg,${it.helmet} 0 44%,${it.vest||it.shirt} 44% 100%)`);
+function openGarage(){if(state==='garage'||state==='loading')return;AU.init();gPrev=state==='over'?'over':'title';state='garage';showScreen(null);$('#garage').hidden=false;
+  gSel={bike:prof.bike,outfit:prof.outfit};player.x=SHOW.x;player.z=SHOW.z;player.y=.32;player.h=.6;player.v=0;player.lean=0;
+  player.items.forEach(it=>PS.tilt.remove(it.m));player.items=[];
+  setDay(.3);applyViewOffset();renderGarage();track('garage_open',{from:gPrev});}
+function closeGarage(){if(state!=='garage')return;$('#garage').hidden=true;buildPlayer(prof.bike,prof.outfit);state=gPrev;camera.clearViewOffset();
+  if(gPrev==='over')showScreen('#over');else{showScreen('#title');renderProfile();renderMaps();setDay(.2);}
+  if(gPrev==='over'){const nu=$('#reward');if(nu&&lastReward)renderReward(lastReward);}}
+function applyViewOffset(){if(state!=='garage'){camera.clearViewOffset();return;}
+  if(vw>=900)camera.setViewOffset(vw,vh,-vw*.17,0,vw,vh);else camera.setViewOffset(vw,vh,0,vh*.24,vw,vh);}
+function renderGarage(){$('#coinGarage').textContent=fmt(prof.coins);
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===gTab));
+  const body=$('#gbody');$('#gfoot').hidden=gTab==='ach';
+  if(gTab==='ach'){const n=prof.ach.length;body.innerHTML=`<div class="achrow" style="background:transparent;padding:0 2px"><span>已達成 ${n} / ${ACH.length} 個成就</span></div>`+ACH.map(a=>{const d=prof.ach.includes(a.id);
+      return `<div class="achrow${d?' done':''}"><span class="st">${d?`<img alt="" src="${ICON.check}">`:''}</span><div><b>${a.name}</b><span>${a.desc}${a.unlock?`・解鎖「${a.unlock}」`:''}</span></div><em>${d?'已達成':coinSVG+'+'+a.coins}</em></div>`;}).join('')+
+    `<div class="syncbox"><b>地標圖鑑 ${prof.landmarks.length}/${LANDMARK_TOTAL}</b>在台灣地圖騎經地標就會自動 GPS 打卡。<div class="lmchips">${['台北101','龜山島','太魯閣','台中歌劇院','日月潭','阿里山','安平古堡','高雄愛河','鵝鑾鼻燈塔'].map(n=>`<span class="${prof.landmarks.includes(n)?'on':''}">${prof.landmarks.includes(n)?'📍':''}${n}</span>`).join('')}</div></div>`+
+    `<div class="syncbox"><b>換手機、換 App 也想保留進度？</b>從 LINE、IG 或瀏覽器打開遊戲，進度是分開存的。複製進度連結，到另一邊打開，匠幣、造型、成就都會一起帶過去。<button class="mini" id="btnSync" type="button">複製進度連結</button></div>`;return;}
+  const list=gTab==='bike'?BIKES:OUTFITS,eq=gTab==='bike'?prof.bike:prof.outfit;
+  body.innerHTML=list.map(it=>{const own=isOwned(it);const st=it.id===eq?'<small>使用中</small>':own?'<small>已擁有</small>':it.ach?`<small>🔒 成就解鎖</small>`:`<small>${coinSVG}${it.price}</small>`;
+    return `<button class="item${own?'':' lock'}${gSel[gTab]===it.id?' sel':''}" data-id="${it.id}" aria-pressed="${gSel[gTab]===it.id}">${it.id===eq?'<span class="tag">使用中</span>':''}<span class="sw" style="${swatch(gTab,it)}"></span><b>${it.name}</b>${st}</button>`;}).join('');
+  updGarageFoot();}
+function updGarageFoot(){if(gTab==='ach')return;const list=gTab==='bike'?BIKES:OUTFITS,eq=gTab==='bike'?prof.bike:prof.outfit;const it=list.find(x=>x.id===gSel[gTab])||list[0];
+  const own=isOwned(it),btn=$('#gAction');let info=`<b>${it.name}</b>${it.desc}`;btn.disabled=false;btn.dataset.act='';
+  if(it.id===eq){btn.textContent='使用中';btn.disabled=true;}
+  else if(own){btn.textContent='換上這個造型';btn.dataset.act='equip';}
+  else if(it.ach){const a=ACH.find(x=>x.id===it.ach);btn.textContent=`完成成就「${a.name}」解鎖`;btn.disabled=true;info+=`<br>條件：${a.desc}`;}
+  else if(prof.coins>=it.price){btn.textContent=`用 ${it.price} 匠幣解鎖並換上`;btn.dataset.act='buy';}
+  else{btn.textContent=`還差 ${it.price-prof.coins} 匠幣`;btn.disabled=true;info+=`<br>每跑一班，營收每 NT$100 換 1 枚匠幣。`;}
+  $('#gInfo').innerHTML=info;}
+$('#gbody').addEventListener('click',e=>{if(e.target.id==='btnSync'){syncCopy(e.target);return;}const b=e.target.closest('.item');if(!b)return;gSel[gTab]=b.dataset.id;buildPlayer(gSel.bike,gSel.outfit);
+  AU.tone(880,.06,'triangle',.08);emit(player.x,1.2,player.z,14,['#ffffff','#f5b800',BR.taskgo.color],{smin:1,smax:3,vmin:2,vmax:5,szmin:.08,szmax:.16});renderGarage();});
+document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;gTab=b.dataset.tab;renderGarage();});
+$('#gAction').addEventListener('click',()=>{const act=$('#gAction').dataset.act;const list=gTab==='bike'?BIKES:OUTFITS;const it=list.find(x=>x.id===gSel[gTab]);if(!it||!act)return;
+  if(act==='buy'){if(prof.coins<it.price)return;prof.coins-=it.price;prof.owned.push(it.id);track('item_unlock',{item:it.id,price:it.price});
+    emit(player.x,1.4,player.z,50,['#f5b800','#ffffff',BR.taskgo.color,BR.homigo.color,BR.washgo.color],{smin:2,smax:6,vmin:5,vmax:10,szmin:.12,szmax:.26});AU.done();buzz([20,40,30]);}
+  if(gTab==='bike')prof.bike=it.id;else prof.outfit=it.id;saveProf();track('item_equip',{item:it.id});if(act==='equip')AU.pickup();renderGarage();});
+$('#btnGarage').addEventListener('click',openGarage);$('#btnCloseGarage').addEventListener('click',closeGarage);
+addEventListener('keydown',e=>{if(e.code==='Escape'&&state==='garage')closeGarage();});
+canvas.addEventListener('pointerdown',e=>{if(state!=='garage')return;gDrag={x:e.clientX,h:player.h};try{canvas.setPointerCapture(e.pointerId);}catch(_){}});
+canvas.addEventListener('pointermove',e=>{if(state==='garage'&&gDrag)player.h=gDrag.h+(e.clientX-gDrag.x)*.012;});
+const endG=()=>{gDrag=null;};canvas.addEventListener('pointerup',endG);canvas.addEventListener('pointercancel',endG);
+let lastReward=null;
+/* ---------- map selector ---------- */
+const isMapOpen=id=>id==='t'?(prof.tw.unlocked||prof.tw.trial>0||challengeMap==='t'):(prof.earned>=MAPS[id].unlock||id===challengeMap);
+function renderMaps(){const cols=[BR.taskgo.color,BR.homigo.color,BR.washgo.color];
+  $('#maps').innerHTML=['s','m','l'].map(id=>{const m=MAPS[id],open=isMapOpen(id),own=prof.earned>=m.unlock,best=getBest(id),on=MAP&&MAP.id===id;
+    const mg=`<span class="mg" style="grid-template-columns:repeat(${m.n},1fr)">${Array.from({length:m.n*m.n},(_,k)=>`<i style="--c:${cols[k%3]}"></i>`).join('')}</span>`;
+    const info=own?`<small>${best?'最佳 NT$'+fmt(best):'還沒跑過'}</small>`:open?'<small>朋友的挑戰</small>':`<small>累積 ${m.unlock} 匠幣解鎖</small><span class="pb"><i style="width:${Math.min(100,prof.earned/m.unlock*100)}%"></i></span>`;
+    return `<button class="mapc${on?' on':''}${open?'':' lock'}" data-id="${id}" role="radio" aria-checked="${on}">${!own&&open?'<span class="pass">挑戰通行</span>':''}${mg}<b>${m.name}</b><span>${m.dur} 秒・${m.sub}</span>${info}</button>`;}).join('')+twCard();
+  showBest();}
+function twIcon(){const T=MAPS.t;return T.layout.map(r=>r.map(c=>`<i style="--c:${c==='.'?'transparent':c==='mount'||c==='peak'?'#6f9d57':'#ff6b1a'}"></i>`).join('')).join('');}
+function twCard(){const tw=prof.tw,on=MAP&&MAP.id==='t',best=getBest('t');let sub,btn;
+  if(tw.unlocked){sub=`180 秒・全台三大城區・${best?'最佳 NT$'+fmt(best):'還沒跑過'}`;btn=on?'':'<button class="mini" data-act="play" type="button">騎向全台</button>';}
+  else if(challengeMap==='t'){sub='朋友在台灣地圖向你挑戰，這次可以直接玩';btn=on?'':'<button class="mini" data-act="play" type="button">接受挑戰</button>';}
+  else if(tw.trial>0){sub=`送你 ${tw.trial} 次體驗・朋友從你的連結玩完一班就永久解鎖`;btn=on?'<button class="mini alt" data-act="invite" type="button">邀朋友</button>':'<button class="mini" data-act="play" type="button">體驗一次</button>';}
+  else{sub=tw.shared?`等朋友從你的連結玩完一班（${tw.friends||0}/1）就永久解鎖`:'分享給朋友就能體驗，朋友來玩就永久解鎖';btn='<button class="mini" data-act="invite" type="button">分享解鎖</button>';}
+  return `<div class="twc${on?' on':''}"><span class="mg" style="grid-template-columns:repeat(9,1fr)">${twIcon()}</span><div class="tx"><b>台灣地圖<em>隱藏版</em></b><span>${sub}</span></div>${btn}</div>`;}
+const inviteLink=()=>`${SHARE_URL}?ref=${prof.refCode}`;
+const inviteText='我在玩《匠城出任務》，騎機車接 LINE 派工跑遍全城，一班 90 秒，來比比看誰賺得多！';
+function openInvite(){AU.init();$('#invIcon').innerHTML=twIcon();$('#invIcon').style.gridTemplateColumns='repeat(9,1fr)';
+  const l=inviteLink();$('#invLink').value=inviteText+' '+l;
+  $('#inThreads').href='https://www.threads.net/intent/post?text='+encodeURIComponent(inviteText+' '+l);
+  $('#inFb').href='https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(l);
+  $('#inLine').href=isTouch||ENV.line?'https://line.me/R/share?text='+encodeURIComponent(inviteText+'\n'+l):'https://social-plugins.line.me/lineit/share?url='+encodeURIComponent(l)+'&text='+encodeURIComponent(inviteText);
+  updInviteSteps();$('#invDone').textContent='';$('#invite').hidden=false;track('invite_open',{env:ENV.name});checkReferral(true);}
+function updInviteSteps(){$('#invS1').classList.toggle('ok',!!prof.tw.shared);$('#invS2').classList.toggle('ok',!!prof.tw.unlocked);$('#invCount').textContent=Math.min(1,prof.tw.friends||0);}
+function grantTrial(silent){if(prof.tw.unlocked)return false;let gave=false;
+  if(!prof.tw.shared||apiOK===false){if(prof.tw.trial<1){prof.tw.trial=1;gave=true;}}
+  prof.tw.shared=true;saveProf();updInviteSteps();if(state==='title')renderMaps();
+  if(!silent)$('#invDone').textContent=gave?'送你 1 次台灣地圖體驗！回到標題就能選。朋友從你的連結玩完一班，就會永久解鎖。':'已分享。朋友從你的連結玩完一班，台灣地圖就會永久解鎖。';
+  track('invite_share',{gave,env:ENV.name});return gave;}
+$('#invite').querySelector('.socials').addEventListener('click',e=>{const a=e.target.closest('.soc');if(!a)return;
+  if(a.id==='inCopy'){const t=$('#invLink').value;const ok=()=>{grantTrial(false);$('#invDone').textContent+=' 連結已複製。';};
+    const fb=()=>{const i=$('#invLink');i.focus();i.select();try{document.execCommand('copy');}catch(_){}ok();};
+    try{navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t).then(ok,fb):fb();}catch(_){fb();}return;}
+  grantTrial(false);});
+$('#btnCloseInvite').addEventListener('click',()=>{$('#invite').hidden=true;if(state==='title')renderMaps();});
+$('#invite').addEventListener('click',e=>{if(e.target.id==='invite'){$('#invite').hidden=true;if(state==='title')renderMaps();}});
+let refChecked=0;
+async function checkReferral(force){if(prof.tw.unlocked||!prof.tw.shared)return;if(!force&&Date.now()-refChecked<30000)return;refChecked=Date.now();
+  await checkApi();if(!apiOK)return;
+  try{const j=await apiFetch(`/referral?code=${encodeURIComponent(prof.refCode)}`);prof.tw.friends=j.count||0;
+    if(prof.tw.friends>=1){prof.tw.unlocked=true;saveProf();track('taiwan_unlock',{env:ENV.name});updInviteSteps();if(state==='title'){renderMaps();
+      const c=$('#challenge');c.hidden=false;c.innerHTML='🎉 有朋友從你的連結來玩了！<b>台灣地圖</b>永久解鎖。';}AU.done();}
+    else saveProf();}catch(e){}}
+async function reportReferral(){if(!prof.refBy||prof.refSent||prof.refBy===prof.refCode)return;await checkApi();if(!apiOK)return;
+  try{await apiFetch('/referral',{method:'POST',body:JSON.stringify({code:prof.refBy,pid:prof.pid,env:ENV.name})});prof.refSent=true;saveProf();track('referral_done',{});}catch(e){}}
+$('#maps').addEventListener('click',e=>{if(state!=='title')return;const act=e.target.closest('[data-act]');
+  if(act&&act.dataset.act==='invite'){openInvite();return;}
+  if(act&&act.dataset.act==='play'){const bt=$('#btnStart');bt.disabled=true;bt.textContent='載入台灣地圖中…';$('#mapHint').textContent='';
+    if(prof.tw.unlocked){prof.map='t';saveProf();}setTimeout(()=>{loadMap('t');renderMaps();bt.disabled=false;bt.textContent='開始上工';track('map_select',{map:'t'});},40);return;}
+  const b=e.target.closest('.mapc');if(!b)return;const id=b.dataset.id;const m=MAPS[id];
+  if(!isMapOpen(id)){b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');AU.init();AU.bump();
+    $('#mapHint').textContent=`累積獲得 ${m.unlock} 匠幣就能解鎖${m.name}，目前累積 ${fmt(prof.earned)} 枚。`;return;}
+  $('#mapHint').textContent='';if(MAP.id===id)return;if(prof.earned>=m.unlock){prof.map=id;saveProf();}
+  const bt=$('#btnStart');bt.disabled=true;bt.textContent='載入地圖中…';
+  setTimeout(()=>{loadMap(id);renderMaps();bt.disabled=false;bt.textContent='開始上工';track('map_select',{map:id});},40);});
+
+/* ---------- online leaderboard (Cloudflare Functions) ---------- */
+const API=CONFIG.api||'/api/public/game';let apiOK=null,apiCheck=null,season=null;
+async function apiFetch(path,opt){const c=new AbortController();const t=setTimeout(()=>c.abort(),6000);
+  try{const r=await fetch(API+path,Object.assign({signal:c.signal,headers:{'Content-Type':'application/json'}},opt||{}));
+    const ct=r.headers.get('content-type')||'';if(!ct.includes('json'))throw new Error('no-api');const j=await r.json();if(!r.ok)throw new Error(j&&j.error||'error');return j;}
+  finally{clearTimeout(t);}}
+function checkApi(){if(!apiCheck)apiCheck=apiFetch('/season').then(d=>{apiOK=true;season=d.season||null;renderPrize();},()=>{apiOK=false;});return apiCheck;}
+function renderPrize(){const el=$('#prizeLine');if(!season){el.hidden=true;return;}el.hidden=false;
+  el.innerHTML=`🏆 ${escapeHtml(season.name)}：${MAPS[season.prizeMap].name}前 ${season.topN} 名得獎${season.prize?'・'+escapeHtml(season.prize.split('\n')[0]):''}　<a href="/legal/game-rules/" target="_blank" rel="noopener">活動辦法</a>`;}
+/* ---- run：開局憑證、每 10 秒心跳（正在上工人數）---- */
+const DEVICE_KEY='jiangcheng-device-v1';
+function deviceId(){try{let d=localStorage.getItem(DEVICE_KEY);if(!d){d=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,12));localStorage.setItem(DEVICE_KEY,d);}return d;}catch(e){return null;}}
+let run=null,runEnded=false,pingTimer=0,submitted=false;
+function ping(ended){if(!run||runEnded)return;if(ended){runEnded=true;clearInterval(pingTimer);}
+  const body=JSON.stringify({runId:run.runId,token:run.token,score:Math.max(0,Math.round(score)),ended:!!ended});
+  if(ended&&navigator.sendBeacon){navigator.sendBeacon(API+'/heartbeat',body);return;}
+  fetch(API+'/heartbeat',{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true}).catch(()=>{});}
+function beginRun(){if(run&&!runEnded)ping(true);run=null;runEnded=false;submitted=false;clearInterval(pingTimer);if(!CONFIG.api)return;const mapId=MAP.id;
+  fetch(API+'/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceId:deviceId(),nickname:prof.name||'',map:mapId})})
+    .then(r=>r.ok?r.json():null).then(d=>{if(d&&d.runId&&MAP.id===mapId){run=d;pingTimer=setInterval(()=>{if(state==='play')ping(false);},10000);}}).catch(()=>{});}
+addEventListener('pagehide',()=>{if(state==='play'||state==='pause'||state==='count')ping(true);});
+/* ---- 正在上工、累計遊玩、最常上工 ---- */
+let engage=null,engageAt=0;
+const fmtSec=s=>s<60?s+' 秒':Math.floor(s/60)+' 分 '+(s%60)+' 秒';
+async function loadStats(){if(!CONFIG.api)return;try{engage=await apiFetch('/stats');engageAt=Date.now();renderLive();}catch(e){}}
+function renderLive(){if(!engage)return;const d=engage;$('#liveBar').hidden=false;$('#liveTxt').textContent='正在上工 '+fmt(d.live.count)+' 人';
+  $('#liveTotals').textContent=`累計 ${fmt(d.totals.plays)} 局・${fmt(d.totals.players)} 位師傅`;
+  if(!$('#board').hidden&&(boardPeriod==='live'||boardPeriod==='loyal'))renderSocial();}
+function renderSocial(){const d=engage,body=$('#boardBody');if(!d){body.innerHTML='<div class="lbnote">統計暫時讀不到，稍後再試。</div>';return;}
+  let h=`<div class="lbstats"><div><b>${fmt(d.totals.plays)}</b><small>累計遊玩（局）</small></div><div><b>${fmt(d.totals.minutes)}</b><small>累計上工（分鐘）</small></div><div><b>${fmt(d.totals.players)}</b><small>玩家人數</small></div></div>`;
+  if(boardPeriod==='live'){const L=d.live.players||[];
+    h+=L.length?L.map((p,i)=>`<div class="lb"><span class="no">${i+1}</span><div class="nm">${escapeHtml(p.name)}<span>已上工 ${fmtSec(p.seconds)}</span></div><span class="sc">NT$${fmt(p.score)}</span></div>`).join('')+(d.live.count>L.length?`<div class="lbnote">還有 ${d.live.count-L.length} 位師傅在跑單</div>`:'')
+      :'<div class="lbnote">現在沒有人在跑單，趁機搶頭香。</div>';}
+  else{const T=d.topPlayers||[];
+    h+=T.length?T.map((p,i)=>`<div class="lb"><span class="no">${i+1}</span><div class="nm">${escapeHtml(p.nickname)}<span>${escapeHtml(p.phoneMasked)}・${fmt(p.minutes)} 分鐘</span></div><span class="sc">${fmt(p.plays)} 局</span></div>`).join('')
+      :'<div class="lbnote">還沒有常客，玩完送出成績就會出現在這裡。</div>';}
+  body.innerHTML=h;}
+setInterval(()=>{if((state==='title'||state==='over')&&!document.hidden)loadStats();},15000);
+/* ---- 上榜聯絡資料（暱稱＋手機），沿用舊版存在同一個 profile 的欄位 ---- */
+if(prof.nickname&&!prof.name){prof.name=String(prof.nickname).slice(0,12);saveProf();}
+const maskPhone=p=>p.slice(0,4)+'***'+p.slice(-3);
+const hasContact=()=>!!(prof.name&&/^09\d{8}$/.test(prof.phone||''));
+/* ---- 排行榜：地圖 × 本季／總榜，另有正在上工、最常上工 ---- */
+let boardMap='s',boardPeriod='season',boardFrom=null;
+function openBoard(p){AU.init();boardFrom=['#title','#over'].find(x=>!$(x).hidden)||null;if(boardFrom)$(boardFrom).hidden=true;$('#board').hidden=false;
+  boardMap=MAP.id;if(typeof p==='string')boardPeriod=p;else if(boardPeriod==='live'||boardPeriod==='loyal')boardPeriod='season';renderBoard();track('board_open',{map:boardMap});}
+function closeBoard(){$('#board').hidden=true;if(boardFrom)$(boardFrom).hidden=false;}
+async function renderBoard(){const social=boardPeriod==='live'||boardPeriod==='loyal';
+  $('#boardTitle').textContent=social?(boardPeriod==='live'?'正在上工':'最常上工'):MAPS[boardMap].name;$('#boardMaps').hidden=social;
+  document.querySelectorAll('#boardMaps button').forEach(b=>b.classList.toggle('on',b.dataset.m===boardMap));
+  document.querySelectorAll('#boardPeriod button').forEach(b=>b.classList.toggle('on',b.dataset.p===boardPeriod));
+  const body=$('#boardBody');body.innerHTML='<div class="lbnote">讀取中…</div>';await checkApi();
+  if(apiOK&&social){if(!engage||Date.now()-engageAt>10000)await loadStats();renderSocial();return;}
+  if(!apiOK){body.innerHTML=`<div class="lbnote">線上排行榜會在正式網站開放。下面是你在這支手機上的最佳紀錄：</div>`+['s','m','l','t'].filter(k=>k!=='t'||isMapOpen('t')).map(k=>`<div class="lb"><span class="no">${k==='t'?'台':MAPS[k].n}</span><div class="nm">${MAPS[k].name}<span>${MAPS[k].dur} 秒・${MAPS[k].sub}</span></div><span class="sc">${getBest(k)?'NT$'+fmt(getBest(k)):'—'}</span></div>`).join('');return;}
+  const want=boardMap+boardPeriod;
+  try{const j=await apiFetch(`/leaderboard?map=${boardMap}&limit=50${boardPeriod==='all'?'&scope=all':''}`);if(want!==boardMap+boardPeriod)return;
+    const s=j.season;let h='';
+    if(boardPeriod==='season'&&j.scope!=='season')h+='<div class="lbnote">目前沒有進行中的賽季，下面是總榜。</div>';
+    if(s&&j.scope==='season')h+=s.prizeMap===boardMap
+      ?`<div class="lbprize">🏆 ${escapeHtml(s.name)}・前 ${s.topN} 名得獎${s.prize?'\n'+escapeHtml(s.prize):''}\n活動至 ${new Date(s.endsAt).toLocaleString('zh-TW',{hour12:false})}</div>`
+      :`<div class="lbnote">「${escapeHtml(s.name)}」獎品只看<b>${MAPS[s.prizeMap].name}</b>，這張地圖的名次不計獎。</div>`;
+    const mine=hasContact()?[prof.name,maskPhone(prof.phone)]:null;const rows=j.entries||[];
+    h+=rows.length?rows.map(r=>{const me=!!mine&&r.nickname===mine[0]&&r.phoneMasked===mine[1];
+        return `<div class="lb${me?' me':''}"><span class="no">${r.rank}</span><div class="nm">${escapeHtml(r.nickname)}${me?'（你）':''}<span>${escapeHtml(r.phoneMasked)}</span></div><span class="sc">NT$${fmt(r.score)}</span></div>`;}).join('')
+      :`<div class="lbnote">${j.scope==='season'?'這一季':'目前'}還沒有人上榜，跑一班就能搶第一。</div>`;
+    h+='<div class="lbnote"><a href="/legal/game-rules/" target="_blank" rel="noopener">活動辦法與領獎方式</a></div>';
+    body.innerHTML=h;}
+  catch(e){body.innerHTML='<div class="lbnote">排行榜暫時讀不到，稍後再試。</div>';}}
+function escapeHtml(t){return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+$('#btnBoard').addEventListener('click',openBoard);$('#btnBoard2').addEventListener('click',openBoard);$('#btnCloseBoard').addEventListener('click',closeBoard);
+$('#boardMaps').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;boardMap=b.dataset.m;renderBoard();});
+$('#boardPeriod').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;boardPeriod=b.dataset.p;renderBoard();});
+addEventListener('keydown',e=>{if(e.code==='Escape'&&!$('#board').hidden)closeBoard();});
+addEventListener('keydown',e=>{if(e.code==='Escape'&&!$('#invite').hidden){$('#invite').hidden=true;if(state==='title')renderMaps();}});
+function sbMsg(t,cls){const m=$('#sbMsg');m.textContent=t;m.className='sb-msg'+(cls?' '+cls:'');}
+function renderContact(){const has=hasContact();$('#sbSaved').hidden=!has;$('#sbRow').hidden=has;$('#sbCk').hidden=has;
+  if(has){$('#sbSaved').innerHTML=`以「${escapeHtml(prof.name)}」${maskPhone(prof.phone)} 送出${submitted?'':'<button type="button" id="sbEdit">改資料</button>'}`;
+    const ed=$('#sbEdit');if(ed)ed.addEventListener('click',()=>{$('#nick').value=prof.name;$('#phone').value=prof.phone;$('#consent').checked=false;prof.phone='';saveProf();renderContact();});}
+  else if(!$('#nick').value)$('#nick').value=prof.name||'';}
+async function setupSubmit(){const box=$('#submitBox');await checkApi();if(!apiOK||state!=='over'||score<=0){box.hidden=true;return;}
+  box.hidden=false;$('#sbTitle').textContent=`登上${MAP.name}排行榜`;renderContact();
+  const b=$('#btnSubmit');b.disabled=!run||submitted;b.textContent=submitted?'已送出':'送出成績';
+  if(!run)sbMsg('這一局沒連上記分伺服器，下一局再試試。','err');
+  else if(season&&season.prizeMap!==MAP.id)sbMsg(`「${season.name}」獎品只看${MAPS[season.prizeMap].name}，這張地圖的成績會記在${MAP.name}榜。`);
+  else sbMsg('');}
+function scoreStats(){return {taskgo:stats.taskgo,homigo:stats.homigo,washgo:stats.washgo,expired:stats.expired,maxCombo:stats.maxCombo,rush:stats.rush,batch3:stats.batch3,
+  tickets:stats.tickets,lawful:stats.lawful,garbage:stats.garbage,checkins:stats.checkins};}
+async function submitScore(){if(submitted||!run)return;let name=prof.name,phone=prof.phone;
+  if(!hasContact()){name=($('#nick').value||'').replace(/\s+/g,' ').trim();phone=($('#phone').value||'').replace(/[\s-]/g,'');
+    if(!name||[...name].length>12){sbMsg('暱稱請填 1–12 個字','err');return;}
+    if(!/^09\d{8}$/.test(phone)){sbMsg('手機請填 09 開頭 10 碼','err');return;}
+    if(!$('#consent').checked){sbMsg('請勾選同意個資使用說明','err');return;}}
+  const b=$('#btnSubmit');b.disabled=true;b.textContent='送出中…';sbMsg('');
+  try{const j=await apiFetch('/submit',{method:'POST',body:JSON.stringify({runId:run.runId,token:run.token,score:Math.round(score),stats:scoreStats(),nickname:name,phone,consent:true})});
+    submitted=true;prof.name=name;prof.nickname=name;prof.phone=phone;saveProf();renderContact();b.textContent='已送出';
+    const where=j.season&&j.isPrizeMap?`「${j.season.name}」`:j.season?`本季${MAP.name}榜`:`${MAP.name}總榜`;
+    sbMsg(j.rank?(j.isBest?`上榜了！${where}第 ${j.rank} 名（共 ${j.total} 位師傅）。`:`已記錄。你在${where}的最佳是 NT$${fmt(j.best)}，目前第 ${j.rank} 名。`):'已記錄成績。','ok');
+    track('score_submit',{map:MAP.id,score,rank:j.rank||0});}
+  catch(e){b.disabled=false;b.textContent='送出成績';sbMsg(e&&e.message&&e.message!=='no-api'&&e.name!=='AbortError'?e.message:'送出失敗，請檢查網路後再試一次。','err');}}
+$('#btnSubmit').addEventListener('click',submitScore);
+$('#phone').addEventListener('keydown',e=>{if(e.key==='Enter')submitScore();});
+$('#btnLive').addEventListener('click',()=>openBoard('live'));
+checkApi();loadStats();
+function syncCopy(btn){const link=`${SHARE_URL}?p=${progCode()}`;track('progress_export',{env:ENV.name});
+  const box=btn.parentElement;let inp=box.querySelector('input');if(!inp){inp=document.createElement('input');inp.readOnly=true;inp.setAttribute('aria-label','進度連結');box.appendChild(inp);}inp.value=link;
+  const ok=()=>{btn.textContent='已複製，到另一邊貼上打開';};const fb=()=>{inp.focus();inp.select();try{if(document.execCommand('copy')){ok();return;}}catch(e){}btn.textContent='請長按下方連結複製';};
+  try{navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(link).then(ok,fb):fb();}catch(e){fb();}}
+/* ---------- adaptive quality for slower phones ---------- */
+const perf={t0:0,f:0,done:false};
+function perfTick(now){if(state!=='play'||perf.done)return;if(!perf.t0){perf.t0=now;perf.f=0;return;}perf.f++;const el=(now-perf.t0)/1000;
+  if(el>3.5){perf.done=true;const fps=perf.f/el;if(fps<42){renderer.setPixelRatio(1);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}sun.shadow.mapSize.set(1024,1024);
+      if(fps<28){sun.shadow.mapSize.set(512,512);}resize();track('quality_low',{fps:Math.round(fps),env:ENV.name});}}}
 let countT=0,countLast=-1;
-function startGame(){if(state==='count'||state==='play'||state==='loading')return;AU.init();resetWorld();showScreen(null);$('#hud').hidden=false;$('#hint').style.opacity=1;
-  track('game_start',{challenge:challenge||0});beginRun();
+function startGame(){if(state==='count'||state==='play'||state==='loading'||state==='garage'||$('#btnStart').disabled&&state==='title')return;
+  if(MAP.id==='t'&&!prof.tw.unlocked&&challengeMap!=='t'){if(prof.tw.trial>0){prof.tw.trial--;saveProf();}else{toTitle();openInvite();return;}}$('#board').hidden=true;$('#submitBox').hidden=true;AU.init();resetWorld();showScreen(null);$('#hud').hidden=false;$('#hint').style.opacity=1;
+  weather=pickWeather();resetEvents();setupWeatherFx();showWeatherCard();
+  track('game_start',{challenge:challenge||0,env:ENV.name,map:MAP.id,weather:weather.id});beginRun();perf.t0=0;perf.f=0;
   $('#hint').textContent=isTouch?'按住畫面任意處拖曳，騎向發光的任務點':'用 WASD 或方向鍵，騎向發光的任務點';moved=0;
   state='count';countT=3.8;countLast=-1;$('#count').hidden=false;canvas.focus({preventScroll:true});}
-function beginPlay(){state='play';setTimeout(()=>{$('#count').hidden=true;},650);AU.startMusic();
-  spawn('taskgo',{site:'h2',issue:'浴室漏水',force:true,dur:40});
-  setTimeout(()=>{if(state==='play'&&gt<3)spawn('washgo',{site:'h1'});},1400);
+function beginPlay(){state='play';setTimeout(()=>{$('#count').hidden=true;},650);setTimeout(()=>{$('#wxCard').hidden=true;},2200);AU.startMusic();AU.ambient(weather.id);
+  if(weather.id==='snow')captureMoment(MAP.ocean?'全台下雪了？！師傅照樣上工':'高雄下雪了？！我還在送洗衣','snow',6000);
+  if(weather.id==='rain'&&prof.outfit!=='rain')captureMoment('下大雨沒穿雨衣，全身濕透照樣送件','rain',9000);
+  const near=siteIds(['house']).sort((a,b)=>Math.hypot(S[a].dx-player.x,S[a].dz-player.z)-Math.hypot(S[b].dx-player.x,S[b].dz-player.z));
+  spawn('taskgo',{site:near[0],issue:'浴室漏水',force:true,dur:40});
+  setTimeout(()=>{if(state==='play'&&gt<3)spawn('washgo',{site:near[1]||near[0]});},1400);
   pending.push({at:9,type:'homigo'});nextSpawn=16;}
-function pauseGame(){if(state!=='play')return;state='pause';AU.stopMusic();joy.active=false;joyEl.hidden=true;showScreen('#pauseScr');}
-function resumeGame(){if(state!=='pause')return;AU.init();state='play';showScreen(null);AU.startMusic();}
-function toTitle(){ping(true);state='title';$('#hud').hidden=true;showScreen('#title');showBest();loadBoard();loadStats();AU.stopMusic();orders=[];renderOrders();clearEdges();$('#work').hidden=true;nav.visible=false;setDay(.2);}
+function pauseGame(){if(state!=='play')return;state='pause';AU.stopMusic();AU.stopAmbient();joy.active=false;joyEl.hidden=true;showScreen('#pauseScr');}
+function resumeGame(){if(state!=='pause')return;AU.init();state='play';showScreen(null);AU.startMusic();AU.ambient(weather.id);}
+function toTitle(){ping(true);state='title';$('#hud').hidden=true;clearWeatherFx();resetEvents();resetFog();AU.stopAmbient();weather=WX.sun;$('#wxCard').hidden=true;showScreen('#title');if(!isMapOpen(MAP.id)&&!(MAP.id==='t'&&prof.tw.trial>0)){loadMap(isMapOpen(prof.map)?prof.map:'s');}renderMaps();renderProfile();checkReferral(false);AU.stopMusic();orders=[];renderOrders();clearEdges();$('#work').hidden=true;nav.visible=false;setDay(.2);}
 function clearEdges(){edgePool.forEach(e=>e.el.style.display='none');}
 const RANKS=[[0,'見習師傅','LINE 通知還不太熟，下一班會更順。'],[9000,'熟手師傅','路線抓得不錯，客戶開始指名找你。'],[17000,'資深職人','報修、收送、交屋一把抓，代管公司搶著合作。'],[26000,'匠級達人','整座城的工單都靠你撐住了。']];
 let lastShot=null,lastRank='';
 function snap(){try{renderer.render(scene,camera);return canvas.toDataURL('image/jpeg',.9);}catch(e){return null;}}
-function endGame(){state='over';AU.stopMusic();AU.done();joy.active=false;joyEl.hidden=true;$('#work').hidden=true;nav.visible=false;clearEdges();
+function endGame(){state='over';AU.stopMusic();AU.stopAmbient();AU.done();ev.check=null;if(ev.truck)removeTruck();joy.active=false;joyEl.hidden=true;$('#work').hidden=true;nav.visible=false;clearEdges();
   orders=[];renderOrders();updMarkers(0);lastShot=snap();$('#hud').hidden=true;
+  $('#overMap').textContent=`18:00 收工・${MAP.name}`;
   const best=getBest(),isNew=score>best;if(isNew)setBest(score);
-  const rk=RANKS.filter(r=>score>=r[0]).pop();$('#rankName').textContent=rk[1];lastRank=rk[1];
-  $('#rankNote').textContent=challenge?(score>challenge?`你贏過朋友的 NT$ ${fmt(challenge)} 了！把成績傳回去嗆一下。`:`離朋友的 NT$ ${fmt(challenge)} 還差 NT$ ${fmt(challenge-score)}，再跑一班追上去。`):rk[2];
-  track('game_end',{score,rank:rk[1],taskgo:stats.taskgo,homigo:stats.homigo,washgo:stats.washgo});$('#newBest').hidden=!isNew;
+  const RK=RANKS.map((r,i)=>[MAP.ranks[i],r[1],r[2]]);
+  const rk=RK.filter(r=>score>=r[0]).pop();$('#rankName').textContent=rk[1];lastRank=rk[1];
+  const nr=RK.find(r=>r[0]>score);
+  const vsFriend=challenge&&challengeMap===MAP.id;
+  $('#rankNote').textContent=vsFriend?(score>challenge?`你贏過朋友的 NT$ ${fmt(challenge)} 了！把成績傳回去嗆一下。`:`離朋友的 NT$ ${fmt(challenge)} 還差 NT$ ${fmt(challenge-score)}，再跑一班追上去。`):(nr?`${rk[2]}再 NT$ ${fmt(nr[0]-score)} 就能升上「${nr[1]}」。`:rk[2]);
+  track('game_end',{map:MAP.id,score,rank:rk[1],taskgo:stats.taskgo,homigo:stats.homigo,washgo:stats.washgo});$('#newBest').hidden=!isNew;
   const total=stats.taskgo+stats.homigo+stats.washgo;
   const rows=[['taskgo','報修結案',`施工照 ${stats.taskgo*3} 張`,stats.taskgo,'件'],['homigo','新房客入住',stats.homigo?`亮了 ${stats.homigo} 盞燈`:'還在等房客',stats.homigo,'戶'],['washgo','衣物收送','LINE 接單',stats.washgo,'袋']];
   $('#stats').innerHTML=rows.map(([k,a,b,n,u])=>`<div class="stat" style="--c:${BR[k].color}"><div class="top2">${chipHTML(k)}<div class="n">${n}<small>${u}</small></div></div><div class="d"><b>${a}</b>${b}</div></div>`).join('');
-  $('#lineNote').textContent=`這一班騎了 ${(player.dist*.002).toFixed(1)} 公里，完成 ${total} 張工單，最高連單 ×${stats.maxCombo.toFixed(1)}${stats.expired?`，逾時 ${stats.expired} 張`:''}。三個品牌的通知都從 LINE 進來，現場人員不用另外裝 App。`;
-  ping(true);prepareSubmit();showScreen('#over');const fs=$('#finalScore');const t0=performance.now();(function cnt(){const k=Math.min(1,(performance.now()-t0)/1100);fs.textContent=fmt(score*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(cnt);})();}
+  lastReward=grantRewards();renderReward(lastReward);ping(true);setupSubmit();reportReferral();loadStats();renderMoments();
+  const evs=[stats.dogsCaught?`被土狗包圍 ${stats.dogsCaught} 次`:stats.dogsEscaped?'甩掉土狗大隊':'',stats.tickets?`吃了 ${stats.tickets} 張罰單`:'',stats.lawful?'臨檢乖乖停車':'',stats.tools?'忘了帶扳手':'',stats.battery?(isEV()?'換了一次電池':'加了一次油'):'',stats.garbage?'幫忙追垃圾車':'',stats.tea?`喝了 ${stats.tea} 杯手搖飲`:'',stats.checkins?`打卡 ${stats.checkins} 個地標`:''].filter(Boolean);
+  $('#lineNote').textContent=`今天${weather.name}${weather.id==='snow'?'（對，下雪）':''}，騎了 ${(player.dist*.002).toFixed(1)} 公里，完成 ${total} 張工單，最高連單 ×${stats.maxCombo.toFixed(1)}${stats.expired?`，逾時 ${stats.expired} 張`:''}${evs.length?'，'+evs.join('、'):''}。三個品牌的通知都從 LINE 進來，現場人員不用另外裝 App。`;
+  showScreen('#over');const fs=$('#finalScore');const t0=performance.now();(function cnt(){const k=Math.min(1,(performance.now()-t0)/1100);fs.textContent=fmt(score*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(cnt);})();}
 $('#btnStart').addEventListener('click',startGame);$('#btnAgain').addEventListener('click',startGame);
 $('#btnHome').addEventListener('click',toTitle);$('#btnPause').addEventListener('click',pauseGame);
 $('#btnResume').addEventListener('click',resumeGame);$('#btnQuit').addEventListener('click',toTitle);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseGame();});
 
-/* ================= leaderboard ================= */
-let run=null,submitted=false;
-const PROFILE_KEY='jiangcheng-profile-v1';
-function getProfile(){try{const p=JSON.parse(localStorage.getItem(PROFILE_KEY)||'null');return p&&p.nickname&&p.phone?p:null;}catch(e){return null;}}
-function setProfile(p){try{if(p)localStorage.setItem(PROFILE_KEY,JSON.stringify(p));else localStorage.removeItem(PROFILE_KEY);}catch(e){}}
-const maskPhone=p=>p.slice(0,4)+'***'+p.slice(-3);
-const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const DEVICE_KEY='jiangcheng-device-v1';
-function deviceId(){try{let d=localStorage.getItem(DEVICE_KEY);if(!d){d=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,12));localStorage.setItem(DEVICE_KEY,d);}return d;}catch(e){return null;}}
-let pingTimer=0,runEnded=false;
-function ping(ended){if(!run||runEnded)return;if(ended){runEnded=true;clearInterval(pingTimer);}
-  const body=JSON.stringify({runId:run.runId,token:run.token,score,ended:!!ended});
-  if(ended&&navigator.sendBeacon){navigator.sendBeacon(CONFIG.api+'/heartbeat',body);return;}
-  fetch(CONFIG.api+'/heartbeat',{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true}).catch(()=>{});}
-function startPings(){clearInterval(pingTimer);pingTimer=setInterval(()=>{if(state==='play')ping(false);},10000);}
-addEventListener('pagehide',()=>{if(state==='play'||state==='pause'||state==='count')ping(true);});
-function beginRun(){if(run&&!runEnded)ping(true);run=null;runEnded=false;submitted=false;clearInterval(pingTimer);if(!CONFIG.api)return;
-  const prof=getProfile();
-  fetch(CONFIG.api+'/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceId:deviceId(),nickname:prof?prof.nickname:''})}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.runId){run=d;startPings();}}).catch(()=>{});}
-function loadBoard(){if(!CONFIG.api)return;
-  fetch(CONFIG.api+'/leaderboard?limit=10').then(r=>r.ok?r.json():null).then(d=>{if(!d)return;
-    const box=$('#titleBoard');box.hidden=false;
-    $('#lbTitle').textContent=d.season?d.season.name:'總排行';
-    const pz=$('#lbPrize');pz.hidden=!(d.season&&d.season.prize);if(d.season&&d.season.prize)pz.textContent='前 '+d.season.topN+' 名：'+d.season.prize.split('\n')[0];
-    const list=d.entries||[];$('#lbEmpty').hidden=list.length>0;
-    $('#lbList').innerHTML=list.map(e=>`<li><i>${e.rank}</i><span>${esc(e.nickname)}<small>${esc(e.phoneMasked)}</small></span><b>NT$ ${fmt(e.score)}</b></li>`).join('');
-  }).catch(()=>{});}
-const fmtSec=s=>s<60?s+' 秒':Math.floor(s/60)+' 分 '+(s%60)+' 秒';
-function loadStats(){if(!CONFIG.api)return;
-  fetch(CONFIG.api+'/stats').then(r=>r.ok?r.json():null).then(d=>{if(!d)return;
-    $('#titleBoard').hidden=false;
-    $('#lbLive').textContent='正在上工 '+fmt(d.live.count)+' 人';
-    $('#stPlays').textContent=fmt(d.totals.plays);$('#stMinutes').textContent=fmt(d.totals.minutes);$('#stPlayers').textContent=fmt(d.totals.players);
-    const live=d.live.players||[];$('#liveEmpty').hidden=live.length>0;
-    $('#liveList').innerHTML=live.map((p,i)=>`<li><i>${i+1}</i><span>${esc(p.name)}<small>已上工 ${fmtSec(p.seconds)}</small></span><b>NT$ ${fmt(p.score)}</b></li>`).join('')+(d.live.count>live.length?`<li><span><small>還有 ${d.live.count-live.length} 位師傅在跑單</small></span></li>`:'');
-    const loyal=d.topPlayers||[];$('#loyalEmpty').hidden=loyal.length>0;
-    $('#loyalList').innerHTML=loyal.map((p,i)=>`<li><i>${i+1}</i><span>${esc(p.nickname)}<small>${esc(p.phoneMasked)}・${fmt(p.minutes)} 分鐘</small></span><b>${fmt(p.plays)} 局</b></li>`).join('');
-  }).catch(()=>{});}
-document.querySelectorAll('.lb-tabs button').forEach(b=>b.addEventListener('click',()=>{
-  document.querySelectorAll('.lb-tabs button').forEach(x=>x.setAttribute('aria-selected',x===b?'true':'false'));
-  document.querySelectorAll('[data-pane]').forEach(p=>p.hidden=p.dataset.pane!==b.dataset.tab);}));
-setInterval(()=>{if((state==='title'||state==='over')&&!document.hidden)loadStats();},15000);
-function lbMsg(t,cls){const m=$('#lbMsg');m.textContent=t;m.className='msg'+(cls?' '+cls:'');}
-function renderProfile(){const p=getProfile();$('#lbSaved').hidden=!p;$('#lbFields').hidden=!!p;
-  if(p){$('#lbSaved').innerHTML=`以「${esc(p.nickname)}」${maskPhone(p.phone)} 送出<button type="button" id="lbEdit">改資料</button>`;$('#lbConsent').checked=true;
-    $('#lbEdit').addEventListener('click',()=>{$('#lbNick').value=p.nickname;$('#lbPhone').value=p.phone;setProfile(null);renderProfile();});}}
-function prepareSubmit(){const f=$('#lbForm');if(!CONFIG.api||score<=0){f.hidden=true;return;}
-  f.hidden=false;$('#lbFormTitle').textContent='登上排行榜';renderProfile();
-  const b=$('#lbSubmit');b.disabled=!run;b.textContent='送出成績';
-  lbMsg(run?'':'這一局沒連上記分伺服器，下一局再試試。',run?'':'err');}
-$('#lbForm').addEventListener('submit',e=>{e.preventDefault();if(!run||submitted)return;
-  const p=getProfile()||{nickname:$('#lbNick').value.trim(),phone:$('#lbPhone').value.replace(/[\s-]/g,'')};
-  if(!p.nickname){lbMsg('請填暱稱','err');return;}
-  if(!/^09\d{8}$/.test(p.phone)){lbMsg('手機請填 09 開頭 10 碼','err');return;}
-  if(!$('#lbConsent').checked){lbMsg('請勾選同意個資使用說明','err');return;}
-  const b=$('#lbSubmit');b.disabled=true;b.textContent='送出中…';lbMsg('');
-  fetch(CONFIG.api+'/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({runId:run.runId,token:run.token,score,stats,nickname:p.nickname,phone:p.phone,consent:true})})
-    .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{
-      if(!ok){b.disabled=false;b.textContent='送出成績';lbMsg(d.error||'送出失敗，請稍後再試','err');return;}
-      submitted=true;setProfile(p);renderProfile();$('#lbSaved').querySelector('button')?.remove();b.textContent='已送出';
-      const where=d.season?d.season.name:'總榜';
-      lbMsg(d.rank?(d.isBest?`登上${where}第 ${d.rank} 名！`:`已記錄。你在${where}的最佳成績 NT$ ${fmt(d.best)}，目前第 ${d.rank} 名。`):'已記錄成績。','ok');
-      track('leaderboard_submit',{score,rank:d.rank||0});
-    }).catch(()=>{b.disabled=false;b.textContent='送出成績';lbMsg('網路不穩，請再按一次','err');});});
-loadBoard();loadStats();
-
 /* ================= day cycle ================= */
 const C1={sun:new THREE.Color('#fff6e6'),sky:new THREE.Color('#e2f1ff'),gnd:new THREE.Color('#8a9a60'),bg:new THREE.Color('#cfe6ee')};
 const C2={sun:new THREE.Color('#ffa65c'),sky:new THREE.Color('#ffc9a3'),gnd:new THREE.Color('#7a6552'),bg:new THREE.Color('#f2b58e')};
-let lampsOn=false;
-function setDay(p){const e=p*p;const a=lerp(-1.0,1.05,p);sun.position.set(Math.sin(a)*70,lerp(62,34,e)+Math.cos(a)*18,38);
+let lampsOn=null;
+const sunDir=new THREE.Vector3(0,60,38);let shadowSpan=0;
+function setDay(p){const e=p*p;const a=lerp(-1.0,1.05,p);sunDir.set(Math.sin(a)*70,lerp(62,34,e)+Math.cos(a)*18,38);
   sun.color.copy(C1.sun).lerp(C2.sun,e);sun.intensity=lerp(.98,.82,e);hemi.color.copy(C1.sky).lerp(C2.sky,e);hemi.groundColor.copy(C1.gnd).lerp(C2.gnd,e);
   hemi.intensity=lerp(.72,.62,e);BG.copy(C1.bg).lerp(C2.bg,e);scene.fog.color.copy(BG);
+  if(state==='play'||state==='count'||state==='pause')weatherLight();
   const on=p>.78;if(on!==lampsOn){lampsOn=on;lampHeadMat.color.set(on?'#ffe6a0':'#6b6f78');}lampGlows.forEach(s=>s.material.opacity=on?clamp((p-.78)*6,0,.9):0);}
 
 /* ================= camera ================= */
 const camPos=new THREE.Vector3(60,48,60),camLook=new THREE.Vector3();let vw=1,vh=1,portrait=false,titleAng=.6;
-function resize(){vw=innerWidth;vh=innerHeight;renderer.setSize(vw,vh,false);camera.aspect=vw/vh;portrait=vw/vh<.8;camera.fov=portrait?46:38;camera.updateProjectionMatrix();}
+function resize(){vw=innerWidth;vh=innerHeight;renderer.setSize(vw,vh,false);camera.aspect=vw/vh;portrait=vw/vh<.8;camera.fov=portrait?46:38;camera.updateProjectionMatrix();if(typeof applyViewOffset==='function')applyViewOffset();}
 addEventListener('resize',resize);resize();
 function camFollow(dt,k){const f=portrait?1.18:1;const lead=clamp(player.v,0,14)*.28;
   const tx=player.x+Math.sin(player.h)*lead,tz=player.z+Math.cos(player.h)*lead*.8;
@@ -1107,10 +1692,14 @@ let last=performance.now(),elapsed=0,clockMin=-1,secLast=-1,ordersH=0,ordersHT=0
 const timeEl=$('#time'),leftEl=$('#left'),ringEl=$('#clockRing'),clockEl=$('#clock'),scoreEl=$('#score'),comboEl=$('#combo'),workEl=$('#work'),workRing=$('#workRing'),workLbl=$('#workLbl'),workPc=$('#workPc');
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;elapsed+=dt;
   try{update(dt);}catch(err){console.error(err);}
-  renderer.render(scene,camera);requestAnimationFrame(frame);}
+  renderer.render(scene,camera);perfTick(now);requestAnimationFrame(frame);}
 function update(dt){
   // ambient animation
-  if(S.W){S.W.obj.clothes.rotation.z-=dt*(state==='play'?5:3);if(Math.random()<dt*3)spawnBubble(S.W.x+rnd(-1.5,1.5),10.5,S.W.z+rnd(-.5,1.5));}
+  washIds.forEach(id=>{const w=S[id];if(!w)return;w.obj.clothes.rotation.z-=dt*(state==='play'?5:3);if(Math.random()<dt*3)spawnBubble(w.x+rnd(-1.5,1.5),10.5,w.z+rnd(-.5,1.5));});
+  cranes.forEach((c,i)=>{c.rotation.y=Math.sin(elapsed*.12+i*2)*1.3;});
+  pads.forEach((pd,i)=>{pd.ring.scale.setScalar(1+Math.sin(elapsed*4+i)*.06);pd.beam.rotation.y+=dt;});lmAnim.forEach(f=>f(elapsed));
+  if(rainLines||snowPts||weather.id==='wind')updWeather(dt);
+  ships.forEach((sh,i)=>{sh.position.y=.35+Math.sin(elapsed*1.3+i)*.12;sh.rotation.z=Math.sin(elapsed*.9+i)*.03;});
   if(S.HQ){S.HQ.obj.logo.rotation.y+=dt*1.2;S.HQ.obj.logo.position.y=7.5+.5+Math.sin(elapsed*2)*.15;}
   if(S._park){S._park.spout.scale.y=1+Math.sin(elapsed*6)*.08;}
   bubbles.forEach(b=>{if(!b.visible)return;const u=b.userData;u.t+=dt;b.position.y+=u.vy*dt;b.position.x+=Math.sin(u.t*3)*.01+u.vx*dt;const k=u.t/u.life;
@@ -1119,7 +1708,13 @@ function update(dt){
     const s=u.t<.2?u.t/.2:u.t>1.8?Math.max(0,1-(u.t-1.8)/.3):1;g.scale.setScalar(Math.max(.001,s));if(u.t>2.1){scene.remove(g);pops.splice(i,1);}});
   updTraffic(dt);updParticles(dt);
 
-  if(state==='title'||state==='loading'){titleAng+=dt*.07;const R=portrait?92:70;camPos.set(Math.sin(titleAng)*R,portrait?70:50,Math.cos(titleAng)*R);camLook.set(0,0,0);}
+  if(state==='garage'){if(!gDrag)player.h+=dt*.45;gAng+=dt;const d=portrait?7.2:6.4;
+    camPos.lerp(new THREE.Vector3(SHOW.x+d*.72,3.1,SHOW.z+d*.86),1-Math.exp(-5*dt));camLook.lerp(new THREE.Vector3(SHOW.x,1.05,SHOW.z),1-Math.exp(-5*dt));
+    if(podium)podium.rotation.y=player.h;}
+  else if(state==='title'||state==='loading'){titleAng+=dt*.07;
+    if(MAP&&MAP.ocean){const cx=MAP.center||(MAP.center=(()=>{let x=0,z=0,k=0;MAP.layout.forEach((r,j)=>r.forEach((t,i)=>{if(isLandType(t)){x+=blockCenters[i];z+=blockCenters[j];k++;}}));return [x/k,z/k];})());
+      const ang=Math.sin(titleAng*.8)*.3,R=HALF*(portrait?1.05:.95),H=HALF*(portrait?3.4:2.2);camPos.lerp(new THREE.Vector3(cx[0]+Math.sin(ang)*R,H,cx[1]+Math.cos(ang)*R),1-Math.exp(-2.5*dt));camLook.lerp(new THREE.Vector3(cx[0],0,cx[1]),1-Math.exp(-2.5*dt));}
+    else{const f=HALF/33.5,R=(portrait?92:70)*f;camPos.lerp(new THREE.Vector3(Math.sin(titleAng)*R,(portrait?70:50)*f,Math.cos(titleAng)*R),1-Math.exp(-2.5*dt));camLook.lerp(new THREE.Vector3(0,0,0),1-Math.exp(-2.5*dt));}}
   else if(state==='count'){camFollow(dt,2.2);countT-=dt;const n=Math.ceil(countT-.8);
     if(n!==countLast){countLast=n;const el=$('#count');el.innerHTML=`<span>${n>0?n:'上工！'}</span>`;AU.count(n<=0);}
     if(countT<=.3)beginPlay();setDay(0);}
@@ -1128,10 +1723,15 @@ function update(dt){
 
   // player visuals
   PS.root.position.set(player.x,player.y,player.z);PS.root.rotation.y=player.h;PS.tilt.rotation.z=player.lean;
-  PS.wheels.forEach(w=>w.rotation.x+=player.v*dt/.3);if(PS.rider)PS.rider.position.y=.9+Math.sin(elapsed*12)*.015*Math.min(1,player.v/5);
+  PS.wheels.forEach(w=>w.rotation.x+=player.v*dt/.3);if(PS.rider){PS.rider.position.y=.9+Math.sin(elapsed*12)*.015*Math.min(1,player.v/5);PS.rider.rotation.z=player.stun>0?Math.sin(elapsed*28)*.35:0;}
   shadowBlob.position.set(player.x,player.y+.03,player.z);shadowBlob.scale.set(.8,1.3,1);shadowBlob.rotation.z=-player.h;
-  player.items.forEach((it,i)=>{it.t+=dt;const s=Math.min(1,it.t*5);it.m.scale.setScalar(s*(1+.25*Math.max(0,1-it.t*3)));it.m.position.set(0,1.28+i*.46+Math.sin(elapsed*8+i)*.02,-.92);it.m.rotation.y=i*.25;});
+  player.items.forEach((it,i)=>{it.t+=dt;const s=Math.min(1,it.t*5);it.m.scale.setScalar(s*(1+.25*Math.max(0,1-it.t*3)));it.m.position.set(0,PS.rackY+.23+i*.46+Math.sin(elapsed*8+i)*.02,-.92);it.m.rotation.y=i*.25;});
 
+  // sun + shadow: follow the scooter while riding so shadows stay sharp on big maps
+  {const follow=state==='play'||state==='count'||state==='garage'||state==='over'||state==='pause';const span=follow?42:HALF+12;
+    sun.target.position.set(follow?player.x:0,0,follow?player.z:0);sun.position.copy(sun.target.position).add(sunDir);
+    if(span!==shadowSpan){shadowSpan=span;Object.assign(sun.shadow.camera,{left:-span,right:span,top:span,bottom:-span,far:320});sun.shadow.camera.updateProjectionMatrix();
+      sun.shadow.bias=span>60?-.003:-.0005;sun.shadow.normalBias=span>60?.25:.03;}}
   // camera
   let sx=0,sy=0;if(camShake>0&&!reduceMotion){camShake-=dt;sx=rnd(-.2,.2)*camShake*3;sy=rnd(-.2,.2)*camShake*3;}
   camera.position.set(camPos.x+sx,camPos.y+sy,camPos.z);camera.lookAt(camLook);
@@ -1149,19 +1749,29 @@ function update(dt){
 }
 function play(dt){gt+=dt;const p=clamp(gt/DUR,0,1);setDay(p);
   // input + movement
-  const inp=readInput();player.bumpCd-=dt;
-  if(inp.m>0){const tgt=Math.atan2(inp.x,inp.y);const d=angDiff(tgt,player.h);const turn=clamp(d,-7.5*dt,7.5*dt);player.h+=turn;
-    player.lean+=((-turn/dt)*.06-player.lean)*Math.min(1,dt*8);const tv=14*inp.m*(Math.abs(d)>2.2?.35:1);player.v+=clamp(tv-player.v,-30*dt,20*dt);
+  let inp=readInput();player.bumpCd-=dt;player.boost=Math.max(0,(player.boost||0)-dt);
+  if(player.stun>0){player.stun-=dt;inp={x:0,y:0,m:0};player.v*=Math.exp(-dt*8);}
+  const vmax=14*(ev.battery?.42:1)*(player.boost>0?1.4:1);if(player.v>vmax)player.v+=clamp(vmax-player.v,-18*dt,0);
+  if(inp.m>0){const tgt=Math.atan2(inp.x,inp.y);const d=angDiff(tgt,player.h);const tr=7.5*weather.turn;const turn=clamp(d,-tr*dt,tr*dt);player.h+=turn;
+    player.lean+=((-turn/dt)*.06-player.lean)*Math.min(1,dt*8);const tv=vmax*inp.m*(Math.abs(d)>2.2?.35:1);player.v+=clamp(tv-player.v,-30*dt,20*dt);
     moved+=dt;if(moved>2.2)$('#hint').style.opacity=0;}
   else{player.v+=clamp(-player.v,-26*dt,0);player.lean*=Math.exp(-dt*6);}
   player.lean=clamp(player.lean,-.4,.4);
-  const ox=player.x,oz=player.z;player.x+=Math.sin(player.h)*player.v*dt;player.z+=Math.cos(player.h)*player.v*dt;
-  collide();player.dist+=Math.hypot(player.x-ox,player.z-oz);
+  {const dx=Math.sin(player.h)*player.v,dz=Math.cos(player.h)*player.v,k=Math.min(1,gripNow()*dt);player.vx=(player.vx||0)+(dx-(player.vx||0))*k;player.vz=(player.vz||0)+(dz-(player.vz||0))*k;
+    if(gust.on>0){player.vx+=gust.dir.x*11*dt;player.vz+=gust.dir.z*11*dt;}
+    const slip=Math.abs(player.vx*Math.cos(player.h)-player.vz*Math.sin(player.h));
+    if(slip>3.2&&weather.id!=='sun'&&Math.random()<dt*14)emit(player.x,.2,player.z,1,weather.id==='snow'?['#ffffff','#e3ebf0']:['#dbe9f6','#9fc3d8'],{smin:1,smax:3,vmin:1,vmax:2.5,lmin:.3,lmax:.5,szmin:.1,szmax:.18});
+    if(slip>5&&!player.slipSaid&&weather.id!=='sun'){player.slipSaid=true;floatText('打滑啦～',player.x,2.8,player.z,'#fff','say');if(weather.id==='snow')captureMoment('雪地甩尾，師傅差點變成冰上曲棍球','slide',120);else captureMoment('雨天甩尾，送件變成甩尾大賽','slide',120);}}
+  if(player.boost>0&&Math.random()<dt*30)emit(player.x-Math.sin(player.h)*1.2,.6,player.z-Math.cos(player.h)*1.2,1,['#c9a37a','#fff3d6','#ff6b1a'],{smin:.2,smax:1,vmin:.5,vmax:1.5,g:0,lmin:.3,lmax:.6,szmin:.15,szmax:.28});
+  const ox=player.x,oz=player.z,nx=ox+player.vx*dt,nz=oz+player.vz*dt;
+  if(walkable(nx,nz)){player.x=nx;player.z=nz;}else if(walkable(nx,oz)){player.x=nx;player.v*=.9;player.vz*=.3;}else if(walkable(ox,nz)){player.z=nz;player.v*=.9;player.vx*=.3;}else{player.v*=.5;player.vx*=.3;player.vz*=.3;}
+  collide();if(!walkable(player.x,player.z)){player.x=ox;player.z=oz;}player.dist+=Math.hypot(player.x-ox,player.z-oz);
   const onBlk=blockCenters.some(bx=>blockCenters.some(bz=>Math.abs(player.x-bx)<BLK&&Math.abs(player.z-bz)<BLK));player.y+=((onBlk?.25:0)-player.y)*Math.min(1,dt*14);
   player.dustT-=dt;if(player.v>9&&player.dustT<=0){player.dustT=.07;emit(player.x-Math.sin(player.h)*1,.2,player.z-Math.cos(player.h)*1,1,['#d8d2c6','#c9c2b3'],{smin:.2,smax:.8,vmin:.3,vmax:1,g:-1,lmin:.4,lmax:.7,szmin:.2,szmax:.35,spread:1});}
+  updEvents(dt);checkLandmarks();
   // pending spawns
   for(let i=pending.length-1;i>=0;i--){const q=pending[i];if(gt>=q.at){if(orders.length<MAXO){spawn(q.type,q);pending.splice(i,1);}else q.at=gt+2;}}
-  if(gt>=nextSpawn){spawnRandom();nextSpawn=gt+(gt>55?6:7.5);}
+  if(gt>=nextSpawn){spawnRandom();nextSpawn=gt+(gt>DUR*.6?MAP.spawn[1]:MAP.spawn[0]);}
   // expiry
   let exp=false;orders.slice().forEach(o=>{if(gt-o.t0>o.dur){exp=true;stats.expired++;dropItem(o);orders=orders.filter(x=>x!==o);combo=1;AU.expire();
     toast(o.type,`「${o.title}」逾時，客戶在 LINE 上給了一顆星`);}});if(exp)renderOrders();
@@ -1172,6 +1782,8 @@ function play(dt){gt+=dt;const p=clamp(gt/DUR,0,1);setDay(p);
   if(working){workEl.hidden=false;const sp=toScreen(player.x,player.y+3.2,player.z);workEl.style.transform=`translate(${sp.x}px,${sp.y}px)`;
     workRing.style.strokeDashoffset=207.3*(1-working.prog);workPc.textContent=Math.floor(working.prog*100)+'%';
     workLbl.textContent=working.prog<.3?'GPS 打卡':working.prog<.8?'施工中':'拍照上傳';}
+  else if(ev.check){workEl.hidden=false;const sp=toScreen(player.x,player.y+3.2,player.z);workEl.style.transform=`translate(${sp.x}px,${sp.y}px)`;
+    const pr=clamp(ev.check.p,0,1);workRing.style.strokeDashoffset=207.3*(1-pr);workPc.textContent=Math.floor(pr*100)+'%';workLbl.textContent=ev.check.label;}
   else workEl.hidden=true;
   // HUD
   const mins=9*60+Math.floor(p*540/5)*5;if(mins!==clockMin){clockMin=mins;timeEl.textContent=`${String(Math.floor(mins/60)).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`;}
@@ -1182,10 +1794,19 @@ function play(dt){gt+=dt;const p=clamp(gt/DUR,0,1);setDay(p);
   let urgent=null;orders.forEach(o=>{const rem=1-(gt-o.t0)/o.dur;if(o.bar)o.bar.style.transform=`scaleX(${clamp(rem,0,1)})`;if(o.el){o.el.classList.toggle('urgent',rem*o.dur<8);o.el.classList.toggle('go',inZone.has(curTarget(o)));}
     if(!urgent||rem*o.dur<(1-(gt-urgent.t0)/urgent.dur)*urgent.dur)urgent=o;});
   // nav arrow to most urgent
-  if(urgent){const s=S[curTarget(urgent)];const dx=s.dx-player.x,dz=s.dz-player.z,d=Math.hypot(dx,dz);if(d>5){nav.visible=true;const a=Math.atan2(dx,dz);
-      nav.position.set(player.x+Math.sin(a)*2.5,player.y+.12,player.z+Math.cos(a)*2.5);nav.rotation.y=a;navM.color.set(BR[urgent.type].color);navM.opacity=.75+Math.sin(elapsed*8)*.2;}else nav.visible=false;}
+  const navT=ev.battery&&ev.station?{dx:ev.station.x,dz:ev.station.z,c:'#12b5a5'}:urgent?{dx:S[curTarget(urgent)].dx,dz:S[curTarget(urgent)].dz,c:BR[urgent.type].color}:null;
+  if(navT){const dx=navT.dx-player.x,dz=navT.dz-player.z,d=Math.hypot(dx,dz);if(d>5){nav.visible=true;const a=Math.atan2(dx,dz);
+      nav.position.set(player.x+Math.sin(a)*2.5,player.y+.12,player.z+Math.cos(a)*2.5);nav.rotation.y=a;navM.color.set(navT.c);navM.opacity=.75+Math.sin(elapsed*8)*.2;}else nav.visible=false;}
   else nav.visible=false;
   updEdges(urgent);
+  if(pads.length){player.teleCd=(player.teleCd||0)-dt;
+    if(player.teleCd<=0){const here=pads.find(pd=>Math.hypot(player.x-pd.x,player.z-pd.z)<2.3);
+      if(here){let dest=null;if(urgent){const t=S[curTarget(urgent)];dest=pads.filter(q=>q!==here).sort((a,b)=>Math.hypot(a.x-t.dx,a.z-t.dz)-Math.hypot(b.x-t.dx,b.z-t.dz))[0];}
+        if(!dest)dest=pads[(pads.indexOf(here)+1)%pads.length];
+        emit(player.x,1,player.z,24,['#6fd3ff','#ffffff'],{smin:1,smax:4,vmin:3,vmax:8});
+        player.x=dest.x+2.8;player.z=dest.z;player.teleCd=2.2;stats.hsr=(stats.hsr||0)+1;flash();AU.tone(330,.45,'sine',.14,1320);buzz(30);
+        emit(player.x,1,player.z,24,['#6fd3ff','#ffffff'],{smin:1,smax:4,vmin:3,vmax:8});camFollow(1,60);
+        toast('taskgo',`搭高鐵從${here.name}到${dest.name}，直接接下一件工作`);}}}
   if(gt>=DUR)endGame();}
 function collide(){const r=.75;let hit=false;
   colliders.forEach(b=>{const cx=clamp(player.x,b.minx,b.maxx),cz=clamp(player.z,b.minz,b.maxz);let dx=player.x-cx,dz=player.z-cz;const d2=dx*dx+dz*dz;
@@ -1202,7 +1823,7 @@ function updMarkers(dt){const need={};if(state==='play')orders.forEach(o=>{const
     Object.keys(m.icons).forEach(k=>{m.icons[k].visible=false;});types.forEach((k,i)=>{const sp=m.icons[k];sp.visible=true;sp.position.set((i-(types.length-1)/2)*2.4,8.2+Math.sin(elapsed*3+i)*.3,0);});
     m.lab.position.y=6.5;});}
 let topH=100;function updEdges(urgent){let used=0;
-  ordersHT-=1;if(ordersHT<=0){ordersH=ordersEl.offsetHeight;topH=document.querySelector('.top').offsetHeight||100;ordersHT=20;}const topM=topH+26;const botM=ordersH+30,m=30;
+  ordersHT-=1;if(ordersHT<=0){ordersH=ordersEl.offsetHeight;topH=Math.max(document.querySelector('.top').offsetHeight||100,toastsEl.children.length?toastsEl.getBoundingClientRect().bottom-10:0);ordersHT=12;}const topM=topH+26;const botM=ordersH+30,m=30;
   const seen=new Set(),placed=[];orders.forEach(o=>{const id=curTarget(o);const key=id+o.type;if(seen.has(key))return;seen.add(key);const s=S[id];
     const p=toScreen(s.dx,2,s.dz);const inside=!p.behind&&p.x>m&&p.x<vw-m&&p.y>topM&&p.y<vh-botM;if(inside)return;
     const e=edgeEl(used++);e.el.style.display='grid';if(e.type!==o.type){e.type=o.type;e.el.style.setProperty('--c',BR[o.type].color);e.img.src=ICON[BR[o.type].icon];}
@@ -1212,6 +1833,12 @@ let topH=100;function updEdges(urgent){let used=0;
     for(let tries=0;tries<4&&placed.some(q=>Math.hypot(q[0]-ex,q[1]-ey)<42);tries++){if(side)ey=clamp(ey+(ey>cy?-44:44),topM,vh-botM);else ex=clamp(ex+(ex>cx?-44:44),m,vw-m);}
     placed.push([ex,ey]);
     e.el.style.transform=`translate(${ex}px,${ey}px) scale(${o===urgent?1.12:1})`;e.ar.style.transform=`rotate(${Math.atan2(dy,dx)}rad)`;});
+  const specials=[];if(ev.station&&ev.battery)specials.push({x:ev.station.x,z:ev.station.z,c:'#12b5a5',ic:'bolt',k:'station'});if(ev.police&&ev.police.state!=='done')specials.push({x:ev.police.x,z:ev.police.z,c:'#2d6bff',ic:'siren',k:'police'});
+  specials.forEach(sp_=>{const p=toScreen(sp_.x,2,sp_.z);const inside=!p.behind&&p.x>m&&p.x<vw-m&&p.y>topM&&p.y<vh-botM;if(inside)return;
+    const e=edgeEl(used++);e.el.style.display='grid';if(e.type!==sp_.k){e.type=sp_.k;e.el.style.setProperty('--c',sp_.c);e.img.src=ICON[sp_.ic];}
+    const cx=vw/2,cy=(topM+vh-botM)/2;let dx=p.x-cx,dy=p.y-cy;if(p.behind){dx=-dx;dy=-dy;}const hw=vw/2-m,hh=(vh-botM-topM)/2;const k=Math.min(hw/Math.max(1e-3,Math.abs(dx)),hh/Math.max(1e-3,Math.abs(dy)));
+    let ex=cx+dx*k,ey=cy+dy*k;for(let tries=0;tries<4&&placed.some(q=>Math.hypot(q[0]-ex,q[1]-ey)<42);tries++)ey=clamp(ey+(ey>cy?-44:44),topM,vh-botM);placed.push([ex,ey]);
+    e.el.style.transform=`translate(${ex}px,${ey}px)`;e.ar.style.transform=`rotate(${Math.atan2(dy,dx)}rad)`;});
   for(let i=used;i<edgePool.length;i++)edgePool[i].el.style.display='none';}
 
 /* ================= share card ================= */
@@ -1222,7 +1849,7 @@ async function buildCard(){const W=1080,H=1350,c=cvs(W,H),g=c.getContext('2d');c
   if(img){const s=Math.max(pw/img.width,ph/img.height),iw=img.width*s,ih=img.height*s;g.drawImage(img,px+(pw-iw)/2,py+(ph-ih)/2,iw,ih);}
   else{g.fillStyle='#f2b58e';g.fillRect(px,py,pw,ph);}
   const gr=g.createLinearGradient(0,py+ph-220,0,py+ph);gr.addColorStop(0,'rgba(27,34,51,0)');gr.addColorStop(1,'rgba(27,34,51,.55)');g.fillStyle=gr;g.fillRect(px,py,pw,ph);g.restore();
-  g.font=`900 26px ${B}`;const eb='INFORCRAFT 匠管 · 城市任務小遊戲';const ew=g.measureText(eb).width+44;g.fillStyle='rgba(27,34,51,.88)';rr(g,px+28,py+28,ew,52,26);g.fill();
+  g.font=`900 26px ${B}`;const eb=`INFORCRAFT 匠管 · ${MAP.name}・${weather.name}`;const ew=g.measureText(eb).width+44;g.fillStyle='rgba(27,34,51,.88)';rr(g,px+28,py+28,ew,52,26);g.fill();
   g.fillStyle='#fff';g.textBaseline='middle';g.fillText(eb,px+50,py+55);
   g.font=`40px ${D}`;g.fillStyle='#fff';g.fillText('18:00 收工，今日結算',px+36,py+ph-44);
   // title
@@ -1244,20 +1871,32 @@ async function buildCard(){const W=1080,H=1350,c=cvs(W,H),g=c.getContext('2d');c
   g.fillStyle='#556074';g.font=`500 26px ${B}`;g.fillText(SHARE_URL.replace(/^https?:\/\//,''),px,H-40);
   g.fillStyle='#ff6b1a';rr(g,W-48-250,H-150,250,84,42);g.fill();g.fillStyle='#fff';g.font=`38px ${D}`;g.textAlign='center';g.fillText('來挑戰 →',W-48-125,H-95);g.textAlign='left';
   return c;}
-const shareLink=()=>`${SHARE_URL}?s=${Math.round(score)}`;
-const shareText=()=>`我在《匠城出任務》跑了一個班，賺到 NT$${fmt(score)}，拿到「${lastRank}」！你能超過我嗎？`;
+const shareLink=()=>`${SHARE_URL}?s=${Math.round(score)}&m=${MAP.id}&ref=${prof.refCode}`;
+const shareText=()=>`我在《匠城出任務》${MAP.name}跑了一個班，賺到 NT$${fmt(score)}，拿到「${lastRank}」！你能超過我嗎？`;
 let cardBlob=null;
-async function openShare(){track('share_open',{score});const btn=$('#btnShare');btn.disabled=true;
+let shareTxtNow='';
+async function openShare(opt){opt=opt&&opt.moment?opt:null;track('share_open',{score,moment:opt?opt.moment.tag:''});const btn=$('#btnShare');btn.disabled=true;
   try{await document.fonts.ready;}catch(e){}
-  const c=await buildCard();const url=c.toDataURL('image/png');$('#shareImg').src=url;cardBlob=null;c.toBlob(b=>{cardBlob=b;},'image/png');
-  $('#linkBox').value=shareText()+' '+shareLink();$('#shareDone').textContent='';
+  const c=opt?await buildMomentCard(opt.moment):await buildCard();shareTxtNow=opt?`《匠城出任務》今日名場面：「${opt.moment.caption}」😂 你也來跑一班看看`:shareText();const url=c.toDataURL('image/png');$('#shareImg').src=url;cardBlob=null;c.toBlob(b=>{cardBlob=b;},'image/png');
+  $('#linkBox').value=shareTxtNow+' '+shareLink();$('#shareDone').textContent='';
   const embedded=(()=>{try{return window.self!==window.top;}catch(e){return true;}})();
-  const dl=$('#btnDownload');dl.hidden=embedded;dl.href=url;
+  const dl=$('#btnDownload');dl.hidden=embedded||ENV.inApp||isTouch;dl.href=url;
+  const txt=shareTxtNow,lnk=shareLink();
+  $('#shThreads').href='https://www.threads.net/intent/post?text='+encodeURIComponent(txt+' '+lnk);
+  $('#shFb').href='https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(lnk);
+  $('#shLine').href=isTouch||ENV.line?'https://line.me/R/share?text='+encodeURIComponent(txt+'\n'+lnk):'https://social-plugins.line.me/lineit/share?url='+encodeURIComponent(lnk)+'&text='+encodeURIComponent(txt);
   $('#btnNativeShare').hidden=!navigator.share;document.querySelector('.sm .acts').style.gridTemplateColumns=navigator.share?'1fr 1fr':'1fr';$('#shareModal').hidden=false;btn.disabled=false;}
-$('#btnShare').addEventListener('click',openShare);
+$('#btnShare').addEventListener('click',()=>openShare());
+document.querySelector('#shareModal .socials').addEventListener('click',e=>{const a=e.target.closest('.soc');if(!a)return;if(a.tagName==='A')track('share_'+a.id.slice(2).toLowerCase(),{score,env:ENV.name});grantTrial(true);});
+$('#shIg').addEventListener('click',async()=>{track('share_ig',{score,env:ENV.name});const lnk=shareLink();
+  try{if(navigator.clipboard&&navigator.clipboard.writeText)await navigator.clipboard.writeText(lnk);}catch(e){}
+  try{const file=cardBlob&&new File([cardBlob],'匠城出任務成績.png',{type:'image/png'});
+    if(!ENV.inApp&&file&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file]});$('#shareDone').textContent='在分享選單選 Instagram，記得在限動加上「連結」貼紙，挑戰連結已經複製好了。';return;}}
+  catch(e){if(e&&e.name==='AbortError')return;}
+  $('#shareDone').textContent='挑戰連結已複製。① 長按上面的成績圖存到相簿 ② 打開 IG 限動選這張圖 ③ 加「連結」貼紙貼上。';});
 $('#btnCloseShare').addEventListener('click',()=>{$('#shareModal').hidden=true;});
 $('#shareModal').addEventListener('click',e=>{if(e.target.id==='shareModal')$('#shareModal').hidden=true;});
-$('#btnNativeShare').addEventListener('click',async()=>{const text=shareText(),url=shareLink();
+$('#btnNativeShare').addEventListener('click',async()=>{const text=shareTxtNow||shareText(),url=shareLink();
   try{const file=cardBlob&&new File([cardBlob],'匠城出任務成績.png',{type:'image/png'});
     if(file&&navigator.canShare&&navigator.canShare({files:[file]}))await navigator.share({files:[file],text:text+' '+url});
     else await navigator.share({title:'匠城出任務',text,url});track('share_native',{score});$('#shareDone').textContent='已開啟分享';}
@@ -1268,16 +1907,280 @@ $('#btnCopy').addEventListener('click',()=>{const t=$('#linkBox').value;const ok
 $('#btnDownload').addEventListener('click',()=>track('share_download',{score}));
 addEventListener('keydown',e=>{if(e.code==='Escape'&&!$('#shareModal').hidden)$('#shareModal').hidden=true;});
 
+/* ================= weather ================= */
+const WX={
+  sun:{id:'sun',name:'晴天',icon:'☀️',grip:14,turn:1,w:45,note:'好天氣，衝一波業績！'},
+  rain:{id:'rain',name:'雨天',icon:'🌧️',grip:4.2,turn:.82,w:27,note:'路面濕滑，轉彎會甩尾'},
+  wind:{id:'wind',name:'強風',icon:'🌬️',grip:9,turn:.92,w:18,note:'陣風會把你往旁邊推'},
+  snow:{id:'snow',name:'下雪',icon:'❄️',grip:2.6,turn:.7,w:10,note:'台灣竟然下雪？！路面超級滑'}
+};
+let weather=WX.sun;const gust={t:0,next:6,on:0,dir:new THREE.Vector3(1,0,0),base:0,first:true};
+const C_RAIN=new THREE.Color('#8e9daa'),C_SNOW=new THREE.Color('#e3ebf0'),C_WIND=new THREE.Color('#d9d2b8');
+function pickWeather(){if(prof.runs<1)return WX.sun;let r=Math.random()*100;for(const k of ['sun','rain','wind','snow']){r-=WX[k].w;if(r<0)return WX[k];}return WX.sun;}
+const gripNow=()=>weather.grip*(weather.id==='rain'&&prof.outfit==='rain'?1.9:1);
+let rainLines=null,snowPts=null,snowCover=null;
+const flakeTex=(()=>{const c=cvs(32,32),g=c.getContext('2d');const gr=g.createRadialGradient(16,16,0,16,16,16);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,32,32);return ctex(c);})();
+function clearWeatherFx(){[rainLines,snowPts,snowCover].forEach(o=>{if(o){scene.remove(o);o.geometry.dispose();o.material.dispose();}});rainLines=snowPts=snowCover=null;}
+function setupWeatherFx(){clearWeatherFx();resetFog();const cx=player.x,cz=player.z;
+  if(weather.id==='rain'){const N=isTouch?450:800,pos=new Float32Array(N*6);for(let i=0;i<N;i++){const x=cx+rnd(-28,28),y=rnd(0,24),z=cz+rnd(-30,22);pos.set([x,y,z,x+.12,y+1.3,z+.3],i*6);}
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    rainLines=new THREE.LineSegments(geo,new THREE.LineBasicMaterial({color:'#dbe9f6',transparent:true,opacity:.55}));rainLines.frustumCulled=false;scene.add(rainLines);}
+  if(weather.id==='snow'){const N=isTouch?350:600,pos=new Float32Array(N*3);for(let i=0;i<N;i++)pos.set([cx+rnd(-28,28),rnd(0,20),cz+rnd(-30,22)],i*3);
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    snowPts=new THREE.Points(geo,new THREE.PointsMaterial({color:'#ffffff',size:.5,map:flakeTex,transparent:true,depthWrite:false}));snowPts.frustumCulled=false;scene.add(snowPts);
+    if(!MAP.ocean){snowCover=new THREE.Mesh(new THREE.PlaneGeometry(2*HALF,2*HALF),new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:.36,depthWrite:false}));
+      snowCover.rotation.x=-PI/2;snowCover.position.y=.3;snowCover.renderOrder=1;scene.add(snowCover);}}
+  if(weather.id==='wind'){gust.base=rnd(0,TAU);gust.next=rnd(3,5);gust.first=true;}
+  if(weather.id==='rain'){scene.fog.near=26;scene.fog.far=Math.max(120,HALF*2);}else if(weather.id==='snow'){scene.fog.near=34;scene.fog.far=Math.max(150,HALF*2.4);}
+}
+function resetFog(){scene.fog.near=HALF*2.5;scene.fog.far=HALF*5.4;}
+function weatherLight(){if(weather.id==='rain'){sun.intensity*=.45;hemi.intensity*=.82;BG.lerp(C_RAIN,.65);}
+  else if(weather.id==='snow'){sun.intensity*=.72;hemi.intensity*=1.12;BG.lerp(C_SNOW,.75);}
+  else if(weather.id==='wind'){BG.lerp(C_WIND,.3);}scene.fog.color.copy(BG);}
+function updWeather(dt){const cx=player.x,cz=player.z;
+  if(rainLines){const a=rainLines.geometry.attributes.position,p=a.array,N=p.length/6,wx=weather.id==='rain'?(gust.on>0?gust.dir.x*6:0):0;
+    for(let i=0;i<N;i++){const k=i*6;p[k+1]-=38*dt;p[k+4]-=38*dt;p[k]+=wx*dt;p[k+3]+=wx*dt;
+      if(p[k+1]<0){const x=cx+rnd(-28,28),z=cz+rnd(-30,22),y=rnd(16,26);p[k]=x;p[k+1]=y;p[k+2]=z;p[k+3]=x+.12;p[k+4]=y+1.3;p[k+5]=z+.3;
+        if(Math.random()<.04)emit(x,.1,z,1,['#dbe9f6'],{smin:.5,smax:1.2,vmin:1,vmax:2,lmin:.2,lmax:.35,szmin:.06,szmax:.1});}}
+    a.needsUpdate=true;}
+  if(snowPts){const a=snowPts.geometry.attributes.position,p=a.array,N=p.length/3;
+    for(let i=0;i<N;i++){const k=i*3;p[k+1]-=2.6*dt;p[k]+=Math.sin(elapsed*1.3+i)*.6*dt;if(p[k+1]<0){p[k]=cx+rnd(-28,28);p[k+1]=rnd(14,20);p[k+2]=cz+rnd(-30,22);}}
+    a.needsUpdate=true;}
+  if(weather.id==='wind'&&state==='play'){gust.next-=dt;
+    if(gust.next<=0){gust.on=1.5;gust.next=rnd(4.5,7.5);const a=gust.base+rnd(-.6,.6);gust.dir.set(Math.sin(a),0,Math.cos(a));camShake=.18;AU.whoosh();
+      if(gust.first){gust.first=false;toastEv('強風特報','陣風來了！抓緊把手','#8a7b4a','🌬️');captureMoment('陣風一來，師傅差點被吹去對向車道','wind',450);}}
+    if(gust.on>0)gust.on-=dt;
+    if(Math.random()<dt*(gust.on>0?40:8)){const a=gust.base;emit(cx-Math.sin(a)*14+rnd(-8,8),rnd(.5,3),cz-Math.cos(a)*14+rnd(-8,8),1,['#6f9d57','#c9a15a','#8a6b48'],{smin:0,smax:.1,vmin:0,vmax:.5,g:.6,lmin:1.2,lmax:2,szmin:.12,szmax:.2});
+      const q=P[pIdx];const sp=gust.on>0?16:7;q.vx=Math.sin(a)*sp+rnd(-1,1);q.vz=Math.cos(a)*sp+rnd(-1,1);}}}
+function showWeatherCard(){const c=$('#wxCard');c.hidden=false;c.querySelector('.wxi').textContent=weather.icon;
+  const city=MAP.ocean?'全台':'高雄';
+  c.querySelector('b').textContent=weather.id==='snow'?`今日天氣：${city}下雪了？！`:`今日天氣：${weather.name}`;
+  c.querySelector('small').textContent=weather.id==='rain'&&prof.outfit==='rain'?'你穿了機車雨衣，抓地力比較好':weather.id==='rain'?'路面濕滑會甩尾（車庫的「機車雨衣」可以抓地）':weather.note;
+  $('#wxHud').textContent=`${weather.icon} ${weather.name}`;}
+
+/* ================= random events ================= */
+const FX=new THREE.Group();scene.add(FX);
+let ev={next:12,used:new Set(),dogs:null,police:null,station:null,truck:null,teas:[],teaNext:10,battery:false,toolDone:false,check:null};
+let moments=[];
+function resetEvents(){while(FX.children.length)FX.remove(FX.children[0]);if(ev.truck)removeTruck();
+  ev={next:rnd(11,15),used:new Set(),dogs:null,police:null,station:null,truck:null,teas:[],teaNext:rnd(7,12),battery:false,toolDone:false,check:null};moments=[];}
+function toastEv(label,msg,color,emo){const el=document.createElement('div');el.className='toast';el.style.setProperty('--c',color);
+  el.innerHTML=`<span class="chip" style="--c:${color};font-size:19px">${emo}</span><div><div class="hd">${label}<span>匠城快報 · 剛剛</span></div><p>${msg}</p></div>`;
+  toastsEl.prepend(el);while(toastsEl.children.length>2)toastsEl.lastChild.remove();setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),320);},3600);}
+function captureMoment(caption,tag,delay){setTimeout(()=>{if(state!=='play'||moments.length>=4||moments.some(m=>m.tag===tag))return;
+  try{const nv=nav.visible;nav.visible=false;const saved=camera.position.clone();camera.position.lerp(new THREE.Vector3(player.x,player.y+1,player.z),.42);camera.lookAt(player.x,player.y+.6,player.z);
+    renderer.render(scene,camera);const src=canvas.toDataURL('image/jpeg',.86);camera.position.copy(saved);camera.lookAt(camLook);nav.visible=nv;
+    moments.push({caption,tag,src,wx:weather.id,map:MAP.id});track('moment',{tag});}catch(e){}},delay||0);}
+function roadPoints(){const pts=[],n=ROADS.length-1;for(let i=0;i<=n;i++)for(let j=0;j<n;j++){const m=(ROADS[j]+ROADS[j+1])/2;if(roadV(i,j))pts.push([ROADS[i],m]);if(roadH(j,i))pts.push([m,ROADS[i]]);}return pts;}
+function pickRoadPoint(minD,maxD){const pts=roadPoints().filter(([x,z])=>{const d=Math.hypot(x-player.x,z-player.z);
+    return d>minD&&d<maxD&&!pads.some(q=>Math.hypot(q.x-x,q.z-z)<7)&&!Object.values(S).some(s=>s&&s.dx!=null&&Math.hypot(s.dx-x,s.dz-z)<5.5)&&!(ev.police&&Math.hypot(ev.police.x-x,ev.police.z-z)<8)&&!(ev.station&&Math.hypot(ev.station.x-x,ev.station.z-z)<8);});
+  return pts.length?pick(pts):null;}
+function pushOut(o,r){colliders.forEach(b=>{const cx=clamp(o.x,b.minx,b.maxx),cz=clamp(o.z,b.minz,b.maxz);const dx=o.x-cx,dz=o.z-cz,d=Math.hypot(dx,dz);if(d<r&&d>1e-4){o.x=cx+dx/d*r;o.z=cz+dz/d*r;}});}
+function person(shirt,extra){const g=new THREE.Group();cyl(g,.24,.3,.8,shirt,0,0,0,10);const h=new THREE.Mesh(new THREE.SphereGeometry(.23,12,10),mat('#f1c9a5'));h.position.y=1.03;g.add(h);
+  if(extra==='cap'){const c=cyl(g,.25,.25,.12,'#f4f6f8',0,1.2,0,12);box(g,.3,.04,.18,'#1b2233',0,1.2,.2);}
+  else{const hair=new THREE.Mesh(new THREE.SphereGeometry(.25,12,10,0,TAU,0,PI*.5),mat(pick(['#2b2522','#5a4636','#8a8a8a'])));hair.position.y=1.08;g.add(hair);}
+  const arm=box(g,.1,.55,.1,shirt,.32,.45,0);g.userData.arm=arm;return g;}
+function label3d(text,y){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:labelTex(text),depthTest:false,transparent:true}));sp.scale.set(3.4,.96,1);sp.position.y=y;sp.renderOrder=19;return sp;}
+AU.bark=function(){this.tone(620,.07,'square',.06,380);this.tone(560,.08,'square',.05,330,.1);};
+AU.siren=function(){for(let i=0;i<4;i++){this.tone(i%2?740:980,.18,'sawtooth',.04,null,i*.18);}};
+AU.putt=function(){this.tone(85,.07,'square',.07,60);};
+AU.whoosh=function(){this.noise(.6,.25,0,500);};
+AU.ambient=function(type){this.stopAmbient();const c=this.ctx;if(!c||type==='sun')return;try{const n=c.sampleRate*2,b=c.createBuffer(1,n,c.sampleRate),a=b.getChannelData(0);for(let i=0;i<n;i++)a[i]=Math.random()*2-1;
+  const s=c.createBufferSource();s.buffer=b;s.loop=true;const f=c.createBiquadFilter();f.type=type==='wind'?'lowpass':'bandpass';f.frequency.value=type==='rain'?1900:type==='wind'?450:900;f.Q.value=.6;
+  const g=c.createGain();g.gain.value=type==='rain'?.08:type==='wind'?.11:.025;s.connect(f);f.connect(g);g.connect(this.master);s.start();this.amb=s;}catch(e){}};
+AU.stopAmbient=function(){if(this.amb){try{this.amb.stop();}catch(e){}this.amb=null;}};
+
+function startEvent(){const opts=[['dogs',3],['police',2.4],['battery',2],['garbage',2.2]].filter(([k])=>!ev.used.has(k));if(!opts.length)return;
+  let r=Math.random()*opts.reduce((a,o)=>a+o[1],0),k=opts[0][0];for(const o of opts){r-=o[1];if(r<0){k=o[0];break;}}
+  const ok=k==='dogs'?startDogs():k==='police'?startPolice():k==='battery'?startBattery():startGarbage();if(ok){ev.used.add(k);track('event',{type:k,map:MAP.id,wx:weather.id});}}
+function updEvents(dt){if(gt<8)return;ev.next-=dt;
+  if(ev.next<=0&&!ev.dogs&&!ev.truck&&gt<DUR-14){startEvent();ev.next=rnd(15,22);}
+  ev.teaNext-=dt;if(ev.teaNext<=0){ev.teaNext=rnd(13,20);if(ev.teas.length<2&&gt<DUR-8)spawnTea();}
+  updDogs(dt);updPolice(dt);updStation(dt);updTruck(dt);updTeas(dt);}
+
+/* ---- 1. stray dogs ---- */
+function makeDog(col){const g=new THREE.Group();box(g,.42,.36,.9,col,0,.34,0);const head=new THREE.Group();head.position.set(0,.66,.5);g.add(head);
+  box(head,.36,.32,.36,col,0,0,0);box(head,.2,.14,.2,'#3b2a20',0,.02,.24);box(head,.08,.16,.06,col,-.12,.3,-.04);box(head,.08,.16,.06,col,.12,.3,-.04);
+  const legs=[[-.14,.3],[.14,.3],[-.14,-.3],[.14,-.3]].map(([x,z])=>box(g,.1,.36,.1,col,x,0,z));const tail=box(g,.07,.07,.36,col,0,.56,-.56);tail.rotation.x=.8;return {g,legs,tail};}
+function startDogs(){if(ev.dogs)return false;const cols=['#c8955c','#2b2622','#e9dcc7'];const list=[];
+  for(let k=0;k<3;k++){const a=player.h+PI+rnd(-.5,.5),d=12+k*1.6;let x=player.x+Math.sin(a)*d,z=player.z+Math.cos(a)*d;if(!walkable(x,z)){x=player.x-Math.sin(player.h)*(8+k);z=player.z-Math.cos(player.h)*(8+k);}
+    const m=makeDog(cols[k]);m.g.position.set(x,0,z);FX.add(m.g);list.push({m,x,z,sp:rnd(11.6,12.6),bark:rnd(0,.8),h:0});}
+  ev.dogs={list,t:0,mode:'chase',mt:0};toastEv('注意','後面有土狗大隊在追你！快騎！','#8a5a3b','🐕');AU.bark();return true;}
+function updDogs(dt){const D=ev.dogs;if(!D)return;D.t+=dt;D.mt+=dt;
+  D.list.forEach((d,i)=>{let tx=player.x,tz=player.z,sp=d.sp;
+    if(D.mode==='circle'){const a=elapsed*3+i*TAU/3;tx=player.x+Math.sin(a)*1.9;tz=player.z+Math.cos(a)*1.9;sp=6;}
+    if(D.mode==='leave'){tx=d.x+Math.sin(d.h)*10;tz=d.z+Math.cos(d.h)*10;sp=9;}
+    const dx=tx-d.x,dz=tz-d.z,dist=Math.hypot(dx,dz);if(dist>.05){const s=Math.min(dist,sp*dt);d.x+=dx/dist*s;d.z+=dz/dist*s;if(D.mode!=='circle')d.h=Math.atan2(dx,dz);else d.h=Math.atan2(player.x-d.x,player.z-d.z);}
+    pushOut(d,.5);d.m.g.position.set(d.x,0,d.z);d.m.g.rotation.y=d.h;d.m.legs.forEach((l,k)=>l.rotation.x=Math.sin(elapsed*22+k*PI)*.7);d.m.tail.rotation.y=Math.sin(elapsed*18)*.6;
+    d.bark-=dt;if(d.bark<=0&&D.mode!=='leave'){d.bark=rnd(.7,1.4);AU.bark();if(Math.random()<.45&&floaters.length<8)floatText('汪！',d.x,1.6,d.z,'#8a5a3b');}
+    if(D.mode==='chase'&&Math.hypot(player.x-d.x,player.z-d.z)<1.3&&player.stun<=0){D.mode='circle';D.mt=0;player.stun=1.6;player.v=0;player.vx=player.vz=0;stats.dogsCaught++;
+      camShake=.3;buzz([30,30,30]);floatText('被包圍了！',player.x,3.2,player.z,'#e5484d','big');captureMoment('被 3 隻土狗包圍，師傅當場投降','dogs',380);}});
+  if(D.mode==='chase'&&(D.t>11||D.list.every(d=>Math.hypot(player.x-d.x,player.z-d.z)>28))){D.mode='leave';D.mt=0;stats.dogsEscaped++;toastEv('成功甩開','甩掉土狗大隊了！繼續上工','#1fae78','🐕');}
+  if(D.mode==='circle'&&D.mt>2.4){D.mode='leave';D.mt=0;}
+  if(D.mode==='leave'&&D.mt>2.5){D.list.forEach(d=>FX.remove(d.m.g));ev.dogs=null;}}
+
+/* ---- 2. forgot the tools (hooked in processSite) ---- */
+function maybeForgetTools(rep){if(rep.toolChecked)return false;rep.toolChecked=true;
+  if(ev.toolDone||!S.BASE||gt<6||Math.random()>.32)return false;ev.toolDone=true;stats.tools++;
+  rep.targets=['BASE',rep.site];rep.stage=0;rep.t0=Math.min(gt,rep.t0+12);
+  toastEv('糟糕','打開工具箱才發現…扳手忘在工務所！先回去拿','#ff6b1a','🔧');floatText('…扳手呢？',player.x,2.8,player.z,'#fff','say');AU.expire();
+  captureMoment('到了現場才發現：扳手沒帶','tools',250);renderOrders();track('event',{type:'tools',map:MAP.id,wx:weather.id});return true;}
+
+/* ---- 3. police checkpoint ---- */
+function startPolice(){if(ev.police)return false;const pt=pickRoadPoint(18,46);if(!pt)return false;const [x,z]=pt;const g=new THREE.Group();g.position.set(x,0,z);FX.add(g);
+  const car=makeCar('#f4f6f8');car.position.set(2.2,0,-2.4);car.rotation.y=PI/2;g.add(car);box(car,1.92,.16,3.72,'#1f4e9c',0,.62,0);
+  const lr=new THREE.Mesh(BOX,new THREE.MeshBasicMaterial({color:'#ff2d2d'})),lb=new THREE.Mesh(BOX,new THREE.MeshBasicMaterial({color:'#2d6bff'}));
+  lr.scale.set(.5,.2,.3);lb.scale.set(.5,.2,.3);lr.position.set(-.3,1.75,-.25);lb.position.set(.3,1.75,-.25);car.add(lr);car.add(lb);
+  [[-2.6,-1.8],[-2.6,1.8],[2.8,1.6],[-1.2,-2.8]].forEach(([a,b])=>cone(g,a,b));
+  const cop=person('#243b6b','cap');cop.position.set(-1.6,0,0);cop.rotation.y=PI/2;g.add(cop);const stick=box(cop,.08,.7,.08,'#ff8a2a',.4,.7,.1,true);stick.rotation.z=-.9;
+  g.add(label3d('臨檢',4.2));const ring=new THREE.Mesh(new THREE.RingGeometry(4.2,4.5,40),new THREE.MeshBasicMaterial({color:'#2d6bff',transparent:true,opacity:.7,depthWrite:false}));ring.rotation.x=-PI/2;ring.position.y=.08;g.add(ring);
+  ev.police={x,z,g,lr,lb,cop,state:'wait',hold:0,life:45,inside:false};
+  toastEv('前方臨檢','前方路口臨檢中，經過時請停車受檢','#2d6bff','👮');return true;}
+function updPolice(dt){const P0=ev.police;if(!P0)return;P0.life-=dt;const on=Math.sin(elapsed*10)>0;P0.lr.visible=on;P0.lb.visible=!on;
+  P0.cop.userData.arm.rotation.z=Math.sin(elapsed*6)*.6;
+  const d=Math.hypot(player.x-P0.x,player.z-P0.z),inside=d<4.4;
+  if(P0.state==='wait'&&inside&&!P0.inside){if(player.v>7){ticket(P0);}else{P0.state='check';floatText('您好，臨檢，請出示駕照',P0.x-1.6,2.6,P0.z,'#fff','say');}}
+  if(P0.state==='check'){if(!inside){ticket(P0);}else if(player.v<2.6){P0.hold+=dt;ev.check={p:P0.hold/1.6,label:'臨檢中：出示駕照…'};
+      if(P0.hold>=1.6){P0.state='done';ev.check=null;stats.lawful++;addScore(200,P0.x,P0.z,'#2d6bff');AU.pickup();
+        toastEv('臨檢通過','謝謝配合，騎車小心！守法好市民 +NT$200','#2d6bff','👮');floatText('騎車小心喔！',P0.x-1.6,2.6,P0.z,'#fff','say');captureMoment('乖乖停下來臨檢，警察說騎車小心','lawful',100);}}
+    else ev.check={p:P0.hold/1.6,label:'請停車受檢'};}
+  P0.inside=inside;if(P0.life<=0&&!inside){FX.remove(P0.g);ev.police=null;ev.check=null;}}
+function ticket(P0){P0.state='done';ev.check=null;stats.tickets++;const fine=Math.min(600,Math.round(score));score-=fine;bumpScoreUI();AU.siren();camShake=.3;buzz([40,30,40]);
+  floatText(`罰單 -NT$${fmt(fine||0)}`,player.x,3.4,player.z,'#e5484d','big');emit(player.x,2,player.z,18,['#ffffff','#f4f1ea'],{smin:1,smax:4,vmin:3,vmax:7,g:5,szmin:.2,szmax:.35});
+  floatText('先生，這邊臨檢喔！',P0.x-1.6,2.6,P0.z,'#fff','say');toastEv('被開單了','闖越臨檢，罰單 NT$600，這班白做了一半…','#e5484d','🚨');captureMoment('闖臨檢被開單，老闆會扣薪嗎','ticket',150);}
+
+/* ---- 4. battery / fuel empty ---- */
+const isEV=()=>prof.bike==='ev';
+function startBattery(){if(ev.station||ev.battery)return false;const pt=pickRoadPoint(22,52);if(!pt)return false;const [x,z]=pt;const g=new THREE.Group();g.position.set(x,0,z);FX.add(g);const ev1=isEV();
+  if(ev1){[-.9,.9].forEach(dx=>{box(g,1.3,2.2,.8,'#12b5a5',dx,0,-2.6);for(let r=0;r<3;r++)for(let c=0;c<2;c++){const s=new THREE.Mesh(BOX,new THREE.MeshBasicMaterial({color:'#7dffb0'}));s.scale.set(.42,.34,.05);s.position.set(dx-.24+c*.48,.5+r*.5,-2.18);g.add(s);}});
+    const sg=signMesh('換電站','#0f8f83','#fff',2.6,.7,{round:10});sg.position.set(0,2.8,-2.55);g.add(sg);}
+  else{[[-1.8,-1.4],[1.8,-1.4],[-1.8,1.4],[1.8,1.4]].forEach(([a,b])=>box(g,.18,3.2,.18,'#dcdfe3',a,0,b-2.2));box(g,4.6,.4,3.8,'#e5484d',0,3.2,-2.2);box(g,4.6,.14,3.8,'#ffffff',0,3.05,-2.2);
+    [-.9,.9].forEach(dx=>{box(g,.6,1.4,.5,'#f4f6f8',dx,0,-2.4);box(g,.5,.3,.05,'#2d3440',dx,1,-2.14,true);});const sg=signMesh('加油站','#e5484d','#fff',2.4,.7,{round:10});sg.position.set(0,3.9,-.28);g.add(sg);}
+  const ring=new THREE.Mesh(new THREE.RingGeometry(2.6,2.95,40),new THREE.MeshBasicMaterial({color:'#12b5a5',transparent:true,opacity:.85,depthWrite:false}));ring.rotation.x=-PI/2;ring.position.y=.08;g.add(ring);
+  g.add(label3d(ev1?'換電站':'加油站',5));
+  ev.station={x,z,g,ring,hold:0,putt:0,ev:ev1,done:false};ev.battery=true;
+  toastEv(ev1?'電量警告':'油量警告',ev1?'電量剩 3%！速度只剩四成，快去換電站':'油箱見底！速度只剩四成，快去加油站','#12b5a5',ev1?'🔋':'⛽');
+  captureMoment(ev1?'電量 3%，只能龜速前進':'油箱見底，一路噗噗噗','battery',2600);return true;}
+function updStation(dt){const s=ev.station;if(!s)return;s.ring.scale.setScalar(1+Math.sin(elapsed*5)*.06);
+  if(ev.battery){s.putt-=dt;if(s.putt<=0){s.putt=.42;AU.putt();emit(player.x-Math.sin(player.h)*1.1,.5,player.z-Math.cos(player.h)*1.1,2,['#8a8f98','#b9bdc4'],{smin:.2,smax:.8,vmin:.5,vmax:1.4,g:-1,lmin:.6,lmax:1,szmin:.2,szmax:.4});
+      if(Math.random()<.12&&floaters.length<8)floatText('噗噗噗…',player.x,2.6,player.z,'#fff','say');}
+    const d=Math.hypot(player.x-s.x,player.z-s.z);
+    if(d<3&&player.v<3.2){s.hold+=dt;ev.check={p:s.hold/1.2,label:s.ev?'換電池中…':'加油中…'};
+      if(s.hold>=1.2){ev.battery=false;ev.check=null;stats.battery++;s.done=true;s.doneT=3;AU.done();emit(player.x,1.2,player.z,26,['#7dffb0','#ffffff','#12b5a5'],{smin:1,smax:4,vmin:3,vmax:7});
+        toastEv(s.ev?'換電完成':'加滿了','滿電出發！速度恢復','#12b5a5',s.ev?'🔋':'⛽');}}
+    else if(d<3)ev.check={p:s.hold/1.2,label:'停下來才能'+(s.ev?'換電':'加油')};else if(ev.check&&ev.check.label.includes(s.ev?'換電':'加油'))ev.check=null;}
+  if(s.done){s.doneT-=dt;if(s.doneT<=0){FX.remove(s.g);ev.station=null;}}}
+
+/* ---- 5. garbage truck (Für Elise) ---- */
+const FUR_ELISE=[76,75,76,75,76,71,74,72,69,0,60,64,69,71,0,64,68,71,72,0,64,76,75,76,75,76,71,74,72,69,0,60,64,69,71,0,64,72,71,69,0,0];
+function makeTruck(){const g=new THREE.Group();box(g,2.1,1.5,1.6,'#f5c518',0,.35,1.7);box(g,1.9,.7,.05,'#34495e',0,1.05,2.52,true);box(g,2.3,2.2,3.2,'#f5c518',0,.35,-.8);
+  box(g,2.32,.3,3.22,'#1fae78',0,1.3,-.8,true);[[1,1.6],[-1,1.6],[1,-1.4],[-1,-1.4]].forEach(([x,z])=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.3,12),mat('#23262c'));w.rotation.z=PI/2;w.position.set(x,.42,z);g.add(w);});
+  const lb=label3d('垃圾車 ♪',3.8);g.add(lb);g.traverse(o=>{if(o.isMesh)o.castShadow=true;});return g;}
+function startGarbage(){if(ev.truck||!trafficLoops.length)return false;
+  let best=null;trafficLoops.forEach(loop=>{loop.forEach(([x,z])=>{const d=Math.hypot(x-player.x,z-player.z);if(!best||d<best.d)best={loop,d};});});if(!best||best.d>60)return false;
+  const mesh=makeTruck();const v=addVehicle(best.loop,mesh,4.6,0,1.9);
+  let bd=0,bdist=1e9;for(let d=0;d<v.L;d+=2){const s=v.segs.find(s=>d>=s.s&&d<s.s+s.l);const t=(d-s.s)/s.l;const x=lerp(s.a[0],s.b[0],t),z=lerp(s.a[1],s.b[1],t);const dd=Math.hypot(x-player.x,z-player.z);if(dd<bdist){bdist=dd;bd=d;}}
+  v.d=(bd-22+v.L)%v.L;v.truck=true;
+  const folks=[];for(let k=0;k<4;k++){const p=person(pick(['#e58fb0','#6aa3d8','#f0b43a','#9b8bd6','#ffffff']));const bag=box(p,.4,.45,.35,'#1b1f27',.42,.1,.12);FX.add(p);folks.push({p,lag:12+k*7});}
+  ev.truck={v,folks,hist:[],t:0,mi:0,mt:0,near:0,helped:false,shot:false};
+  toastEv('♪ 給愛麗絲響起','垃圾車來了！全巷子的人都衝出來了','#f5c518','🚛');return true;}
+function removeTruck(){const T=ev.truck;if(!T)return;CITY.remove(T.v.mesh);const i=traffic.indexOf(T.v);if(i>=0)traffic.splice(i,1);T.folks.forEach(f=>FX.remove(f.p));ev.truck=null;}
+function updTruck(dt){const T=ev.truck;if(!T)return;T.t+=dt;const v=T.v;T.hist.unshift([v.x,v.z,v.h]);if(T.hist.length>60)T.hist.pop();
+  T.folks.forEach((f,i)=>{const hp=T.hist[Math.min(T.hist.length-1,f.lag)];if(!hp)return;const bx=hp[0]-Math.sin(hp[2])*1.2+Math.cos(hp[2])*(i%2?.7:-.7),bz=hp[1]-Math.cos(hp[2])*1.2-Math.sin(hp[2])*(i%2?.7:-.7);
+    f.p.position.set(bx,Math.abs(Math.sin(elapsed*12+i))*.18,bz);f.p.rotation.y=hp[2];f.p.userData.arm.rotation.x=Math.sin(elapsed*14+i)*.9;});
+  const d=Math.hypot(player.x-v.x,player.z-v.z);T.mt-=dt;
+  if(T.mt<=0){T.mt=.21;const m=FUR_ELISE[T.mi++%FUR_ELISE.length];const vol=clamp(1-d/45,0,1)*.11;if(m&&vol>.005)AU.tone(440*Math.pow(2,(m-69)/12),.24,'triangle',vol);}
+  if(d<7){T.near+=dt;if(!T.shot){T.shot=true;captureMoment('垃圾車一來，全巷子都在跑','garbage',300);}
+    if(T.near>3&&!T.helped){T.helped=true;stats.garbage++;addScore(300,v.x,v.z,'#1fae78');toastEv('好鄰居','幫阿姨追到垃圾車 +NT$300','#1fae78','🗑️');}}
+  if(T.t>30)removeTruck();}
+
+/* ---- 6. bubble tea boost ---- */
+function makeTea(){const g=new THREE.Group();const cup=new THREE.Mesh(new THREE.CylinderGeometry(.34,.27,.8,14),new THREE.MeshLambertMaterial({color:'#c9a37a',transparent:true,opacity:.92}));cup.position.y=.4;g.add(cup);
+  for(let i=0;i<6;i++){const b=new THREE.Mesh(new THREE.SphereGeometry(.07,6,5),mat('#2b1d14'));b.position.set(Math.cos(i)*.14,.1,Math.sin(i)*.14);g.add(b);}
+  box(g,.72,.05,.72,'#ffffff',0,.8,0,true);const st=cyl(g,.04,.04,.7,'#e5484d',.08,.8,0,6);st.rotation.z=-.2;return g;}
+function spawnTea(){const pt=pickRoadPoint(8,38);if(!pt)return;const g=makeTea();const side=Math.random()<.5?-1.6:1.6;const vert=ROADS.some(r=>Math.abs(r-pt[0])<.01);
+  const x=pt[0]+(vert?side:0),z=pt[1]+(vert?0:side);g.position.set(x,.3,z);g.scale.setScalar(1.6);FX.add(g);ev.teas.push({g,x,z,life:26});}
+function updTeas(dt){ev.teas=ev.teas.filter(t=>{t.life-=dt;t.g.rotation.y+=dt*2.5;t.g.position.y=.3+Math.abs(Math.sin(elapsed*3))*.3;
+  if(Math.hypot(player.x-t.x,player.z-t.z)<1.9){FX.remove(t.g);player.boost=6;stats.tea++;AU.done();floatText('咕嚕咕嚕！',player.x,3,player.z,'#c9a37a','big');
+    toastEv('手搖飲續命','全速衝刺 6 秒！','#c9a37a','🧋');if(stats.tea>=2)captureMoment('今天第二杯手搖飲，時速破表','tea',400);return false;}
+  if(t.life<=0){FX.remove(t.g);return false;}return true;});}
+
+/* ---- moment share card ---- */
+function wrapText(g,text,maxW){const out=[];let line='';for(const ch of Array.from(text)){if(g.measureText(line+ch).width>maxW&&line){out.push(line);line=ch;}else line+=ch;}if(line)out.push(line);return out;}
+async function buildMomentCard(m){const W=1080,H=1350,c=cvs(W,H),g=c.getContext('2d');const D='Huninn, "Noto Sans TC", sans-serif',B='"Noto Sans TC", sans-serif';
+  g.fillStyle='#1b2233';g.fillRect(0,0,W,H);const img=await loadImg(m.src);
+  if(img){const ph=1040,s=Math.max(W/img.width,ph/img.height),iw=img.width*s,ih=img.height*s;g.save();g.beginPath();g.rect(0,0,W,ph);g.clip();g.drawImage(img,(W-iw)/2,(ph-ih)/2,iw,ih);g.restore();}
+  const gr=g.createLinearGradient(0,640,0,1060);gr.addColorStop(0,'rgba(27,34,51,0)');gr.addColorStop(1,'rgba(27,34,51,1)');g.fillStyle=gr;g.fillRect(0,640,W,420);
+  g.font=`900 28px ${B}`;const wx=WX[m.wx]||WX.sun;const eb=`匠城出任務・今日名場面・${wx.name}`;const ew=g.measureText(eb).width+48;g.fillStyle='#ff6b1a';rr(g,48,48,ew,58,29);g.fill();
+  g.fillStyle='#fff';g.textBaseline='middle';g.fillText(eb,72,78);
+  g.textBaseline='alphabetic';g.font=`86px ${D}`;const lines=wrapText(g,`「${m.caption}」`,W-120).slice(0,3);let y=1120-(lines.length-1)*96;
+  lines.forEach(l=>{g.lineWidth=14;g.strokeStyle='#1b2233';g.lineJoin='round';g.strokeText(l,60,y);g.fillStyle='#ffffff';g.fillText(l,60,y);y+=96;});
+  g.fillStyle='rgba(255,255,255,.7)';g.font=`500 28px ${B}`;g.fillText(SHARE_URL.replace(/^https?:\/\//,''),60,H-60);
+  g.fillStyle='#ff6b1a';rr(g,W-48-330,H-128,330,84,42);g.fill();g.fillStyle='#fff';g.font=`38px ${D}`;g.textAlign='center';g.fillText('你也來跑一班 →',W-48-165,H-73);g.textAlign='left';
+  return c;}
+function renderMoments(){const box_=$('#moments');if(!moments.length){box_.hidden=true;return;}box_.hidden=false;
+  $('#mrow').innerHTML=moments.map((m,i)=>`<button class="mo" data-i="${i}" type="button"><img alt="" src="${m.src}"><span>${m.caption}</span></button>`).join('');}
+$('#mrow').addEventListener('click',e=>{const b=e.target.closest('.mo');if(!b)return;const m=moments[+b.dataset.i];if(m){track('moment_share_open',{tag:m.tag});openShare({moment:m});}});
+
+/* ================= Taiwan landmarks ================= */
+function makeOpera(){const g=new THREE.Group();box(g,9.4,5.6,7.4,'#f2f1ec',0,0,-.4);
+  for(let i=0;i<4;i++){const o=new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.05,.3,18),mat('#3c4556'));o.rotation.x=PI/2;o.scale.set(1,1,1.5);o.position.set(-3.3+i*2.2,2.4+(i%2)*.8,3.36);g.add(o);}
+  for(let i=0;i<3;i++){const o=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.3,18),mat('#3c4556'));o.rotation.z=PI/2;o.scale.set(1,1,1.4);o.position.set(4.72,1.8+i*1.2,-2.6+i*2.2);g.add(o);}
+  box(g,9.8,.35,7.8,'#e4e2dc',0,5.6,-.4);box(g,10.5,.08,2,'#86bf5c',0,0,4.6,true);return {g,H:6.2};}
+function makeLoveRiver(){const g=new THREE.Group();const w=new THREE.Mesh(new THREE.PlaneGeometry(11.6,4.2),new THREE.MeshLambertMaterial({color:'#3f9fd0'}));w.rotation.x=-PI/2;w.position.y=.06;g.add(w);
+  box(g,11.6,.3,.35,'#b8b2a6',0,0,2.2,true);box(g,11.6,.3,.35,'#b8b2a6',0,0,-2.2,true);
+  const br=new THREE.Group();g.add(br);box(br,1.8,.25,5.2,'#d8342c',0,1,0);box(br,.12,.9,5.2,'#f4f1ea',.85,1.2,0,true);box(br,.12,.9,5.2,'#f4f1ea',-.85,1.2,0,true);
+  for(let i=0;i<7;i++){const l=new THREE.Mesh(new THREE.SphereGeometry(.12,8,6),new THREE.MeshBasicMaterial({color:i%2?'#ff5f9e':'#ffd66b'}));l.position.set(.85,2.2,-2.4+i*.8);br.add(l);}
+  [[-4.6,3.8],[-2,4.2],[3.6,-4],[4.8,3.9]].forEach(([x,z])=>palm(x,z,rnd(3.6,4.4),g));
+  const boat=new THREE.Group();box(boat,2.4,.5,1,'#f4f6f8',0,0,0);box(boat,1.2,.6,.8,'#ff5f9e',-.2,.5,0);boat.position.set(-3,.15,0);g.add(boat);
+  const lb=label3d('愛之船',2.2);lb.scale.set(2.6,.74,1);boat.add(lb);return {g,H:2.5,boat};}
+function makeAnping(){const g=new THREE.Group();box(g,8.6,2.2,7.4,'#a6452f',0,0,-.3);for(let i=0;i<8;i++)box(g,.6,.5,.4,'#a6452f',-3.9+i*1.12,2.2,3.2,true);
+  box(g,3.4,4.2,3.4,'#f4f1ea',-.6,2.2,-.9);const roof=new THREE.Mesh(new THREE.ConeGeometry(2.8,2,4),mat('#b8402a'));roof.rotation.y=PI/4;roof.position.set(-.6,7.4,-.9);roof.castShadow=true;g.add(roof);
+  box(g,1.6,1.3,.2,'#34495e',-.6,3.4,.82,true);const cn=new THREE.Mesh(new THREE.CylinderGeometry(.18,.24,1.6,10),mat('#2d3440'));cn.rotation.x=PI/2;cn.position.set(2.6,2.6,3.6);g.add(cn);
+  return {g,H:8.4};}
+function makeAlishan(){const o=makeMountain(false);const g=o.g;const trunk=cyl(g,.9,1.3,6,'#6b4a33',0,0,.5,9);const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(3.2,0),mat('#2f6e3a'));crown.position.set(0,7.6,.5);crown.castShadow=true;g.add(crown);
+  const track=new THREE.Mesh(new THREE.TorusGeometry(4.6,.08,6,48),mat('#5c626c'));track.rotation.x=PI/2;track.position.y=.28;g.add(track);
+  const train=new THREE.Group();g.add(train);for(let i=0;i<3;i++){const car=box(train,.7,.7,1.3,'#c0392b',0,.3,0);car.position.set(4.6*Math.cos(i*.32),.3,4.6*Math.sin(i*.32));car.rotation.y=-i*.32;box(car,1.01,.18,1.01,'#f5c518',0,.25,0,true);}
+  return {g,H:10,train};}
+function makeSunMoon(){const g=new THREE.Group();const lake=new THREE.Mesh(new THREE.CylinderGeometry(4.6,4.6,.12,32),new THREE.MeshLambertMaterial({color:'#2f8fc2'}));lake.position.set(-.5,.12,.6);g.add(lake);
+  const isl=new THREE.Mesh(new THREE.CylinderGeometry(.6,.7,.3,10),mat('#6f9d57'));isl.position.set(.3,.2,1.2);g.add(isl);
+  [[-4.6,-4.2,3.4,6],[4.2,-3.8,3,5],[4.6,3.8,2.6,4]].forEach(([x,z,r,h])=>{const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,7),mat('#5d8f4e'));m.position.set(x,h/2,z);m.castShadow=true;g.add(m);});
+  const pg=new THREE.Group();pg.position.set(-3.6,0,4);g.add(pg);for(let i=0;i<4;i++){box(pg,1.3-i*.2,.8,1.3-i*.2,'#f4f1ea',0,i*.95,0);box(pg,1.7-i*.22,.15,1.7-i*.22,'#b8402a',0,i*.95+.8,0,true);}
+  return {g,H:6};}
+function makeTaroko(){const g=new THREE.Group();[[-3.2,0,3.4,11,'#8a8f98'],[3.2,0,3.4,11,'#9aa0a8'],[-3.6,-4,3,8,'#5d8f4e'],[3.4,4.2,2.8,7,'#5d8f4e']].forEach(([x,z,r,h,c])=>{const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,6),mat(c));m.position.set(x,h/2,z);m.castShadow=true;g.add(m);});
+  const w=new THREE.Mesh(new THREE.PlaneGeometry(2,11),new THREE.MeshLambertMaterial({color:'#6fc3e6'}));w.rotation.x=-PI/2;w.position.y=.08;g.add(w);
+  const arch=new THREE.Mesh(new THREE.TorusGeometry(2.2,.18,8,24,PI),mat('#d8342c'));arch.position.set(0,2.2,1);g.add(arch);box(g,4.6,.18,.9,'#d8342c',0,4.4,1);return {g,H:11};}
+function makeLighthouse(){const g=new THREE.Group();cyl(g,.9,1.2,6.5,'#ffffff',0,0,0,16);cyl(g,1,1,.9,'#2d3440',0,6.5,0,16);
+  const lt=new THREE.Mesh(new THREE.CylinderGeometry(.6,.6,.8,12),new THREE.MeshBasicMaterial({color:'#ffe38a'}));lt.position.y=7.4;g.add(lt);const cap=new THREE.Mesh(new THREE.ConeGeometry(1,.9,12),mat('#2d3440'));cap.position.y=8.2;g.add(cap);
+  const beam=new THREE.Mesh(new THREE.ConeGeometry(1.2,9,12,1,true),new THREE.MeshBasicMaterial({color:'#fff4b0',transparent:true,opacity:.18,depthWrite:false,side:THREE.DoubleSide}));beam.rotation.z=PI/2;beam.position.set(4.5,7.4,0);
+  const rot=new THREE.Group();rot.position.y=0;rot.add(beam);g.add(rot);return {g,H:9,rot};}
+function makeTurtleIsland(){const g=new THREE.Group();const body=new THREE.Mesh(new THREE.SphereGeometry(4,10,8),mat('#5d8f4e'));body.scale.set(1.4,.55,1);g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(1.4,8,6),mat('#6f9d57'));head.position.set(-5.8,.8,0);head.scale.set(1.2,.9,.9);g.add(head);
+  const peak=new THREE.Mesh(new THREE.ConeGeometry(2,3.4,7),mat('#4f7f45'));peak.position.set(1,2.6,0);g.add(peak);return g;}
+let landmarks=[],lmAnim=[];
+function addLandmark(name,x,z,labelY,rad){landmarks.push({name,x,z,r:rad||12.5});const lb=label3d('📍'+name,labelY||9);lb.scale.set(4.4,1.24,1);lb.position.set(x,labelY||9,z);CITY.add(lb);}
+function buildLandmarkBlock(type,bx,bz,add){
+  if(type==='opera'){add(null,'','deco',bx,bz,makeOpera(),9.4,7.4);addLandmark('台中歌劇院',bx,bz,8);return true;}
+  if(type==='loveriver'){const o=makeLoveRiver();place(o.g,bx,bz);addCollider(bx,bz,11.6,5,1);lmLive.push(o.boat);lmAnim.push(t=>{o.boat.position.x=Math.sin(t*.35)*4;o.boat.rotation.y=Math.cos(t*.35)>0?0:PI;});addLandmark('高雄愛河',bx,bz,5);return true;}
+  if(type==='anping'){add(null,'','deco',bx,bz,makeAnping(),8.6,7.4);addLandmark('安平古堡',bx,bz,10.5);return true;}
+  if(type==='alishan'){const o=makeAlishan();o.g.position.set(bx,.2,bz);CITY.add(o.g);addCollider(bx,bz,11.4,11.4,o.H);lmLive.push(o.train);lmAnim.push(t=>{o.train.rotation.y=-t*.5;});addLandmark('阿里山',bx,bz,12);return true;}
+  if(type==='sunmoon'){const o=makeSunMoon();o.g.position.set(bx,.2,bz);CITY.add(o.g);addCollider(bx,bz,11.4,11.4,4);addLandmark('日月潭',bx,bz,7.5);return true;}
+  if(type==='taroko'){const o=makeTaroko();o.g.position.set(bx,.2,bz);CITY.add(o.g);addCollider(bx,bz,11.4,11.4,o.H);addLandmark('太魯閣',bx,bz,12.5);return true;}
+  return false;}
+const LANDMARK_TOTAL=9;
+function checkLandmarks(){landmarks.forEach(l=>{if(l.hit)return;if(Math.hypot(player.x-l.x,player.z-l.z)>l.r)return;l.hit=true;stats.checkins++;
+  const isNew=!prof.landmarks.includes(l.name);if(isNew){prof.landmarks.push(l.name);saveProf();}
+  addScore(100,l.x,l.z,'#ff6b1a');AU.pickup();floatText(`📍 GPS 打卡：${l.name}`,player.x,3.6,player.z,'#ff6b1a','big');
+  toastEv(isNew?'地標圖鑑 +1':'GPS 打卡',`${l.name} 打卡成功 +NT$100${isNew?`（圖鑑 ${prof.landmarks.length}/${LANDMARK_TOTAL}）`:''}`,'#ff6b1a','📍');
+  if(stats.checkins===1)captureMoment(`在${l.name}打卡，順便上工`,'landmark',350);track('checkin',{name:l.name,isNew});});}
+
 /* ================= boot ================= */
 async function boot(){
   try{await Promise.race([Promise.all([document.fonts.load('40px Huninn','Homigo社宅包租代管中心Washgo洗衣TaskGo工務所匠城便利商店檳榔林王張黃吳宅中華路四維林森三多×'),
     document.fonts.load('700 20px "Noto Sans TC"','待轉慢')]),new Promise(r=>setTimeout(r,2500))]);}catch(e){}
-  buildCity();makeMarkers();
-  const tr=[[rectLoop(-10,10,-10,10),makeCar('#f7c948',true),7.5,0,1.7],[rectLoop(-30,30,-30,30),makeCar('#e9ecef'),8.5,.1,1.7],[rectLoop(-30,30,-30,30),null,9,.55,1],
-    [rectLoop(-30,10,-10,30),makeCar('#d8342c'),7,.35,1.7],[rectLoop(-10,30,-30,10),makeCar('#5b7fa6'),7.5,.6,1.7],[rectLoop(-10,30,-30,10),null,8.5,.1,1],[rectLoop(-30,30,-30,30),makeCar('#f7c948',true),8,.8,1.7]];
-  tr.forEach(([loop,mesh,sp,ph,r])=>{let tilt=null;if(!mesh){const s=makeScooter(pick(['#d8342c','#2d3440','#8fb3c9']),'#2a2d34',{shirt:pick(['#6a8caf','#c0504d','#3b3b3b']),vest:pick(['#e9e2d0','#34495e']),helmet:pick(['#ffffff','#e5484d','#3a8dde'])});
-      s.root.traverse(o=>{if(o.isMesh)o.castShadow=true;});mesh=s.root;tilt=s.tilt;}const v=addVehicle(loop,mesh,sp,ph,r);v.tilt=tilt;});
-  setDay(.2);state='title';const b=$('#btnStart');b.disabled=false;b.textContent='開始上工';
+  const first=challengeMap&&isMapOpen(challengeMap)?challengeMap:(isMapOpen(prof.map)&&prof.map!=='t'?prof.map:(prof.map==='t'&&prof.tw.unlocked?'t':'s'));loadMap(first);checkApi().then(()=>checkReferral(true));
+  if(refIncoming&&!challenge&&!imported){const c=$('#challenge');c.hidden=false;c.innerHTML='朋友邀請你來匠城跑一班！你玩完一班，他就能解鎖<b>隱藏版台灣地圖</b>。';}
+  setDay(.2);state='title';renderProfile();renderMaps();if(imported){const c=$('#challenge');c.hidden=false;c.innerHTML=(challenge?c.innerHTML+'<br>':'')+`已帶入你的進度：<b>${fmt(prof.coins)}</b> 匠幣，造型和成就也都在。`;}const b=$('#btnStart');b.disabled=false;b.textContent='開始上工';
 }
 requestAnimationFrame(frame);boot();
 })();

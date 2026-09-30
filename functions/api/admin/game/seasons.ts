@@ -3,7 +3,7 @@ import type { Env } from '../../../_shared/env';
 import { requireAuth } from '../../../_shared/auth';
 import { getSql } from '../../../_shared/db';
 import { json, error } from '../../../_shared/response';
-import { listSeasons, withGameSchema } from '../../../_shared/game';
+import { isGameMap, listSeasons, withGameSchema } from '../../../_shared/game';
 
 export interface SeasonInput {
   name?: string;
@@ -12,6 +12,7 @@ export interface SeasonInput {
   prize?: string;
   topN?: number;
   isActive?: boolean;
+  prizeMap?: string;
 }
 
 export function parseSeasonInput(body: SeasonInput): { value?: Required<SeasonInput>; error?: string } {
@@ -23,6 +24,8 @@ export function parseSeasonInput(body: SeasonInput): { value?: Required<SeasonIn
   if (Number.isNaN(starts.getTime()) || Number.isNaN(ends.getTime())) return { error: '請填正確的起訖時間' };
   if (ends <= starts) return { error: '結束時間必須晚於開始時間' };
   if (!Number.isInteger(topN) || topN < 1 || topN > 100) return { error: '得獎名額請填 1–100' };
+  const prizeMap = body.prizeMap ?? 's';
+  if (!isGameMap(prizeMap)) return { error: '獎品地圖請選小、中、大或台灣地圖' };
   return {
     value: {
       name,
@@ -31,6 +34,7 @@ export function parseSeasonInput(body: SeasonInput): { value?: Required<SeasonIn
       prize: String(body.prize ?? '').trim(),
       topN,
       isActive: body.isActive !== false,
+      prizeMap,
     },
   };
 }
@@ -57,8 +61,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const v = parsed.value;
   const sql = getSql(context.env);
   const rows = await withGameSchema(context.env, () => sql`
-    INSERT INTO game_seasons (name, starts_at, ends_at, prize, top_n, is_active)
-    VALUES (${v.name}, ${v.startsAt}, ${v.endsAt}, ${v.prize}, ${v.topN}, ${v.isActive})
+    INSERT INTO game_seasons (name, starts_at, ends_at, prize, top_n, is_active, prize_map)
+    VALUES (${v.name}, ${v.startsAt}, ${v.endsAt}, ${v.prize}, ${v.topN}, ${v.isActive}, ${v.prizeMap})
     RETURNING id
   `);
   return json({ ok: true, id: (rows[0] as { id: string }).id }, 201);

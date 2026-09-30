@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import {
-  ApiError, gameAdminApi, type GameBoardEntry, type GameSeason, type GameSeasonInput,
+  ApiError, GAME_MAP_LABELS, gameAdminApi, type GameBoardEntry, type GameMap, type GameSeason, type GameSeasonInput,
 } from '@/lib/api';
+
+const MAP_IDS = Object.keys(GAME_MAP_LABELS) as GameMap[];
 
 const muted: CSSProperties = { fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.7 };
 const input: CSSProperties = {
@@ -30,7 +32,7 @@ function emptyForm(): GameSeasonInput {
   const start = new Date();
   start.setMinutes(0, 0, 0);
   const end = new Date(start.getTime() + 14 * 86400_000);
-  return { name: '', startsAt: start.toISOString(), endsAt: end.toISOString(), prize: '', topN: 10, isActive: true };
+  return { name: '', startsAt: start.toISOString(), endsAt: end.toISOString(), prize: '', topN: 10, isActive: true, prizeMap: 's' };
 }
 
 function seasonStatus(s: GameSeason): { label: string; tone: 'success' | 'default' | 'accent' } {
@@ -108,6 +110,12 @@ function SeasonForm({
           <span style={{ fontSize: 13, fontWeight: 600 }}>得獎名額（前 N 名）</span>
           <input type="number" min={1} max={100} style={input} value={form.topN} onChange={(e) => setForm({ ...form, topN: Number(e.target.value) })} />
         </label>
+        <label style={{ display: 'grid', gap: 4 }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>獎品地圖（只看這張的名次）</span>
+          <select style={input} value={form.prizeMap} onChange={(e) => setForm({ ...form, prizeMap: e.target.value as GameMap })}>
+            {MAP_IDS.map((m) => <option key={m} value={m}>{GAME_MAP_LABELS[m]}</option>)}
+          </select>
+        </label>
       </div>
       <label style={{ display: 'grid', gap: 4 }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>獎品說明</span>
@@ -135,6 +143,7 @@ export function GameSeasons() {
   const { user } = useAuth();
   const [seasons, setSeasons] = useState<GameSeason[]>([]);
   const [selected, setSelected] = useState<string>('all');
+  const [boardMap, setBoardMap] = useState<GameMap>('s');
   const [editing, setEditing] = useState<{ id: string | null; value: GameSeasonInput } | null>(null);
   const [entries, setEntries] = useState<GameBoardEntry[]>([]);
   const [boardLoading, setBoardLoading] = useState(false);
@@ -150,20 +159,25 @@ export function GameSeasons() {
     }
   }, []);
 
-  const loadBoard = useCallback(async (id: string) => {
+  const boardReq = useRef(0);
+  const loadBoard = useCallback(async (id: string, map: GameMap) => {
+    const req = ++boardReq.current;
     setBoardLoading(true);
     try {
-      const { entries: list } = await gameAdminApi.leaderboard(id);
-      setEntries(list);
+      const { entries: list } = await gameAdminApi.leaderboard(id, map);
+      if (req === boardReq.current) setEntries(list);
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : '排行榜載入失敗');
     } finally {
-      setBoardLoading(false);
+      if (req === boardReq.current) setBoardLoading(false);
     }
   }, []);
 
   useEffect(() => { void loadSeasons(); }, [loadSeasons]);
-  useEffect(() => { void loadBoard(selected); }, [selected, loadBoard]);
+  useEffect(() => { void loadBoard(selected, boardMap); }, [selected, boardMap, loadBoard]);
+
+  const selectedPrizeMap = seasons.find((s) => s.id === selected)?.prizeMap;
+  useEffect(() => { if (selectedPrizeMap) setBoardMap(selectedPrizeMap); }, [selected, selectedPrizeMap]);
 
   if (user?.role !== 'super_admin') {
     return (
@@ -198,23 +212,23 @@ export function GameSeasons() {
     const note = e.isWinner ? '' : (window.prompt(`${e.nickname} 的得獎備註（例如獎項、寄送狀態），可留空`, '') ?? null);
     if (note === null) return;
     await gameAdminApi.setWinner(season.id, e.playerId, !e.isWinner, note);
-    await loadBoard(selected);
+    await loadBoard(selected, boardMap);
   }
 
   async function markTopN() {
-    if (!season) return;
+    if (!season || boardMap !== season.prizeMap) return;
     const top = entries.filter((e) => !e.isBlocked).slice(0, season.topN).filter((e) => !e.isWinner);
     if (!top.length) return;
-    if (!window.confirm(`把前 ${season.topN} 名（排除已取消資格者）標記為得獎者？`)) return;
+    if (!window.confirm(`把${GAME_MAP_LABELS[boardMap]}前 ${season.topN} 名（排除已取消資格者）標記為得獎者？`)) return;
     for (const e of top) await gameAdminApi.setWinner(season.id, e.playerId, true, '');
-    await loadBoard(selected);
+    await loadBoard(selected, boardMap);
   }
 
   async function toggleBlocked(e: GameBoardEntry) {
     const msg = e.isBlocked ? `恢復 ${e.nickname} 的參賽資格？` : `取消 ${e.nickname} 的參賽資格？他的成績會從公開排行榜移除。`;
     if (!window.confirm(msg)) return;
     await gameAdminApi.setBlocked(e.playerId, !e.isBlocked);
-    await loadBoard(selected);
+    await loadBoard(selected, boardMap);
   }
 
   return (
@@ -262,7 +276,7 @@ export function GameSeasons() {
                 >
                   <div style={{ fontWeight: 700 }}>{s.name} <Badge tone={st.tone}>{st.label}</Badge></div>
                   <div style={muted}>
-                    {formatDateTime(s.startsAt)} – {formatDateTime(s.endsAt)}・前 {s.topN} 名得獎
+                    {formatDateTime(s.startsAt)} – {formatDateTime(s.endsAt)}・{GAME_MAP_LABELS[s.prizeMap]}前 {s.topN} 名得獎
                   </div>
                 </button>
                 <Button variant="ghost" onClick={() => setEditing({ id: s.id, value: { ...s } })}>編輯</Button>
@@ -286,16 +300,28 @@ export function GameSeasons() {
 
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-          <h3 style={{ fontSize: 16, flex: 1 }}>{season ? `${season.name} 排名` : '總榜排名'}</h3>
-          {season && <Button variant="secondary" onClick={() => void markTopN()}>標記前 {season.topN} 名得獎</Button>}
+          <h3 style={{ fontSize: 16, flex: 1 }}>{season ? `${season.name} 排名` : '總榜排名'}・{GAME_MAP_LABELS[boardMap]}</h3>
+          {season && boardMap === season.prizeMap && (
+            <Button variant="secondary" onClick={() => void markTopN()}>標記前 {season.topN} 名得獎</Button>
+          )}
           <Button
             variant="ghost"
-            onClick={() => downloadCsv(`${season ? season.name : '總榜'}-排行榜.csv`, entries)}
+            onClick={() => downloadCsv(`${season ? season.name : '總榜'}-${GAME_MAP_LABELS[boardMap]}-排行榜.csv`, entries)}
             disabled={!entries.length}
           >
             匯出 CSV
           </Button>
         </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+          {MAP_IDS.map((m) => (
+            <Button key={m} variant={m === boardMap ? 'secondary' : 'ghost'} onClick={() => setBoardMap(m)}>
+              {GAME_MAP_LABELS[m]}{season?.prizeMap === m ? '（獎品）' : ''}
+            </Button>
+          ))}
+        </div>
+        {season && boardMap !== season.prizeMap && (
+          <p style={{ ...muted, marginBottom: 8 }}>這個賽季的獎品只看{GAME_MAP_LABELS[season.prizeMap]}，這張地圖的名次僅供參考。</p>
+        )}
         {season?.prize && <p style={{ ...muted, whiteSpace: 'pre-line', marginBottom: 8 }}>獎品：{season.prize}</p>}
         {boardLoading && <p style={muted}>載入中…</p>}
         {!boardLoading && !entries.length && <p style={muted}>這個榜還沒有成績。</p>}

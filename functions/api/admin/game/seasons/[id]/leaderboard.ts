@@ -3,9 +3,9 @@ import type { Env } from '../../../../../_shared/env';
 import { requireAuth } from '../../../../../_shared/auth';
 import { getSql } from '../../../../../_shared/db';
 import { json, error } from '../../../../../_shared/response';
-import { decryptPhone, getSeason, loadLeaderboard, withGameSchema } from '../../../../../_shared/game';
+import { decryptPhone, getSeason, loadLeaderboard, toGameMap, withGameSchema } from '../../../../../_shared/game';
 
-/** 後台完整排名：含完整手機與得獎標記。id 為 all 時是總榜。 */
+/** 後台完整排名：含完整手機與得獎標記。id 為 all 時是總榜；?map= 預設為賽季的獎品地圖。 */
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
@@ -14,8 +14,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const seasonId = id === 'all' ? null : id;
   const season = seasonId ? await getSeason(context.env, seasonId) : null;
   if (seasonId && !season) return error('找不到賽季', 404);
+  const map = toGameMap(new URL(context.request.url).searchParams.get('map'), season?.prizeMap ?? 's');
 
-  const rows = await loadLeaderboard(context.env, seasonId, 500, true);
+  const rows = await loadLeaderboard(context.env, seasonId, map, 500, true);
   const sql = getSql(context.env);
   const winnerRows = seasonId
     ? await withGameSchema(context.env, () => sql`
@@ -36,5 +37,5 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     isWinner: winners.has(r.playerId),
     winnerNote: winners.get(r.playerId) ?? '',
   })));
-  return json({ season, entries });
+  return json({ season, map, entries });
 };

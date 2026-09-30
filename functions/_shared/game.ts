@@ -3,16 +3,42 @@ import { getSessionSecret } from './env';
 import { getSql } from './db';
 import { decryptToken } from './crypto';
 
-/** 遊戲一班 90 秒；加上倒數與網路延遲，送出時至少要經過這麼久。 */
-export const GAME_MIN_RUN_MS = 85_000;
 /** 開局後超過這個時間就不能再送成績。 */
 export const GAME_MAX_RUN_MS = 30 * 60_000;
-export const GAME_MAX_ORDERS = 40;
-export const GAME_MAX_SCORE = 120_000;
 
-/** 與遊戲內 reward() 的基本單價一致：單價 ×(1 + 0.4×剩餘時間比例)× 連單倍率（1–2）。 */
+export type GameMap = 's' | 'm' | 'l' | 't';
+export const GAME_MAPS: GameMap[] = ['s', 'm', 'l', 't'];
+
+/** 每張地圖一班的秒數、分數上限與工單上限（含逾時），與遊戲內 MAPS 一致。 */
+export const MAP_RULES: Record<GameMap, { seconds: number; maxScore: number; maxOrders: number }> = {
+  s: { seconds: 90, maxScore: 60_000, maxOrders: 40 },
+  m: { seconds: 120, maxScore: 90_000, maxOrders: 55 },
+  l: { seconds: 150, maxScore: 130_000, maxOrders: 70 },
+  t: { seconds: 180, maxScore: 160_000, maxOrders: 85 },
+};
+export const GAME_MAX_SCORE = MAP_RULES.t.maxScore;
+
+export function isGameMap(v: unknown): v is GameMap {
+  return typeof v === 'string' && (GAME_MAPS as string[]).includes(v);
+}
+
+export function toGameMap(v: unknown, fallback: GameMap = 's'): GameMap {
+  return isGameMap(v) ? v : fallback;
+}
+
+/** 開局倒數與網路延遲留 5 秒，送出時至少要經過這麼久。 */
+export function minRunMs(map: GameMap): number {
+  return (MAP_RULES[map].seconds - 5) * 1000;
+}
+
+/** 與遊戲內 reward() 一致：單價 ×(1 + 0.4×剩餘時間比例)× 連單倍率（1–2）× 急件 1.8。 */
 const BASE_PAY = { taskgo: 1200, homigo: 1500, washgo: 380 } as const;
 const MAX_MULTIPLIER = 1.4 * 2;
+const RUSH_EXTRA = BASE_PAY.homigo * MAX_MULTIPLIER * 0.8;
+/** 遊戲內事件：三袋整車送洗 +600、臨檢通過 +200、垃圾車 +300、地標打卡 +100、闖臨檢罰單最多 -600。 */
+const EVENT_PAY = { batch3: 600, lawful: 200, garbage: 300, checkin: 100, ticket: 600 } as const;
+/** 台灣地圖地標數。 */
+const MAX_CHECKINS = 9;
 
 export interface GameStats {
   taskgo: number;
@@ -20,6 +46,12 @@ export interface GameStats {
   washgo: number;
   expired: number;
   maxCombo: number;
+  rush: number;
+  batch3: number;
+  tickets: number;
+  lawful: number;
+  garbage: number;
+  checkins: number;
 }
 
 export interface GameSeasonRow {
@@ -30,6 +62,7 @@ export interface GameSeasonRow {
   prize: string;
   topN: number;
   isActive: boolean;
+  prizeMap: GameMap;
 }
 
 export interface LeaderboardRow {
@@ -45,8 +78,8 @@ export interface LeaderboardRow {
 
 export function isMissingGameSchema(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return /relation ["']?game_(seasons|players|runs|scores|winners)["']? does not exist/i.test(msg)
-    || /column ["']?[a-z_.]*(device_id|nickname|player_id|last_seen_at|last_score|ended_at)["']? (of relation ["']?game_runs["']? )?does not exist/i.test(msg);
+  return /relation ["']?game_(seasons|players|runs|scores|winners|referrals)["']? does not exist/i.test(msg)
+    || /column ["']?[a-z_.]*(device_id|nickname|player_id|last_seen_at|last_score|ended_at|map)["']? (of relation ["']?game_[a-z]+["']? )?does not exist/i.test(msg);
 }
 
 export async function applyGameMigration(env: Env): Promise<string[]> {
@@ -129,6 +162,23 @@ export async function applyGameMigration(env: Env): Promise<string[]> {
     FROM game_scores s WHERE s.run_id = r.id AND r.player_id IS NULL
   `;
   steps.push('game_runs.engagement');
+  await sql`ALTER TABLE game_runs ADD COLUMN IF NOT EXISTS map TEXT NOT NULL DEFAULT 's'`;
+  await sql`ALTER TABLE game_scores ADD COLUMN IF NOT EXISTS map TEXT NOT NULL DEFAULT 's'`;
+  await sql`ALTER TABLE game_seasons ADD COLUMN IF NOT EXISTS prize_map TEXT NOT NULL DEFAULT 's'`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_game_scores_season_map_score ON game_scores (season_id, map, score DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_game_scores_map_score ON game_scores (map, score DESC)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS game_referrals (
+      id BIGSERIAL PRIMARY KEY,
+      ref_code TEXT NOT NULL,
+      friend_pid TEXT NOT NULL UNIQUE,
+      env TEXT,
+      ip_hash TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_game_referrals_code ON game_referrals (ref_code)`;
+  steps.push('game_maps_referrals');
   return steps;
 }
 
@@ -215,22 +265,39 @@ export function parseGameStats(input: unknown): GameStats | null {
     washgo: toInt(o.washgo),
     expired: toInt(o.expired ?? 0),
     maxCombo: Number(o.maxCombo ?? 1),
+    rush: toInt(o.rush ?? 0),
+    batch3: toInt(o.batch3 ?? 0),
+    tickets: toInt(o.tickets ?? 0),
+    lawful: toInt(o.lawful ?? 0),
+    garbage: toInt(o.garbage ?? 0),
+    checkins: toInt(o.checkins ?? 0),
   };
-  const counts = [stats.taskgo, stats.homigo, stats.washgo, stats.expired];
+  const counts = [
+    stats.taskgo, stats.homigo, stats.washgo, stats.expired, stats.rush, stats.batch3,
+    stats.tickets, stats.lawful, stats.garbage, stats.checkins,
+  ];
   if (counts.some((n) => !Number.isInteger(n) || n < 0)) return null;
   if (!Number.isFinite(stats.maxCombo) || stats.maxCombo < 1 || stats.maxCombo > 2) return null;
   return stats;
 }
 
-/** 分數必須落在這些工單可能賺到的範圍內，回傳錯誤訊息或 null。 */
-export function checkScorePlausible(score: number, stats: GameStats): string | null {
-  if (!Number.isInteger(score) || score < 0 || score > GAME_MAX_SCORE) return '分數不合理';
+/** 分數必須落在這些工單與事件可能賺到的範圍內，回傳錯誤訊息或 null。 */
+export function checkScorePlausible(score: number, stats: GameStats, map: GameMap): string | null {
+  const rule = MAP_RULES[map];
+  if (!Number.isInteger(score) || score < 0 || score > rule.maxScore) return '分數不合理';
   if (score % 10 !== 0) return '分數不合理';
   const orders = stats.taskgo + stats.homigo + stats.washgo;
-  if (orders + stats.expired > GAME_MAX_ORDERS) return '工單數不合理';
+  if (orders + stats.expired > rule.maxOrders) return '工單數不合理';
+  if (stats.rush > orders || stats.batch3 * 3 > stats.washgo) return '工單數不合理';
+  if (stats.tickets + stats.lawful > 1 || stats.garbage > 1) return '事件次數不合理';
+  if (stats.checkins > (map === 't' ? MAX_CHECKINS : 0)) return '打卡次數不合理';
   const base = stats.taskgo * BASE_PAY.taskgo + stats.homigo * BASE_PAY.homigo + stats.washgo * BASE_PAY.washgo;
+  const bonus = stats.batch3 * EVENT_PAY.batch3 + stats.lawful * EVENT_PAY.lawful
+    + stats.garbage * EVENT_PAY.garbage + stats.checkins * EVENT_PAY.checkin;
   const slack = orders * 10;
-  if (score < base - slack || score > base * MAX_MULTIPLIER + slack) return '分數與工單數不符';
+  const min = base - slack - stats.tickets * EVENT_PAY.ticket;
+  const max = base * MAX_MULTIPLIER + stats.rush * RUSH_EXTRA + bonus + slack;
+  if (score < min || score > max) return '分數與工單數不符';
   if (orders > 0 && stats.maxCombo < 1.1) return '連單紀錄不合理';
   return null;
 }
@@ -244,6 +311,7 @@ function mapSeason(row: Record<string, unknown>): GameSeasonRow {
     prize: String(row.prize ?? ''),
     topN: Number(row.top_n ?? 10),
     isActive: Boolean(row.is_active),
+    prizeMap: toGameMap(row.prize_map),
   };
 }
 
@@ -282,10 +350,11 @@ function mapBoard(rows: Record<string, unknown>[]): LeaderboardRow[] {
   }));
 }
 
-/** 每位玩家取最佳成績；同分以先達成者為先。seasonId 為 null 時是總榜。 */
+/** 每位玩家在該地圖取最佳成績；同分以先達成者為先。seasonId 為 null 時是總榜。 */
 export async function loadLeaderboard(
   env: Env,
   seasonId: string | null,
+  map: GameMap,
   limit: number,
   includeBlocked = false,
 ): Promise<LeaderboardRow[]> {
@@ -297,7 +366,7 @@ export async function loadLeaderboard(
           s.player_id, p.nickname, p.phone_masked, p.phone_enc, p.is_blocked, s.score, s.created_at,
           COUNT(*) OVER (PARTITION BY s.player_id) AS plays
         FROM game_scores s JOIN game_players p ON p.id = s.player_id
-        WHERE s.season_id = ${seasonId}::uuid AND (${includeBlocked}::boolean OR NOT p.is_blocked)
+        WHERE s.season_id = ${seasonId}::uuid AND s.map = ${map} AND (${includeBlocked}::boolean OR NOT p.is_blocked)
         ORDER BY s.player_id, s.score DESC, s.created_at ASC
       ) best
       ORDER BY score DESC, created_at ASC
@@ -309,7 +378,7 @@ export async function loadLeaderboard(
           s.player_id, p.nickname, p.phone_masked, p.phone_enc, p.is_blocked, s.score, s.created_at,
           COUNT(*) OVER (PARTITION BY s.player_id) AS plays
         FROM game_scores s JOIN game_players p ON p.id = s.player_id
-        WHERE ${includeBlocked}::boolean OR NOT p.is_blocked
+        WHERE s.map = ${map} AND (${includeBlocked}::boolean OR NOT p.is_blocked)
         ORDER BY s.player_id, s.score DESC, s.created_at ASC
       ) best
       ORDER BY score DESC, created_at ASC
@@ -408,4 +477,20 @@ export async function loadEngagement(env: Env): Promise<GameEngagement> {
   });
 }
 
-export const leaderboardCacheKey = (seasonId: string | null, limit: number) => `game:board:${seasonId ?? 'all'}:${limit}`;
+export const leaderboardCacheKey = (seasonId: string | null, map: GameMap, limit: number) =>
+  `game:board:${seasonId ?? 'all'}:${map}:${limit}`;
+
+/** 公開排行榜的快取鍵（賽季與總榜、所有地圖、10 與 50 筆）。 */
+export function allBoardCacheKeys(seasonId: string | null): string[] {
+  const scopes = seasonId ? [seasonId, null] : [null];
+  return scopes.flatMap((s) => GAME_MAPS.flatMap((m) => [leaderboardCacheKey(s, m, 10), leaderboardCacheKey(s, m, 50)]));
+}
+
+/** 邀請碼、玩家識別碼：遊戲在玩家瀏覽器產生的英數字。 */
+export function isRefCode(v: unknown): v is string {
+  return typeof v === 'string' && /^[a-z0-9]{8,16}$/.test(v);
+}
+
+export function isGamePid(v: unknown): v is string {
+  return typeof v === 'string' && /^[a-z0-9]{12,40}$/.test(v);
+}

@@ -3,7 +3,7 @@ import type { Env } from '../../../_shared/env';
 import { getSql } from '../../../_shared/db';
 import { json, error } from '../../../_shared/response';
 import {
-  cleanDeviceId, cleanNickname, hashIp, hitRateLimit, signRunToken, withGameSchema,
+  cleanDeviceId, cleanNickname, hashIp, hitRateLimit, signRunToken, toGameMap, withGameSchema,
 } from '../../../_shared/game';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -11,7 +11,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (await hitRateLimit(context.env, `start:${ipHash}`, 120, 3600)) {
     return error('開局太頻繁，請稍後再試', 429);
   }
-  let body: { deviceId?: string; nickname?: string } = {};
+  let body: { deviceId?: string; nickname?: string; map?: string } = {};
   try {
     body = await context.request.json() as typeof body;
   } catch {
@@ -19,12 +19,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
   const deviceId = cleanDeviceId(body.deviceId);
   const nickname = cleanNickname(body.nickname);
+  const map = toGameMap(body.map);
   const sql = getSql(context.env);
   try {
     const rows = await withGameSchema(context.env, () => sql`
-      INSERT INTO game_runs (ip_hash, device_id, nickname, last_seen_at, player_id)
+      INSERT INTO game_runs (ip_hash, device_id, nickname, map, last_seen_at, player_id)
       VALUES (
-        ${ipHash}, ${deviceId}, ${nickname}, now(),
+        ${ipHash}, ${deviceId}, ${nickname}, ${map}, now(),
         (SELECT player_id FROM game_runs WHERE device_id = ${deviceId} AND player_id IS NOT NULL
          ORDER BY started_at DESC LIMIT 1)
       )

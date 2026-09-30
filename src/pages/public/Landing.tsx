@@ -16,7 +16,11 @@ interface GameSeason {
   endsAt: string;
   prize: string;
   topN: number;
+  prizeMap: GameMap;
 }
+
+type GameMap = 's' | 'm' | 'l' | 't';
+const MAP_LABELS: Record<GameMap, string> = { s: '小地圖', m: '中地圖', l: '大地圖', t: '台灣地圖' };
 
 interface GameStats {
   live: { count: number; players: { name: string; score: number; seconds: number }[] };
@@ -25,6 +29,7 @@ interface GameStats {
 }
 
 interface LeaderboardResponse {
+  map: GameMap;
   season: GameSeason | null;
   entries: LeaderboardEntry[];
 }
@@ -118,9 +123,11 @@ function Leaderboard() {
 
   useEffect(() => {
     let alive = true;
-    fetch('/api/public/game/leaderboard?limit=10')
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d: LeaderboardResponse) => { if (alive) setData(d); })
+    const get = (map?: GameMap) => fetch(`/api/public/game/leaderboard?limit=10${map ? `&map=${map}` : ''}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))) as Promise<LeaderboardResponse>;
+    get()
+      .then((d) => (d.season && d.season.prizeMap !== d.map ? get(d.season.prizeMap) : d))
+      .then((d) => { if (alive) setData(d); })
       .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
   }, []);
@@ -129,11 +136,11 @@ function Leaderboard() {
   return (
     <div className="lp-board">
       <div className="lp-board-head">
-        <div className="lp-eyebrow">排行榜</div>
+        <div className="lp-eyebrow">排行榜・{MAP_LABELS[data?.map ?? 's']}</div>
         <h3>{season ? season.name : '全站排行'}</h3>
         {season && (
           <p className="lp-muted">
-            活動期間 {formatDate(season.startsAt)} – {formatDate(season.endsAt)}，前 {season.topN} 名可獲獎
+            活動期間 {formatDate(season.startsAt)} – {formatDate(season.endsAt)}，{MAP_LABELS[season.prizeMap]}前 {season.topN} 名可獲獎
           </p>
         )}
       </div>
@@ -330,10 +337,11 @@ export function Landing() {
       <section id="game" className="lp-section game">
         <div className="lp-wrap">
           <div className="lp-eyebrow">遊戲挑戰</div>
-          <h2>匠城出任務：90 秒跑完三品牌工單</h2>
+          <h2>匠城出任務：一個班跑完三品牌工單</h2>
           <p className="lp-muted lp-sub">
             騎著機車在匠城接單：TaskGo 報修派工、Homigo 送鑰匙交屋、Washgo 衣物收送。
-            連單越多營收越高，登上排行榜還有機會拿獎品。
+            從 90 秒的小地圖一路解鎖到中、大地圖，還有邀請朋友才開得了的隱藏版台灣地圖；
+            每班天氣和路上狀況都不一樣。連單越多營收越高，登上排行榜還有機會拿獎品。
           </p>
           <div className="lp-game-grid">
             <GameFrame />

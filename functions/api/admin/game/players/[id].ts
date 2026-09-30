@@ -4,7 +4,7 @@ import { requireAuth } from '../../../../_shared/auth';
 import { getSql } from '../../../../_shared/db';
 import { json, error } from '../../../../_shared/response';
 import { cacheDelete } from '../../../../_shared/cache';
-import { getCurrentSeason, leaderboardCacheKey, withGameSchema } from '../../../../_shared/game';
+import { allBoardCacheKeys, getCurrentSeason, withGameSchema } from '../../../../_shared/game';
 
 /** 取消或恢復玩家參賽資格（作弊處理）。 */
 export const onRequestPatch: PagesFunction<Env> = async (context) => {
@@ -25,8 +25,6 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
   `);
   if (!rows.length) return error('找不到玩家', 404);
   const season = await getCurrentSeason(context.env);
-  const keys = [leaderboardCacheKey(null, 10), leaderboardCacheKey(null, 50)];
-  if (season) keys.push(leaderboardCacheKey(season.id, 10), leaderboardCacheKey(season.id, 50));
-  await cacheDelete(context.env, ...keys);
+  await cacheDelete(context.env, ...allBoardCacheKeys(season?.id ?? null));
   return json({ ok: true });
 };

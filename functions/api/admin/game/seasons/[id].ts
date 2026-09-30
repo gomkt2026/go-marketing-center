@@ -4,12 +4,11 @@ import { requireAuth } from '../../../../_shared/auth';
 import { getSql } from '../../../../_shared/db';
 import { json, error } from '../../../../_shared/response';
 import { cacheDelete } from '../../../../_shared/cache';
-import { leaderboardCacheKey, withGameSchema } from '../../../../_shared/game';
+import { allBoardCacheKeys, withGameSchema } from '../../../../_shared/game';
 import { parseSeasonInput, type SeasonInput } from '../seasons';
 
 async function bustBoard(env: Env, seasonId: string) {
-  await cacheDelete(env, leaderboardCacheKey(seasonId, 10), leaderboardCacheKey(seasonId, 50),
-    leaderboardCacheKey(null, 10), leaderboardCacheKey(null, 50));
+  await cacheDelete(env, ...allBoardCacheKeys(seasonId));
 }
 
 export const onRequestPut: PagesFunction<Env> = async (context) => {
@@ -30,7 +29,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
   const rows = await withGameSchema(context.env, () => sql`
     UPDATE game_seasons SET
       name = ${v.name}, starts_at = ${v.startsAt}, ends_at = ${v.endsAt},
-      prize = ${v.prize}, top_n = ${v.topN}, is_active = ${v.isActive}, updated_at = now()
+      prize = ${v.prize}, top_n = ${v.topN}, is_active = ${v.isActive}, prize_map = ${v.prizeMap}, updated_at = now()
     WHERE id = ${id}::uuid RETURNING id
   `);
   if (!rows.length) return error('找不到賽季', 404);

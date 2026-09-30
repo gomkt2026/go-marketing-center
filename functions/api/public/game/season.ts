@@ -10,7 +10,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       season: season
         ? {
           id: season.id, name: season.name, startsAt: season.startsAt, endsAt: season.endsAt,
-          prize: season.prize, topN: season.topN,
+          prize: season.prize, topN: season.topN, prizeMap: season.prizeMap,
         }
         : null,
     }, 200, { 'Cache-Control': 'public, max-age=60' });

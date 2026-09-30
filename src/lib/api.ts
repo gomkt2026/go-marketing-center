@@ -1501,6 +1501,10 @@ export const checkinApi = {
 };
 
 // -- 遊戲排行榜後台(僅集團管理者) ---------------------------------------------
+export type GameMap = 's' | 'm' | 'l' | 't';
+
+export const GAME_MAP_LABELS: Record<GameMap, string> = { s: '小地圖', m: '中地圖', l: '大地圖', t: '台灣地圖' };
+
 export interface GameSeason {
   id: string;
   name: string;
@@ -1509,6 +1513,7 @@ export interface GameSeason {
   prize: string;
   topN: number;
   isActive: boolean;
+  prizeMap: GameMap;
 }
 
 export interface GameSeasonInput {
@@ -1518,6 +1523,7 @@ export interface GameSeasonInput {
   prize: string;
   topN: number;
   isActive: boolean;
+  prizeMap: GameMap;
 }
 
 export interface GameBoardEntry {
@@ -1541,8 +1547,10 @@ export const gameAdminApi = {
     request<{ ok: boolean }>(`/api/admin/game/seasons/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteSeason: (id: string) =>
     request<{ ok: boolean }>(`/api/admin/game/seasons/${id}`, { method: 'DELETE' }),
-  leaderboard: (seasonId: string | 'all') =>
-    request<{ season: GameSeason | null; entries: GameBoardEntry[] }>(`/api/admin/game/seasons/${seasonId}/leaderboard`),
+  leaderboard: (seasonId: string | 'all', map?: GameMap) =>
+    request<{ season: GameSeason | null; map: GameMap; entries: GameBoardEntry[] }>(
+      `/api/admin/game/seasons/${seasonId}/leaderboard${map ? `?map=${map}` : ''}`,
+    ),
   setWinner: (seasonId: string, playerId: string, isWinner: boolean, note = '') =>
     request<{ ok: boolean }>(`/api/admin/game/seasons/${seasonId}/winners`, {
       method: 'POST', body: JSON.stringify({ playerId, isWinner, note }),

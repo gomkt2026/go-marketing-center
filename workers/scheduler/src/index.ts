@@ -36,6 +36,7 @@ import { slugifyStoryKey } from '../../../functions/_shared/press';
 import { syncPerformanceInsights } from '../../../functions/_shared/insights';
 import { analyzeAllBrandPerformance } from '../../../functions/_shared/performance-learn';
 import { notifyPendingReviewDigest, notifyPublishFailed } from '../../../functions/_shared/line-ops';
+import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from '../../../functions/_shared/auto-post-brands';
 
 const AUTO_DRAFT_THRESHOLD = 0.75;
 
@@ -154,6 +155,7 @@ async function generateSignalDrafts(env: Env): Promise<void> {
       AND ms.relevance_score >= ${AUTO_DRAFT_THRESHOLD}
       AND ms.status = 'new'
       AND ms.discovered_at > now() - interval '48 hours'
+      AND b.slug = ANY(${[...AUTO_POST_BRAND_SLUGS]}::text[])
       AND NOT EXISTS (SELECT 1 FROM contents c WHERE c.source_market_signal_id = ms.id)
     ORDER BY ms.relevance_score DESC, ms.discovered_at DESC
     LIMIT 1
@@ -170,6 +172,8 @@ async function generateSignalDrafts(env: Env): Promise<void> {
         brandCtx, platform,
         topic: signal.title,
         topicSummary: signal.summary ?? undefined,
+        skipImage: true,
+        skipPrediction: true,
       });
       const { contentId } = await saveGeneratedContent(env, {
         brandCtx, platform, result,
@@ -202,8 +206,8 @@ const CATCHUP_GENERATIONS_PER_TICK = 1; // 每 tick 只補 1 則,避開 Workers 
 
 async function listAutoPostSlugs(env: Env): Promise<string[]> {
   const slots = await listAllPostingSlots(env, { enabledOnly: true });
-  const slugs = [...new Set(slots.map((s) => s.brandSlug))];
-  return slugs.length ? slugs : ['homigo', 'taskgo', 'washgo'];
+  const slugs = [...new Set(slots.map((s) => s.brandSlug))].filter(isAutoPostBrand);
+  return slugs.length ? slugs : [...AUTO_POST_BRAND_SLUGS];
 }
 
 async function brandHasSlotJob(
@@ -510,6 +514,7 @@ async function generateDailyThemePlatforms(
             : `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。配圖做成痛點海報,系統畫面當解法卡。主受眾:${audience.name}。`,
         audienceLane: 'b2b',
         audienceName: audience.name,
+        skipPrediction: true,
       });
 
       const account = await getMetaAccount(env, brand.id, platform);
@@ -1115,7 +1120,7 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
   const twHour = (new Date().getUTCHours() + 8) % 24;
   const minute = new Date().getUTCMinutes();
   const isTopOfHour = minute < 15 || minute >= 45;
-  const configured = await listAllPostingSlots(env, { enabledOnly: true });
+  const configured = (await listAllPostingSlots(env, { enabledOnly: true })).filter((s) => isAutoPostBrand(s.brandSlug));
   const themeHours = new Set(configured.filter((s) => s.slotKind === 'daily_theme').map((s) => s.hourTw));
   if (!themeHours.size) themeHours.add(DAILY_THEME_HOUR_TW);
   const jobs: BrandJobMessage[] = [];
@@ -1196,6 +1201,7 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
       SELECT b.id, b.slug, b.name
       FROM brands b
       WHERE b.is_active = true
+        AND b.slug = ANY(${[...AUTO_POST_BRAND_SLUGS]}::text[])
       ORDER BY b.slug
     `;
     for (const brand of brands as { id: string; slug: string; name: string }[]) {

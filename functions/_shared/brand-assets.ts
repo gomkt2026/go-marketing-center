@@ -234,6 +234,7 @@ type AssetRow = {
   feature?: string | null;
   usage_context?: string | null;
   asset_status?: string | null;
+  used_in_threads_count?: number | null;
 };
 
 function toAssetPick(env: Env, row: AssetRow): BrandAssetPick | null {
@@ -312,7 +313,7 @@ export async function searchBrandAssets(
     .filter((row) => isUsableForAi(row, opts))
     .filter((row) => !opts.preferScreenshot || row.image_category === 'system_screenshot')
     .map((row) => ({ row, score: matchScore(row, opts) }))
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => b.score - a.score || (a.row.used_in_threads_count ?? 0) - (b.row.used_in_threads_count ?? 0))
     .map(({ row }) => toAssetPick(env, row))
     .filter((item): item is BrandAssetPick => !!item);
 }

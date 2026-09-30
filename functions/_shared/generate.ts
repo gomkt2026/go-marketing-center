@@ -1,26 +1,25 @@
 import type { Env } from './env';
 import { getSql } from './db';
-import { chatCompleteJson, generateImage, generateImageWithReference } from './openai';
+import { generateImage } from './openai';
+import { socialChatJson } from './social-llm';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
-  HOMIGO_TEXT_MARK_RULE, SYSTEM_SCREENSHOT_POSTER_RULE,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
   buildImageInspiredPostPrompt,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
   defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
   SEO_TOPIC_BANK, brandSeoFacts, type SeoTopicSeed,
-  buildSocialImagePrompt, PHOTO_EDITORIAL_CONVERT_RULE, HOMIGO_CONVERT_RULE, TASKGO_GRAPHIC_CONVERT_RULE,
-  WASHGO_CUTE_CONVERT_RULE, defaultDesignImageStyle,
+  buildSocialImagePrompt, defaultDesignImageStyle,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
   type GeneratedXPost, type EcosystemXAngle,
   type AudienceLane, type ImageStyleId,
 } from './prompts';
 import { buildMediaKey, getMediaBytes, mediaUrlToKey, putMedia } from './media';
 import { compositeLogo } from './watermark';
-import { frameScreenshotForIg } from './ig-frame';
+import { composeAssetOnBrandCard, frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
 import { X_TWEET_MAX_CHARS } from './x';
-import { burnPosterHeadline, POSTER_NO_GLYPHS_RULE } from './poster-text';
+import { burnPosterHeadline } from './poster-text';
 import { loadBrandImagePromptPack } from './image-prompts';
 import {
   describeAssetForPrompt, pickBrandAsset, pickBrandScreenshot, markAssetUsed,
@@ -162,27 +161,8 @@ async function generateSystemScreenshotPoster(
     if (!ref) return null;
     const isFb = params.platform === 'facebook';
     const isIg = params.platform === 'instagram';
-    const pack = await loadBrandImagePromptPack(env, '', params.brandSlug).catch(() => null);
-    const designSpec = pack?.designStyle || defaultDesignImageStyle(params.brandSlug);
     const logo = await getBrandLogo(env, params.brandSlug);
-    const headlineHint = params.imagePrompt?.trim()
-      || 'B2B pain-point poster. Leave an empty banner for typography. No letters or glyphs.';
-    const prompt = [
-      headlineHint,
-      designSpec,
-      SYSTEM_SCREENSHOT_POSTER_RULE,
-      POSTER_NO_GLYPHS_RULE,
-      isFb
-        ? 'LANDSCAPE poster 3:2. Empty left 38% banner. Scene and device card on the right.'
-        : 'PORTRAIT poster. Empty top 25% banner.',
-      logo
-        ? 'Do not draw any logo or brand wordmark; leave a clean corner for the official logo composite.'
-        : params.brandSlug === 'homigo' ? HOMIGO_TEXT_MARK_RULE : '',
-    ].filter(Boolean).join('\n\n');
-    const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
-    let bytes = await generateImageWithReference(env, {
-      prompt, reference: ref, size, quality: 'high', inputFidelity: 'high',
-    });
+    let bytes = await composeAssetOnBrandCard(ref, params.brandSlug, isFb);
     bytes = await finishPosterImage(env, bytes, {
       brandSlug: params.brandSlug,
       landscape: isFb,
@@ -195,9 +175,10 @@ async function generateSystemScreenshotPoster(
       logoPosition: isIg && params.brandSlug === 'homigo' ? 'bottom-left' : 'bottom-right',
     });
     const key = buildMediaKey(params.brandSlug, 'jpg');
+    console.log(`[generate] ${params.brandSlug}/${params.platform} 使用素材庫原圖,未生圖`);
     return await putMedia(env, key, bytes, 'image/jpeg');
   } catch (e) {
-    console.error('[generate] 系統畫面海報生成失敗,改用簡報框原圖', e);
+    console.error('[generate] 素材海報合成失敗,改用簡報框原圖', e);
     return null;
   }
 }
@@ -223,28 +204,7 @@ async function generatePhotoEditorialPoster(
     const isFb = params.platform === 'facebook';
     const isIg = params.platform === 'instagram';
     const logo = await getBrandLogo(env, params.brandSlug);
-    const convertRule = params.brandSlug === 'taskgo'
-      ? TASKGO_GRAPHIC_CONVERT_RULE
-      : params.brandSlug === 'washgo'
-        ? WASHGO_CUTE_CONVERT_RULE
-        : params.brandSlug === 'homigo'
-          ? HOMIGO_CONVERT_RULE
-          : PHOTO_EDITORIAL_CONVERT_RULE;
-    const pack = await loadBrandImagePromptPack(env, '', params.brandSlug).catch(() => null);
-    const prompt = buildSocialImagePrompt({
-      brandSlug: params.brandSlug,
-      scene: [params.imagePrompt?.trim() || 'Redraw this photograph as a brand editorial poster.', convertRule].join('\n\n'),
-      imageStyle: 'photo',
-      landscape: isFb,
-      hasLogo: !!logo,
-      emptyBanner: true,
-      designStyle: pack?.designStyle,
-      photoStyle: pack?.photoStyle,
-    });
-    const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
-    let bytes = await generateImageWithReference(env, {
-      prompt, reference: ref, size, quality: 'high', inputFidelity: 'high',
-    });
+    let bytes = await composeAssetOnBrandCard(ref, params.brandSlug, isFb);
     bytes = await finishPosterImage(env, bytes, {
       brandSlug: params.brandSlug,
       landscape: isFb,
@@ -257,9 +217,10 @@ async function generatePhotoEditorialPoster(
       logoPosition: isIg && params.brandSlug === 'homigo' ? 'bottom-left' : 'bottom-right',
     });
     const key = buildMediaKey(params.brandSlug, 'jpg');
+    console.log(`[generate] ${params.brandSlug}/${params.platform} 使用素材庫原圖,未生圖`);
     return await putMedia(env, key, bytes, 'image/jpeg');
   } catch (e) {
-    console.error('[generate] 實拍編輯海報轉換失敗,沿用原圖', e);
+    console.error('[generate] 素材海報合成失敗,改用原圖', e);
     return null;
   }
 }
@@ -294,10 +255,13 @@ async function recentImageStyles(env: Env, brandId: string): Promise<ImageStyleI
     .filter((s): s is ImageStyleId => s === 'photo' || s === 'design' || s === 'illustration');
 }
 
-/** Threads 配圖每品牌每日上限(控制成本;以台灣時區的一天計) */
-const THREADS_IMAGE_DAILY_CAP = 4;
-/** 品牌專屬上限:Washgo 以「短文 + 可愛圖」衝曝光,每篇 Threads 都配圖 */
-const THREADS_IMAGE_DAILY_CAP_BY_BRAND: Record<string, number> = { washgo: 10 };
+/**
+ * 圖片成本:三品牌各 30 美金/月。
+ * FB/IG 海報用 gpt-image-1-mini(約 $0.015–0.05/張),Threads 每天最多 1 張。
+ * 不再用 gpt-image-1 high(直式一張約 $0.25)。
+ */
+const POSTER_IMAGE_MODEL = 'gpt-image-1-mini';
+const THREADS_IMAGE_DAILY_CAP = 1;
 
 async function threadsImageCountToday(env: Env, brandId: string): Promise<number> {
   const sql = getSql(env);
@@ -352,12 +316,11 @@ export async function generatePlatformPost(
       : await pickAudience(env, brandCtx.brandId, brandCtx.slug, lane);
 
   let reusedAsset: BrandAssetPick | null = null;
-  // B 端 FB/IG 優先取真實系統畫面當素材,但要做成痛點海報,不是整頁截圖直發。
-  // Threads 本來就不走素材庫。
-  if (!params.skipImage && !params.skipAssetLookup && (platform === 'facebook' || platform === 'instagram')) {
+  // 三個平台都先用品牌上傳的圖。有素材就本地合成,不呼叫生圖。
+  if (!params.skipImage && !params.skipAssetLookup) {
     try {
       reusedAsset = await pickBrandAsset(env, brandCtx.brandId, {
-        preferScreenshot: lane === 'b2b',
+        preferScreenshot: platform !== 'threads' && lane === 'b2b',
         query: params.topic,
       });
     } catch (e) {
@@ -365,10 +328,8 @@ export async function generatePlatformPost(
     }
   }
 
-  const screenshotPoster = !!(reusedAsset && isSystemScreenshot(reusedAsset)
-    && (platform === 'facebook' || platform === 'instagram'));
-  const convertPhotoPoster = !!(reusedAsset && !screenshotPoster
-    && (platform === 'facebook' || platform === 'instagram'));
+  const screenshotPoster = !!(reusedAsset && isSystemScreenshot(reusedAsset));
+  const convertPhotoPoster = !!(reusedAsset && !screenshotPoster);
   const recentStyles = params.skipImage || convertPhotoPoster || screenshotPoster
     ? []
     : await recentImageStyles(env, brandCtx.brandId).catch(() => [] as ImageStyleId[]);
@@ -398,7 +359,7 @@ export async function generatePlatformPost(
   const systemPrompt = params.collaborationContext
     ? `${brandCtx.systemPrompt}\n\n${audienceLaneInstruction(brandCtx.slug, lane)}\n\n${params.collaborationContext}`
     : `${brandCtx.systemPrompt}\n\n${audienceLaneInstruction(brandCtx.slug, lane)}`;
-  let post = await chatCompleteJson<GeneratedPost>(env, {
+  let post = await socialChatJson<GeneratedPost>(env, {
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
@@ -417,7 +378,7 @@ export async function generatePlatformPost(
     : platform === 'threads' && brandVoice.threadsMaxChars ? brandVoice.threadsMaxChars
     : null;
   if (hardLimit && post.body.length > hardLimit) {
-    post = await chatCompleteJson<GeneratedPost>(env, {
+    post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -434,7 +395,7 @@ export async function generatePlatformPost(
 
   const prediction = params.skipPrediction
     ? { score: 0, analysis: '', suggestions: [] }
-    : await chatCompleteJson<EngagementPrediction>(env, {
+    : await socialChatJson<EngagementPrediction>(env, {
       messages: [
         { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
         { role: 'user', content: buildEngagementEvalPrompt({ platform, body: post.body }) },
@@ -466,14 +427,14 @@ export async function generatePlatformPost(
       return {
         post, prediction, imageUrl: posterUrl, imageError: null,
         audienceLane: lane, audienceName: audience.name,
-        imageSource: 'generated', imageStyle: 'design', assetId: reusedAsset.id,
+        imageSource: 'asset', imageStyle: 'design', assetId: reusedAsset.id,
       };
     }
-    const fallbackUrl = platform === 'instagram'
+    const fallbackUrl = platform === 'instagram' || platform === 'threads'
       ? await frameAssetForInstagram(env, brandCtx.slug, reusedAsset.fileUrl) ?? reusedAsset.fileUrl
       : reusedAsset.fileUrl;
     return {
-      post, prediction, imageUrl: fallbackUrl, imageError: '系統畫面海報生成失敗,改用簡報框原圖',
+      post, prediction, imageUrl: fallbackUrl, imageError: '素材海報合成失敗,沿用原圖',
       audienceLane: lane, audienceName: audience.name,
       imageSource: 'asset', imageStyle: null, assetId: reusedAsset.id,
     };
@@ -495,27 +456,27 @@ export async function generatePlatformPost(
       return {
         post, prediction, imageUrl: posterUrl, imageError: null,
         audienceLane: lane, audienceName: audience.name,
-        imageSource: 'generated', imageStyle: 'design', assetId: reusedAsset.id,
+        imageSource: 'asset', imageStyle: 'design', assetId: reusedAsset.id,
       };
     }
     const fallbackUrl = platform === 'instagram'
       ? await frameAssetForInstagram(env, brandCtx.slug, reusedAsset.fileUrl) ?? reusedAsset.fileUrl
       : reusedAsset.fileUrl;
     return {
-      post, prediction, imageUrl: fallbackUrl, imageError: '實拍編輯海報轉換失敗,沿用原圖',
+      post, prediction, imageUrl: fallbackUrl, imageError: '素材海報合成失敗,沿用原圖',
       audienceLane: lane, audienceName: audience.name,
       imageSource: 'asset', imageStyle: null, assetId: reusedAsset.id,
     };
   }
 
-  // FB / IG 貼文生成配圖;Threads 由 AI 判斷選填 imagePrompt 才產圖(每品牌每日上限控成本)
+  // 素材庫沒有可用的圖才生圖。Threads 每天最多 1 張生成圖。
   // 風格依 imageStyle 輪替:photo / design / illustration。Washgo 不再全平台鎖插畫。
   let imageUrl: string | null = null;
   let imageError: string | null = null;
   let wantsImage = !!post.imagePrompt;
   if (wantsImage && platform === 'threads') {
     try {
-      const cap = THREADS_IMAGE_DAILY_CAP_BY_BRAND[brandCtx.slug] ?? THREADS_IMAGE_DAILY_CAP;
+      const cap = THREADS_IMAGE_DAILY_CAP;
       const used = await threadsImageCountToday(env, brandCtx.brandId);
       if (used >= cap) {
         wantsImage = false;
@@ -542,8 +503,8 @@ export async function generatePlatformPost(
         photoStyle: imagePack.photoStyle,
       });
       const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
-      const quality = style === 'design' || isFb || isIg || brandCtx.slug === 'washgo' ? 'high' as const : 'medium' as const;
-      let bytes = await generateImage(env, { prompt, size, quality });
+      const quality = platform === 'threads' ? 'medium' as const : 'high' as const;
+      let bytes = await generateImage(env, { prompt, size, quality, model: POSTER_IMAGE_MODEL });
       const shouldOverlay = isFb || isIg || !!post.posterHeadline;
       if (shouldOverlay) {
         bytes = await finishPosterImage(env, bytes, {
@@ -585,14 +546,14 @@ export async function generatePlatformPost(
  */
 export async function generateOfftopicPost(
   env: Env,
-  params: { usedTopics: string[]; brandSlug?: string; forceLoveStory?: boolean; usedAngles?: string[] },
+  params: { usedTopics: string[]; brandSlug?: string; forceLoveStory?: boolean; usedAngles?: string[]; skipPrediction?: boolean },
 ): Promise<GenerationResult> {
   const spec = composeOfftopicPrompt(params.usedTopics, params.brandSlug, {
     forceLoveStory: params.forceLoveStory,
     usedAngles: params.usedAngles,
   });
   const userPrompt = spec.prompt;
-  let post = await chatCompleteJson<GeneratedPost>(env, {
+  let post = await socialChatJson<GeneratedPost>(env, {
     messages: [
       { role: 'system', content: OFFTOPIC_SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
@@ -606,7 +567,7 @@ export async function generateOfftopicPost(
   if (spec.isLoveStory && !post.replyBody && spec.replyHint) post.replyBody = spec.replyHint;
 
   if (post.body.length > 500) {
-    post = await chatCompleteJson<GeneratedPost>(env, {
+    post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: OFFTOPIC_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
@@ -622,13 +583,15 @@ export async function generateOfftopicPost(
     if (spec.isLoveStory && !post.replyBody && spec.replyHint) post.replyBody = spec.replyHint;
   }
 
-  const prediction = await chatCompleteJson<EngagementPrediction>(env, {
-    messages: [
-      { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
-      { role: 'user', content: buildEngagementEvalPrompt({ platform: 'threads', body: post.body }) },
-    ],
-    temperature: 0.3,
-  });
+  const prediction = params.skipPrediction
+    ? { score: 0, analysis: '', suggestions: [] }
+    : await socialChatJson<EngagementPrediction>(env, {
+      messages: [
+        { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
+        { role: 'user', content: buildEngagementEvalPrompt({ platform: 'threads', body: post.body }) },
+      ],
+      temperature: 0.3,
+    });
 
   return { post, prediction, imageUrl: null, imageError: null, offtopicCategory: spec.category, loveAngle: spec.loveAngle };
 }
@@ -653,6 +616,7 @@ export async function generatePostFromImage(
     audienceName?: string;
     assetId?: string;
     extraInstruction?: string;
+    skipPrediction?: boolean;
   },
 ): Promise<GenerationResult> {
   const { brandCtx, imageUrl, platform } = params;
@@ -678,7 +642,7 @@ export async function generatePostFromImage(
     && (platform === 'facebook' || platform === 'instagram');
   const convertPhotoPoster = !screenshotPoster && (platform === 'facebook' || platform === 'instagram')
     && ['real_photo', 'people', 'scene', 'brand_collab'].includes(params.imageCategory ?? '');
-  let post = await chatCompleteJson<GeneratedPost>(env, {
+  let post = await socialChatJson<GeneratedPost>(env, {
     messages: [{ role: 'system', content: systemPrompt }, visionUserMessage],
   });
   post.body = normalizeMultilineText(post.body);
@@ -692,7 +656,7 @@ export async function generatePostFromImage(
     : platform === 'threads' && brandVoice.threadsMaxChars ? brandVoice.threadsMaxChars
     : null;
   if (hardLimit && post.body.length > hardLimit) {
-    post = await chatCompleteJson<GeneratedPost>(env, {
+    post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: systemPrompt },
         visionUserMessage,
@@ -708,13 +672,15 @@ export async function generatePostFromImage(
   post.cta = SHARED_BRAND_CTA;
   post.hashtags = clampHashtags(post.hashtags, platform);
 
-  const prediction = await chatCompleteJson<EngagementPrediction>(env, {
-    messages: [
-      { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
-      { role: 'user', content: buildEngagementEvalPrompt({ platform, body: post.body }) },
-    ],
-    temperature: 0.3,
-  });
+  const prediction = params.skipPrediction
+    ? { score: 0, analysis: '', suggestions: [] }
+    : await socialChatJson<EngagementPrediction>(env, {
+      messages: [
+        { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
+        { role: 'user', content: buildEngagementEvalPrompt({ platform, body: post.body }) },
+      ],
+      temperature: 0.3,
+    });
 
   if (screenshotPoster) {
     const posterUrl = await generateSystemScreenshotPoster(env, {
@@ -731,7 +697,7 @@ export async function generatePostFromImage(
     if (posterUrl) {
       return {
         post, prediction, imageUrl: posterUrl, imageError: null,
-        audienceLane: lane, audienceName, imageSource: 'generated', imageStyle: 'design',
+        audienceLane: lane, audienceName, imageSource: 'asset', imageStyle: 'design',
         assetId: params.assetId ?? null,
       };
     }
@@ -752,7 +718,7 @@ export async function generatePostFromImage(
     if (posterUrl) {
       return {
         post, prediction, imageUrl: posterUrl, imageError: null,
-        audienceLane: lane, audienceName, imageSource: 'generated', imageStyle: 'design',
+        audienceLane: lane, audienceName, imageSource: 'asset', imageStyle: 'design',
         assetId: params.assetId ?? null,
       };
     }
@@ -782,6 +748,7 @@ export async function generateThreadsFromImage(
     feature?: string;
     usageContext?: string;
     assetId?: string;
+    skipPrediction?: boolean;
   },
 ): Promise<GenerationResult> {
   return generatePostFromImage(env, { ...params, platform: 'threads' });
@@ -905,11 +872,11 @@ export async function generateEcosystemXPost(
     { role: 'system' as const, content: ECOSYSTEM_X_SYSTEM_PROMPT },
     { role: 'user' as const, content: userPrompt },
   ];
-  let post = await chatCompleteJson<GeneratedXPost>(env, { messages, temperature: 0.7 });
+  let post = await socialChatJson<GeneratedXPost>(env, { messages, temperature: 0.7 });
 
   const overLimit = (p: GeneratedXPost) => !p.tweets?.length || p.tweets.some((t) => t.length > X_TWEET_MAX_CHARS);
   if (overLimit(post)) {
-    post = await chatCompleteJson<GeneratedXPost>(env, {
+    post = await socialChatJson<GeneratedXPost>(env, {
       messages: [
         ...messages,
         { role: 'assistant', content: JSON.stringify(post) },
@@ -1054,7 +1021,7 @@ export async function generateSeoArticle(
   const cta = websiteCta(slug, audience);
   const pitchFacts = brandSeoFacts(slug);
   const relatedHint = (seed?.relatedTerms ?? []).join('、');
-  const article = await chatCompleteJson<SeoArticleLlmShape>(env, {
+  const article = await socialChatJson<SeoArticleLlmShape>(env, {
     messages: [
       {
         role: 'system',

@@ -20,8 +20,12 @@ export interface Env {
   OPENAI_API_KEY?: string;
   /** 選填:覆寫文字模型,預設 gpt-4o-mini */
   OPENAI_TEXT_MODEL?: string;
-  /** 選填:覆寫圖片模型,預設 gpt-image-1 */
+  /** 選填:覆寫圖片模型,預設 gpt-image-1-mini(發文配圖成本) */
   OPENAI_IMAGE_MODEL?: string;
+  /** Claude API key。三品牌發文文案走 Haiku;未設定則退回 OpenAI 文字模型 */
+  ANTHROPIC_API_KEY?: string;
+  /** 選填:覆寫發文文案模型,預設 claude-haiku-4-5 */
+  ANTHROPIC_TEXT_MODEL?: string;
   /** ElevenLabs API key(Podcast 語音合成、Conversational AI) */
   ELEVENLABS_API_KEY?: string;
   /** Washgo 阿樂 Conversational Agent id */

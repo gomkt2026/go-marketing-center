@@ -140,17 +140,17 @@ async function parseImageResponse(res: Response): Promise<Uint8Array> {
 /** 產生圖片,回傳 JPEG bytes */
 export async function generateImage(
   env: Env,
-  params: { prompt: string; size?: ImageSize; quality?: ImageQuality },
+  params: { prompt: string; size?: ImageSize; quality?: ImageQuality; model?: string },
 ): Promise<Uint8Array> {
   const apiKey = requireApiKey(env);
   const res = await fetch(`${OPENAI_BASE}/images/generations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1',
+      model: params.model ?? env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1-mini',
       prompt: params.prompt,
       size: params.size ?? '1024x1024',
-      // 預設 medium(快);海報設計圖用 high 提升畫面精緻度。中文主標改後製,不再靠模型畫字
+      // 預設 medium。中文主標由後製疊上,不再靠模型畫字,也不再用 gpt-image-1 high
       quality: params.quality ?? 'medium',
       // IG Graph API 的 image_url 只接受 JPEG,統一輸出 JPEG(檔案也較小)
       output_format: 'jpeg',
@@ -181,19 +181,21 @@ export async function generateImageWithReference(
     reference: Uint8Array;
     size?: ImageSize;
     quality?: ImageQuality;
-    /** high=保留參考圖細節(logo/系統 UI);low=允許重構圖 */
+    model?: string;
+    /** high=保留參考圖細節(logo/系統 UI);low=允許重構圖。mini 不送這個欄位 */
     inputFidelity?: 'high' | 'low';
   },
 ): Promise<Uint8Array> {
   const apiKey = requireApiKey(env);
   const { mime, filename } = referenceImageMime(params.reference);
+  const model = params.model ?? env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1-mini';
   const form = new FormData();
-  form.append('model', env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1');
+  form.append('model', model);
   form.append('prompt', params.prompt);
   form.append('size', params.size ?? '1024x1024');
   form.append('quality', params.quality ?? 'medium');
   form.append('output_format', 'jpeg');
-  form.append('input_fidelity', params.inputFidelity ?? 'high');
+  if (!model.includes('mini')) form.append('input_fidelity', params.inputFidelity ?? 'low');
   form.append('image[]', new Blob([params.reference as unknown as ArrayBuffer], { type: mime }), filename);
   const res = await fetch(`${OPENAI_BASE}/images/edits`, {
     method: 'POST',

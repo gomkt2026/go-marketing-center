@@ -18,6 +18,7 @@ import {
   hourlyCategoryForKind, isHourlyFamily, isOfftopicFamily, slotKindLabel,
   type PostingSlotKind,
 } from './posting-slots';
+import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from './auto-post-brands';
 
 /** 品牌相關跟風文時段(台灣時間) */
 export const THREADS_POST_HOURS_TW: readonly number[] = [0, 6, 12, 18];
@@ -137,7 +138,10 @@ export async function generateThreadsSlot(
   const selected = (brands as {
     id: string; slug: string; name: string; last_at: string | null; today_count: number;
     recent_categories: (string | null)[] | null;
-  }[]).filter((b) => !opts?.slugs?.length || opts.slugs.includes(b.slug));
+  }[]).filter((b) => {
+    if (opts?.slugs?.length) return opts.slugs.includes(b.slug);
+    return isAutoPostBrand(b.slug);
+  });
   const hourlyCaps = await countSlotsByBrand(env, 'threads');
 
   if (opts?.slugs?.length) {
@@ -225,6 +229,7 @@ export async function generateThreadsSlot(
           feature: candidateImage.feature ?? undefined,
           usageContext: candidateImage.usage_context ?? undefined,
           assetId: candidateImage.id,
+          skipPrediction: true,
         });
       } else {
         const trendsBlock = [
@@ -240,6 +245,7 @@ export async function generateThreadsSlot(
           topic,
           extraInstruction: category.instruction.replace('{{TRENDS}}', trendsBlock),
           audienceLane: 'b2c',
+          skipPrediction: true,
         });
       }
 
@@ -292,10 +298,7 @@ export async function generateThreadsOfftopicSlot(
 ): Promise<ThreadsSlotBatchResult> {
   const sql = getSql(env);
   const result: ThreadsSlotBatchResult = { generated: [], skipped: [] };
-  const targetSlugs = opts?.slugs?.length
-    ? opts.slugs
-    : ((await sql`SELECT slug FROM brands WHERE is_active = true ORDER BY slug`) as { slug: string }[])
-      .map((b) => b.slug);
+  const targetSlugs = opts?.slugs?.length ? opts.slugs : [...AUTO_POST_BRAND_SLUGS];
   const offtopicCaps = await countSlotsByBrand(env, 'threads');
 
   for (const slug of targetSlugs) {
@@ -351,6 +354,7 @@ export async function generateThreadsOfftopicSlot(
         brandSlug: brand.slug,
         forceLoveStory,
         usedAngles,
+        skipPrediction: true,
       });
 
       const { contentId } = await saveGeneratedContent(env, {

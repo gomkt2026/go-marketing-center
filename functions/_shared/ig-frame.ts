@@ -84,3 +84,60 @@ export async function frameScreenshotForIg(imageBytes: Uint8Array, brandSlug: st
     resized?.free();
   }
 }
+
+/** 海報留白底色,對得上後製主標,不是 IG 簡報框那組深色底 */
+const POSTER_BG: Record<string, [number, number, number]> = {
+  homigo: [0xf5, 0xf1, 0xea],
+  washgo: [0xe6, 0xf2, 0xff],
+  taskgo: [0x0b, 0x2d, 0x5c],
+};
+
+/**
+ * 把品牌上傳的原圖放進留白卡,不呼叫圖片模型。
+ * 橫式左側 38%、直式上方 25% 留給後製繁中主標。
+ */
+export async function composeAssetOnBrandCard(
+  imageBytes: Uint8Array,
+  brandSlug: string,
+  landscape: boolean,
+): Promise<Uint8Array> {
+  const { PhotonImage, SamplingFilter, resize, watermark } = await loadPhoton();
+  const shot = PhotonImage.new_from_byteslice(imageBytes);
+  let canvas: PhotonImage | null = null;
+  let card: PhotonImage | null = null;
+  let resized: PhotonImage | null = null;
+  try {
+    const width = landscape ? 1200 : 1080;
+    const height = landscape ? 800 : 1350;
+    const bannerFrac = landscape ? 0.38 : 0.25;
+    const bg = POSTER_BG[brandSlug] ?? POSTER_BG.homigo;
+    canvas = fillCanvas(PhotonImage, width, height, bg);
+
+    const pad = 28;
+    const zoneX = landscape ? Math.round(width * bannerFrac) + pad : pad;
+    const zoneY = landscape ? pad : Math.round(height * bannerFrac) + pad;
+    const zoneW = Math.max(1, landscape ? width - zoneX - pad : width - pad * 2);
+    const zoneH = Math.max(1, landscape ? height - pad * 2 : height - zoneY - pad);
+
+    const scale = Math.min(zoneW / shot.get_width(), zoneH / shot.get_height());
+    const tw = Math.max(1, Math.round(shot.get_width() * scale));
+    const th = Math.max(1, Math.round(shot.get_height() * scale));
+    resized = resize(shot, tw, th, SamplingFilter.Lanczos3);
+
+    const cardPad = 12;
+    card = fillCanvas(PhotonImage, tw + cardPad * 2, th + cardPad * 2, [255, 255, 255]);
+    watermark(card, resized, BigInt(cardPad), BigInt(cardPad));
+
+    const cardW = tw + cardPad * 2;
+    const cardH = th + cardPad * 2;
+    const x = zoneX + Math.round((zoneW - cardW) / 2);
+    const y = zoneY + Math.round((zoneH - cardH) / 2);
+    watermark(canvas, card, BigInt(Math.max(0, x)), BigInt(Math.max(0, y)));
+    return canvas.get_bytes_jpeg(90);
+  } finally {
+    shot.free();
+    canvas?.free();
+    card?.free();
+    resized?.free();
+  }
+}

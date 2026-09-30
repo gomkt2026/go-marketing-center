@@ -223,7 +223,7 @@ function GameFrame() {
         />
       ) : (
         <button type="button" className="lp-game-cover" onClick={() => setPlaying(true)}>
-          <img src="/game/og-image.jpg" alt="匠城出任務遊戲畫面" loading="lazy" />
+          <img src="/game/og-image.jpg?v=0930" alt="匠城出任務遊戲畫面" loading="lazy" />
           <span className="lp-play">開始遊戲</span>
         </button>
       )}

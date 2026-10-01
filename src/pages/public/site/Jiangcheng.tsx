@@ -12,8 +12,16 @@ export function Jiangcheng() {
           <h1>收工以後，跑一班舒壓</h1>
           <p className="lp-lead">
             匠城出任務是給工班互動的小遊戲：騎車接 TaskGo 報修、Homigo 送鑰匙、Washgo 收衣服。
-            它不是廣告頁。玩完可以上排行榜，同一套呈現也接進 TaskGo 和 Washgo 的系統裡。
+            介面現在有 English、日本語、Tiếng Việt、Bahasa Indonesia。先讓人用自己的語言，體驗在台灣跑一班的天氣、垃圾車和路上突發。
+            玩完可以上排行榜，同一套呈現也接進 TaskGo 和 Washgo 的系統裡。
           </p>
+          <figure className="lp-poster tall">
+            <img
+              src="/site/jiangcheng-languages.jpg"
+              alt="匠城出任務四種語言畫面：English 的 Craft City Rush、日本語的匠シティ・ラッシュ、Tiếng Việt 與 Bahasa Indonesia。同一條台灣街道，慢字路標分別是 SLOW、徐行、CHẬM、PELAN。"
+            />
+            <figcaption>同一條台灣街。English、日本語、Tiếng Việt、Bahasa Indonesia 都能上手，先體驗在台灣跑一班。</figcaption>
+          </figure>
           <div className="lp-game-grid" style={{ marginTop: 28 }}>
             <GameFrame />
             <Leaderboard />

@@ -614,6 +614,10 @@ export const LANDING_CSS = `
 .lp-shots figure{margin:0}
 .lp-shots img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;display:block}
 .lp-shots figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.lp-poster{margin:28px 0 0}
+.lp-poster img{width:100%;height:auto;border-radius:18px;display:block;box-shadow:0 12px 32px rgba(0,0,0,.08)}
+.lp-poster.tall{max-width:760px}
+.lp-poster figcaption{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.6}
 .lp-integ-title{margin:44px 0 16px !important;font-size:20px !important}
 .lp-integ{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
 .lp-integ-card .lp-btn{align-self:flex-start;margin-top:auto}
@@ -653,6 +657,14 @@ export const LANDING_CSS = `
 .lp-table tr:last-child td{border-bottom:0}
 .lp-table td:first-child{font-weight:700;color:var(--ink);white-space:nowrap}
 .lp-note{font-size:13px;color:var(--muted);line-height:1.7}
+.lp-form{display:grid;gap:14px;background:#fff;border:1px solid #E6E8E2;border-radius:20px;padding:24px;max-width:640px}
+.lp-form label{display:grid;gap:6px;font-size:14px;font-weight:700;color:var(--ink)}
+.lp-form input,.lp-form textarea{font:inherit;font-weight:400;padding:12px 14px;border-radius:10px;border:1px solid #D5D8D0;background:#fff}
+.lp-form textarea{min-height:96px;resize:vertical}
+.lp-form .lp-hp{position:absolute;left:-9999px;height:0;overflow:hidden}
+.lp-form-msg{margin:0;font-size:14px;line-height:1.6}
+.lp-form-msg.ok{color:#1f7a3a}
+.lp-form-msg.bad{color:#9a3412}
 `;
 
 export function PublicFrame({ title, children }: { title: string; children: ReactNode }) {

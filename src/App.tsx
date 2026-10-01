@@ -57,6 +57,7 @@ const Show = lazyPage(() => import('@/pages/public/site/Show'), 'Show');
 const Jiangcheng = lazyPage(() => import('@/pages/public/site/Jiangcheng'), 'Jiangcheng');
 const Center = lazyPage(() => import('@/pages/public/site/Center'), 'Center');
 const GameSeasons = lazyPage(() => import('@/pages/settings/GameSeasons'), 'GameSeasons');
+const Inquiries = lazyPage(() => import('@/pages/inquiries/Inquiries'), 'Inquiries');
 
 /** 未登入看公開首頁；已登入沿用原本的品牌工作台導向。 */
 function RootGate() {
@@ -113,6 +114,7 @@ function AppRoutes() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/meta-threads" element={<MetaThreadsPlaybook />} />
         <Route path="/settings/game" element={<GameSeasons />} />
+        <Route path="/inquiries" element={<Inquiries />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

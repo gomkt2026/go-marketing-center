@@ -1560,3 +1560,22 @@ export const gameAdminApi = {
       method: 'PATCH', body: JSON.stringify({ isBlocked }),
     }),
 };
+
+export interface PostingInquiry {
+  id: string;
+  name: string;
+  phone: string;
+  lineId: string | null;
+  trade: string;
+  message: string | null;
+  status: 'new' | 'contacted';
+  staffNote: string | null;
+  createdAt: string;
+  contactedAt: string | null;
+}
+
+export const inquiriesApi = {
+  list: () => request<{ inquiries: PostingInquiry[] }>('/api/inquiries'),
+  update: (id: string, body: { status?: 'new' | 'contacted'; staffNote?: string }) =>
+    request<{ ok: boolean }>(`/api/inquiries/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+};

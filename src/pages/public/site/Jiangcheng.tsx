@@ -1,0 +1,73 @@
+import { Link } from 'react-router-dom';
+import {
+  GAME_SHOTS, GameFrame, INTEGRATIONS, Leaderboard, PublicFrame, brandOf,
+} from '@/pages/public/Landing';
+
+export function Jiangcheng() {
+  return (
+    <PublicFrame title="匠城出任務">
+      <section className="lp-section game">
+        <div className="lp-wrap">
+          <div className="lp-eyebrow">遊戲挑戰</div>
+          <h1>收工以後，跑一班舒壓</h1>
+          <p className="lp-lead">
+            匠城出任務是給工班互動的小遊戲：騎車接 TaskGo 報修、Homigo 送鑰匙、Washgo 收衣服。
+            它不是廣告頁。玩完可以上排行榜，同一套呈現也接進 TaskGo 和 Washgo 的系統裡。
+          </p>
+          <div className="lp-game-grid" style={{ marginTop: 28 }}>
+            <GameFrame />
+            <Leaderboard />
+          </div>
+          {GAME_SHOTS.length > 0 && (
+            <div className="lp-shots">
+              {GAME_SHOTS.map((s) => (
+                <figure key={s.src}>
+                  <img src={s.src} alt={s.caption} loading="lazy" />
+                  <figcaption>{s.caption}</figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="lp-section">
+        <div className="lp-wrap">
+          <h2>地圖怎麼解</h2>
+          <div className="lp-flow">
+            <div className="lp-flow-item"><span>1</span><b>小地圖</b><small>90 秒，先熟悉接單、打卡、回程。</small></div>
+            <div className="lp-flow-item"><span>2</span><b>中地圖、大地圖</b><small>單變多，天氣和路上狀況每班不一樣。</small></div>
+            <div className="lp-flow-item"><span>3</span><b>台灣地圖</b><small>邀請朋友才開得了的隱藏版。</small></div>
+            <div className="lp-flow-item"><span>4</span><b>排行榜</b><small>暱稱上場，電話只顯示遮罩。連單營收越高，越有機會拿獎。</small></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="lp-section soft">
+        <div className="lp-wrap">
+          <h2>已經接進系統的匠城呈現</h2>
+          <p className="lp-muted lp-sub">
+            結案或查進度時，流程會變成一段匠城動畫。下面兩個連結開新分頁，不嵌在這個網站裡。
+          </p>
+          <div className="lp-integ">
+            {INTEGRATIONS.map((c) => {
+              const b = brandOf(c.brand);
+              return (
+                <article key={c.url} className="lp-integ-card" style={{ ['--c' as string]: b.color }}>
+                  <img className="lp-brand-logo" src={b.logo} alt="" />
+                  <h3>{c.title}</h3>
+                  <p>{c.body}</p>
+                  <a className="lp-btn ghost" href={c.url} target="_blank" rel="noopener">開啟展示</a>
+                  <p className="lp-demo-note">測試場域展示，並非真實客戶或真實案件。</p>
+                </article>
+              );
+            })}
+          </div>
+          <div className="lp-hero-cta">
+            <Link className="lp-btn ghost" to="/go-posting">看 Go 幫你發文</Link>
+          </div>
+        </div>
+      </section>
+    </PublicFrame>
+  );
+}

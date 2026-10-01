@@ -1,6 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+
+export const CONTACT_EMAIL = 'service@inforcraft.com.tw';
+
+const NAV = [
+  { to: '/welcome', label: '首頁' },
+  { to: '/go-posting', label: 'Go幫你發文' },
+  { to: '/proof', label: '品牌成果' },
+  { to: '/show', label: 'Podcast' },
+  { to: '/jiangcheng', label: '遊戲' },
+  { to: '/center', label: '怎麼運作' },
+];
 
 interface LeaderboardEntry {
   rank: number;
@@ -34,7 +45,7 @@ interface LeaderboardResponse {
   entries: LeaderboardEntry[];
 }
 
-const BRANDS = [
+export const BRANDS = [
   {
     slug: 'taskgo',
     name: 'TaskGo 匠管',
@@ -70,7 +81,7 @@ const BRANDS = [
   },
 ];
 
-const MODULES = [
+export const MODULES = [
   { title: '品牌工作台', body: '每個品牌一個儀表板：待審內容、今日發布、成效摘要與待辦一眼看完。' },
   { title: '內容中心與審閱', body: 'AI 依品牌規範產出文案與配圖，經過核准、修改、退回、延期等審閱流程才發布，每一版都留紀錄。' },
   { title: '一鍵多平台發布', body: 'Threads、Facebook、Instagram 走官方 API 直接發布，官網 SEO 長文也能推到各品牌部落格。' },
@@ -86,7 +97,165 @@ const MODULES = [
   { title: '成效分析與學習', body: '彙整各平台互動數據，找出表現好的題材與格式，回饋到下一輪內容生成。' },
 ];
 
-const FLOW = [
+export const PRESS = [
+  {
+    brand: 'taskgo',
+    date: '2025/10/20',
+    title: '數位工具平民化 匠管 Task Go 助攻工班資訊透明',
+    note: '師傅用手機拍照、語音回報，施工紀錄不再靠紙本。',
+    url: 'https://money.udn.com/money/story/5635/9082541',
+  },
+  {
+    brand: 'homigo',
+    date: '2026/07/01',
+    title: '匠管攜手達觀跨足 PropTech 市場 推出 Homigo 智慧租屋管理平台',
+    note: '從 TaskGo 的工單經驗延伸到租屋管理，房東房客用 LINE 就能報修。',
+    url: 'https://money.udn.com/money/story/5635/9726282',
+  },
+  {
+    brand: 'washgo',
+    date: '2026/09/16',
+    title: '傳統洗衣店也拚 AI 數位轉型！匠管 Washgo 中部落地、開放品牌加入',
+    note: '收件、品管、收送串成一條流程，已在中部洗衣店實際上線。',
+    url: 'https://money.udn.com/money/story/5635/9756429',
+  },
+];
+
+export const PODCAST = {
+  page: 'https://player.soundon.fm/p/e70c6ec4-699d-4972-a735-88447eaa2d09',
+  feeds: [
+    { label: 'SoundOn 訂閱', url: 'https://feeds.soundon.fm/podcasts/e70c6ec4-699d-4972-a735-88447eaa2d09.xml' },
+    { label: 'YouTube 訂閱', url: 'https://feeds.soundon.fm/podcasts/e70c6ec4-699d-4972-a735-88447eaa2d09/yt.xml' },
+    { label: 'Spotify 訂閱', url: 'https://feeds.soundon.fm/podcasts/e70c6ec4-699d-4972-a735-88447eaa2d09/spotify.xml' },
+  ],
+};
+
+export const INTEGRATIONS = [
+  {
+    brand: 'taskgo',
+    title: 'TaskGo 結案報告：匠城呈現',
+    body: '修繕案結案後，系統把派工、到場、施工、驗收變成一段匠城出任務動畫，業主點開就看得懂這次修了什麼。',
+    url: 'https://dev.taskgo.com.tw/project-case-report/6cMnEQRUbnwau4fRTYFL8oJ1tapbNrinlC_wXn0ykfGnohTfYgooXqBb9RZN17Gd/play',
+  },
+  {
+    brand: 'washgo',
+    title: 'Washgo 洗滌追蹤：匠城呈現',
+    body: '客人查送洗進度時，收件、洗護、品管、送回會以匠城動畫一路播完，等衣服的時間也有東西看。',
+    url: 'https://washgo-liff.pages.dev/track/4e3271fc4a/play',
+  },
+];
+
+/** 遊戲截圖放在 public/game/shots/。截圖不可出現真實姓名、電話或地址。 */
+export const GAME_SHOTS: { src: string; caption: string }[] = [];
+
+const PLATFORM_LABELS: Record<string, string> = { facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads' };
+
+interface ShowcasePost {
+  brandSlug: string;
+  platform: string;
+  publishedAt: string | null;
+  title: string;
+  excerpt: string;
+  permalink: string | null;
+}
+
+interface ShowcaseEpisode {
+  title: string;
+  publishedAt: string | null;
+  summary: string;
+  url: string | null;
+}
+
+function useJson<T>(url: string): T | null {
+  const [data, setData] = useState<T | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: T | null) => { if (alive && d) setData(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [url]);
+  return data;
+}
+
+export function brandOf(slug: string) {
+  return BRANDS.find((b) => b.slug === slug)!;
+}
+
+export function BrandPosts() {
+  const data = useJson<{ posts: ShowcasePost[] }>('/api/public/showcase/posts');
+  return (
+    <div className="lp-brands">
+      {BRANDS.map((b) => {
+        const post = data?.posts.find((p) => p.brandSlug === b.slug);
+        return (
+          <article key={b.slug} className="lp-post" style={{ ['--c' as string]: b.color }}>
+            <header>
+              <img src={b.editor} alt={b.editorName} />
+              <div>
+                <b>{b.name}</b>
+                <small>AI 小編 {b.editorName}</small>
+              </div>
+            </header>
+            {post ? (
+              <>
+                <div className="lp-post-meta">
+                  {PLATFORM_LABELS[post.platform] ?? post.platform}
+                  {post.publishedAt ? `・${formatDate(post.publishedAt)}` : ''}
+                </div>
+                {post.title && <h3>{post.title}</h3>}
+                <p>{post.excerpt}</p>
+                {post.permalink && (
+                  <a className="lp-link" href={post.permalink} target="_blank" rel="noopener">看這則貼文</a>
+                )}
+              </>
+            ) : (
+              <p className="lp-muted">{data ? '最近一則貼文準備中。' : '載入中…'}</p>
+            )}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+export function PodcastBlock() {
+  const data = useJson<{ episode: ShowcaseEpisode | null }>('/api/public/showcase/podcast');
+  const ep = data?.episode;
+  return (
+    <div className="lp-podcast">
+      <a href={PODCAST.page} target="_blank" rel="noopener" className="lp-podcast-cover">
+        <img src="/podcast/cover.jpg" alt="GO三小編熱聊：阿豪、小咪、阿樂" loading="lazy" />
+      </a>
+      <div className="lp-podcast-body">
+        <h3>GO三小編熱聊</h3>
+        <p className="lp-muted">
+          工班出身的阿豪、包租管家小咪、洗衣店店員阿樂，每週聊工地、租屋、洗衣的熱門話題。
+          三個人的聲音、腳本與上架都由行銷中心產出。
+        </p>
+        {ep && (
+          <div className="lp-episode">
+            <div className="lp-post-meta">最新一集{ep.publishedAt ? `・${formatDate(ep.publishedAt)}` : ''}</div>
+            <b>{ep.title}</b>
+            <p>{ep.summary}</p>
+            {ep.url && <a className="lp-link" href={ep.url} target="_blank" rel="noopener">收聽這一集</a>}
+          </div>
+        )}
+        <div className="lp-hero-cta">
+          <a className="lp-btn" href={PODCAST.page} target="_blank" rel="noopener">到 SoundOn 收聽</a>
+        </div>
+        <div className="lp-feeds">
+          {PODCAST.feeds.map((f) => (
+            <a key={f.url} href={f.url} target="_blank" rel="noopener">{f.label}</a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const FLOW = [
   { step: '1', title: '蒐集', body: '市場情報、品牌知識、過往成效' },
   { step: '2', title: '生成', body: 'AI 小編依品牌口吻產文案與圖' },
   { step: '3', title: '審閱', body: '人工核准、修改或退回' },
@@ -104,7 +273,7 @@ function formatStay(seconds: number): string {
   return `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
 }
 
-function Leaderboard() {
+export function Leaderboard() {
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [failed, setFailed] = useState(false);
   const [stats, setStats] = useState<GameStats | null>(null);
@@ -210,13 +379,13 @@ function Leaderboard() {
   );
 }
 
-function GameFrame() {
+export function GameFrame() {
   const [playing, setPlaying] = useState(false);
   return (
     <div className="lp-game">
       {playing ? (
         <iframe
-          src="/game/?embed=1"
+          src="/game/index.html?embed=1"
           title="匠城出任務"
           allow="autoplay; fullscreen"
           allowFullScreen
@@ -228,46 +397,40 @@ function GameFrame() {
         </button>
       )}
       <div className="lp-game-actions">
-        <a className="lp-btn ghost" href="/game/" target="_blank" rel="noopener">全螢幕開啟</a>
+        <a className="lp-btn ghost" href="/game/index.html" target="_blank" rel="noopener">全螢幕開啟</a>
         <span className="lp-muted">手機直接點「全螢幕開啟」操作最順</span>
       </div>
     </div>
   );
 }
 
+const HOME_PAGES = [
+  { to: '/go-posting', title: 'Go 幫你發文', body: '工班不用自己顧粉專。每週兩則，一個月 999。', cta: '看價格表' },
+  { to: '/proof', title: '三品牌發文與報導', body: '阿豪、小咪、阿樂各一則最新貼文，加上經濟日報三篇。', cta: '看成果' },
+  { to: '/show', title: '三小編熱聊', body: '同一套中心做出的 Podcast，SoundOn、YouTube、Spotify 都能聽。', cta: '去收聽' },
+  { to: '/jiangcheng', title: '匠城出任務', body: '收工後跑一班。遊戲也接進 TaskGo 結案報告和 Washgo 洗滌追蹤。', cta: '玩一局' },
+  { to: '/center', title: '行銷中心怎麼跑', body: '題材、生成、審閱、發布、學習。工班看到的貼文都從這裡出來。', cta: '看流程' },
+];
+
 export function Landing() {
-  const { user } = useAuth();
-
   return (
-    <div className="lp">
-      <style>{LANDING_CSS}</style>
-
-      <header className="lp-nav">
-        <div className="lp-wrap lp-nav-inner">
-          <a href="#top" className="lp-logo"><b>GO</b> 行銷中心</a>
-          <nav>
-            <a href="#universe">GO 宇宙</a>
-            <a href="#modules">功能</a>
-            <a href="#game">遊戲挑戰</a>
-          </nav>
-          {user
-            ? <Link className="lp-btn small" to="/home">進入行銷中心</Link>
-            : <Link className="lp-btn small" to="/login">登入</Link>}
-        </div>
-      </header>
-
+    <PublicFrame title="匠管的 AI 行銷中心">
       <section id="top" className="lp-hero">
         <div className="lp-wrap lp-hero-inner">
           <div>
             <div className="lp-eyebrow">GO Marketing Center</div>
-            <h1>匠管 GO 宇宙的<br />AI 行銷營運中心</h1>
+            <h1>匠管為三個品牌<br />打造的 AI 行銷中心</h1>
             <p className="lp-lead">
-              TaskGo、Homigo、Washgo 三個品牌共用一套行銷系統：多位 AI 小編依品牌口吻產出內容，
-              團隊審閱後一鍵發布到 Threads、Facebook、Instagram 與官網，成效再回流讓下一篇更準。
+              匠管同時經營 TaskGo、Homigo、Washgo，人手不可能每天顧三組粉專。
+              所以我們做了 GO 行銷中心：它會自己在 Facebook、Instagram、Threads 發文，
+              三位小編阿豪、小咪、阿樂各有固定人設與口吻，還能自己錄 Podcast。
+            </p>
+            <p className="lp-lead">
+              我們也做了小遊戲「匠城出任務」讓師傅收工後舒壓，並把它接進 TaskGo 與 Washgo 系統裡。
             </p>
             <div className="lp-hero-cta">
-              <a className="lp-btn" href="#game">玩遊戲認識 GO 宇宙</a>
-              <a className="lp-btn ghost" href="#modules">看完整功能</a>
+              <a className="lp-btn" href="#game">直接玩匠城出任務</a>
+              <Link className="lp-btn ghost" to="/go-posting">每週兩篇，一個月 999</Link>
             </div>
           </div>
           <div className="lp-hero-art">
@@ -284,87 +447,76 @@ export function Landing() {
         </div>
       </section>
 
-      <section id="universe" className="lp-section">
-        <div className="lp-wrap">
-          <div className="lp-eyebrow">匠管 GO 宇宙</div>
-          <h2>三個品牌，一條 LINE 串起生活大小事</h2>
-          <p className="lp-muted lp-sub">修繕、租屋、洗衣都是日常會遇到的服務。GO 宇宙讓現場人員不用另外裝 App，通知都從 LINE 進來。</p>
-          <div className="lp-brands">
-            {BRANDS.map((b) => (
-              <article key={b.slug} className="lp-brand" style={{ ['--c' as string]: b.color }}>
-                <img className="lp-brand-logo" src={b.logo} alt={b.name} />
-                <h3>{b.name}</h3>
-                <p className="lp-brand-tag">{b.tagline}</p>
-                <p>{b.body}</p>
-                <a className="lp-link" href={b.cta.url} target="_blank" rel="noopener">{b.cta.label}</a>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="lp-section soft">
-        <div className="lp-wrap">
-          <div className="lp-eyebrow">運作方式</div>
-          <h2>從題材到成效，一個循環跑完</h2>
-          <div className="lp-flow">
-            {FLOW.map((f) => (
-              <div key={f.step} className="lp-flow-item">
-                <span>{f.step}</span>
-                <b>{f.title}</b>
-                <small>{f.body}</small>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="modules" className="lp-section">
-        <div className="lp-wrap">
-          <div className="lp-eyebrow">功能模組</div>
-          <h2>行銷團隊每天要用的，都在這裡</h2>
-          <div className="lp-modules">
-            {MODULES.map((m) => (
-              <div key={m.title} className="lp-module">
-                <b>{m.title}</b>
-                <p>{m.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section id="game" className="lp-section game">
         <div className="lp-wrap">
-          <div className="lp-eyebrow">遊戲挑戰</div>
-          <h2>匠城出任務：一個班跑完三品牌工單</h2>
+          <div className="lp-eyebrow">先玩一局</div>
+          <h2>匠城出任務</h2>
           <p className="lp-muted lp-sub">
-            騎著機車在匠城接單：TaskGo 報修派工、Homigo 送鑰匙交屋、Washgo 衣物收送。
-            從 90 秒的小地圖一路解鎖到中、大地圖，還有邀請朋友才開得了的隱藏版台灣地圖；
-            每班天氣和路上狀況都不一樣。連單越多營收越高，登上排行榜還有機會拿獎品。
+            騎車接 TaskGo 報修、Homigo 送鑰匙、Washgo 收衣服。90 秒就能開跑，不用註冊。
+            想全螢幕玩，直接開遊戲頁。
           </p>
           <div className="lp-game-grid">
             <GameFrame />
             <Leaderboard />
           </div>
+          <div className="lp-hero-cta">
+            <a className="lp-btn" href="/game/index.html" target="_blank" rel="noopener">開啟完整遊戲</a>
+            <Link className="lp-btn ghost" to="/jiangcheng">地圖、排行榜與系統裡的匠城呈現</Link>
+          </div>
         </div>
       </section>
 
-      <footer className="lp-footer">
-        <div className="lp-wrap lp-footer-inner">
-          <span>© {new Date().getFullYear()} GO 行銷中心</span>
-          <nav>
-            <a href="/privacy">隱私權政策</a>
-            <a href="/legal/game-rules/">遊戲活動辦法</a>
-            {user ? <Link to="/home">進入行銷中心</Link> : <Link to="/login">團隊登入</Link>}
-          </nav>
+      <section id="posts" className="lp-section">
+        <div className="lp-wrap">
+          <div className="lp-eyebrow">品牌發文</div>
+          <h2>三位 AI 小編，各自顧一個品牌</h2>
+          <p className="lp-muted lp-sub">每個品牌只放最新發出去的一則，內容由小編依品牌口吻產出、團隊審過才上線。</p>
+          <BrandPosts />
         </div>
-      </footer>
-    </div>
+      </section>
+
+      <section className="lp-section soft">
+        <div className="lp-wrap">
+          <div className="lp-eyebrow">給工班的方案</div>
+          <h2>Go 幫你發文，只收 999／月</h2>
+          <p className="lp-muted lp-sub">同一套會自己發文的中心，現在可以幫工班、店家每週寫兩則。不是另外一套系統的月費。</p>
+          <div className="lp-price">
+            <div className="lp-price-hero">
+              <div className="lp-post-meta">每週 2 則 · Facebook、Instagram、Threads</div>
+              <div className="lp-amount">999<small> 元／月</small></div>
+              <p className="lp-muted">AI 小編撰寫，發布前有人看過才上線。沒有第二種方案。</p>
+              <Link className="lp-btn" to="/go-posting">看完整價格表</Link>
+            </div>
+            <div>
+              <p className="lp-muted">這套中心先拿來經營匠管自己的三個品牌。工班可以先看成果，再決定要不要讓 Go 幫你發。</p>
+              <div className="lp-hero-cta">
+                <Link className="lp-btn ghost" to="/proof">看三品牌最新發文</Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="lp-section">
+        <div className="lp-wrap">
+          <div className="lp-eyebrow">分頁看</div>
+          <h2>每一塊都可以單獨看完</h2>
+          <div className="lp-pages" style={{ marginTop: 28 }}>
+            {HOME_PAGES.map((p) => (
+              <Link key={p.to} className="lp-page-card" to={p.to}>
+                <b>{p.title}</b>
+                <p>{p.body}</p>
+                <span>{p.cta}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+    </PublicFrame>
   );
 }
 
-const LANDING_CSS = `
+export const LANDING_CSS = `
 .lp{--ink:#23301c;--green:#8CAA71;--green-soft:#EAF1E3;--muted:#6C6C6C;background:#fff;color:#3A3A3A;min-height:100vh;scroll-behavior:smooth}
 .lp *{box-sizing:border-box}
 .lp a{color:inherit}
@@ -438,6 +590,34 @@ const LANDING_CSS = `
 .lp-rank-name{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lp-rank-name small{display:block;font-weight:400;color:var(--muted);font-size:12px}
 .lp-rank-score{font-weight:800;color:#ff6b1a;font-variant-numeric:tabular-nums}
+.lp-post,.lp-press,.lp-integ-card{border:1px solid #E6E8E2;border-top:4px solid var(--c);border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:10px;background:#fff}
+.lp-post header{display:flex;align-items:center;gap:12px}
+.lp-post header img{width:48px;height:48px;border-radius:50%;object-fit:cover;background:#f4f4f4}
+.lp-post header b{display:block;color:var(--c)}
+.lp-post header small{color:var(--muted);font-size:12px}
+.lp-post h3,.lp-press h3{font-size:16px;line-height:1.5}
+.lp-post p,.lp-press p,.lp-integ-card p{margin:0;font-size:14px;line-height:1.75}
+.lp-post .lp-link,.lp-press .lp-link{margin-top:auto;color:var(--c)}
+.lp-post-meta{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.03em}
+.lp-press{text-decoration:none;transition:transform .15s,box-shadow .15s}
+.lp-press:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.06)}
+.lp-podcast{display:grid;grid-template-columns:320px 1fr;gap:32px;align-items:center;margin-top:28px}
+.lp-podcast-cover img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:20px;display:block;box-shadow:0 12px 32px rgba(0,0,0,.1)}
+.lp-podcast-body{display:flex;flex-direction:column;gap:12px}
+.lp-podcast-body h3{font-size:24px}
+.lp-podcast-body .lp-hero-cta{margin-top:4px}
+.lp-episode{background:#F7F9F5;border-radius:14px;padding:14px 16px;display:grid;gap:6px}
+.lp-episode p{margin:0;font-size:14px;line-height:1.7;color:#555}
+.lp-feeds{display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
+.lp-feeds a{color:var(--muted)}
+.lp-shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:24px}
+.lp-shots figure{margin:0}
+.lp-shots img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;display:block}
+.lp-shots figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.lp-integ-title{margin:44px 0 16px !important;font-size:20px !important}
+.lp-integ{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+.lp-integ-card .lp-btn{align-self:flex-start;margin-top:auto}
+.lp-demo-note{font-size:12px !important;color:#8a4b00;background:#FDEBD3;border-radius:8px;padding:6px 10px;align-self:flex-start}
 .lp-footer{border-top:1px solid #E6E8E2;padding:28px 0;font-size:13px;color:var(--muted)}
 .lp-footer-inner{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .lp-footer nav{display:flex;gap:18px}
@@ -445,11 +625,73 @@ const LANDING_CSS = `
   .lp h1{font-size:32px}
   .lp h2{font-size:24px}
   .lp-hero{padding:48px 0}
-  .lp-hero-inner,.lp-game-grid{grid-template-columns:1fr}
+  .lp-hero-inner,.lp-game-grid,.lp-podcast,.lp-integ{grid-template-columns:1fr}
+  .lp-podcast-cover{max-width:320px}
   .lp-brands,.lp-modules{grid-template-columns:1fr}
   .lp-flow{grid-template-columns:1fr 1fr}
-  .lp-nav nav{display:none}
+  .lp-nav-inner{height:auto;flex-wrap:wrap;padding:10px 0;gap:10px}
+  .lp-nav nav{display:flex;order:3;width:100%;margin-left:0;overflow-x:auto;gap:14px;padding-bottom:6px}
   .lp-nav-inner .lp-btn{margin-left:auto}
   .lp-section{padding:52px 0}
+  .lp-pages,.lp-price{grid-template-columns:1fr}
+  .lp-price-hero .lp-amount{font-size:44px}
 }
+.lp-nav nav a[aria-current=page]{color:var(--ink);font-weight:800}
+.lp-pages{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.lp-page-card{display:flex;flex-direction:column;gap:8px;border:1px solid #E6E8E2;border-radius:16px;padding:20px;text-decoration:none;background:#fff}
+.lp-page-card:hover{border-color:var(--green)}
+.lp-page-card b{color:var(--ink);font-size:17px}
+.lp-page-card p{margin:0;font-size:14px;line-height:1.7;color:#555}
+.lp-page-card span{margin-top:auto;font-weight:700;font-size:14px;color:var(--green)}
+.lp-price{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:start}
+.lp-price-hero{background:#fff;border:2px solid var(--green);border-radius:20px;padding:28px}
+.lp-price-hero .lp-amount{font-size:56px;font-weight:900;color:var(--ink);line-height:1;margin:8px 0}
+.lp-price-hero .lp-amount small{font-size:18px;font-weight:700;color:var(--muted)}
+.lp-table{width:100%;border-collapse:collapse;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #E6E8E2}
+.lp-table th,.lp-table td{text-align:left;padding:14px 16px;border-bottom:1px solid #E6E8E2;font-size:15px;vertical-align:top}
+.lp-table th{background:#F7F9F5;color:var(--ink);font-size:13px}
+.lp-table tr:last-child td{border-bottom:0}
+.lp-table td:first-child{font-weight:700;color:var(--ink);white-space:nowrap}
+.lp-note{font-size:13px;color:var(--muted);line-height:1.7}
 `;
+
+export function PublicFrame({ title, children }: { title: string; children: ReactNode }) {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  const here = pathname === '/' ? '/welcome' : pathname;
+
+  useEffect(() => {
+    document.title = `${title}｜GO 行銷中心`;
+  }, [title]);
+
+  return (
+    <div className="lp">
+      <style>{LANDING_CSS}</style>
+      <header className="lp-nav">
+        <div className="lp-wrap lp-nav-inner">
+          <Link to="/welcome" className="lp-logo"><b>GO</b> 行銷中心</Link>
+          <nav>
+            {NAV.map((item) => (
+              <Link key={item.to} to={item.to} aria-current={here === item.to ? 'page' : undefined}>{item.label}</Link>
+            ))}
+          </nav>
+          {user
+            ? <Link className="lp-btn small" to="/home">進入行銷中心</Link>
+            : <Link className="lp-btn small" to="/login">登入</Link>}
+        </div>
+      </header>
+      {children}
+      <footer className="lp-footer">
+        <div className="lp-wrap lp-footer-inner">
+          <span>© {new Date().getFullYear()} GO 行銷中心</span>
+          <nav>
+            <Link to="/go-posting">Go幫你發文</Link>
+            <a href="/privacy">隱私權政策</a>
+            <a href="/legal/game-rules/">遊戲活動辦法</a>
+            {user ? <Link to="/home">進入行銷中心</Link> : <Link to="/login">團隊登入</Link>}
+          </nav>
+        </div>
+      </footer>
+    </div>
+  );
+}

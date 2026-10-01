@@ -51,6 +51,11 @@ const BrandGeo = lazyPage(() => import('@/pages/geo/BrandGeo'), 'BrandGeo');
 const BrandSeo = lazyPage(() => import('@/pages/seo/BrandSeo'), 'BrandSeo');
 const PostingTimes = lazyPage(() => import('@/pages/brand/PostingTimes'), 'PostingTimes');
 const Landing = lazyPage(() => import('@/pages/public/Landing'), 'Landing');
+const GoPosting = lazyPage(() => import('@/pages/public/site/GoPosting'), 'GoPosting');
+const Proof = lazyPage(() => import('@/pages/public/site/Proof'), 'Proof');
+const Show = lazyPage(() => import('@/pages/public/site/Show'), 'Show');
+const Jiangcheng = lazyPage(() => import('@/pages/public/site/Jiangcheng'), 'Jiangcheng');
+const Center = lazyPage(() => import('@/pages/public/site/Center'), 'Center');
 const GameSeasons = lazyPage(() => import('@/pages/settings/GameSeasons'), 'GameSeasons');
 
 /** 未登入看公開首頁；已登入沿用原本的品牌工作台導向。 */
@@ -130,6 +135,23 @@ export default function App() {
               </Suspense>
             )}
           />
+          {([
+            ['/go-posting', GoPosting],
+            ['/proof', Proof],
+            ['/show', Show],
+            ['/jiangcheng', Jiangcheng],
+            ['/center', Center],
+          ] as const).map(([path, Page]) => (
+            <Route
+              key={path}
+              path={path}
+              element={(
+                <Suspense fallback={<LoadingState />}>
+                  <Page />
+                </Suspense>
+              )}
+            />
+          ))}
 
           <Route
             path="/e/:slug"

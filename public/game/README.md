@@ -133,6 +133,16 @@
 
 追蹤事件新增：`event`（type：dogs / police / battery / garbage / tools）、`moment`、`moment_share_open`、`checkin`；`game_start` 附帶 `weather`。
 
+## 多國語系
+
+遊戲支援 **中文、English、日本語、Tiếng Việt、Bahasa Indonesia**。計分、賽季、心跳、邀請解鎖和瀏覽器裡的匠幣進度都跟語言無關。
+
+- **已經玩過的人**：瀏覽器裡已有進度時，維持中文，直到自己按標題畫面右上角的 🌐 換語言。
+- **新玩家**：依手機語言自動切換（日文、越南文、印尼文或馬來文）。其他語言在台灣時區預設中文，不在台灣則預設英文。
+- **指定語言的連結**：網址加 `?lang=en`、`?lang=ja`、`?lang=vi`、`?lang=id`、`?lang=zh`。
+- 翻譯檔在 `jiangcheng-game_多國語系/i18n-source/`。中文原文是鍵，改完後要重新寫進 `public/game/index.html` 的 `I18N_DATA` 區塊。
+- `game_start` 附帶 `lang`。
+
 ## 其他
 
 - 最佳紀錄存在玩家自己的瀏覽器裡；玩家在結算畫面填暱稱、手機並勾選同意後，成績才會送到排行榜。

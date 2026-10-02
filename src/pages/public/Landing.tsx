@@ -620,7 +620,10 @@ export const LANDING_CSS = `
 .lp-poster figcaption{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.6}
 .lp-integ-title{margin:44px 0 16px !important;font-size:20px !important}
 .lp-integ{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+.lp-integ.stack{grid-template-columns:1fr}
 .lp-integ-card .lp-btn{align-self:flex-start;margin-top:auto}
+.lp-play-frame{width:100%;height:min(78vh,820px);min-height:640px;border:0;border-radius:14px;background:#cfe6ee;display:block}
+.lp-integ-card .lp-link{align-self:flex-start;font-weight:700;font-size:14px;color:var(--c)}
 .lp-demo-note{font-size:12px !important;color:#8a4b00;background:#FDEBD3;border-radius:8px;padding:6px 10px;align-self:flex-start}
 .lp-footer{border-top:1px solid #E6E8E2;padding:28px 0;font-size:13px;color:var(--muted)}
 .lp-footer-inner{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}

@@ -55,9 +55,9 @@ export function Jiangcheng() {
         <div className="lp-wrap">
           <h2>已經接進系統的匠城呈現</h2>
           <p className="lp-muted lp-sub">
-            結案或查進度時，流程會變成一段匠城動畫。下面兩個連結開新分頁，不嵌在這個網站裡。
+            結案或查進度時，流程直接在下面播成一段匠城動畫。客戶不用再按開啟，就能看到派工、施工、洗滌這些資訊怎麼串在一起。
           </p>
-          <div className="lp-integ">
+          <div className="lp-integ stack">
             {INTEGRATIONS.map((c) => {
               const b = brandOf(c.brand);
               return (
@@ -65,8 +65,15 @@ export function Jiangcheng() {
                   <img className="lp-brand-logo" src={b.logo} alt="" />
                   <h3>{c.title}</h3>
                   <p>{c.body}</p>
-                  <a className="lp-btn ghost" href={c.url} target="_blank" rel="noopener">開啟展示</a>
+                  <iframe
+                    className="lp-play-frame"
+                    src={c.url}
+                    title={c.title}
+                    allow="autoplay; fullscreen"
+                    allowFullScreen
+                  />
                   <p className="lp-demo-note">測試場域展示，並非真實客戶或真實案件。</p>
+                  <a className="lp-link" href={c.url} target="_blank" rel="noopener">另開完整畫面</a>
                 </article>
               );
             })}

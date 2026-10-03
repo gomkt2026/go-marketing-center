@@ -312,6 +312,10 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
 .livebar b{color:var(--hm);display:inline-flex;align-items:center;gap:5px}
 .livebar b::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--hm);animation:pulse 1.2s infinite}
 .livebar button{appearance:none;border:0;background:none;color:var(--ink2);text-decoration:underline;font:700 12.5px var(--body);cursor:pointer;padding:0;margin-left:auto}
+.promo{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;background:linear-gradient(115deg,#0b2d5c 0 76%,#2ba3d6 76%);border-radius:14px;padding:9px 12px;font-size:12.5px;line-height:1.45;font-weight:700}
+.promo b{display:block;font-size:14px;color:#ffd23a}.promo em{margin-left:auto;font-style:normal;font-weight:900;white-space:nowrap;background:#fff;color:#0b2d5c;border-radius:999px;padding:3px 10px}
+.promoline{margin:0;font-size:12.5px;line-height:1.55;color:#0b2d5c;background:#e3f2fa;border-radius:10px;padding:7px 10px;font-weight:700}.promoline a{color:#0b2d5c;font-weight:900}
+.sm .promoline{text-align:left}
 .prizeline{margin:0;font-size:12.5px;line-height:1.45;color:#8a4b00;background:#fdebd3;border-radius:10px;padding:6px 10px;font-weight:700}
 .lbprize{font-size:12.5px;line-height:1.5;color:#8a4b00;background:#fdebd3;border-radius:12px;padding:8px 12px;font-weight:700;white-space:pre-line}
 .lbstats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
@@ -437,6 +441,7 @@ html:not([data-lang="zh"]) .rank b{font-size:17px}
     <div class="challenge" id="challenge" hidden></div>
     <div class="prof"><span class="coinpill"><i class="coin"></i><span id="coinTitle">0</span> 匠幣</span><span id="streakTitle"></span><button class="mini" id="btnGarage">車庫・換造型</button></div>
     <div class="daily" id="dailyTitle"></div>
+    <a class="promo" id="promoTitle" hidden target="_blank" rel="noopener"><span><b>🎁 路況名場面分享活動</b>21 種突發路況等你撞見，糗照分享到 Threads，回匠管活動貼文留言，每週抽 10 份小禮物</span><em>怎麼參加</em></a>
     <div class="mapsh"><span class="eyebrow">選擇地圖</span><button class="mini" id="btnBoard" type="button">排行榜</button></div>
     <div class="maps" id="maps" role="radiogroup" aria-label="選擇地圖"></div>
     <p class="maphint" id="mapHint"></p>
@@ -469,7 +474,7 @@ html:not([data-lang="zh"]) .rank b{font-size:17px}
       <p class="rank-note" id="rankNote"></p>
     </div>
     <div class="stats" id="stats"></div>
-    <div class="moments" id="moments" hidden><div class="mh"><b>今日名場面</b><span>點照片就能分享這張糗照</span></div><div class="mrow" id="mrow"></div></div>
+    <div class="moments" id="moments" hidden><div class="mh"><b>今日名場面</b><span>點照片就能分享這張糗照</span></div><div class="mrow" id="mrow"></div><p class="promoline" id="promoOver" hidden>🎁 點照片分享到 Threads，加上 <b>#匠城路況</b> 並標記 <b>@inforcraft_</b>，再到<a class="promoPost" target="_blank" rel="noopener">匠管活動貼文</a>留言，每週抽 10 份小禮物（<a class="promoRules" target="_blank" rel="noopener">活動辦法</a>）</p></div>
     <div class="submit" id="submitBox" hidden>
       <div class="sb-h"><b id="sbTitle">登上排行榜</b><button class="mini" id="btnBoard2" type="button">看排行榜</button></div>
       <div class="sb-saved" id="sbSaved" hidden></div>
@@ -535,6 +540,7 @@ html:not([data-lang="zh"]) .rank b{font-size:17px}
       <button class="soc" id="shIg" type="button"><i style="background:radial-gradient(circle at 30% 110%,#ffd600 0 18%,#ff7a00 30%,#ff0069 55%,#d300c5 75%,#7638fa 100%)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17" cy="7" r="1" fill="#fff" stroke="none"/></svg></i>IG 限動</button>
     </div>
     <p class="tip" id="shareTip">點上面的按鈕直接分享；也可以長按圖片存到相簿</p>
+    <p class="promoline" id="promoTip" hidden>🎁 參加活動：先長按圖片存到相簿，按 Threads 發文時把這張圖加進去。發完到<a class="promoPost" target="_blank" rel="noopener">匠管活動貼文</a>留言，貼上你的貼文連結。</p>
     <div class="acts"><button class="go-btn" id="btnNativeShare">分享</button><button class="btn2" id="btnCopy">複製挑戰連結</button></div>
     <a class="btn2" id="btnDownload" download="匠城出任務成績.png" href="#" hidden>下載成績圖</a>
     <input id="linkBox" readonly aria-label="挑戰連結">
@@ -654,6 +660,9 @@ const CONFIG={
   api:'/api/public/game',
   // 台灣地圖上的 TaskGo 服務進度看板（live:true 顯示橘色「服務中」樣式）
   regions:[{city:'高雄',status:'服務中',live:true},{city:'台中',status:'已開始接單',live:true},{city:'台北',status:'10 月中團隊到位',live:false}],
+  // 路況名場面 Threads 分享活動（只在中文介面、活動期間顯示）。發好匠管活動貼文後，把 post 換成那篇貼文的網址
+  promo:{tag:'匠城路況',account:'inforcraft_',post:'https://www.threads.com/@inforcraft_',rules:'/legal/game-threads/',
+    start:'2026-10-03T00:00:00+08:00',end:'2026-11-01T23:59:59+08:00'},
   links:{
     taskgo:{url:'https://app.taskgo.com.tw/register',title:'TaskGo 免費試用 14 天',sub:'讓工程專案管理更簡單、更智能'},
     homigo:{url:'https://www.homigo.com.tw',title:'Homigo 免費開始，不綁信用卡',sub:'不是管理房子，而是讓房子自己運作',
@@ -662,6 +671,7 @@ const CONFIG={
       line:'https://line.me/R/ti/p/%40washgo',lineTitle:'加 Washgo LINE 好友，直接下單',lineSub:'衣物送洗，交給 Washgo'}
   }
 };
+function promoOn(){const P=CONFIG.promo,now=Date.now();return LANG==='zh'&&!!P&&now>=Date.parse(P.start)&&now<=Date.parse(P.end);}
 const SHARE_URL=(()=>{const m=document.querySelector('meta[property="og:url"]');return (m&&m.content)||CONFIG.siteUrl;})();
 function track(ev,params){params=params||{};
   try{if(typeof window.gtag==='function')window.gtag('event',ev,params);}catch(e){}
@@ -1999,7 +2009,8 @@ let cardBlob=null;
 let shareTxtNow='';
 async function openShare(opt){opt=opt&&opt.moment?opt:null;track('share_open',{score,moment:opt?opt.moment.tag:''});const btn=$('#btnShare');btn.disabled=true;
   try{await document.fonts.ready;}catch(e){}
-  const c=opt?await buildMomentCard(opt.moment):await buildCard();shareTxtNow=opt?T('《匠城出任務》今日名場面：「{0}」😂 你也來跑一班看看',T(opt.moment.caption)):shareText();const url=c.toDataURL('image/png');$('#shareImg').src=url;cardBlob=null;c.toBlob(b=>{cardBlob=b;},'image/png');
+  const c=opt?await buildMomentCard(opt.moment):await buildCard();shareTxtNow=opt?T('《匠城出任務》今日名場面：「{0}」😂 你也來跑一班看看',T(opt.moment.caption)):shareText();
+  const promo=!!opt&&promoOn();if(promo)shareTxtNow+=` #${CONFIG.promo.tag} @${CONFIG.promo.account}`;$('#promoTip').hidden=!promo;const url=c.toDataURL('image/png');$('#shareImg').src=url;cardBlob=null;c.toBlob(b=>{cardBlob=b;},'image/png');
   $('#linkBox').value=shareTxtNow+' '+shareLink();$('#shareDone').textContent='';
   const embedded=(()=>{try{return window.self!==window.top;}catch(e){return true;}})();
   const dl=$('#btnDownload');dl.hidden=embedded||ENV.inApp||isTouch;dl.href=url;
@@ -2089,8 +2100,9 @@ function resetEvents(){while(FX.children.length)FX.remove(FX.children[0]);if(ev.
 function toastEv(label,msg,color,emo){const el=document.createElement('div');el.className='toast';el.style.setProperty('--c',color);
   el.innerHTML=`<span class="chip" style="--c:${color};font-size:19px">${emo}</span><div><div class="hd">${label}<span>匠城快報 · 剛剛</span></div><p>${msg}</p></div>`;
   toastsEl.prepend(el);while(toastsEl.children.length>2)toastsEl.lastChild.remove();setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),320);},3600);}
-function captureMoment(caption,tag,delay){setTimeout(()=>{if(state!=='play'||moments.length>=4||moments.some(m=>m.tag===tag))return;
-  try{const nv=nav.visible;nav.visible=false;const saved=camera.position.clone();camera.position.lerp(new THREE.Vector3(player.x,player.y+1,player.z),.42);camera.lookAt(player.x,player.y+.6,player.z);
+function captureMoment(caption,tag,delay,focus){setTimeout(()=>{if(state!=='play'||moments.length>=4||moments.some(m=>m.tag===tag))return;
+  try{const nv=nav.visible;nav.visible=false;const saved=camera.position.clone();const fx=focus?lerp(player.x,focus.x,.62):player.x,fz=focus?lerp(player.z,focus.z,.62):player.z;
+    camera.position.lerp(new THREE.Vector3(fx,player.y+1,fz),focus?.3:.42);camera.lookAt(fx,player.y+.6,fz);
     renderer.render(scene,camera);const src=canvas.toDataURL('image/jpeg',.86);camera.position.copy(saved);camera.lookAt(camLook);nav.visible=nv;
     moments.push({caption,tag,src,wx:weather.id,map:MAP.id});track('moment',{tag});}catch(e){}},delay||0);}
 function roadPoints(){const pts=[],n=ROADS.length-1;for(let i=0;i<=n;i++)for(let j=0;j<n;j++){const m=(ROADS[j]+ROADS[j+1])/2;if(roadV(i,j))pts.push([ROADS[i],m]);if(roadH(j,i))pts.push([m,ROADS[i]]);}return pts;}
@@ -2146,6 +2158,8 @@ function kid(){const p=person(pick(['#f4f6f8','#9fc3e8','#f6d36b']),'cap');p.sca
 function bigTruck(col){const g=new THREE.Group();box(g,2.2,1.6,1.7,col,0,.35,2.4);box(g,2,.7,.05,'#34495e',0,1.1,3.26,true);box(g,2.4,2.4,4.4,'#e9ecef',0,.35,-.8);
   [[1,2.4],[-1,2.4],[1,-.2],[-1,-.2],[1,-2.2],[-1,-2.2]].forEach(([x,z])=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.3,12),mat('#23262c'));w.rotation.z=PI/2;w.position.set(x,.42,z);g.add(w);});return g;}
 function hazardLights(car,y,zf,zb,x){const m=blinker('#ffb020');[[x,zf],[-x,zf],[x,zb],[-x,zb]].forEach(([a,b])=>{const l=new THREE.Mesh(BOX,m);l.scale.set(.32,.18,.08);l.position.set(a,y,b);car.add(l);});return m;}
+// the photo waits until the rider is close enough for the incident to be in frame
+function incMoment(o,caption,tag){o.mom=[caption,tag];}
 function incToast(o,msg){const d=INC_DEFS[o.key];toastEv(d.n,msg,'#e5484d',d.e);}
 
 const INC_MAKE={
@@ -2154,7 +2168,7 @@ const INC_MAKE={
     o.crowd=[];for(let i=0;i<7;i++){const p=person(pick(['#ff6b1a','#f5c518','#ffffff','#3a8dde']));p.position.set(rnd(-3,3),0,i%2?rnd(3.4,5.6):rnd(-5.8,-3.6));p.rotation.y=rnd(0,TAU);g.add(p);o.crowd.push(p);
       if(i%2===0){const f=box(p,.05,1.4,.05,'#8a6b48',.32,.9,0,true);const fl=box(p,.02,.42,.62,pick(['#ff6b1a','#1fae78','#f5c518']),.32,1.9,.32,true);}}
     incBlock(o,0,0,7.4,12.5);incLabel(o,'🚚 造勢中',5.2);o.dur=22;
-    incToast(o,'造勢車隊佔住整條路，鑼鼓喧天，請繞路');captureMoment('遇到造勢車隊，師傅被塞了一份傳單','election',1600);},
+    incToast(o,'造勢車隊佔住整條路，鑼鼓喧天，請繞路');incMoment(o,'遇到造勢車隊，師傅被塞了一份傳單','election');},
   electionU(o,dt){o.crowd.forEach((p,i)=>{p.userData.arm.rotation.z=-2.4+Math.sin(elapsed*9+i)*.6;p.position.y=Math.abs(Math.sin(elapsed*6+i))*.15;});
     o.say-=dt;if(o.say<=0){o.say=2.4;const [x,z]=incW(o,0,0);floatText(pick(['凍蒜！凍蒜！','拜託拜託！','請支持阿匠！']),x,4.4,z,'#fff','say');AU.tone(523,.12,'square',.05);AU.tone(659,.16,'square',.05,null,.13);}},
   fire(o){const g=incGroup(o);const ft=bigTruck('#d8342c');ft.position.set(-1.6,0,-1);g.add(ft);const lad=box(ft,.5,.2,5.5,'#c8ccd2',0,2.8,-.6);lad.rotation.x=-.18;
@@ -2163,7 +2177,7 @@ const INC_MAKE={
     for(let i=0;i<2;i++){const f=person('#c0392b','cap');f.position.set(2.4,0,-3.2+i*1.6);f.rotation.y=-PI/2;g.add(f);}
     const hose=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,5,8),mat('#f5c518'));hose.rotation.z=PI/2;hose.position.set(3,.1,-2.4);g.add(hose);
     [[-3,-6],[3,-6],[-3,6],[3,6]].forEach(([a,b])=>cone(g,a,b));incBlock(o,0,0,7.4,12.5);incLabel(o,'🚒 消防管制',5.2);o.dur=22;
-    incToast(o,'住宅冒煙，消防車到場，住戶都平安疏散了，這段路先管制');captureMoment('消防車都到了，師傅只能繞一大圈','fire',1400);},
+    incToast(o,'住宅冒煙，消防車到場，住戶都平安疏散了，這段路先管制');incMoment(o,'消防車都到了，師傅只能繞一大圈','fire');},
   fireU(o,dt){const on=Math.sin(elapsed*12)>0;o.lr.color.set(on?'#ff2d2d':'#5a1010');o.lb.color.set(on?'#10205a':'#2d6bff');
     if(Math.random()<dt*14){const [x,z]=incW(o,6.2,-1);emit(x+rnd(-1,1),rnd(1,3),z+rnd(-1,1),1,['#5c5f66','#8a8d93','#3d4048'],{smin:.2,smax:.8,vmin:2,vmax:4,g:-1.2,lmin:1.6,lmax:2.6,szmin:.6,szmax:1.2});}
     if(Math.random()<dt*10){const [x,z]=incW(o,3.6,-2.4);emit(x,.4,z,2,['#cfe8ff','#ffffff'],{smin:3,smax:5,vmin:1,vmax:2,lmin:.3,lmax:.5,szmin:.1,szmax:.18});}},
@@ -2171,12 +2185,12 @@ const INC_MAKE={
     const sg=signMesh('前方施工 請改道','#f5a524','#1b2233',3.2,.9,{round:8});sg.position.set(0,1.7,-4.75);sg.rotation.y=PI;g.add(sg);const sg2=sg.clone();sg2.position.z=4.75;sg2.rotation.y=0;g.add(sg2);
     box(g,4,.12,3,'#6b5a45',0,0,0,true);const ex=new THREE.Group();box(ex,1.8,1,2.4,'#f5c518',0,.2,0);box(ex,1.2,1,1.2,'#f5c518',0,1.2,-.4);const arm=box(ex,.3,.3,2.6,'#f5c518',0,1.5,1.4);arm.rotation.x=-.5;ex.position.set(1.2,0,0);g.add(ex);o.ex=ex;
     const wk=person('#ff6b1a','cap');wk.position.set(-2,0,1);g.add(wk);o.wk=wk;incBlock(o,0,0,7.4,10);incLabel(o,'🚧 施工中',4.6);o.dur=28;
-    incToast(o,'昨天還能走的路，今天變成施工區，只能繞路');captureMoment('導航說直走，結果直接撞上施工圍籬','works',1200);},
+    incToast(o,'昨天還能走的路，今天變成施工區，只能繞路');incMoment(o,'導航說直走，結果直接撞上施工圍籬','works');},
   worksU(o,dt){o.ex.rotation.y=Math.sin(elapsed*.8)*.6;o.wk.userData.arm.rotation.z=-2.4+Math.sin(elapsed*5)*.5;
     if(Math.random()<dt*4){const [x,z]=incW(o,0,0);emit(x,.4,z,2,['#b8a58a','#8a7a64'],{smin:.5,smax:1.5,vmin:1,vmax:2,lmin:.4,lmax:.8,szmin:.15,szmax:.3});}},
   dogrun(o){const g=incGroup(o);o.dog=makeDog('#e9dcc7');g.add(o.dog.g);o.owner=person('#6a8caf');g.add(o.owner);
     o.zone=incSlow(o,0,0,7,13,1,.15);incLabel(o,'🐕 狗狗逃家',3.8);o.dur=24;o.dt=0;o.dx=0;o.dz=0;
-    incToast(o,'一隻狗衝到馬路中央，阿伯在後面追，車都塞住了（幫忙攔下牠有獎勵）');captureMoment('狗狗大逃家，整條路都在等牠','dogrun',1500);},
+    incToast(o,'一隻狗衝到馬路中央，阿伯在後面追，車都塞住了（幫忙攔下牠有獎勵）');incMoment(o,'狗狗大逃家，整條路都在等牠','dogrun');},
   dogrunU(o,dt){if(o.caught)return;o.dt+=dt;const tx=Math.sin(o.dt*1.7)*2.6,tz=Math.sin(o.dt*.9)*5.2;const vx=tx-o.dx,vz=tz-o.dz;o.dx=tx;o.dz=tz;
     o.dog.g.position.set(tx,0,tz);o.dog.g.rotation.y=Math.atan2(vx,vz);o.dog.legs.forEach((l,i)=>{l.rotation.x=Math.sin(elapsed*22+i*1.6)*.7;});o.dog.tail.rotation.y=Math.sin(elapsed*20)*.6;
     const ox=Math.sin(o.dt*1.7-.9)*2.6,oz=Math.sin(o.dt*.9-.9)*5.2;o.owner.position.set(ox,0,oz);o.owner.rotation.y=Math.atan2(tx-ox,tz-oz);o.owner.userData.arm.rotation.z=-2.6+Math.sin(elapsed*10)*.5;
@@ -2185,51 +2199,51 @@ const INC_MAKE={
       toastEv('好心師傅','幫阿伯攔下逃家的狗 +NT$200','#1fae78','🐕');stats.goodDeed++;stats.incDog=1;captureMoment('師傅順手幫阿伯抓到逃家的狗','dogcatch',100);}},
   chicken(o){const g=incGroup(o);o.ch=[];for(let i=0;i<8;i++){const c=chicken();c.position.set(rnd(-3,3),0,rnd(-1.6,1.6));g.add(c);o.ch.push({g:c,s:rnd(.6,1.2)*(i%2?1:-1),ph:rnd(0,TAU)});}
     const farmer=person('#8a6b48');farmer.position.set(-3.8,0,2.4);g.add(farmer);o.farmer=farmer;incBlock(o,0,0,7.4,4.4);incLabel(o,'🐔 雞群過馬路',3.4);o.dur=16;
-    incToast(o,'一群雞霸佔馬路，所有車都只能乖乖等');captureMoment('一群雞過馬路，全部的車都在等','chicken',1400);},
+    incToast(o,'一群雞霸佔馬路，所有車都只能乖乖等');incMoment(o,'一群雞過馬路，全部的車都在等','chicken');},
   chickenU(o,dt){o.ch.forEach(c=>{c.g.position.x+=c.s*dt;if(Math.abs(c.g.position.x)>3.2){c.s*=-1;c.g.position.x=clamp(c.g.position.x,-3.2,3.2);}c.g.rotation.y=c.s>0?PI/2:-PI/2;c.g.position.y=Math.abs(Math.sin(elapsed*10+c.ph))*.08;});
     o.say-=dt;if(o.say<=0){o.say=2.2;const [x,z]=incW(o,0,0);floatText(pick(['咕咕咕～','咯咯咯！','咕！']),x,2,z,'#fff','say');AU.tone(900,.06,'square',.04,1300);AU.tone(800,.08,'square',.04,1100,.09);}
     const [x,z]=incW(o,0,0);if(Math.hypot(player.x-x,player.z-z)<3.4&&Math.random()<dt*6)emit(x+rnd(-2,2),.8,z+rnd(-1,1),2,['#ffffff','#f1efe6'],{smin:.5,smax:2,vmin:1,vmax:3,g:.4,lmin:.8,lmax:1.4,szmin:.08,szmax:.14});},
   cat(o){const g=incGroup(o);const car=makeCar('#5b7fa6');car.position.set(1.75,0,0);g.add(car);
     const r=person('#e5484d');r.rotation.x=-PI/2;r.position.set(-.1,.25,.6);g.add(r);const cat=new THREE.Group();box(cat,.3,.24,.4,'#f0a04b',0,0,0);box(cat,.24,.22,.22,'#f0a04b',0,.12,.28);box(cat,.06,.1,.06,'#f0a04b',-.08,.34,.32,true);box(cat,.06,.1,.06,'#f0a04b',.08,.34,.32,true);
     cat.position.set(.7,0,1.2);cat.rotation.y=-PI/2;g.add(cat);o.cat=cat;cone(g,-.6,-2.6);cone(g,-.6,2.8);incBlock(o,1.75,0,3.6,6);incLabel(o,'🐈 救貓中',3.6);o.dur=22;
-    incToast(o,'有隻貓卡在車底，救援中，這個車道先封起來');captureMoment('全城最重要的任務：把貓救出來','cat',1400);},
+    incToast(o,'有隻貓卡在車底，救援中，這個車道先封起來');incMoment(o,'全城最重要的任務：把貓救出來','cat');},
   catU(o,dt){o.cat.position.x=.7+Math.max(0,Math.sin(elapsed*1.3))*.35;o.say-=dt;if(o.say<=0){o.say=3;const [x,z]=incW(o,.6,1.2);floatText(pick(['喵～','喵嗚？','出來出來～']),x,1.6,z,'#fff','say');AU.tone(880,.18,'triangle',.04,620);}},
   unload(o){const g=incGroup(o);const t=bigTruck('#3a8dde');t.position.set(1.75,0,0);g.add(t);const door=box(t,2.3,2.2,.08,'#cfd4da',0,.35,-3);door.rotation.x=1.2;door.position.z=-3.6;
     for(let i=0;i<5;i++)box(g,.7,.6,.7,'#c49a6c',3.4+rnd(-.2,.2),i%3*.6,-3.5+(i/3|0)*.8);
     const wk=person('#3b3b3b');g.add(wk);box(wk,.6,.5,.5,'#c49a6c',0,.55,.42);o.wk=wk;hazardLights(t,1.1,3.3,-3,1.05);incBlock(o,1.75,0,3.6,9);incLabel(o,'🚛 卸貨中',4.6);o.dur=30;
-    incToast(o,'一台貨車停在路邊卸貨：「我只卸一下喔」');captureMoment('「我只卸一下喔」——卸了半小時','unload',2200);},
+    incToast(o,'一台貨車停在路邊卸貨：「我只卸一下喔」');incMoment(o,'「我只卸一下喔」——卸了半小時','unload');},
   unloadU(o,dt){const k=(Math.sin(elapsed*1.2)+1)/2;o.wk.position.set(lerp(1,3.4,k),0,-3.6);o.wk.rotation.y=Math.cos(elapsed*1.2)>0?PI/2:-PI/2;
     o.say-=dt;if(o.say<=0){o.say=4.5;const [x,z]=incW(o,2,-3.6);floatText(pick(['我只卸一下喔！','快好了快好了','再一箱就好！']),x,2.8,z,'#fff','say');}},
   crane(o){const g=incGroup(o);const t=bigTruck('#f5a524');t.position.set(1.75,0,0);g.add(t);[[-1.5,1.6],[1.5,1.6],[-1.5,-2.4],[1.5,-2.4]].forEach(([a,b])=>box(t,.25,.6,.25,'#2d3440',a,0,b,true));
     const tur=new THREE.Group();tur.position.set(0,2.8,-.8);t.add(tur);cyl(tur,.6,.7,.6,'#f5a524',0,0,0);const boom=box(tur,.45,.45,9,'#f5c518',0,.6,4.2);boom.rotation.x=-.32;
     const cable=box(tur,.04,3.4,.04,'#2d3440',0,0,8.1,true);cable.position.y=1.9;box(tur,.6,.5,.6,'#e5484d',0,.1,8.1);o.tur=tur;const fl=person('#ff6b1a','cap');fl.position.set(-1.2,0,4.6);g.add(fl);o.fl=fl;
     for(let i=-2;i<=2;i++)cone(g,-.3,i*1.6);incBlock(o,1.75,0,4.4,9.5);incLabel(o,'🏗️ 吊車作業',5.4);o.dur=24;
-    incToast(o,'吊車佔了半條路在作業，旁邊車道慢慢過');captureMoment('吊車在頭上轉，師傅低頭快速通過','crane',1600);},
+    incToast(o,'吊車佔了半條路在作業，旁邊車道慢慢過');incMoment(o,'吊車在頭上轉，師傅低頭快速通過','crane');},
   craneU(o,dt){o.tur.rotation.y=Math.sin(elapsed*.4)*1.1;o.fl.userData.arm.rotation.z=-2.4+Math.sin(elapsed*4)*.6;},
   riders(o){const g=incGroup(o);o.sc=[];for(let i=0;i<9;i++){const s=makeScooter(pick(['#2d3440','#d8342c','#f4f6f8','#8fb3c9']),'#2a2d34',{shirt:pick(['#e5487b','#1fae78','#f5a524','#3b3b3b']),vest:'#2d3440',helmet:pick(['#e5487b','#1fae78','#f5c518'])});
       box(s.tilt,.7,.62,.62,pick(['#e5487b','#1fae78','#f5a524']),0,1,-.75);s.root.position.set(rnd(-2.8,2.8),0,rnd(-6,6));g.add(s.root);o.sc.push({r:s.root,sp:rnd(1.6,3)*(Math.random()<.5?1:-1),x:s.root.position.x});}
     o.zone=incSlow(o,0,0,7.4,13,.5,.35);incLabel(o,'🛵 外送尖峰',3.6);o.dur=24;
-    incToast(o,'商圈附近外送大軍出動，整條路速度變慢');captureMoment('外送大軍包圍，師傅被擠成夾心','riders',1400);},
+    incToast(o,'商圈附近外送大軍出動，整條路速度變慢');incMoment(o,'外送大軍包圍，師傅被擠成夾心','riders');},
   ridersU(o,dt){o.sc.forEach(s=>{s.r.position.z+=s.sp*dt;if(Math.abs(s.r.position.z)>6.2){s.r.position.z=-Math.sign(s.r.position.z)*6.1;}s.r.rotation.y=s.sp>0?0:PI;s.r.position.x=s.x+Math.sin(elapsed*1.3+s.x)*.4;});
     o.say-=dt;if(o.say<=0){o.say=3.2;const [x,z]=incW(o,0,0);floatText(pick(['借過借過～','餐要冷了！','前面的快點啦'])
 ,x,2.4,z,'#fff','say');AU.horn();}},
   hazard(o){const g=incGroup(o);const car=makeCar('#e9ecef');car.position.set(0,0,0);g.add(car);o.hm=hazardLights(car,.78,1.88,-1.88,.62);
     const d=person('#c0504d');d.position.set(-1.6,0,-1);g.add(d);box(d,.18,.12,.3,'#ffffff',-.26,.4,.18,true);o.d=d;incBlock(o,0,0,2.4,4.4);incLabel(o,'🚗 臨停中',3.4);o.dur=22;
-    incToast(o,'一台車開雙黃燈停在路中央，後面車都卡住了');captureMoment('雙黃燈一開，路就是他家的','hazard',1400);},
+    incToast(o,'一台車開雙黃燈停在路中央，後面車都卡住了');incMoment(o,'雙黃燈一開，路就是他家的','hazard');},
   hazardU(o,dt){o.hm.color.set(Math.sin(elapsed*8)>0?'#ffb020':'#4a3410');o.say-=dt;if(o.say<=0){o.say=4;const [x,z]=incW(o,-1.6,-1);floatText(pick(['我馬上好～','買個雞排而已','五分鐘就好！']),x,2.6,z,'#fff','say');}},
   bus(o){const g=incGroup(o);const b=new THREE.Group();box(b,2.4,2.4,9,'#2f9e7a',0,.35,0);box(b,2.42,.7,8.2,'#34495e',0,1.55,0,true);box(b,2.42,.12,9,'#ffffff',0,1.1,0,true);
     [[1.1,3],[-1.1,3],[1.1,-3],[-1.1,-3]].forEach(([x,z])=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,.3,12),mat('#23262c'));w.rotation.z=PI/2;w.position.set(x,.48,z);b.add(w);});
     b.position.set(1.75,0,0);g.add(b);o.hm=hazardLights(b,1,4.52,-4.52,1);const tri=new THREE.Mesh(new THREE.ConeGeometry(.4,.7,3),mat('#e5484d'));tri.position.set(1.75,.35,-6.2);g.add(tri);
     o.pax=[];for(let i=0;i<4;i++){const p=person(pick(['#9b8bd6','#6aa3d8','#f0b43a','#e58fb0']));p.position.set(-.4+rnd(-.4,.4),0,-2+i*1.4);p.rotation.y=rnd(0,TAU);g.add(p);o.pax.push(p);}
     incBlock(o,1.75,0,3.6,10.5);incLabel(o,'🚌 公車故障',4.4);o.dur=24;
-    incToast(o,'公車拋錨停在路中間，後面開始大排長龍');captureMoment('公車拋錨，全車乘客下來陪師傅等','bus',1600);},
+    incToast(o,'公車拋錨停在路中間，後面開始大排長龍');incMoment(o,'公車拋錨，全車乘客下來陪師傅等','bus');},
   busU(o,dt){o.hm.color.set(Math.sin(elapsed*8)>0?'#ffb020':'#4a3410');if(Math.random()<dt*6){const [x,z]=incW(o,1.75,-4.8);emit(x,1,z,1,['#5c5f66','#8a8d93'],{smin:.2,smax:.6,vmin:1,vmax:2,g:-1,lmin:1,lmax:1.8,szmin:.3,szmax:.6});}},
   filming(o){const g=incGroup(o);const cam=new THREE.Group();[-.4,.4].forEach(a=>{const l=box(cam,.05,1.4,.05,'#2d3440',a,0,0,true);l.rotation.z=a;});box(cam,.5,.4,.8,'#1b2233',0,1.4,0);cyl(cam,.16,.16,.3,'#1b2233',0,1.5,.5);cam.position.set(-1.5,0,-3);g.add(cam);
     for(const [x,z] of [[2.6,-3.4],[-3,2.6]]){box(g,.06,2.2,.06,'#2d3440',x,0,z,true);const p=new THREE.Mesh(BOX,new THREE.MeshBasicMaterial({color:'#fff8d6'}));p.scale.set(1,.7,.08);p.position.set(x,2.4,z);p.rotation.y=Math.atan2(-x,-z);g.add(p);}
     const actor=person('#e5487b');actor.position.set(0,0,1.4);actor.rotation.y=PI;g.add(actor);o.actor=actor;const dir=person('#2d3440','cap');dir.position.set(-2.4,0,-4.2);g.add(dir);box(g,.6,.5,.6,'#c0392b',-2.4,0,-5,true);
     const sg=signMesh('拍攝中 請安靜','#1b2233','#fff',3,.8,{round:8});sg.position.set(0,1.6,-6);sg.rotation.y=PI;g.add(sg);const sg2=sg.clone();sg2.position.z=6;sg2.rotation.y=0;g.add(sg2);
     incBlock(o,0,0,7.4,12);incLabel(o,'🎬 拍攝中',4.6);o.dur=20;
-    incToast(o,'路口在拍廣告 MV，部分區域管制，請改道');captureMoment('誤入 MV 拍攝現場，師傅差點出道','filming',1300);},
+    incToast(o,'路口在拍廣告 MV，部分區域管制，請改道');incMoment(o,'誤入 MV 拍攝現場，師傅差點出道','filming');},
   filmingU(o,dt){o.actor.rotation.y=PI+Math.sin(elapsed*2)*.8;o.actor.userData.arm.rotation.z=-2.2+Math.sin(elapsed*6)*.7;o.say-=dt;
     if(o.say<=0){o.say=3.4;const [x,z]=incW(o,-2.4,-4.2);floatText(pick(['Action！','卡！再來一次','那個機車可以入鏡嗎？']),x,2.6,z,'#fff','say');}},
   market(o){const g=incGroup(o);const cols=['#e5484d','#1fae78','#3a8dde','#f5a524','#9b8bd6'];
@@ -2237,14 +2251,14 @@ const INC_MAKE={
       const roof=new THREE.Mesh(new THREE.ConeGeometry(1.75,.6,4),mat(cols[(i*2+(side>0))%5]));roof.rotation.y=PI/4;roof.position.set(x,2.2,z);roof.castShadow=true;g.add(roof);box(g,2,.7,1.2,'#f4f1ea',x,0,z,true);}
     o.ppl=[];for(let i=0;i<5;i++){const p=person(pick(['#e58fb0','#6aa3d8','#f0b43a','#ffffff']));p.position.set(rnd(-.5,.5),0,rnd(-5,5));g.add(p);o.ppl.push({p,s:rnd(.6,1.2)*(i%2?1:-1)});}
     incBlock(o,0,0,7.4,12);incLabel(o,'🎪 臨時市集',4.4);o.dur=28;
-    incToast(o,'原本的停車區變成市集，雞排和烤香腸的味道飄過來了');captureMoment('市集的雞排太香，師傅差點忘了在上班','market',1400);},
+    incToast(o,'原本的停車區變成市集，雞排和烤香腸的味道飄過來了');incMoment(o,'市集的雞排太香，師傅差點忘了在上班','market');},
   marketU(o,dt){o.ppl.forEach(q=>{q.p.position.z+=q.s*dt;if(Math.abs(q.p.position.z)>5.5)q.s*=-1;q.p.rotation.y=q.s>0?0:PI;});
     const [x,z]=incW(o,0,0);if(Math.hypot(player.x-x,player.z-z)<11){o.say-=dt;if(o.say<=0){o.say=3.6;floatText(pick(['雞排好香…','烤香腸三條一百！','老闆，珍奶一杯！']),x,2.8,z,'#fff','say');}}},
   school(o){const g=incGroup(o);o.kids=[];for(let i=0;i<9;i++){const k=kid();k.position.set(rnd(-3,3),0,rnd(-1.4,1.4));g.add(k);o.kids.push({k,s:rnd(.8,1.4)*(i%2?1:-1)});}
     const guard=person('#f5c518','cap');guard.position.set(-3.6,0,-2);g.add(guard);const fl=box(guard,.04,.04,.9,'#e5484d',.4,.8,.4,true);o.guard=guard;
     for(let i=0;i<3;i++){const s=makeScooter('#f4f6f8','#2a2d34',{shirt:pick(['#6a8caf','#e58fb0']),vest:'#e9e2d0',helmet:'#ffffff'});s.root.position.set(3,0,-5+i*4.6);g.add(s.root);}
     o.zone=incSlow(o,0,0,7.4,13,.45,.15);incLabel(o,'🏫 放學時間',3.4);o.dur=26;
-    incToast(o,'放學了！學生和接送的家長擠滿路口，騎慢一點');captureMoment('放學時間到，師傅被小學生包圍','school',1400);},
+    incToast(o,'放學了！學生和接送的家長擠滿路口，騎慢一點');incMoment(o,'放學時間到，師傅被小學生包圍','school');},
   schoolU(o,dt){o.kids.forEach(q=>{q.k.position.x+=q.s*dt;if(Math.abs(q.k.position.x)>3.3)q.s*=-1;q.k.rotation.y=q.s>0?PI/2:-PI/2;q.k.position.y=Math.abs(Math.sin(elapsed*8+q.s*9))*.08;});
     o.guard.userData.arm.rotation.z=-2.6+Math.sin(elapsed*3)*.3;},
   ambulance(o){let best=null;trafficLoops.forEach(loop=>{loop.forEach(([x,z])=>{const d=Math.hypot(x-player.x,z-player.z);if(!best||d<best.d)best={loop,d};});});if(!best||best.d>50)return false;
@@ -2253,7 +2267,7 @@ const INC_MAKE={
     o.lr=blinker('#ff2d2d');o.lb=blinker('#2d6bff');const a=new THREE.Mesh(BOX,o.lr),b=new THREE.Mesh(BOX,o.lb);a.scale.set(.6,.22,.3);b.scale.set(.6,.22,.3);a.position.set(-.4,2.4,1.4);b.position.set(.4,2.4,1.4);g.add(a);g.add(b);
     const v=addVehicle(best.loop,g,12,0,1.9);let bd=0,bdist=1e9;for(let d=0;d<v.L;d+=2){const s=v.segs.find(s=>d>=s.s&&d<s.s+s.l);const t=(d-s.s)/s.l;const x=lerp(s.a[0],s.b[0],t),z=lerp(s.a[1],s.b[1],t);const dd=Math.hypot(x-player.x,z-player.z);if(dd<bdist){bdist=dd;bd=d;}}
     v.d=(bd-30+v.L)%v.L;v.amb=true;o.v=v;o.veh=[v];o.dur=20;o.blockT=0;o.near=false;o.zone={minx:0,maxx:0,minz:0,maxz:0,pm:.6,tm:.3,o,r:9};inc.slow.push(o.zone);
-    incToast(o,'救護車鳴笛接近，請讓出道路！');captureMoment('救護車來了，全城一起讓道','ambulance',2600);return true;},
+    incToast(o,'救護車鳴笛接近，請讓出道路！');incMoment(o,'救護車來了，全城一起讓道','ambulance');return true;},
   ambulanceU(o,dt){const v=o.v;const on=Math.sin(elapsed*14)>0;o.lr.color.set(on?'#ff2d2d':'#5a1010');o.lb.color.set(on?'#10205a':'#2d6bff');o.x=v.x;o.z=v.z;
     o.zone.minx=v.x-9;o.zone.maxx=v.x+9;o.zone.minz=v.z-9;o.zone.maxz=v.z+9;const d=Math.hypot(player.x-v.x,player.z-v.z);
     o.sir-=dt;if(o.sir<=0&&d<40){o.sir=.75;AU.siren();}
@@ -2266,7 +2280,7 @@ const INC_MAKE={
       const v=addVehicle(best.loop,car,3.6,0,1.9);o.veh.push(v);}
     const lead=o.veh[0];let bd=0,bdist=1e9;for(let d=0;d<lead.L;d+=2){const s=lead.segs.find(s=>d>=s.s&&d<s.s+s.l);const t=(d-s.s)/s.l;const dd=Math.hypot(lerp(s.a[0],s.b[0],t)-player.x,lerp(s.a[1],s.b[1],t)-player.z);if(dd<bdist){bdist=dd;bd=d;}}
     o.veh.forEach((v,i)=>{v.d=(bd+14-i*5.4+v.L)%v.L;});o.dur=28;o.follow=0;
-    incToast(o,'婚禮車隊慢慢經過，跟在後面說不定拿得到喜糖');captureMoment('跟著婚禮車隊，師傅沾沾喜氣','wedding',1800);return true;},
+    incToast(o,'婚禮車隊慢慢經過，跟在後面說不定拿得到喜糖');incMoment(o,'跟著婚禮車隊，師傅沾沾喜氣','wedding');return true;},
   weddingU(o,dt){const last=o.veh[o.veh.length-1];o.x=last.x;o.z=last.z;const d=Math.min(...o.veh.map(v=>Math.hypot(player.x-v.x,player.z-v.z)));
     if(d<8&&!o.candy){o.follow+=dt;if(o.follow>2.5){o.candy=true;stats.incCandy=1;addScore(66,player.x,player.z,'#ff5f9e');floatText('🍬 喜糖 +NT$66',player.x,3,player.z,'#ff5f9e','big');AU.done();toastEv('沾喜氣','新人撒喜糖 +NT$66','#ff5f9e','💒');}}
     if(Math.random()<dt*3){const v=pick(o.veh);emit(v.x,2.4,v.z,2,['#ff5f9e','#ffd66b','#ffffff'],{smin:.5,smax:2,vmin:1,vmax:3,g:.5,lmin:1,lmax:1.6,szmin:.08,szmax:.14});}},
@@ -2275,7 +2289,7 @@ const INC_MAKE={
     o.gods=[];[[-2.6,-4],[2.6,-4]].forEach(([x,z],i)=>{const gd=new THREE.Group();cyl(gd,.5,.7,2.2,i?'#2d6b3a':'#c0392b',0,0,0,10);const h=new THREE.Mesh(new THREE.SphereGeometry(.75,12,10),mat(i?'#3d7a4a':'#b8402a'));h.position.y=2.7;gd.add(h);
       box(gd,.9,.2,.2,'#1b2233',0,2.8,.6,true);gd.position.set(x,0,z);g.add(gd);o.gods.push(gd);});
     const dr=person('#f5c518');dr.position.set(0,0,4);g.add(dr);cyl(g,.45,.45,.5,'#c0392b',.6,.5,4);o.dr=dr;incBlock(o,0,0,7.4,12.5);incLabel(o,'🥁 遶境中',5.2);o.dur=22;
-    incToast(o,'廟會遶境經過，鞭炮、陣頭、神轎，整條路先暫停');captureMoment('遇到廟會遶境，順便求個收工平安','temple',1600);},
+    incToast(o,'廟會遶境經過，鞭炮、陣頭、神轎，整條路先暫停');incMoment(o,'遇到廟會遶境，順便求個收工平安','temple');},
   templeU(o,dt){o.pal.position.y=Math.abs(Math.sin(elapsed*3))*.25;o.pal.rotation.z=Math.sin(elapsed*3)*.08;o.gods.forEach((gd,i)=>{gd.rotation.y=Math.sin(elapsed*2+i*2)*.9;gd.position.y=Math.abs(Math.sin(elapsed*2.5+i))*.2;});
     o.dr.userData.arm.rotation.z=-2.4+Math.sin(elapsed*14)*.6;o.pop-=dt;if(o.pop<=0){o.pop=rnd(.6,1.4);const [x,z]=incW(o,rnd(-3,3),rnd(-6,6));emit(x,.3,z,10,['#ff2d2d','#ffd23a','#ffffff'],{smin:2,smax:5,vmin:2,vmax:5,lmin:.2,lmax:.5,szmin:.08,szmax:.16});
       emit(x,.5,z,3,['#b9bdc4','#8a8f98'],{smin:.2,smax:.6,vmin:1,vmax:2,g:-1,lmin:1,lmax:1.8,szmin:.4,szmax:.8});const dd=Math.hypot(player.x-x,player.z-z);if(dd<30)for(let i=0;i<4;i++)AU.noise(.05,.18*(1-dd/30),i*.07,2400);}
@@ -2294,7 +2308,7 @@ const INC_MAKE={
     [[-3.4,1.2,.4],[-4.2,1,-1.2],[-2.6,1.5,-1],[-3.8,.9,1.4]].forEach(([x,y,z])=>{const f=new THREE.Mesh(new THREE.IcosahedronGeometry(rnd(1.2,1.7),0),mat(pick(['#3f8a4a','#4f9a55','#2f6e3a'])));f.position.set(x,y,z);f.castShadow=true;g.add(f);});
     for(let i=0;i<10;i++){const l=new THREE.Mesh(new THREE.IcosahedronGeometry(.25,0),mat('#4f9a55'));l.position.set(rnd(-3,3),.15,rnd(-2.5,2.5));g.add(l);}
     cone(g,-2.6,-3.6);cone(g,2.6,-3.6);cone(g,-2.6,3.6);cone(g,2.6,3.6);incBlock(o,0,0,7.4,4.4);incLabel(o,'🌳 倒樹封路',3.6);o.dur=26;
-    incToast(o,'一棵樹倒在馬路上，暫時封路，請繞道');captureMoment('路被大樹擋住，師傅只能原地傻眼','tree',1300);},
+    incToast(o,'一棵樹倒在馬路上，暫時封路，請繞道');incMoment(o,'路被大樹擋住，師傅只能原地傻眼','tree');},
   pothole(o){const g=incGroup(o);o.lx=pick([-1.75,1.75]);const h=new THREE.Mesh(new THREE.CircleGeometry(1.25,20),new THREE.MeshBasicMaterial({color:'#1d1f24'}));h.rotation.x=-PI/2;h.position.set(o.lx,.06,0);g.add(h);
     const rim=new THREE.Mesh(new THREE.RingGeometry(1.25,1.6,20),new THREE.MeshBasicMaterial({color:'#6b6f78'}));rim.rotation.x=-PI/2;rim.position.set(o.lx,.055,0);g.add(rim);
     cone(g,o.lx-1.9,-1.6);cone(g,o.lx+1.9,1.6);incLabel(o,'🕳️ 坑洞',2.6);o.dur=34;
@@ -2322,7 +2336,9 @@ function endIncident(o,silent){o.cols.forEach(b=>{let i=colliders.indexOf(b);if(
   if(o.g)FX.remove(o.g);const i=inc.list.indexOf(o);if(i>=0)inc.list.splice(i,1);
   if(!silent&&o.seg&&state==='play'&&Math.hypot(player.x-o.x,player.z-o.z)<30&&o.key!=='pothole')floatText('道路恢復通行',o.x,3,o.z,'#1fae78','say');}
 function updIncidents(dt){inc.next-=dt;if(inc.next<=0){inc.next=rnd(10,16);if(inc.list.length<2&&gt<DUR-10&&gt>=12)spawnIncident();}
-  inc.list.slice().forEach(o=>{o.t+=dt;const u=INC_MAKE[o.key+'U'];if(u)u(o,dt);if(o.t>=o.dur)endIncident(o);});
+  inc.list.slice().forEach(o=>{o.t+=dt;const u=INC_MAKE[o.key+'U'];if(u)u(o,dt);
+    if(o.mom&&o.x!=null&&state==='play'&&Math.hypot(player.x-o.x,player.z-o.z)<12){const m=o.mom;o.mom=null;captureMoment(m[0],m[1],0,{x:o.x,z:o.z});}
+    if(o.t>=o.dur)endIncident(o);});
   let m=1;for(const z of inc.slow){if(z.r?Math.hypot(player.x-o_cx(z),player.z-o_cz(z))<z.r:(player.x>z.minx&&player.x<z.maxx&&player.z>z.minz&&player.z<z.maxz))m=Math.min(m,z.pm);}inc.vmul=m;}
 const o_cx=z=>(z.minx+z.maxx)/2,o_cz=z=>(z.minz+z.maxz)/2;
 // traffic hook: vehicles stop for road blocks and slow down in incident zones
@@ -2531,6 +2547,9 @@ requestAnimationFrame(frame);boot();
   btn.addEventListener('click',e=>{e.stopPropagation();menu.hidden=!menu.hidden;});
   menu.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;menu.hidden=true;if(b.dataset.l!==LANG){track('lang_change',{from:LANG,to:b.dataset.l});setLang(b.dataset.l);}});
   addEventListener('pointerdown',e=>{if(!menu.hidden&&!e.target.closest('#langMenu,#btnLang'))menu.hidden=true;});})();
+(function(){if(!promoOn())return;const P=CONFIG.promo;$('#promoTitle').href=P.rules;$('#promoTitle').hidden=false;$('#promoOver').hidden=false;
+  document.querySelectorAll('.promoPost').forEach(a=>{a.href=P.post;a.addEventListener('click',()=>track('promo_post',{}));});document.querySelectorAll('.promoRules').forEach(a=>{a.href=P.rules;});
+  $('#promoTitle').addEventListener('click',()=>track('promo_open',{where:'title'}));})();
 })();
 </script>
 </body>

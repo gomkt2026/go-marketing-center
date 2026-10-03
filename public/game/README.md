@@ -159,6 +159,14 @@
 - 車庫 → 成就頁有「路況圖鑑」（存在 `jiangcheng-profile-v1` 的 `incSeen`），新成就「路況老司機」「熱心師傅」。
 - 選舉車隊的候選人是虛構的「阿匠」。
 - 追蹤事件新增 `incident`（type、map、wx）。
+- 路況名場面會等師傅騎到路況 12 公尺內才拍，鏡頭偏向路況，照片裡看得到是什麼路況。
+
+## 路況名場面 Threads 分享活動
+
+- 設定在 `index.html` 的 `CONFIG.promo`：主題標籤、`@inforcraft_`、活動貼文網址 `post`、起訖時間。只在中文介面、活動期間顯示，時間到自動消失。
+- 開始畫面有活動橫幅，結算畫面的「今日名場面」底下有參加說明；分享名場面時，Threads 預填文字會帶 `#匠城路況 @inforcraft_`。
+- 活動辦法：`/legal/game-threads/`。
+- 追蹤事件新增 `promo_open`、`promo_post`。
 
 ## 其他
 

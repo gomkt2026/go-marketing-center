@@ -85,7 +85,7 @@ export interface LeaderboardRow {
 
 export function isMissingGameSchema(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return /relation ["']?game_(seasons|players|runs|scores|winners|referrals)["']? does not exist/i.test(msg)
+  return /relation ["']?game_(seasons|players|runs|scores|winners|referrals|wishes|wish_supports)["']? does not exist/i.test(msg)
     || /column ["']?[a-z_.]*(device_id|nickname|player_id|last_seen_at|last_score|ended_at|map)["']? (of relation ["']?game_[a-z]+["']? )?does not exist/i.test(msg);
 }
 
@@ -186,6 +186,30 @@ export async function applyGameMigration(env: Env): Promise<string[]> {
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_game_referrals_code ON game_referrals (ref_code)`;
   steps.push('game_maps_referrals');
+  await sql`
+    CREATE TABLE IF NOT EXISTS game_wishes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      nickname TEXT NOT NULL DEFAULT '匿名師傅',
+      body TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'feature',
+      status TEXT NOT NULL DEFAULT 'visible',
+      supports INTEGER NOT NULL DEFAULT 0,
+      ip_hash TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT game_wishes_kind_check CHECK (kind IN ('feature', 'bug', 'cheer')),
+      CONSTRAINT game_wishes_status_check CHECK (status IN ('visible', 'hidden'))
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_game_wishes_visible ON game_wishes (created_at DESC) WHERE status = 'visible'`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS game_wish_supports (
+      wish_id UUID NOT NULL REFERENCES game_wishes(id) ON DELETE CASCADE,
+      ip_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (wish_id, ip_hash)
+    )
+  `;
+  steps.push('game_wishes');
   return steps;
 }
 

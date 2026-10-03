@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   ApiError, GAME_MAP_LABELS, gameAdminApi, type GameBoardEntry, type GameMap, type GameSeason, type GameSeasonInput,
 } from '@/lib/api';
+import { GameWishes } from '@/pages/settings/GameWishes';
 
 const MAP_IDS = Object.keys(GAME_MAP_LABELS) as GameMap[];
 
@@ -369,6 +370,7 @@ export function GameSeasons() {
           </div>
         )}
       </Card>
+      <GameWishes />
     </div>
   );
 }

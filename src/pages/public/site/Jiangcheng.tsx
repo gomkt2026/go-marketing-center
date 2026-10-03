@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import {
   GAME_SHOTS, GameFrame, INTEGRATIONS, Leaderboard, PublicFrame, brandOf,
 } from '@/pages/public/Landing';
+import { GameWeek, WishBoard } from '@/pages/public/site/JiangchengBoard';
 
 export function Jiangcheng() {
   return (
@@ -22,7 +23,7 @@ export function Jiangcheng() {
             />
             <figcaption>同一條台灣街。English、日本語、Tiếng Việt、Bahasa Indonesia 都能上手，先體驗在台灣跑一班。</figcaption>
           </figure>
-          <div className="lp-game-grid" style={{ marginTop: 28 }}>
+          <div id="play" className="lp-game-grid" style={{ marginTop: 28 }}>
             <GameFrame />
             <Leaderboard />
           </div>
@@ -38,6 +39,9 @@ export function Jiangcheng() {
           )}
         </div>
       </section>
+
+      <GameWeek />
+      <WishBoard />
 
       <section className="lp-section">
         <div className="lp-wrap">

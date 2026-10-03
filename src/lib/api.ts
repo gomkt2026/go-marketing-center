@@ -1559,7 +1559,22 @@ export const gameAdminApi = {
     request<{ ok: boolean }>(`/api/admin/game/players/${playerId}`, {
       method: 'PATCH', body: JSON.stringify({ isBlocked }),
     }),
+  wishes: () => request<{ wishes: GameWish[] }>('/api/game/wishes'),
+  setWishStatus: (id: string, status: 'visible' | 'hidden') =>
+    request<{ ok: boolean }>(`/api/game/wishes/${id}`, {
+      method: 'PATCH', body: JSON.stringify({ status }),
+    }),
 };
+
+export interface GameWish {
+  id: string;
+  nickname: string;
+  body: string;
+  kind: 'feature' | 'bug' | 'cheer';
+  status: 'visible' | 'hidden';
+  supports: number;
+  createdAt: string;
+}
 
 export interface PostingInquiry {
   id: string;

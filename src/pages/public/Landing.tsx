@@ -668,6 +668,37 @@ export const LANDING_CSS = `
 .lp-form-msg{margin:0;font-size:14px;line-height:1.6}
 .lp-form-msg.ok{color:#1f7a3a}
 .lp-form-msg.bad{color:#9a3412}
+.lp-week-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+.lp-week-cards div{background:#fff;border:1px solid #E6E8E2;border-radius:14px;padding:14px 12px;text-align:center}
+.lp-week-cards b{display:block;font-size:26px;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.2}
+.lp-week-cards small{color:var(--muted);font-size:12px}
+.lp-heat{display:flex;gap:12px;align-items:flex-start;border-radius:14px;padding:14px 16px;margin-top:16px}
+.lp-heat b{display:block;margin-bottom:4px}
+.lp-heat p{margin:0;font-size:14px;line-height:1.6}
+.lp-heat.hot{background:#fff4e8;color:#9a3412}
+.lp-heat.steady{background:#EAF1E3;color:#23301c}
+.lp-heat.cool{background:#eef6fb;color:#1e3a5f}
+.lp-heat.building{background:#F7F9F5;color:#3A3A3A}
+.lp-bars{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;margin-top:22px}
+.lp-bar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;min-width:0}
+.lp-bar i{display:block;width:100%;max-width:42px;border-radius:8px 8px 4px 4px;background:#8CAA71}
+.lp-bar.today i{background:#ff6b1a}
+.lp-bar b{font-size:12px;font-variant-numeric:tabular-nums}
+.lp-bar small{font-size:11px;color:var(--muted)}
+.lp-jobs{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.lp-jobs span{background:#fff;border:1px solid #E6E8E2;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700}
+.lp-wish-list{display:grid;gap:10px;margin-top:18px}
+.lp-wish{background:#fff;border:1px solid #E6E8E2;border-radius:14px;padding:14px 16px;display:grid;gap:8px}
+.lp-wish-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.lp-kind{font-size:12px;font-weight:800;color:var(--green)}
+.lp-support{border:1px solid #cfd6c7;background:#fff;border-radius:999px;padding:6px 12px;font:700 13px inherit;cursor:pointer;color:var(--ink)}
+.lp-support[aria-pressed=true]{background:#EAF1E3;border-color:var(--green)}
+.lp-kind-picks{display:flex;gap:8px;flex-wrap:wrap}
+.lp-kind-picks button{border:1px solid #cfd6c7;background:#fff;border-radius:999px;padding:6px 12px;font:700 13px inherit;cursor:pointer}
+.lp-kind-picks button[aria-pressed=true]{background:var(--green);color:#fff;border-color:var(--green)}
+@media (max-width:900px){
+  .lp-week-cards{grid-template-columns:1fr 1fr}
+}
 `;
 
 export function PublicFrame({ title, children }: { title: string; children: ReactNode }) {

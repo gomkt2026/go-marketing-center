@@ -92,9 +92,33 @@ const POSTER_BG: Record<string, [number, number, number]> = {
   taskgo: [0x0b, 0x2d, 0x5c],
 };
 
+/** 從放大後的圖裁出置中區塊。Photon 這層沒有穩定的 crop,改切 RGBA。 */
+function cropCenter(
+  PhotonImage: PhotonApi['PhotonImage'],
+  img: PhotonImage,
+  targetW: number,
+  targetH: number,
+): PhotonImage {
+  const sw = img.get_width();
+  const sh = img.get_height();
+  const tw = Math.min(targetW, sw);
+  const th = Math.min(targetH, sh);
+  const x0 = Math.max(0, Math.floor((sw - tw) / 2));
+  const y0 = Math.max(0, Math.floor((sh - th) / 2));
+  const raw = img.get_raw_pixels();
+  const out = new Uint8Array(tw * th * 4);
+  const rowBytes = tw * 4;
+  for (let y = 0; y < th; y++) {
+    const src = ((y0 + y) * sw + x0) * 4;
+    out.set(raw.subarray(src, src + rowBytes), y * rowBytes);
+  }
+  return new PhotonImage(out, tw, th);
+}
+
 /**
- * 把品牌上傳的原圖放進留白卡,不呼叫圖片模型。
- * 橫式左側 38%、直式上方 25% 留給後製繁中主標。
+ * 把品牌上傳的原圖 cover 鋪滿畫布,只留一條窄邊。
+ * 痛點字由後製色條疊在底部,這裡不挖大塊留白。
+ * FB 橫式 1200×800;IG／Threads 直式 4:5。
  */
 export async function composeAssetOnBrandCard(
   imageBytes: Uint8Array,
@@ -104,40 +128,32 @@ export async function composeAssetOnBrandCard(
   const { PhotonImage, SamplingFilter, resize, watermark } = await loadPhoton();
   const shot = PhotonImage.new_from_byteslice(imageBytes);
   let canvas: PhotonImage | null = null;
-  let card: PhotonImage | null = null;
   let resized: PhotonImage | null = null;
+  let cropped: PhotonImage | null = null;
   try {
     const width = landscape ? 1200 : 1080;
     const height = landscape ? 800 : 1350;
-    const bannerFrac = landscape ? 0.38 : 0.25;
     const bg = POSTER_BG[brandSlug] ?? POSTER_BG.homigo;
     canvas = fillCanvas(PhotonImage, width, height, bg);
 
-    const pad = 28;
-    const zoneX = landscape ? Math.round(width * bannerFrac) + pad : pad;
-    const zoneY = landscape ? pad : Math.round(height * bannerFrac) + pad;
-    const zoneW = Math.max(1, landscape ? width - zoneX - pad : width - pad * 2);
-    const zoneH = Math.max(1, landscape ? height - pad * 2 : height - zoneY - pad);
-
-    const scale = Math.min(zoneW / shot.get_width(), zoneH / shot.get_height());
-    const tw = Math.max(1, Math.round(shot.get_width() * scale));
-    const th = Math.max(1, Math.round(shot.get_height() * scale));
+    const pad = 14;
+    const zoneW = width - pad * 2;
+    const zoneH = height - pad * 2;
+    const sw = Math.max(1, shot.get_width());
+    const sh = Math.max(1, shot.get_height());
+    const scale = Math.max(zoneW / sw, zoneH / sh);
+    const tw = Math.max(zoneW, Math.ceil(sw * scale));
+    const th = Math.max(zoneH, Math.ceil(sh * scale));
     resized = resize(shot, tw, th, SamplingFilter.Lanczos3);
-
-    const cardPad = 12;
-    card = fillCanvas(PhotonImage, tw + cardPad * 2, th + cardPad * 2, [255, 255, 255]);
-    watermark(card, resized, BigInt(cardPad), BigInt(cardPad));
-
-    const cardW = tw + cardPad * 2;
-    const cardH = th + cardPad * 2;
-    const x = zoneX + Math.round((zoneW - cardW) / 2);
-    const y = zoneY + Math.round((zoneH - cardH) / 2);
-    watermark(canvas, card, BigInt(Math.max(0, x)), BigInt(Math.max(0, y)));
+    cropped = cropCenter(PhotonImage, resized, zoneW, zoneH);
+    const x = pad + Math.round((zoneW - cropped.get_width()) / 2);
+    const y = pad + Math.round((zoneH - cropped.get_height()) / 2);
+    watermark(canvas, cropped, BigInt(Math.max(0, x)), BigInt(Math.max(0, y)));
     return canvas.get_bytes_jpeg(90);
   } finally {
     shot.free();
     canvas?.free();
-    card?.free();
     resized?.free();
+    cropped?.free();
   }
 }

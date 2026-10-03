@@ -777,7 +777,8 @@ export type PostingSlotKind =
   | 'threads_emotion'
   | 'threads_workplace'
   | 'threads_qa'
-  | 'threads_image';
+  | 'threads_image'
+  | 'threads_game';
 
 export interface PostingSlot {
   id: string;

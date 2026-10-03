@@ -27,6 +27,7 @@ const KIND_LABEL: Record<PostingSlotKind, string> = {
   threads_workplace: '行業現場',
   threads_qa: '互動提問',
   threads_image: '實績畫面',
+  threads_game: '匠城出任務',
 };
 
 const THREADS_KIND_OPTIONS: Array<{ value: PostingSlotKind; label: string; group: string; hint: string }> = [
@@ -40,6 +41,7 @@ const THREADS_KIND_OPTIONS: Array<{ value: PostingSlotKind; label: string; group
   { value: 'threads_workplace', label: '行業現場', group: '品牌', hint: '第一線具體畫面與真實對話' },
   { value: 'threads_qa', label: '互動提問', group: '品牌', hint: '丟一個好回的問題，邀留言' },
   { value: 'threads_image', label: '實績畫面', group: '品牌', hint: '用素材庫圖片當話題' },
+  { value: 'threads_game', label: '匠城出任務', group: '遊戲', hint: '每天 10、15、20 點推廣匠城出任務' },
 ];
 
 type DraftSlot = {

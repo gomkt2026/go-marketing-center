@@ -20,13 +20,14 @@ const genSourceLabel: Record<string, string> = {
   threads_love: '感情散文', threads_weather: '天氣季節', threads_entertainment: '娛樂影視',
   threads_sports: '運動賽事', threads_emotion: '人際視角',
   threads_workplace: '行業現場', threads_qa: '互動提問', threads_image: '實績畫面',
+  threads_game: '匠城出任務',
   daily_theme: '每日主題',
   auto_signal: '情報自動', market_signal: '市場情報', meeting_plan: '會議計畫',
 };
 const genCategoryLabel: Record<string, string> = {
   seasonal_trend: '時事跟風', emotion: '感情視角', weather: '天氣話題',
   entertainment: '娛樂話題', sports: '運動話題', image_inspired: '圖片靈感',
-  workplace: '行業現場', qa: '互動提問',
+  workplace: '行業現場', qa: '互動提問', game_promo: '匠城出任務',
   love_story: '愛情散文', life_gag: '生活梗文', reflection: '生活省思', love_view: '感情觀點',
 };
 const contentStatusLabel: Record<string, string> = {

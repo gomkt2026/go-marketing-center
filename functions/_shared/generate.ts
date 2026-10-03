@@ -5,7 +5,8 @@ import { socialChatJson } from './social-llm';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
-  buildImageInspiredPostPrompt,
+  buildImageInspiredPostPrompt, buildGamePromoPrompt, GAME_PROMO_URL,
+  type GamePromoAngle,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
   defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
   SEO_TOPIC_BANK, brandSeoFacts, type SeoTopicSeed,
@@ -19,7 +20,7 @@ import { compositeLogo } from './watermark';
 import { composeAssetOnBrandCard, frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
 import { X_TWEET_MAX_CHARS } from './x';
-import { burnPosterHeadline } from './poster-text';
+import { burnPainBar, burnPosterHeadline } from './poster-text';
 import { loadBrandImagePromptPack } from './image-prompts';
 import {
   describeAssetForPrompt, pickBrandAsset, pickBrandScreenshot, markAssetUsed,
@@ -96,8 +97,49 @@ function isSystemScreenshot(asset: { imageCategory?: string | null } | null | un
 
 async function loadAssetBytes(env: Env, fileUrl: string): Promise<Uint8Array | null> {
   const key = mediaUrlToKey(fileUrl);
-  if (!key) return null;
-  return getMediaBytes(env, key);
+  if (key) {
+    const stored = await getMediaBytes(env, key);
+    if (stored) return stored;
+  }
+  if (!/^https?:\/\//i.test(fileUrl)) return null;
+  try {
+    const res = await fetch(fileUrl);
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  } catch (e) {
+    console.error('[generate] 下載素材失敗', fileUrl, e);
+    return null;
+  }
+}
+
+/** 把一張已有的圖鋪滿並疊痛點字,寫回 R2。給匠城推廣這類固定畫面用。 */
+export async function renderPainPosterFromUrl(
+  env: Env,
+  params: {
+    brandSlug: string;
+    sourceUrl: string;
+    headline?: string;
+    accent?: string;
+    body?: string;
+    landscape?: boolean;
+  },
+): Promise<string | null> {
+  const ref = await loadAssetBytes(env, params.sourceUrl);
+  if (!ref) return null;
+  const logo = await getBrandLogo(env, params.brandSlug);
+  let bytes = await composeAssetOnBrandCard(ref, params.brandSlug, !!params.landscape);
+  bytes = await finishPosterImage(env, bytes, {
+    brandSlug: params.brandSlug,
+    landscape: !!params.landscape,
+    headline: params.headline,
+    accent: params.accent,
+    body: params.body ?? '',
+    logo,
+    logoPosition: 'bottom-right',
+    painBar: true,
+  });
+  const key = buildMediaKey(params.brandSlug, 'jpg');
+  return putMedia(env, key, bytes, 'image/jpeg');
 }
 
 async function finishPosterImage(
@@ -113,21 +155,33 @@ async function finishPosterImage(
     body: string;
     logo: Uint8Array | null;
     logoPosition: 'bottom-left' | 'bottom-right';
+    /** 有上傳素材:底部痛點條。生圖海報維持原本留白主標。 */
+    painBar?: boolean;
   },
 ): Promise<Uint8Array> {
-  const logoOpts = params.brandSlug === 'homigo'
-    ? { position: params.logoPosition, marginX: 80, marginY: 120 }
-    : { position: params.logoPosition };
+  const logoOpts = params.painBar
+    ? { position: params.logoPosition, marginX: 28, marginY: params.landscape ? 28 : 36 }
+    : params.brandSlug === 'homigo'
+      ? { position: params.logoPosition, marginX: 80, marginY: 120 }
+      : { position: params.logoPosition };
   try {
-    bytes = await burnPosterHeadline(env, bytes, {
-      brandSlug: params.brandSlug,
-      headline: params.headline,
-      accent: params.accent,
-      advantage: params.advantage,
-      kicker: params.kicker,
-      body: params.body,
-      landscape: params.landscape,
-    });
+    bytes = params.painBar
+      ? await burnPainBar(env, bytes, {
+        brandSlug: params.brandSlug,
+        headline: params.headline,
+        accent: params.accent,
+        body: params.body,
+        landscape: params.landscape,
+      })
+      : await burnPosterHeadline(env, bytes, {
+        brandSlug: params.brandSlug,
+        headline: params.headline,
+        accent: params.accent,
+        advantage: params.advantage,
+        kicker: params.kicker,
+        body: params.body,
+        landscape: params.landscape,
+      });
   } catch (e) {
     console.error('[generate] 海報主標後製失敗,沿用無字原圖', e);
   }
@@ -173,6 +227,7 @@ async function generateSystemScreenshotPoster(
       body: params.body ?? '',
       logo,
       logoPosition: isIg && params.brandSlug === 'homigo' ? 'bottom-left' : 'bottom-right',
+      painBar: true,
     });
     const key = buildMediaKey(params.brandSlug, 'jpg');
     console.log(`[generate] ${params.brandSlug}/${params.platform} 使用素材庫原圖,未生圖`);
@@ -215,6 +270,7 @@ async function generatePhotoEditorialPoster(
       body: params.body ?? '',
       logo,
       logoPosition: isIg && params.brandSlug === 'homigo' ? 'bottom-left' : 'bottom-right',
+      painBar: true,
     });
     const key = buildMediaKey(params.brandSlug, 'jpg');
     console.log(`[generate] ${params.brandSlug}/${params.platform} 使用素材庫原圖,未生圖`);
@@ -341,11 +397,9 @@ export async function generatePlatformPost(
     platform, topic: params.topic, topicSummary: params.topicSummary,
     extraInstruction: [
       params.extraInstruction ?? '',
-      screenshotPoster
-        ? `本篇會用品牌上傳的真實系統畫面做成痛點海報。${reusedAsset ? describeAssetForPrompt(reusedAsset, brandCtx.slug) : ''}文案要對得上這張真實畫面,不要幻想不存在的 UI。`
-        : convertPhotoPoster
-          ? `本篇會把品牌上傳的真實照片轉成${brandCtx.slug === 'washgo' ? 'Washgo 可愛洗衣插畫海報' : '品牌編輯海報'}。${reusedAsset ? describeAssetForPrompt(reusedAsset, brandCtx.slug) : ''}文案要對得上原照片裡真的有的細節。`
-          : '',
+      screenshotPoster || convertPhotoPoster
+        ? `本篇會把品牌上傳的原圖鋪滿,底部只疊 4-10 字痛點,不重繪。${reusedAsset ? describeAssetForPrompt(reusedAsset, brandCtx.slug) : ''}文案要對得上這張真實畫面,不要幻想不存在的細節。`
+        : '',
     ].filter(Boolean).join('\n'),
     brandSlug: brandCtx.slug,
     audienceLane: lane,
@@ -638,15 +692,11 @@ export async function generatePostFromImage(
     ],
   };
 
-  const screenshotPoster = params.imageCategory === 'system_screenshot'
-    && (platform === 'facebook' || platform === 'instagram');
-  const convertPhotoPoster = !screenshotPoster && (platform === 'facebook' || platform === 'instagram')
-    && ['real_photo', 'people', 'scene', 'brand_collab'].includes(params.imageCategory ?? '');
   let post = await socialChatJson<GeneratedPost>(env, {
     messages: [{ role: 'system', content: systemPrompt }, visionUserMessage],
   });
   post.body = normalizeMultilineText(post.body);
-  if (!screenshotPoster && !convertPhotoPoster) post.imagePrompt = undefined;
+  post.imagePrompt = undefined;
   post.hashtags = clampHashtags(post.hashtags, platform);
   post.cta = SHARED_BRAND_CTA;
 
@@ -666,7 +716,7 @@ export async function generatePostFromImage(
       temperature: 0.5,
     });
     post.body = normalizeMultilineText(post.body);
-    if (!screenshotPoster && !convertPhotoPoster) post.imagePrompt = undefined;
+    post.imagePrompt = undefined;
     post.hashtags = clampHashtags(post.hashtags, platform);
   }
   post.cta = SHARED_BRAND_CTA;
@@ -682,46 +732,23 @@ export async function generatePostFromImage(
       temperature: 0.3,
     });
 
-  if (screenshotPoster) {
-    const posterUrl = await generateSystemScreenshotPoster(env, {
-      brandSlug: brandCtx.slug,
-      platform,
-      imagePrompt: post.imagePrompt,
-      posterHeadline: post.posterHeadline,
-      posterAccent: post.posterAccent,
-      posterAdvantage: post.posterAdvantage,
-      posterKicker: post.posterKicker,
-      body: post.body,
-      screenshotUrl: imageUrl,
-    });
-    if (posterUrl) {
-      return {
-        post, prediction, imageUrl: posterUrl, imageError: null,
-        audienceLane: lane, audienceName, imageSource: 'asset', imageStyle: 'design',
-        assetId: params.assetId ?? null,
-      };
-    }
-  }
-
-  if (convertPhotoPoster) {
-    const posterUrl = await generatePhotoEditorialPoster(env, {
-      brandSlug: brandCtx.slug,
-      platform,
-      imagePrompt: post.imagePrompt,
-      posterHeadline: post.posterHeadline,
-      posterAccent: post.posterAccent,
-      posterAdvantage: post.posterAdvantage,
-      posterKicker: post.posterKicker,
-      body: post.body,
-      photoUrl: imageUrl,
-    });
-    if (posterUrl) {
-      return {
-        post, prediction, imageUrl: posterUrl, imageError: null,
-        audienceLane: lane, audienceName, imageSource: 'asset', imageStyle: 'design',
-        assetId: params.assetId ?? null,
-      };
-    }
+  const posterUrl = await generateSystemScreenshotPoster(env, {
+    brandSlug: brandCtx.slug,
+    platform,
+    imagePrompt: post.imagePrompt,
+    posterHeadline: post.posterHeadline,
+    posterAccent: post.posterAccent,
+    posterAdvantage: post.posterAdvantage,
+    posterKicker: post.posterKicker,
+    body: post.body,
+    screenshotUrl: imageUrl,
+  });
+  if (posterUrl) {
+    return {
+      post, prediction, imageUrl: posterUrl, imageError: null,
+      audienceLane: lane, audienceName, imageSource: 'asset', imageStyle: 'design',
+      assetId: params.assetId ?? null,
+    };
   }
 
   const framedUrl = platform === 'instagram'
@@ -732,6 +759,78 @@ export async function generatePostFromImage(
     post, prediction, imageUrl: framedUrl, imageError: null,
     audienceLane: lane, audienceName, imageSource: 'asset', imageStyle: null,
     assetId: params.assetId ?? null,
+  };
+}
+
+/** 匠城出任務推廣文。配圖用現成遊戲畫面鋪滿，疊角度鉤子，不生圖。 */
+export async function generateGamePromoPost(
+  env: Env,
+  params: {
+    brandCtx: BrandContext;
+    angle: GamePromoAngle;
+    usedHooks?: string[];
+    stillUrl?: string | null;
+  },
+): Promise<GenerationResult> {
+  const { brandCtx, angle } = params;
+  const userPrompt = buildGamePromoPrompt({
+    brandSlug: brandCtx.slug,
+    angle,
+    usedHooks: params.usedHooks ?? [],
+  });
+  let post = await socialChatJson<GeneratedPost>(env, {
+    messages: [
+      { role: 'system', content: brandCtx.systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.8,
+  });
+  post.body = normalizeMultilineText(post.body);
+  post.imagePrompt = undefined;
+  post.hashtags = clampHashtags(post.hashtags, 'threads');
+  if (!post.posterHeadline) post.posterHeadline = angle.hook;
+  const limit = getBrandVoice(brandCtx.slug).threadsMaxChars ?? 220;
+  if (post.body.length > limit) {
+    post = await socialChatJson<GeneratedPost>(env, {
+      messages: [
+        { role: 'system', content: brandCtx.systemPrompt },
+        { role: 'user', content: userPrompt },
+        { role: 'assistant', content: JSON.stringify(post) },
+        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${limit} 字。縮短到 ${limit} 字以內,網址保留,回傳同格式 JSON。` },
+      ],
+      temperature: 0.5,
+    });
+    post.body = normalizeMultilineText(post.body);
+    post.imagePrompt = undefined;
+    post.hashtags = clampHashtags(post.hashtags, 'threads');
+    if (!post.posterHeadline) post.posterHeadline = angle.hook;
+  }
+  if (!post.body.includes('go-marketing-center.pages.dev/game')) {
+    post.body = `${post.body.trim()}\n\n${GAME_PROMO_URL}`;
+  }
+  let imageUrl: string | null = null;
+  let imageError: string | null = null;
+  if (params.stillUrl) {
+    imageUrl = await renderPainPosterFromUrl(env, {
+      brandSlug: brandCtx.slug,
+      sourceUrl: params.stillUrl,
+      headline: post.posterHeadline || angle.hook,
+      accent: post.posterAccent,
+      body: post.body,
+      landscape: false,
+    });
+    if (!imageUrl) imageError = '遊戲畫面合成失敗';
+  }
+  return {
+    post,
+    prediction: { score: 0, analysis: '', suggestions: [] },
+    imageUrl,
+    imageError,
+    audienceLane: 'b2c',
+    audienceName: '玩家',
+    imageSource: imageUrl ? 'asset' : null,
+    imageStyle: imageUrl ? 'design' : null,
+    assetId: null,
   };
 }
 

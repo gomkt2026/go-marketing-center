@@ -13,7 +13,7 @@ alwaysApply: false
 3. 主色奶油 `#FFF8F0`、淡天藍 `#E6F2FF`、品牌藍 `#3A8DDE`／深藍 `#1D4F8C`／天藍 `#6CC3F5`；金橘 `#FFB84D` 只做小色塊
 4. 可放角落一顆 Washgo 藍小泡泡幫手，不當主角
 5. 禁止：鉛筆草稿線、水彩藝廊靜物、微小孤獨人物配大面積象牙紙、吉卜力電影感、寫實人像
-6. Threads 滿版可愛圖，不要留一大塊空白紙；FB／IG 才留空給後製繁中主標
+6. 有上傳素材時三平台都是原圖鋪滿，底部淡天藍條只印 4–10 字痛點。沒有素材才生圖：Threads 滿版可愛圖；FB／IG 留空給後製繁中主標
 7. 文案也要輕快，像洗衣店年輕店員；不要捷運哲思、成長和解、深夜散文
 
 程式規格：`functions/_shared/prompts.ts` 的 `WASHGO_CUTE_CORE`／`BRAND_DESIGN_IMAGE_STYLE.washgo`

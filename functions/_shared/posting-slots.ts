@@ -14,7 +14,8 @@ export type PostingSlotKind =
   | 'threads_emotion'
   | 'threads_workplace'
   | 'threads_qa'
-  | 'threads_image';
+  | 'threads_image'
+  | 'threads_game';
 
 export const THREADS_SLOT_KINDS: PostingSlotKind[] = [
   'threads_hourly',
@@ -27,6 +28,7 @@ export const THREADS_SLOT_KINDS: PostingSlotKind[] = [
   'threads_workplace',
   'threads_qa',
   'threads_image',
+  'threads_game',
 ];
 
 export const THREADS_HOURLY_FAMILY: PostingSlotKind[] = [
@@ -51,10 +53,11 @@ export const THREADS_KIND_LABEL: Record<PostingSlotKind, string> = {
   threads_workplace: '行業現場',
   threads_qa: '互動提問',
   threads_image: '實績畫面',
+  threads_game: '匠城出任務',
 };
 
 const THREADS_KIND_ERROR =
-  'Threads 請選熱議跟風、天氣季節、娛樂影視、運動賽事、生活梗文、感情散文、人際視角、行業現場、互動提問或實績畫面';
+  'Threads 請選熱議跟風、天氣季節、娛樂影視、運動賽事、生活梗文、感情散文、人際視角、行業現場、互動提問、實績畫面或匠城出任務';
 
 let postingOpsEnsured = false;
 
@@ -104,6 +107,9 @@ export const DEFAULT_SLOT_DEFS: Array<{
   { platform: 'threads', hourTw: 18, slotKind: 'threads_hourly' },
   { platform: 'threads', hourTw: 9, slotKind: 'threads_offtopic' },
   { platform: 'threads', hourTw: 21, slotKind: 'threads_offtopic' },
+  { platform: 'threads', hourTw: 10, slotKind: 'threads_game' },
+  { platform: 'threads', hourTw: 15, slotKind: 'threads_game' },
+  { platform: 'threads', hourTw: 20, slotKind: 'threads_game' },
 ];
 
 export function slotKindLabel(kind: PostingSlotKind): string {
@@ -148,7 +154,7 @@ export async function ensureSlotKindConstraint(env: Env): Promise<void> {
       'daily_theme', 'threads_hourly', 'threads_offtopic',
       'threads_love', 'threads_weather', 'threads_entertainment',
       'threads_sports', 'threads_emotion',
-      'threads_workplace', 'threads_qa', 'threads_image'
+      'threads_workplace', 'threads_qa', 'threads_image', 'threads_game'
     ))
   `;
 }
@@ -176,7 +182,7 @@ export async function ensurePostingOpsTables(env: Env): Promise<void> {
         'daily_theme', 'threads_hourly', 'threads_offtopic',
         'threads_love', 'threads_weather', 'threads_entertainment',
         'threads_sports', 'threads_emotion',
-        'threads_workplace', 'threads_qa', 'threads_image'
+        'threads_workplace', 'threads_qa', 'threads_image', 'threads_game'
       )),
       CONSTRAINT brand_posting_slots_platform_check CHECK (platform IN ('facebook', 'instagram', 'threads')),
       UNIQUE (brand_id, platform, hour_tw, slot_kind)
@@ -205,6 +211,19 @@ export async function ensurePostingOpsTables(env: Env): Promise<void> {
       AND NOT EXISTS (
         SELECT 1 FROM brand_posting_slots s WHERE s.brand_id = b.id
       )
+    ON CONFLICT (brand_id, platform, hour_tw, slot_kind) DO NOTHING
+  `;
+
+  await ensureSlotKindConstraint(env);
+  const gameHours = [10, 15, 20];
+  const gameSlugs = ['homigo', 'taskgo', 'washgo'];
+  await sql`
+    INSERT INTO brand_posting_slots (brand_id, platform, hour_tw, slot_kind, enabled)
+    SELECT b.id, 'threads'::publishing_platform, h.hour_tw, 'threads_game', true
+    FROM brands b
+    CROSS JOIN unnest(${gameHours}::int[]) AS h(hour_tw)
+    WHERE b.is_active = true
+      AND b.slug = ANY(${gameSlugs}::text[])
     ON CONFLICT (brand_id, platform, hour_tw, slot_kind) DO NOTHING
   `;
 
@@ -348,12 +367,13 @@ export async function listEnabledSlotsAtHour(
 export function threadHoursFromSlots(slots: PostingSlot[]): number[] {
   const hours = [...new Set(slots.filter((s) => s.platform === 'threads' && s.enabled).map((s) => s.hourTw))]
     .sort((a, b) => a - b);
-  return hours.length ? hours : [0, 6, 9, 12, 18, 21];
+  return hours.length ? hours : [0, 6, 9, 10, 12, 15, 18, 20, 21];
 }
 
 export function sourceFromSlots(slots: PostingSlot[], hourTw: number): PostingSlotKind {
   const hit = slots.find((s) => s.platform === 'threads' && s.enabled && s.hourTw === hourTw);
   if (hit) return hit.slotKind;
+  if (hourTw === 10 || hourTw === 15 || hourTw === 20) return 'threads_game';
   return hourTw === 9 || hourTw === 21 ? 'threads_offtopic' : 'threads_hourly';
 }
 

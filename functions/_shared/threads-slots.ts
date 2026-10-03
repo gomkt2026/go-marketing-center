@@ -3,9 +3,10 @@ import { getSql } from './db';
 import {
   buildBrandContext,
   THREADS_HOURLY_CATEGORIES, pickThreadsHourlyCategory, type ThreadsHourlyCategoryId,
+  GAME_PUBLIC_STILLS, pickGamePromoAngle,
 } from './prompts';
 import {
-  generatePlatformPost, generateOfftopicPost, generateThreadsFromImage,
+  generatePlatformPost, generateOfftopicPost, generateThreadsFromImage, generateGamePromoPost,
   saveGeneratedContent, findBrandAgent,
 } from './generate';
 import { getThreadsAccount } from './threads';
@@ -24,12 +25,15 @@ import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from './auto-post-brands';
 export const THREADS_POST_HOURS_TW: readonly number[] = [0, 6, 12, 18];
 /** 生活哏文 / 愛情散文時段(台灣時間) */
 export const THREADS_OFFTOPIC_HOURS_TW: readonly number[] = [9, 21];
-/** 小編工作台一天 6 檔 */
-export const THREADS_DESK_HOURS_TW: readonly number[] = [0, 6, 9, 12, 18, 21];
+/** 匠城出任務推廣(台灣時間),加在跟風與生活文之外 */
+export const THREADS_GAME_HOURS_TW: readonly number[] = [10, 15, 20];
+/** 小編工作台一天 9 檔 */
+export const THREADS_DESK_HOURS_TW: readonly number[] = [0, 6, 9, 10, 12, 15, 18, 20, 21];
 
 export const THREADS_SLOT_BRANDS = ['homigo', 'taskgo', 'washgo'] as const;
 const THREADS_DAILY_CAP = 4;
 const THREADS_OFFTOPIC_DAILY_CAP = 2;
+const THREADS_GAME_DAILY_CAP = 3;
 const THREADS_BRANDS_PER_TICK = 3;
 
 export type ThreadsSlotSource = PostingSlotKind;
@@ -65,6 +69,7 @@ export function hourTWFromIso(iso: string): number {
 }
 
 export function sourceForDeskHour(hourTW: number): ThreadsSlotSource {
+  if (THREADS_GAME_HOURS_TW.includes(hourTW)) return 'threads_game';
   return THREADS_OFFTOPIC_HOURS_TW.includes(hourTW)
     ? 'threads_offtopic'
     : 'threads_hourly';
@@ -89,7 +94,7 @@ export async function brandHasSlotContent(
     SELECT c.id FROM contents c
     WHERE c.brand_id = ${brandId}::uuid
       AND c.target_platform = ${platform}
-      AND c.generation_prompt_meta->>'source' LIKE 'threads_%'
+      AND c.generation_prompt_meta->>'source' = ${source}
       AND (c.generation_prompt_meta->>'slotAt')::timestamptz
           BETWEEN ${from}::timestamptz AND ${to}::timestamptz
     LIMIT 1
@@ -153,7 +158,16 @@ export async function generateThreadsSlot(
   }
 
   for (const brand of selected) {
-    if (await brandHasSlotContent(env, brand.id, 'threads', 'threads_hourly', slotAt)) {
+    const hourTW = (slotAt.getUTCHours() + 8) % 24;
+    const brandSlots = await listBrandPostingSlots(env, brand.id);
+    const slotKind = opts?.slotKind
+      ?? brandSlots.find((s) => s.platform === 'threads' && s.enabled && s.hourTw === hourTW)?.slotKind
+      ?? 'threads_hourly';
+    if (slotKind === 'threads_game' || isOfftopicFamily(slotKind)) {
+      result.skipped.push({ slug: brand.slug, reason: '這一檔不是跟風文' });
+      continue;
+    }
+    if (await brandHasSlotContent(env, brand.id, 'threads', slotKind, slotAt)) {
       const reason = '這一檔已經有稿';
       if (opts?.onlyMissing) {
         console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} Threads 跟風檔已存在,跳過`);
@@ -194,11 +208,6 @@ export async function generateThreadsSlot(
         }
         : null;
 
-      const hourTW = (slotAt.getUTCHours() + 8) % 24;
-      const brandSlots = await listBrandPostingSlots(env, brand.id);
-      const slotKind = opts?.slotKind
-        ?? brandSlots.find((s) => s.platform === 'threads' && s.enabled && s.hourTw === hourTW)?.slotKind
-        ?? 'threads_hourly';
       const lockedId = hourlyCategoryForKind(slotKind) as ThreadsHourlyCategoryId | null;
       const recentCategoryIds = (brand.recent_categories ?? []).filter((c): c is string => !!c) as ThreadsHourlyCategoryId[];
       const availableCategoryIds = (candidateImage
@@ -311,8 +320,8 @@ export async function generateThreadsOfftopicSlot(
       const brand = brandRows[0] as { id: string; slug: string; name: string };
       const hourTW = (slotAt.getUTCHours() + 8) % 24;
       const slotKind = opts?.slotKind ?? await sourceForBrandHour(env, brand.id, hourTW);
-      if (isHourlyFamily(slotKind)) {
-        result.skipped.push({ slug: brand.slug, reason: '這一檔是話題／現場主題，改走另一條產稿' });
+      if (isHourlyFamily(slotKind) || slotKind === 'threads_game') {
+        result.skipped.push({ slug: brand.slug, reason: '這一檔不是生活／感情主題，改走另一條產稿' });
         continue;
       }
       if (await brandHasSlotContent(env, brand.id, 'threads', slotKind, slotAt)) {
@@ -397,6 +406,137 @@ export async function generateThreadsOfftopicSlot(
   return result;
 }
 
+/**
+ * 匠城出任務推廣:每天 10 / 15 / 20,每品牌最多 3 篇。
+ * 不走跟風池,也不吃跟風的每日上限。
+ */
+export async function generateThreadsGameSlot(
+  env: Env,
+  slotAt: Date,
+  opts?: { slugs?: string[]; onlyMissing?: boolean },
+): Promise<ThreadsSlotBatchResult> {
+  const sql = getSql(env);
+  const result: ThreadsSlotBatchResult = { generated: [], skipped: [] };
+  const targetSlugs = opts?.slugs?.length ? opts.slugs : [...AUTO_POST_BRAND_SLUGS];
+  const hourTW = (slotAt.getUTCHours() + 8) % 24;
+
+  for (const slug of targetSlugs) {
+    try {
+      const brandRows = await sql`SELECT id, slug FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1`;
+      if (!brandRows.length) {
+        result.skipped.push({ slug, reason: '找不到這個品牌' });
+        continue;
+      }
+      const brand = brandRows[0] as { id: string; slug: string };
+      if (await brandHasSlotContent(env, brand.id, 'threads', 'threads_game', slotAt)) {
+        if (opts?.onlyMissing) {
+          console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} 匠城檔已存在,跳過`);
+        }
+        result.skipped.push({ slug: brand.slug, reason: '這一檔已經有稿' });
+        continue;
+      }
+
+      const todayRows = await sql`
+        SELECT count(*)::int AS n FROM contents
+        WHERE brand_id = ${brand.id}::uuid
+          AND target_platform = 'threads'
+          AND generation_prompt_meta->>'source' = 'threads_game'
+          AND (generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
+          AND (generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
+      `;
+      if ((todayRows[0] as { n: number }).n >= THREADS_GAME_DAILY_CAP) {
+        result.skipped.push({ slug: brand.slug, reason: `今日匠城推廣已達 ${THREADS_GAME_DAILY_CAP} 篇上限` });
+        continue;
+      }
+
+      const usedRows = await sql`
+        SELECT generation_prompt_meta->>'gameAngle' AS angle
+        FROM contents
+        WHERE brand_id = ${brand.id}::uuid
+          AND target_platform = 'threads'
+          AND generation_prompt_meta->>'source' = 'threads_game'
+        ORDER BY created_at DESC
+        LIMIT 6
+      `;
+      const usedAngles = (usedRows as { angle: string | null }[])
+        .map((r) => r.angle)
+        .filter((a): a is string => !!a);
+      const angle = pickGamePromoAngle(usedAngles);
+
+      const assetRows = await sql`
+        SELECT id, file_url FROM brand_assets
+        WHERE brand_id = ${brand.id}::uuid
+          AND asset_type = 'image'
+          AND (
+            name ILIKE '%匠城%'
+            OR coalesce(caption, '') ILIKE '%匠城%'
+            OR name ILIKE '%jiangcheng%'
+          )
+        ORDER BY used_in_threads_count ASC, last_used_at ASC NULLS FIRST
+        LIMIT 6
+      `.catch(() => [] as { id: string; file_url: string }[]);
+      const library = assetRows as { id: string; file_url: string }[];
+      const stills = [
+        ...library.map((row) => row.file_url).filter(Boolean),
+        ...GAME_PUBLIC_STILLS,
+      ];
+      const slotIndex = hourTW === 10 ? 0 : hourTW === 15 ? 1 : 2;
+      const stillUrl = stills.length ? stills[(slotIndex + usedAngles.length) % stills.length] : null;
+      const libraryHit = library.find((row) => row.file_url === stillUrl);
+
+      const brandCtx = await buildBrandContext(env, brand.id);
+      const agentId = await findBrandAgent(env, brand.id);
+      const post = await generateGamePromoPost(env, {
+        brandCtx,
+        angle,
+        usedHooks: usedAngles,
+        stillUrl,
+      });
+      const { contentId } = await saveGeneratedContent(env, {
+        brandCtx,
+        platform: 'threads',
+        result: post,
+        generatedByAgentId: agentId,
+        status: 'pending_review',
+        promptMeta: {
+          source: 'threads_game',
+          category: 'game_promo',
+          gameAngle: angle.id,
+          slotAt: slotAt.toISOString(),
+          audienceLane: 'b2c',
+          stillUrl,
+        },
+        imageAssetMeta: libraryHit
+          ? { sourceAssetId: libraryHit.id, generated: false, reused: true }
+          : undefined,
+      });
+      if (libraryHit) {
+        await sql`
+          UPDATE brand_assets
+          SET used_in_threads_count = used_in_threads_count + 1, last_used_at = now()
+          WHERE id = ${libraryHit.id}::uuid
+        `.catch(() => undefined);
+      }
+      await logActivity(env, {
+        brandId: brand.id,
+        actorType: 'ai_agent',
+        actorAgentId: agentId,
+        action: 'content.generated',
+        entityType: 'content',
+        entityId: contentId,
+        afterState: { platform: 'threads', source: 'threads_game', gameAngle: angle.id, scheduled: false, slotAt: slotAt.toISOString() },
+      });
+      result.generated.push({ slug: brand.slug, contentId, category: angle.id });
+      console.log(`[game] ${brand.slug} 已產匠城推廣 ${angle.hook},${slotAt.toISOString()}(待工作台審核)`);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : '生成失敗';
+      result.skipped.push({ slug, reason });
+      console.error(`[game] 品牌 ${slug} 生成失敗`, e);
+    }
+  }
+  return result;
+}
+
 /** 小編在工作台手動產「今天這一檔」 */
 export async function generateThreadsDeskSlot(
   env: Env,
@@ -414,6 +554,9 @@ export async function generateThreadsDeskSlot(
   const source = brandId
     ? await sourceForBrandHour(env, brandId, hourTW)
     : sourceForDeskHour(hourTW);
+  if (source === 'threads_game') {
+    return generateThreadsGameSlot(env, slotAt, { slugs: [slug], onlyMissing: true });
+  }
   if (isOfftopicFamily(source)) {
     return generateThreadsOfftopicSlot(env, slotAt, { slugs: [slug], onlyMissing: true, slotKind: source });
   }

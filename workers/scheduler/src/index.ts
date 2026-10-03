@@ -15,7 +15,7 @@ import {
   pickBrandScreenshot, SPOTLIGHT_SLUG,
 } from '../../../functions/_shared/generate';
 import {
-  generateThreadsSlot, generateThreadsOfftopicSlot, promoteDueThreadsSafetyNet,
+  generateThreadsSlot, generateThreadsOfftopicSlot, generateThreadsGameSlot, promoteDueThreadsSafetyNet,
   slotAtToday, brandHasSlotContent, hourTWFromIso,
   THREADS_POST_HOURS_TW, THREADS_OFFTOPIC_HOURS_TW,
 } from '../../../functions/_shared/threads-slots';
@@ -347,7 +347,10 @@ async function catchupMissingThreadsSlots(env: Env, slugs: string[], limit = CAT
   while (generated < limit) {
     const missing = await findNextMissingThreadsSlot(env, slugs);
     if (!missing) break;
-    if (isOfftopicFamily(missing.source)) {
+    if (missing.source === 'threads_game') {
+      console.log(`[catchup] 補 ${missing.slug} Threads 匠城 ${missing.hour}:00`);
+      await generateThreadsGameSlot(env, missing.slotAt, { slugs: [missing.slug], onlyMissing: true });
+    } else if (isOfftopicFamily(missing.source)) {
       console.log(`[catchup] 補 ${missing.slug} Threads ${missing.source} ${missing.hour}:00`);
       await generateThreadsOfftopicSlot(env, missing.slotAt, { slugs: [missing.slug], onlyMissing: true, slotKind: missing.source });
     } else {
@@ -1068,6 +1071,11 @@ async function handleBrandJob(env: Env, job: BrandJobMessage): Promise<void> {
         slotKind: job.slotKind && isThreadsSlotKind(job.slotKind) ? job.slotKind : undefined,
       });
       return;
+    case 'generate_game':
+      await generateThreadsGameSlot(env, new Date(job.slotAt), {
+        slugs: [job.slug], onlyMissing: true,
+      });
+      return;
     case 'generate_theme': {
       let brandId = job.brandId;
       let name = job.name;
@@ -1132,6 +1140,7 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
     const due = configured.filter((s) => s.hourTw === genHour);
     const needHourly = due.some((s) => isHourlyFamily(s.slotKind)) || (!configured.length && THREADS_POST_HOURS_TW.includes(genHour));
     const needOfftopic = due.some((s) => isOfftopicFamily(s.slotKind)) || (!configured.length && THREADS_OFFTOPIC_HOURS_TW.includes(genHour));
+    const needGame = due.some((s) => s.slotKind === 'threads_game') || (!configured.length && (genHour === 10 || genHour === 15 || genHour === 20));
     const needTheme = due.some((s) => s.slotKind === 'daily_theme') || (!configured.length && genHour === DAILY_THEME_HOUR_TW);
     const autoSlugs = due.length ? [...new Set(due.map((s) => s.brandSlug))] : await listAutoPostSlugs(env);
 
@@ -1147,6 +1156,12 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
       for (const slug of (slugs.length ? [...new Set(slugs)] : autoSlugs)) {
         const slot = due.find((s) => s.brandSlug === slug && isOfftopicFamily(s.slotKind));
         jobs.push({ kind: 'generate_offtopic', slug, slotAt: slotAt.toISOString(), slotKind: slot?.slotKind });
+      }
+    }
+    if (needGame) {
+      const slugs = due.filter((s) => s.slotKind === 'threads_game').map((s) => s.brandSlug);
+      for (const slug of (slugs.length ? [...new Set(slugs)] : autoSlugs)) {
+        jobs.push({ kind: 'generate_game', slug, slotAt: slotAt.toISOString() });
       }
     }
     if (needTheme) {

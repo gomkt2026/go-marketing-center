@@ -539,6 +539,11 @@ export interface EngagementPrediction {
 // Homigo IG/Threads 專用:4:5 直式「社群設計圖」規範(痛點主標 → 情境 → 解法)
 // ============================================================================
 
+/** 有上傳素材時圖上只印痛點,優勢留在文案 */
+export const ASSET_PAIN_HEADLINE_JSON_SPEC =
+  '"posterHeadline": "必填:4-10 字台灣繁體中文痛點,必須與文案第一句同義,禁止簡體。Homigo 要有情緒(例如「講不清楚」「溝漏水了」);Washgo 例如「衣服洗壞了」;TaskGo 例如「今天做到哪」", ' +
+  '"posterAccent": "主標裡要用品牌強調色的 2-6 字;沒有就空字串"';
+
 /** 海報主標 JSON:後製印字,禁止寫進 imagePrompt 叫模型去畫 */
 export const POSTER_HEADLINE_JSON_SPEC =
   '"posterHeadline": "必填:4-10 字台灣繁體中文痛點主標,必須與文案第一句同義,禁止簡體。Homigo 要有情緒(例如「講不清楚」「根本管不動」「大家都在自保」「房子越多越焦慮」);其他品牌例如「手寫單對不攏」「今天做到哪」", ' +
@@ -886,25 +891,25 @@ export function buildPostUserPrompt(params: {
   const searchBlock = params.platform === 'instagram' && voice?.igSearchQueries?.length
     ? `本篇要能被顧客在 IG 搜尋欄找到。只選下面「一個」搜尋意圖寫進第一句與 hashtag:${voice.igSearchQueries.join('、')}。`
     : '';
-  const imageSpec = params.skipImagePrompt
+  const assetPain = !!(params.screenshotPoster || params.convertPhotoPoster);
+  const imageSpec = params.skipImagePrompt || assetPain
     ? ''
-    : params.screenshotPoster
-      ? B2B_SCREENSHOT_POSTER_PROMPT_SPEC
-      : params.copySpecOverride?.trim()
-        ? wrapCopyImageSpec(params.copySpecOverride)
-        : resolveImagePromptSpec({
-          platform: params.platform, brandSlug: params.brandSlug,
-          imageStyle: params.imageStyle, skipImagePrompt: params.skipImagePrompt,
-          screenshotPoster: params.screenshotPoster, lane,
-        });
-  const overlayHeadline = !params.skipImagePrompt && (
-    params.screenshotPoster
-    || params.convertPhotoPoster
-    || params.imageStyle === 'design'
+    : params.copySpecOverride?.trim()
+      ? wrapCopyImageSpec(params.copySpecOverride)
+      : resolveImagePromptSpec({
+        platform: params.platform, brandSlug: params.brandSlug,
+        imageStyle: params.imageStyle, skipImagePrompt: params.skipImagePrompt,
+        screenshotPoster: params.screenshotPoster, lane,
+      });
+  const overlayHeadline = !assetPain && !params.skipImagePrompt && (
+    params.imageStyle === 'design'
     || params.imageStyle === 'photo'
     || params.platform === 'facebook'
     || params.platform === 'instagram'
   );
+  const headlineSpec = assetPain
+    ? ASSET_PAIN_HEADLINE_JSON_SPEC
+    : overlayHeadline ? POSTER_HEADLINE_JSON_SPEC : '';
   return [
     `請針對以下主題,為 ${params.platform} 平台寫一篇貼文。`,
     `主題:${params.topic}`,
@@ -914,19 +919,14 @@ export function buildPostUserPrompt(params: {
     laneBlock,
     searchBlock,
     params.extraInstruction ?? '',
-    params.screenshotPoster
-      ? '配圖會把品牌上傳的真實系統畫面做成 B 端痛點海報(現場煩惱 + 後製繁中主標與優勢小字 + 這張畫面當解法卡),必須提供 imagePrompt、posterHeadline、posterAdvantage。'
-      : params.convertPhotoPoster
-        ? (params.brandSlug === 'washgo'
-          ? '配圖會把品牌上傳的實拍轉成 Washgo 可愛洗衣插畫海報,必須提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
-          : params.brandSlug === 'taskgo'
-            ? '配圖會把品牌上傳的實拍轉成匠管海軍藍平面海報,必須提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
-            : '配圖會把品牌上傳的實拍轉成 Homigo 米白深藍社群海報,必須提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。')
+    assetPain
+      ? '配圖會把品牌上傳的原圖鋪滿,底部只疊 4-10 字痛點。不要重繪、不要提供 imagePrompt。優勢寫進文案,不要指望印在圖上。'
       : params.skipImagePrompt ? '配圖已指定為品牌上傳的真實截圖或實拍,不要提供 imagePrompt。' : '',
     overlayHeadline ? 'posterHeadline 與 posterAdvantage 必須是正確台灣繁體中文(禁止簡體)。主標與優勢小字會由系統印在留白區,不要把這些字寫進 imagePrompt 叫圖片模型去畫。' : '',
+    assetPain ? 'posterHeadline 必須是正確台灣繁體中文(禁止簡體),4-10 字,與文案第一句同義。' : '',
     '',
     '回傳 JSON 物件,格式:',
-    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${imageSpec ? `, ${imageSpec}` : ''}${overlayHeadline ? `, ${POSTER_HEADLINE_JSON_SPEC}` : ''}}`,
+    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${imageSpec ? `, ${imageSpec}` : ''}${headlineSpec ? `, ${headlineSpec}` : ''}}`,
   ].filter(Boolean).join('\n');
 }
 
@@ -973,12 +973,6 @@ export function buildImageInspiredPostPrompt(params: {
   const searchBlock = params.platform === 'instagram' && voice?.igSearchQueries?.length
     ? `文案第一句要對準顧客會搜的一個詞:${voice.igSearchQueries.join('、')}。`
     : '';
-  const screenshotPoster = params.imageCategory === 'system_screenshot'
-    && (params.platform === 'facebook' || params.platform === 'instagram');
-  const convertPhotoPoster = !!params.convertPhotoPoster
-    || (!screenshotPoster && (params.platform === 'facebook' || params.platform === 'instagram')
-      && ['real_photo', 'people', 'scene', 'brand_collab'].includes(params.imageCategory ?? ''));
-  const overlayFields = screenshotPoster || convertPhotoPoster;
   return [
     `這是品牌上傳的一張${categoryLabel}${params.assetName ? `「${params.assetName}」` : ''}${params.caption ? `,說明:${params.caption}` : ''}。`,
     params.feature || params.usageContext || params.assetRole
@@ -986,15 +980,7 @@ export function buildImageInspiredPostPrompt(params: {
       : '',
     `請仔細看這張圖,挑一個畫面裡真的有的細節或情境當鉤子,寫一篇 ${params.platform} 貼文。`,
     '不要憑空描述圖片裡沒有的東西,也不要寫成單純的圖片說明文;要像有人真的看到/用到這個畫面後,寫下的一則真實感想或分享。',
-    screenshotPoster
-      ? '這張系統畫面會被做成 B 端痛點海報(現場煩惱 + 後製繁中主標與優勢小字 + 畫面當解法卡),不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。主標不要寫進 imagePrompt。'
-      : convertPhotoPoster
-        ? (params.brandSlug === 'washgo'
-          ? '這張實拍會被轉成 Washgo 可愛洗衣插畫海報,不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
-          : params.brandSlug === 'taskgo'
-            ? '這張實拍會被轉成匠管海軍藍平面海報,不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。'
-            : '這張實拍會被轉成 Homigo 米白深藍社群海報,不是原圖直發。請一併提供 imagePrompt、posterHeadline、posterAdvantage。imagePrompt 只描述如何保留原照片主體,不要叫模型畫字。')
-      : '',
+    '這張素材會原圖鋪滿,底部只疊 4-10 字痛點,不會重繪。請提供 posterHeadline。優勢寫進文案。',
     '',
     guideline,
     laneBlock,
@@ -1002,7 +988,7 @@ export function buildImageInspiredPostPrompt(params: {
     params.extraInstruction ?? '',
     '',
     '回傳 JSON 物件:',
-    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話"${overlayFields ? `, ${screenshotPoster ? B2B_SCREENSHOT_POSTER_PROMPT_SPEC : PHOTO_CONVERT_PROMPT_SPEC}, ${POSTER_HEADLINE_JSON_SPEC}` : ''}}`,
+    `{"title": "內部管理用標題", "body": "貼文全文", "hashtags": ["不含#的標籤"], "cta": "行動呼籲一句話", ${ASSET_PAIN_HEADLINE_JSON_SPEC}}`,
   ].filter(Boolean).join('\n');
 }
 
@@ -1129,6 +1115,68 @@ export function pickThreadsHourlyCategory(
     if (roll <= 0) return c;
   }
   return candidates[candidates.length - 1];
+}
+
+// ============================================================================
+// 匠城出任務 Threads 推廣。事實只來自已發布的 v7 文案,不另編功能或數字。
+// ============================================================================
+
+export const GAME_PROMO_URL = 'https://go-marketing-center.pages.dev/game/';
+
+export interface GamePromoAngle {
+  id: string;
+  hook: string;
+  fact: string;
+}
+
+export const GAME_PROMO_ANGLES: GamePromoAngle[] = [
+  { id: 'snow', hook: '高雄下雪了', fact: '每一班隨機天氣。雨天會甩尾、強風把你推向對向，還會高雄下雪。' },
+  { id: 'chase', hook: '野狗追車', fact: '路上不會讓你閒著：野狗追車、警察臨檢、垃圾車播《給愛麗絲》。' },
+  { id: 'shift', hook: '90秒一班', fact: '一個班 90 秒起，手機點開就能玩，不用下載。' },
+  { id: 'map', hook: '解鎖台灣地圖', fact: '分享給朋友，朋友來玩一班，隱藏版台灣地圖就永久解鎖。' },
+  { id: 'langs', hook: '四種語言', fact: '現在有 English、日本語、Tiếng Việt、Bahasa Indonesia。' },
+  { id: 'errands', hook: '一班接三件', fact: '騎車跑一個班，TaskGo 報修、Homigo 送鑰匙、Washgo 收衣服，一次接完。' },
+];
+
+export const GAME_PUBLIC_STILLS = [
+  'https://go-marketing-center.pages.dev/game/og-image.jpg',
+  'https://go-marketing-center.pages.dev/site/jiangcheng-languages.jpg',
+  'https://go-marketing-center.pages.dev/site/jiangcheng-language-menu.jpg',
+];
+
+export function pickGamePromoAngle(excludeIds: string[]): GamePromoAngle {
+  const pool = GAME_PROMO_ANGLES.filter((a) => !excludeIds.includes(a.id));
+  const list = pool.length ? pool : GAME_PROMO_ANGLES;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+export function buildGamePromoPrompt(params: {
+  brandSlug: string;
+  angle: GamePromoAngle;
+  usedHooks: string[];
+}): string {
+  const voice = getBrandVoice(params.brandSlug);
+  const limit = voice.threadsMaxChars ?? 220;
+  const cut = params.brandSlug === 'taskgo'
+    ? '你可以用報修、收工後跑一班當切角。'
+    : params.brandSlug === 'homigo'
+      ? '你可以用送鑰匙當切角。'
+      : params.brandSlug === 'washgo'
+        ? '你可以用收衣服當切角。'
+        : '';
+  return [
+    voice.threadsCraft ?? '',
+    '這篇是「匠城出任務」遊戲推廣。只講下面這一個事實，不要加沒寫到的功能、分數、獎品、下載量或活動。',
+    `角度:${params.angle.hook}`,
+    `可講的事實:${params.angle.fact}`,
+    '需要收尾時只能再帶一句：手機瀏覽器就能玩。網址必須原樣出現一次：',
+    GAME_PROMO_URL,
+    cut,
+    `字數不超過 ${limit} 字。2-4 個短段落、一句一行。`,
+    params.usedHooks.length ? `這些鉤子最近用過，不要重寫同一個開頭：${params.usedHooks.join('、')}` : '',
+    `posterHeadline 用「${params.angle.hook}」，或同義的 4-10 字繁中。`,
+    '回傳 JSON: {"title":"內部標題","body":"貼文全文","hashtags":["不含#的標籤"],"cta":"一句","posterHeadline":"4-10字","posterAccent":""}',
+  ].filter(Boolean).join('\n');
 }
 
 // ============================================================================

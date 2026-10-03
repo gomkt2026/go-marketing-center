@@ -1,19 +1,19 @@
 ---
-description: Homigo／TaskGo／Washgo 的 FB、IG 系統畫面必須做成 B 端痛點海報，不要整頁截圖直發
-globs: functions/_shared/prompts.ts,functions/_shared/generate.ts,functions/_shared/ig-frame.ts
+description: Homigo／TaskGo／Washgo 有上傳素材時原圖鋪滿並只疊痛點字；沒有素材才生圖
+globs: functions/_shared/prompts.ts,functions/_shared/generate.ts,functions/_shared/ig-frame.ts,functions/_shared/poster-text.ts
 alwaysApply: false
 ---
 
-# 三品牌 FB／IG 系統畫面海報
+# 三品牌 FB／IG／Threads 素材圖
 
-產生 Homigo、TaskGo、Washgo 的 FB／IG 圖、自動發文配圖、或改產圖 prompt 時：
+產生 Homigo、TaskGo、Washgo 的 FB／IG／Threads 圖、自動發文配圖、或改產圖程式時：
 
-1. 有品牌上傳的素材就用原圖本地合成（品牌色留白 + 白卡放原圖 + 思源黑體主標），不要呼叫圖片模型重繪
-2. 沒有可用素材才生圖。系統截圖與實拍都走同一條本地合成
-3. 禁止把整頁後台不留白、不加主標就直發
-4. 主標與文案第一句同義，留白區再印一句品牌優勢小字；由系統用思源黑體 TW 後製印上正確繁中；圖片模型禁止畫任何字
-5. 直式上方 25%、橫式左側 38% 留空給後製字（Homigo 是米白 #F5F1EA 留白，Washgo 是奶油／淡天藍留白，TaskGo 是斜切色塊）
-6. Homigo 走新創社群海報：痛點→情境→解法，深藍 #0B2D5C、黃 #F7B500 只做強調，不要房仲海報／保險 DM／紙本素描封面；Washgo 走圓潤可愛洗衣插畫；TaskGo 維持海軍藍斜切工地風
-7. 本地合成失敗才退回簡報框原圖。不要為了「看起來像新圖」再呼叫圖片模型
+1. 有品牌上傳的素材就用原圖本地合成，不要呼叫圖片模型重繪
+2. 素材 cover 鋪滿畫布（FB 橫式、IG／Threads 直式 4:5），只留一條窄邊
+3. 圖上只印 4–10 字繁中痛點，貼在底部色條。優勢小字留在文案，不印上圖
+4. Homigo 米白條＋深藍字、黃字強調；Washgo 淡天藍條＋深藍字；TaskGo 海軍藍條＋白字、黃字強調。TaskGo 斜切只做這條色條
+5. 沒有可用素材才生圖，生圖海報維持留白主標，不要把兩套混在同一張素材圖
+6. 禁止把整頁後台不加痛點字就直發
+7. 本地合成失敗才退回簡報框原圖
 
-程式：`functions/_shared/poster-text.ts`（疊字）、`functions/_shared/prompts.ts` 的 `SYSTEM_SCREENSHOT_POSTER_RULE`、`functions/_shared/generate.ts` 的 `generateSystemScreenshotPoster`
+程式：`functions/_shared/ig-frame.ts` 的 `composeAssetOnBrandCard`、`functions/_shared/poster-text.ts` 的 `burnPainBar`、`functions/_shared/generate.ts`

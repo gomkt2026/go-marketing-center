@@ -3,6 +3,7 @@ import type { Env } from './env';
 export type BrandJobMessage =
   | { kind: 'generate_threads'; slug: string; slotAt: string; slotKind?: string }
   | { kind: 'generate_offtopic'; slug: string; slotAt: string; slotKind?: string }
+  | { kind: 'generate_game'; slug: string; slotAt: string }
   | { kind: 'generate_theme'; brandId: string; slug: string; name: string; slotAt: string; platforms: Array<'facebook' | 'instagram'> }
   | { kind: 'catchup_brand'; slug: string }
   | { kind: 'reply_round'; brandId: string; slug: string; name: string }

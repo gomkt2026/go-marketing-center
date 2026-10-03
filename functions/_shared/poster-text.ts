@@ -323,6 +323,70 @@ function buildEditorialSvg(params: {
   return { svg, x: 0, y: 0 };
 }
 
+/**
+ * 素材鋪滿後的底部痛點條:只印 4–10 字主標。
+ * 優勢小字與英文 kicker 留在文案,不印上圖。
+ * TaskGo 的斜切只做這條色條。
+ */
+export async function burnPainBar(
+  env: Env,
+  imageBytes: Uint8Array,
+  params: {
+    brandSlug: string;
+    headline?: string;
+    accent?: string;
+    body?: string;
+    landscape?: boolean;
+  },
+): Promise<Uint8Array> {
+  const headline = sanitizePosterHeadline(params.headline, params.body ?? '');
+  if (headline.length < 2) return imageBytes;
+  const fontBytes = await loadPosterFontBytes(env);
+  if (!fontBytes) return imageBytes;
+  await ensureResvg(env);
+
+  const { PhotonImage, watermark } = await loadPhoton();
+  const base = PhotonImage.new_from_byteslice(imageBytes);
+  let mark: ReturnType<typeof PhotonImage.new_from_byteslice> | null = null;
+  try {
+    const width = base.get_width();
+    const height = base.get_height();
+    const landscape = params.landscape ?? width > height;
+    const theme = THEME[params.brandSlug] ?? THEME.homigo;
+    const split = splitPosterAccent(headline, params.accent);
+    const barH = Math.round(height * (landscape ? 0.16 : 0.125));
+    const y0 = height - barH;
+    const skew = theme.slant ? Math.round(width * 0.045) : 0;
+    const bar = theme.slant
+      ? `<polygon points="0,${y0 + skew} ${width},${y0} ${width},${height} 0,${height}" fill="${theme.banner}"/>`
+      : `<rect x="0" y="${y0}" width="${width}" height="${barH}" fill="${theme.banner}"/>`;
+    const sidePad = Math.round(width * 0.16);
+    const maxTextW = width - sidePad * 2;
+    const line = `${split.main}${split.accent}`;
+    let fontSize = landscape ? Math.round(barH * 0.42) : Math.round(width * 0.062);
+    while (estimateTextWidth(line, fontSize) > maxTextW && fontSize > 28) fontSize -= 2;
+    const textY = y0 + Math.round(barH * 0.66);
+    const cx = Math.round(width / 2);
+    const text = split.accent
+      ? `<text x="${cx}" y="${textY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700"><tspan fill="${theme.main}">${escapeXml(split.main)}</tspan><tspan fill="${theme.accent}">${escapeXml(split.accent)}</tspan></text>`
+      : `<text x="${cx}" y="${textY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700" fill="${theme.main}">${escapeXml(split.main)}</text>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${bar}${text}</svg>`;
+    const resvg = new Resvg(svg, {
+      fitTo: { mode: 'original' },
+      font: {
+        fontBuffers: [new Uint8Array(fontBytes)],
+        defaultFontFamily: POSTER_FONT_FAMILY,
+      },
+    });
+    mark = PhotonImage.new_from_byteslice(resvg.render().asPng());
+    watermark(base, mark, BigInt(0), BigInt(0));
+    return base.get_bytes_jpeg(90);
+  } finally {
+    base.free();
+    mark?.free();
+  }
+}
+
 export async function burnPosterHeadline(
   env: Env,
   imageBytes: Uint8Array,

@@ -37,6 +37,8 @@ const MAX_MULTIPLIER = 1.4 * 2;
 const RUSH_EXTRA = BASE_PAY.homigo * MAX_MULTIPLIER * 0.8;
 /** 遊戲內事件：三袋整車送洗 +600、臨檢通過 +200、垃圾車 +300、地標打卡 +100、闖臨檢罰單最多 -600。 */
 const EVENT_PAY = { batch3: 600, lawful: 200, garbage: 300, checkin: 100, ticket: 600 } as const;
+/** 突發路況：攔狗 +200、讓救護車 +100、喜糖 +66、遶境 +88、擋救護車 -200，每班各最多一次。 */
+const INCIDENT_PAY = { incDog: 200, incAmbYield: 100, incCandy: 66, incBless: 88, incAmbBlock: 200 } as const;
 /** 台灣地圖地標數。 */
 const MAX_CHECKINS = 9;
 
@@ -52,6 +54,11 @@ export interface GameStats {
   lawful: number;
   garbage: number;
   checkins: number;
+  incDog: number;
+  incAmbYield: number;
+  incAmbBlock: number;
+  incCandy: number;
+  incBless: number;
 }
 
 export interface GameSeasonRow {
@@ -271,10 +278,16 @@ export function parseGameStats(input: unknown): GameStats | null {
     lawful: toInt(o.lawful ?? 0),
     garbage: toInt(o.garbage ?? 0),
     checkins: toInt(o.checkins ?? 0),
+    incDog: toInt(o.incDog ?? 0),
+    incAmbYield: toInt(o.incAmbYield ?? 0),
+    incAmbBlock: toInt(o.incAmbBlock ?? 0),
+    incCandy: toInt(o.incCandy ?? 0),
+    incBless: toInt(o.incBless ?? 0),
   };
   const counts = [
     stats.taskgo, stats.homigo, stats.washgo, stats.expired, stats.rush, stats.batch3,
     stats.tickets, stats.lawful, stats.garbage, stats.checkins,
+    stats.incDog, stats.incAmbYield, stats.incAmbBlock, stats.incCandy, stats.incBless,
   ];
   if (counts.some((n) => !Number.isInteger(n) || n < 0)) return null;
   if (!Number.isFinite(stats.maxCombo) || stats.maxCombo < 1 || stats.maxCombo > 2) return null;
@@ -285,7 +298,10 @@ export function parseGameStats(input: unknown): GameStats | null {
 export function checkScorePlausible(score: number, stats: GameStats, map: GameMap): string | null {
   const rule = MAP_RULES[map];
   if (!Number.isInteger(score) || score < 0 || score > rule.maxScore) return '分數不合理';
-  if (score % 10 !== 0) return '分數不合理';
+  if (stats.incDog > 1 || stats.incCandy > 1 || stats.incBless > 1 || stats.incAmbYield + stats.incAmbBlock > 1) {
+    return '事件次數不合理';
+  }
+  if ((score - stats.incCandy * INCIDENT_PAY.incCandy - stats.incBless * INCIDENT_PAY.incBless) % 10 !== 0) return '分數不合理';
   const orders = stats.taskgo + stats.homigo + stats.washgo;
   if (orders + stats.expired > rule.maxOrders) return '工單數不合理';
   if (stats.rush > orders || stats.batch3 * 3 > stats.washgo) return '工單數不合理';
@@ -293,9 +309,11 @@ export function checkScorePlausible(score: number, stats: GameStats, map: GameMa
   if (stats.checkins > (map === 't' ? MAX_CHECKINS : 0)) return '打卡次數不合理';
   const base = stats.taskgo * BASE_PAY.taskgo + stats.homigo * BASE_PAY.homigo + stats.washgo * BASE_PAY.washgo;
   const bonus = stats.batch3 * EVENT_PAY.batch3 + stats.lawful * EVENT_PAY.lawful
-    + stats.garbage * EVENT_PAY.garbage + stats.checkins * EVENT_PAY.checkin;
+    + stats.garbage * EVENT_PAY.garbage + stats.checkins * EVENT_PAY.checkin
+    + stats.incDog * INCIDENT_PAY.incDog + stats.incAmbYield * INCIDENT_PAY.incAmbYield
+    + stats.incCandy * INCIDENT_PAY.incCandy + stats.incBless * INCIDENT_PAY.incBless;
   const slack = orders * 10;
-  const min = base - slack - stats.tickets * EVENT_PAY.ticket;
+  const min = base - slack - stats.tickets * EVENT_PAY.ticket - stats.incAmbBlock * INCIDENT_PAY.incAmbBlock;
   const max = base * MAX_MULTIPLIER + stats.rush * RUSH_EXTRA + bonus + slack;
   if (score < min || score > max) return '分數與工單數不符';
   if (orders > 0 && stats.maxCombo < 1.1) return '連單紀錄不合理';

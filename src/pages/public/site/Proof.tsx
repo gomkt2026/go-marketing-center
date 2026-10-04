@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BRANDS, BrandPosts, PRESS, PublicFrame, brandOf } from '@/pages/public/Landing';
+import { BRANDS, BrandPosts, BrandResults, PRESS, PublicFrame, brandOf } from '@/pages/public/Landing';
 
 export function Proof() {
   return (
@@ -7,16 +7,30 @@ export function Proof() {
       <section className="lp-hero">
         <div className="lp-wrap">
           <div className="lp-eyebrow">品牌成果</div>
-          <h1>三位小編已經在發文</h1>
+          <h1>三個品牌發了多少、帶來多少</h1>
           <p className="lp-lead">
-            阿豪顧 TaskGo、小咪顧 Homigo、阿樂顧 Washgo。人設固定，口吻不混。
-            下面每個品牌只放最新發出的一則，讓工班看到這套中心實際長什麼樣子。
+            阿豪顧 TaskGo、小咪顧 Homigo、阿樂顧 Washgo，都在 Facebook、Instagram、Threads 發文。
+            下面先看三個品牌加總的成果，再看各品牌最新一則，以及經濟日報的報導。
           </p>
         </div>
       </section>
 
       <section className="lp-section" style={{ paddingTop: 0 }}>
         <div className="lp-wrap">
+          <div className="lp-eyebrow">發文成效</div>
+          <h2>整體成果，一眼看完</h2>
+          <p className="lp-muted lp-sub">
+            有興趣的客戶可以直接看匠管自己三個品牌的發文量、曝光與互動。數字每幾分鐘更新一次。
+          </p>
+          <BrandResults />
+        </div>
+      </section>
+
+      <section className="lp-section">
+        <div className="lp-wrap">
+          <div className="lp-eyebrow">最新貼文</div>
+          <h2>每個品牌最近發出的一則</h2>
+          <p className="lp-muted lp-sub">人設固定，口吻不混。點進去可以看原文。</p>
           <BrandPosts />
         </div>
       </section>

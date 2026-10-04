@@ -220,6 +220,145 @@ export function BrandPosts() {
   );
 }
 
+interface ShowcaseMetric {
+  published: number;
+  pieces: number;
+  measured: number;
+  impressions: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  clicks: number;
+  interactions: number;
+}
+
+interface ShowcaseResults {
+  since: string | null;
+  totals: ShowcaseMetric;
+  last28: ShowcaseMetric;
+  brands: Array<{ slug: string; totals: ShowcaseMetric; last28: ShowcaseMetric }>;
+  platforms: Array<{ platform: string; totals: ShowcaseMetric; last28: ShowcaseMetric }>;
+}
+
+function fmt(n: number): string {
+  return Math.round(n).toLocaleString('zh-TW');
+}
+
+function formatYm(iso: string): string {
+  return new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: 'long' }).format(new Date(iso));
+}
+
+export function BrandResults() {
+  const [data, setData] = useState<ShowcaseResults | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/public/showcase/results')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: ShowcaseResults) => { if (alive) setData(d); })
+      .catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, []);
+
+  if (failed) return <p className="lp-muted">成效數字暫時載入不到。下面仍可看最新貼文與報導。</p>;
+  if (!data) return <p className="lp-muted">成效載入中…</p>;
+
+  const { totals, last28 } = data;
+  const maxImp = Math.max(1, ...data.platforms.map((p) => p.totals.impressions));
+  const threadsShare = totals.impressions > 0
+    ? (data.platforms.find((p) => p.platform === 'threads')?.totals.impressions ?? 0) / totals.impressions
+    : 0;
+
+  return (
+    <div className="lp-proof">
+      <div className="lp-results">
+        <div className="lp-result">
+          <b>{fmt(totals.published)}</b>
+          <span>累計已發</span>
+          <small>三個平台合計</small>
+        </div>
+        <div className="lp-result">
+          <b>{fmt(totals.impressions)}</b>
+          <span>累計曝光</span>
+          <small>{data.since ? `${formatYm(data.since)}起，被看到的次數` : '已發出貼文被看到的次數'}</small>
+        </div>
+        <div className="lp-result">
+          <b>{fmt(last28.impressions)}</b>
+          <span>近 28 天曝光</span>
+          <small>近 28 天發出 {fmt(last28.published)} 則</small>
+        </div>
+        <div className="lp-result">
+          <b>{fmt(last28.interactions)}</b>
+          <span>近 28 天互動</span>
+          <small>按讚 {fmt(last28.likes)}、留言 {fmt(last28.comments)}、分享 {fmt(last28.shares)}、收藏 {fmt(last28.saves)}</small>
+        </div>
+      </div>
+
+      <h3 className="lp-proof-title">三個品牌各自的成果</h3>
+      <div className="lp-brands">
+        {BRANDS.map((b) => {
+          const row = data.brands.find((x) => x.slug === b.slug);
+          const all = row?.totals;
+          const recent = row?.last28;
+          return (
+            <article key={b.slug} className="lp-post" style={{ ['--c' as string]: b.color }}>
+              <header>
+                <img src={b.editor} alt={b.editorName} />
+                <div>
+                  <b>{b.name}</b>
+                  <small>AI 小編 {b.editorName}</small>
+                </div>
+              </header>
+              <div className="lp-metric-grid">
+                <div className="lp-metric"><b>{fmt(all?.published ?? 0)}</b><small>累計已發</small></div>
+                <div className="lp-metric"><b>{fmt(recent?.published ?? 0)}</b><small>近 28 天已發</small></div>
+                <div className="lp-metric"><b>{fmt(all?.impressions ?? 0)}</b><small>累計曝光</small></div>
+                <div className="lp-metric"><b>{fmt(recent?.impressions ?? 0)}</b><small>近 28 天曝光</small></div>
+                <div className="lp-metric wide">
+                  <b>{fmt(recent?.interactions ?? 0)}</b>
+                  <small>近 28 天互動</small>
+                </div>
+              </div>
+              <p className="lp-mix">
+                按讚 {fmt(recent?.likes ?? 0)} · 留言 {fmt(recent?.comments ?? 0)} · 分享 {fmt(recent?.shares ?? 0)} · 收藏 {fmt(recent?.saves ?? 0)}
+                {(recent?.clicks ?? 0) > 0 ? ` · 連結點擊 ${fmt(recent?.clicks ?? 0)}` : ''}
+              </p>
+            </article>
+          );
+        })}
+      </div>
+
+      <h3 className="lp-proof-title">三個平台各自貢獻多少</h3>
+      <div className="lp-plat-grid">
+        {data.platforms.map((p) => (
+          <article key={p.platform} className="lp-plat-card">
+            <div className="lp-post-meta">{PLATFORM_LABELS[p.platform] ?? p.platform}</div>
+            <b>{fmt(p.totals.published)}</b>
+            <small>累計已發</small>
+            <div className="lp-barline" aria-hidden="true">
+              <i style={{ width: `${Math.round((p.totals.impressions / maxImp) * 100)}%` }} />
+            </div>
+            <p>
+              {p.totals.impressions > 0
+                ? `累計曝光 ${fmt(p.totals.impressions)} · 近 28 天 ${fmt(p.last28.impressions)}`
+                : '曝光還在向平台回收'}
+            </p>
+            <p className="lp-muted">近 28 天已發 {fmt(p.last28.published)} 則 · 互動 {fmt(p.last28.interactions)}</p>
+          </article>
+        ))}
+      </div>
+
+      <p className="lp-note">
+        數字來自各平台官方成效，不含廣告。一則內容發到幾個平台，就各算一則。
+        {threadsShare >= 0.6 ? '目前看得到的曝光，主要來自 Threads。' : ''}
+        {totals.clicks > 0 ? `另有累計連結點擊 ${fmt(totals.clicks)}。` : ''}
+      </p>
+    </div>
+  );
+}
+
 export function PodcastBlock() {
   const data = useJson<{ episode: ShowcaseEpisode | null }>('/api/public/showcase/podcast');
   const ep = data?.episode;
@@ -406,7 +545,7 @@ export function GameFrame() {
 
 const HOME_PAGES = [
   { to: '/go-posting', title: 'Go 幫你發文', body: '工班不用自己顧粉專。每週兩則，一個月 999。', cta: '看價格表' },
-  { to: '/proof', title: '三品牌發文與報導', body: '阿豪、小咪、阿樂各一則最新貼文，加上經濟日報三篇。', cta: '看成果' },
+  { to: '/proof', title: '三品牌發文與報導', body: '三個品牌的累計發文、曝光與互動，加上最新貼文和經濟日報。', cta: '看成果' },
   { to: '/show', title: '三小編熱聊', body: '同一套中心做出的 Podcast，SoundOn、YouTube、Spotify 都能聽。', cta: '去收聽' },
   { to: '/jiangcheng', title: '匠城出任務', body: '收工後跑一班。遊戲也接進 TaskGo 結案報告和 Washgo 洗滌追蹤。', cta: '玩一局' },
   { to: '/center', title: '行銷中心怎麼跑', body: '題材、生成、審閱、發布、學習。工班看到的貼文都從這裡出來。', cta: '看流程' },
@@ -490,7 +629,7 @@ export function Landing() {
             <div>
               <p className="lp-muted">這套中心先拿來經營匠管自己的三個品牌。工班可以先看成果，再決定要不要讓 Go 幫你發。</p>
               <div className="lp-hero-cta">
-                <Link className="lp-btn ghost" to="/proof">看三品牌最新發文</Link>
+                <Link className="lp-btn ghost" to="/proof">看三品牌發文成果</Link>
               </div>
             </div>
           </div>
@@ -599,6 +738,27 @@ export const LANDING_CSS = `
 .lp-post p,.lp-press p,.lp-integ-card p{margin:0;font-size:14px;line-height:1.75}
 .lp-post .lp-link,.lp-press .lp-link{margin-top:auto;color:var(--c)}
 .lp-post-meta{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.03em}
+.lp-proof{display:grid;gap:8px}
+.lp-results{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.lp-result{background:#fff;border:1px solid #E6E8E2;border-radius:16px;padding:18px 16px}
+.lp-result b{display:block;font-size:32px;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.lp-result span{display:block;margin-top:8px;font-size:14px;font-weight:800;color:var(--ink)}
+.lp-result small{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:1.5;font-weight:400}
+.lp-proof-title{margin:28px 0 14px !important;font-size:20px !important}
+.lp-metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lp-metric{background:#F7F9F5;border-radius:12px;padding:10px 12px}
+.lp-metric.wide{grid-column:1 / -1}
+.lp-metric b{display:block;font-size:22px;line-height:1.2;color:var(--ink);font-variant-numeric:tabular-nums}
+.lp-metric small{color:var(--muted);font-size:12px}
+.lp-mix{font-size:13px !important;color:var(--muted) !important}
+.lp-plat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.lp-plat-card{background:#fff;border:1px solid #E6E8E2;border-radius:16px;padding:16px 18px}
+.lp-plat-card b{display:block;margin-top:6px;font-size:28px;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums}
+.lp-plat-card small{color:var(--muted);font-size:12px}
+.lp-plat-card p{margin:8px 0 0;font-size:13px;line-height:1.6}
+.lp-barline{height:8px;border-radius:999px;background:#F7F9F5;margin-top:12px;overflow:hidden}
+.lp-barline i{display:block;height:100%;background:#8CAA71;border-radius:999px;min-width:0}
+.lp-proof .lp-note{margin:8px 0 0}
 .lp-press{text-decoration:none;transition:transform .15s,box-shadow .15s}
 .lp-press:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.06)}
 .lp-podcast{display:grid;grid-template-columns:320px 1fr;gap:32px;align-items:center;margin-top:28px}
@@ -634,7 +794,8 @@ export const LANDING_CSS = `
   .lp-hero{padding:48px 0}
   .lp-hero-inner,.lp-game-grid,.lp-podcast,.lp-integ{grid-template-columns:1fr}
   .lp-podcast-cover{max-width:320px}
-  .lp-brands,.lp-modules{grid-template-columns:1fr}
+  .lp-brands,.lp-modules,.lp-results,.lp-plat-grid{grid-template-columns:1fr}
+  .lp-results{grid-template-columns:1fr 1fr}
   .lp-flow{grid-template-columns:1fr 1fr}
   .lp-nav-inner{height:auto;flex-wrap:wrap;padding:10px 0;gap:10px}
   .lp-nav nav{display:flex;order:3;width:100%;margin-left:0;overflow-x:auto;gap:14px;padding-bottom:6px}

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import {
   GAME_SHOTS, GameFrame, INTEGRATIONS, Leaderboard, PublicFrame, brandOf,
 } from '@/pages/public/Landing';
-import { GameWeek, WishBoard } from '@/pages/public/site/JiangchengBoard';
+import { GameScenes, GameWeek, WishBoard } from '@/pages/public/site/JiangchengBoard';
 
 export function Jiangcheng() {
   return (
@@ -40,6 +40,7 @@ export function Jiangcheng() {
         </div>
       </section>
 
+      <GameScenes />
       <GameWeek />
       <WishBoard />
 

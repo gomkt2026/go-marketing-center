@@ -11,10 +11,20 @@ export interface GameWeekDay {
   date: string;
   label: string;
   plays: number;
+  cumulative: number;
   completed: number;
   players: number;
   minutes: number;
   partial: boolean;
+}
+
+export interface GameMonthCompare {
+  monthLabel: string;
+  previousLabel: string;
+  previousPlays: number;
+  level: 'steady' | 'building';
+  label: string;
+  detail: string;
 }
 
 export interface GameHeat {
@@ -37,6 +47,7 @@ export interface GameWeekPulse {
     referrals: number;
   };
   today: { plays: number; completed: number };
+  month: GameMonthCompare;
   heat: GameHeat;
   jobs: { taskgo: number; homigo: number; washgo: number };
   maps: Record<GameMap, number>;
@@ -102,6 +113,49 @@ export function describeHeat(plays: number[]): GameHeat {
   };
 }
 
+/** 公開頁用本月累計來講成長。單日起伏不拿來當標題。 */
+export function describeMonth(currentPlays: number, previousPlays: number, monthLabel: string, previousLabel: string, dayCount: number): GameMonthCompare {
+  const current = currentPlays.toLocaleString('en-US');
+  const previous = previousPlays.toLocaleString('en-US');
+  if (previousPlays <= 0) {
+    return {
+      monthLabel,
+      previousLabel,
+      previousPlays,
+      level: 'building',
+      label: '本月累計還在往上加',
+      detail: `${monthLabel}過了 ${dayCount} 天，累計 ${current} 局。柱子是加總，只會一天比一天高。`,
+    };
+  }
+  if (currentPlays >= previousPlays) {
+    return {
+      monthLabel,
+      previousLabel,
+      previousPlays,
+      level: 'steady',
+      label: '這個月已經超過上個月',
+      detail: `${monthLabel}才過 ${dayCount} 天，累計 ${current} 局，已經多過${previousLabel}整月的 ${previous} 局。`,
+    };
+  }
+  return {
+    monthLabel,
+    previousLabel,
+    previousPlays,
+    level: 'building',
+    label: '本月累計還在往上加',
+    detail: `${monthLabel}過了 ${dayCount} 天，累計 ${current} 局。${previousLabel}整月是 ${previous} 局。單日有高有低，這張圖看的是加總。`,
+  };
+}
+
+function monthLabelOf(date: string): string {
+  return `${Number(date.slice(5, 7))}月`;
+}
+
+function previousMonthLabel(date: string): string {
+  const month = Number(date.slice(5, 7));
+  return `${month === 1 ? 12 : month - 1}月`;
+}
+
 function dayLabel(date: string): string {
   const [, m, d] = date.split('-');
   return `${Number(m)}/${Number(d)}`;
@@ -121,14 +175,16 @@ function asDate(value: unknown): string {
 export async function loadWeekPulse(env: Env): Promise<GameWeekPulse> {
   const sql = getSql(env);
   return withGameSchema(env, async () => {
-    const [days, totals, jobs, maps, signups, referrals] = await Promise.all([
+    const [days, totals, jobs, maps, signups, referrals, previous] = await Promise.all([
       sql`
         WITH bounds AS (
-          SELECT (date_trunc('day', now() AT TIME ZONE 'Asia/Taipei'))::date AS today
+          SELECT
+            date_trunc('month', now() AT TIME ZONE 'Asia/Taipei')::date AS month_start,
+            (date_trunc('day', now() AT TIME ZONE 'Asia/Taipei'))::date AS today
         ),
         days AS (
           SELECT generate_series(
-            (SELECT today FROM bounds) - 6,
+            (SELECT month_start FROM bounds),
             (SELECT today FROM bounds),
             interval '1 day'
           )::date AS day
@@ -143,7 +199,7 @@ export async function loadWeekPulse(env: Env): Promise<GameWeekPulse> {
               ELSE LEAST(1800, EXTRACT(EPOCH FROM (COALESCE(ended_at, last_seen_at, submitted_at) - started_at)))
             END AS seconds
           FROM game_runs
-          WHERE started_at >= ((SELECT today FROM bounds) - 6) AT TIME ZONE 'Asia/Taipei'
+          WHERE started_at >= (SELECT month_start FROM bounds) AT TIME ZONE 'Asia/Taipei'
         )
         SELECT
           d.day,
@@ -160,7 +216,7 @@ export async function loadWeekPulse(env: Env): Promise<GameWeekPulse> {
         SELECT
           COUNT(DISTINCT COALESCE(player_id::text, device_id, ip_hash)) AS players
         FROM game_runs
-        WHERE started_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Taipei')::date - 6) AT TIME ZONE 'Asia/Taipei'
+        WHERE started_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Taipei')::date AT TIME ZONE 'Asia/Taipei'
       `,
       sql`
         SELECT
@@ -168,34 +224,44 @@ export async function loadWeekPulse(env: Env): Promise<GameWeekPulse> {
           COALESCE(SUM(CASE WHEN (stats->>'homigo') ~ '^[0-9]+$' THEN (stats->>'homigo')::int ELSE 0 END), 0) AS homigo,
           COALESCE(SUM(CASE WHEN (stats->>'washgo') ~ '^[0-9]+$' THEN (stats->>'washgo')::int ELSE 0 END), 0) AS washgo
         FROM game_scores
-        WHERE created_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Taipei')::date - 6) AT TIME ZONE 'Asia/Taipei'
+        WHERE created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Taipei')::date AT TIME ZONE 'Asia/Taipei'
       `,
       sql`
         SELECT map, COUNT(*) AS plays
         FROM game_runs
-        WHERE started_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Taipei')::date - 6) AT TIME ZONE 'Asia/Taipei'
+        WHERE started_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Taipei')::date AT TIME ZONE 'Asia/Taipei'
         GROUP BY map
       `,
       sql`
         SELECT COUNT(*) AS n
         FROM game_players
-        WHERE created_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Taipei')::date - 6) AT TIME ZONE 'Asia/Taipei'
+        WHERE created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Taipei')::date AT TIME ZONE 'Asia/Taipei'
       `,
       sql`
         SELECT COUNT(*) AS n
         FROM game_referrals
-        WHERE created_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Taipei')::date - 6) AT TIME ZONE 'Asia/Taipei'
+        WHERE created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Taipei')::date AT TIME ZONE 'Asia/Taipei'
+      `,
+      sql`
+        SELECT COUNT(*) AS plays
+        FROM game_runs
+        WHERE started_at >= (date_trunc('month', now() AT TIME ZONE 'Asia/Taipei')::date - interval '1 month') AT TIME ZONE 'Asia/Taipei'
+          AND started_at < date_trunc('month', now() AT TIME ZONE 'Asia/Taipei')::date AT TIME ZONE 'Asia/Taipei'
       `,
     ]);
 
     const dayRows = days as Record<string, unknown>[];
     const todayKey = asDate(dayRows[dayRows.length - 1]?.day);
+    let running = 0;
     const pulseDays: GameWeekDay[] = dayRows.map((row) => {
       const date = asDate(row.day);
+      const plays = num(row.plays);
+      running += plays;
       return {
         date,
         label: dayLabel(date),
-        plays: num(row.plays),
+        plays,
+        cumulative: running,
         completed: num(row.completed),
         players: num(row.players),
         minutes: Math.round(num(row.seconds) / 60),
@@ -210,11 +276,13 @@ export async function loadWeekPulse(env: Env): Promise<GameWeekPulse> {
     const job = (jobs[0] ?? {}) as Record<string, unknown>;
     const plays = pulseDays.map((d) => d.plays);
     const today = pulseDays[pulseDays.length - 1];
+    const monthPlays = plays.reduce((sum, n) => sum + n, 0);
+    const anchor = pulseDays[0]?.date ?? new Date().toISOString().slice(0, 10);
     return {
       updatedAt: new Date().toISOString(),
       days: pulseDays,
       totals: {
-        plays: plays.reduce((sum, n) => sum + n, 0),
+        plays: monthPlays,
         completed: pulseDays.reduce((sum, d) => sum + d.completed, 0),
         players: num((totals[0] as Record<string, unknown> | undefined)?.players),
         minutes: pulseDays.reduce((sum, d) => sum + d.minutes, 0),
@@ -222,6 +290,13 @@ export async function loadWeekPulse(env: Env): Promise<GameWeekPulse> {
         referrals: num((referrals[0] as Record<string, unknown> | undefined)?.n),
       },
       today: { plays: today?.plays ?? 0, completed: today?.completed ?? 0 },
+      month: describeMonth(
+        monthPlays,
+        num((previous[0] as Record<string, unknown> | undefined)?.plays),
+        monthLabelOf(anchor),
+        previousMonthLabel(anchor),
+        pulseDays.length,
+      ),
       heat: describeHeat(plays),
       jobs: { taskgo: num(job.taskgo), homigo: num(job.homigo), washgo: num(job.washgo) },
       maps: mapCounts,
@@ -236,6 +311,7 @@ export function emptyWeekPulse(): GameWeekPulse {
     days: [],
     totals: { plays: 0, completed: 0, players: 0, minutes: 0, signups: 0, referrals: 0 },
     today: { plays: 0, completed: 0 },
+    month: describeMonth(0, 0, '本月', '上個月', 0),
     heat,
     jobs: { taskgo: 0, homigo: 0, washgo: 0 },
     maps: { s: 0, m: 0, l: 0, t: 0 },

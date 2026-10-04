@@ -7,6 +7,7 @@ interface WeekDay {
   date: string;
   label: string;
   plays: number;
+  cumulative: number;
   completed: number;
   players: number;
   minutes: number;
@@ -24,6 +25,7 @@ interface WeekPulse {
     referrals: number;
   };
   today: { plays: number; completed: number };
+  month: { level: 'steady' | 'building'; label: string; detail: string; previousLabel: string; previousPlays: number };
   heat: { level: HeatLevel; label: string; detail: string };
   jobs: { taskgo: number; homigo: number; washgo: number };
   maps: { s: number; m: number; l: number; t: number };
@@ -73,47 +75,51 @@ export function GameWeek() {
     return () => { alive = false; };
   }, []);
 
-  const maxPlays = Math.max(1, ...(data?.days ?? []).map((d) => d.plays));
-  const heat = data?.heat;
+  const maxCumulative = Math.max(1, ...(data?.days ?? []).map((d) => d.cumulative || d.plays));
+  const month = data?.month;
 
   return (
     <section className="lp-section soft">
       <div className="lp-wrap">
-        <div className="lp-eyebrow">近 7 天</div>
-        <h2>每天更新的遊玩熱度</h2>
+        <div className="lp-eyebrow">本月</div>
+        <h2>這個月的累計還在往上加</h2>
         <p className="lp-muted lp-sub">
-          數字來自實際開局，以台北時間換日。畫面上只留最近一週，最舊的一天會在隔天離開。
-          今天還在累積，熱度用昨天跟再前面幾天比較。
+          數字來自實際開局，以台北時間換月。柱子是本月一天一天加總，所以只會越長越高。
+          單日有人多有人少，看的是這個月整體。
         </p>
-        {failed && <p className="lp-muted">這一週的數字暫時讀不到。</p>}
+        {failed && <p className="lp-muted">這個月的數字暫時讀不到。</p>}
         {!failed && !data && <p className="lp-muted">載入中…</p>}
         {data && (
           <>
-            <div className={`lp-heat ${heat?.level ?? 'building'}`}>
+            <div className={`lp-heat ${month?.level ?? 'building'}`}>
               <div>
-                <b>{heat?.label ?? '熱度累積中'}</b>
-                <p>{heat?.detail} 今天已開局 {formatCount(data.today.plays)} 局，其中 {formatCount(data.today.completed)} 局跑完。</p>
+                <b>{month?.label ?? '本月累計還在往上加'}</b>
+                <p>{month?.detail} 今天又加了 {formatCount(data.today.plays)} 局。</p>
               </div>
             </div>
             <div className="lp-week-cards">
-              <div><b>{formatCount(data.totals.players)}</b><small>不重複玩家</small></div>
-              <div><b>{formatCount(data.totals.plays)}</b><small>開局，跑完 {formatCount(data.totals.completed)}</small></div>
-              <div><b>{formatStay(data.totals.minutes)}</b><small>累計停留</small></div>
-              <div><b>{formatCount(data.totals.signups)}</b><small>留下手機上排行榜</small></div>
-              <div><b>{formatCount(data.totals.referrals)}</b><small>朋友從邀請進來</small></div>
-              <div><b>{formatCount(data.jobs.taskgo + data.jobs.homigo + data.jobs.washgo)}</b><small>遊戲裡完成的單</small></div>
+              <div><b>{formatCount(data.totals.plays)}</b><small>本月累計開局</small></div>
+              <div><b>{formatCount(data.totals.completed)}</b><small>本月跑完</small></div>
+              <div><b>{formatCount(data.totals.players)}</b><small>本月不重複玩家</small></div>
+              <div><b>{formatStay(data.totals.minutes)}</b><small>本月累計停留</small></div>
+              <div><b>{formatCount(month?.previousPlays ?? 0)}</b><small>{month?.previousLabel ?? '上個月'}整月開局</small></div>
+              <div><b>{formatCount(data.jobs.taskgo + data.jobs.homigo + data.jobs.washgo)}</b><small>本月遊戲裡完成的單</small></div>
             </div>
             {data.days.length > 0 && (
-              <div className="lp-bars" aria-label="每日開局數">
-                {data.days.map((d) => (
-                  <div key={d.date} className={`lp-bar${d.partial ? ' today' : ''}`}>
-                    <b>{formatCount(d.plays)}</b>
-                    <i style={{ height: `${Math.max(6, Math.round((d.plays / maxPlays) * 120))}px` }} />
-                    <small>{d.partial ? '今天' : d.label}</small>
-                  </div>
-                ))}
+              <div className="lp-bars" aria-label="本月累計開局">
+                {data.days.map((d) => {
+                  const value = d.cumulative || d.plays;
+                  return (
+                    <div key={d.date} className={`lp-bar${d.partial ? ' today' : ''}`}>
+                      <b>{formatCount(value)}</b>
+                      <i style={{ height: `${Math.max(8, Math.round((value / maxCumulative) * 120))}px` }} />
+                      <small>{d.partial ? '今天' : d.label}</small>
+                    </div>
+                  );
+                })}
               </div>
             )}
+            <p className="lp-muted">柱上的數字是加到當天的累計，不是當天單日。</p>
             <div className="lp-jobs">
               <span>TaskGo 報修 {formatCount(data.jobs.taskgo)}</span>
               <span>Homigo 送鑰匙 {formatCount(data.jobs.homigo)}</span>
@@ -124,6 +130,89 @@ export function GameWeek() {
             </div>
           </>
         )}
+      </div>
+    </section>
+  );
+}
+
+const TASKS = [
+  { key: 'taskgo' as const, brand: 'TaskGo', color: '#ff6b1a', title: '報修派工', body: '騎到現場停一下，GPS 打卡、施工、拍照上傳。' },
+  { key: 'homigo' as const, brand: 'Homigo', color: '#1fae78', title: '送鑰匙交屋', body: '把鑰匙送到新房客手上，燈一亮，這戶就算入住。' },
+  { key: 'washgo' as const, brand: 'Washgo', color: '#3a8dde', title: '衣物收送', body: '沿路收衣服、送去洗，再送回客人手上。' },
+];
+
+const SCENES: { emoji: string; title: string; line: string }[] = [
+  { emoji: '🐕', title: '野狗追車', line: '被土狗包圍，師傅當場投降' },
+  { emoji: '🚓', title: '警察臨檢', line: '停車受檢有獎金，闖過去就罰單' },
+  { emoji: '🚛', title: '垃圾車來了', line: '給愛麗絲一響，全巷子都在跑' },
+  { emoji: '🧋', title: '手搖飲', line: '喝一杯，全速衝刺幾秒' },
+  { emoji: '🐔', title: '雞群過馬路', line: '一群雞霸佔馬路，全部的車都在等' },
+  { emoji: '🐈', title: '貓咪卡在車底', line: '全城最重要的任務：把貓救出來' },
+  { emoji: '🚚', title: '選舉造勢', line: '車隊佔住整條路，師傅被塞了一份傳單' },
+  { emoji: '🥁', title: '廟會遶境', line: '鞭炮陣頭經過，順便求個收工平安' },
+  { emoji: '💒', title: '婚禮車隊', line: '跟在後面，有機會拿到喜糖' },
+  { emoji: '🛵', title: '外送大軍', line: '商圈尖峰，師傅被擠成夾心' },
+  { emoji: '🌧️', title: '突然暴雨', line: '出門還是大太陽，騎到一半天空變黑' },
+  { emoji: '🕳️', title: '巨大坑洞', line: '全速撞進去，工具箱差點飛出去' },
+  { emoji: '🚧', title: '前方施工', line: '導航說直走，結果直接撞上圍籬' },
+  { emoji: '🚑', title: '救護車', line: '讓道有獎金，擋住就扣分' },
+  { emoji: '🏫', title: '學校放學', line: '學生和家長擠滿路口，騎慢一點' },
+];
+
+export function GameScenes() {
+  const [jobs, setJobs] = useState<{ taskgo: number; homigo: number; washgo: number } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/public/game/week')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: WeekPulse | null) => { if (alive && d) setJobs(d.jobs); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <section className="lp-section">
+      <div className="lp-wrap">
+        <div className="lp-eyebrow">這一班會遇到</div>
+        <h2>任務和路上的突發，每一局都不一樣</h2>
+        <p className="lp-muted lp-sub">
+          90 秒裡要接三種單，路上還會隨機冒出台灣日常。下面是玩家收工時會截到的畫面，進遊戲才撞得到下一張。
+        </p>
+        <div className="lp-scene-photos">
+          <figure>
+            <img src="/site/jiangcheng-incidents.jpg" alt="匠城出任務的隨機突發：野狗追車、警察臨檢、垃圾車、油箱見底、手搖飲。" />
+            <figcaption>野狗、臨檢、垃圾車、加油、手搖。這些是每一班都可能遇上的日常。</figcaption>
+          </figure>
+          <figure>
+            <img src="/site/jiangcheng-moments.jpg" alt="匠城出名場面截圖：土狗包圍、高雄下雪還在送洗衣、垃圾車一響全巷子在跑，以及車庫裡的四台機車。" />
+            <figcaption>收工會自動截一張名場面。土狗、送洗、垃圾車，還能換成自己的車。</figcaption>
+          </figure>
+        </div>
+        <div className="lp-task-grid">
+          {TASKS.map((task) => (
+            <article key={task.key} className="lp-task" style={{ ['--c' as string]: task.color }}>
+              <b>{task.brand}・{task.title}</b>
+              <p>{task.body}</p>
+              <strong>{jobs ? `${formatCount(jobs[task.key])} 次` : '…'}</strong>
+              <small className="lp-muted">這個月玩家完成</small>
+            </article>
+          ))}
+        </div>
+        <div className="lp-scene-grid">
+          {SCENES.map((scene) => (
+            <a key={scene.title} className="lp-scene" href="#play">
+              <b>{scene.emoji} {scene.title}</b>
+              <span>{scene.line}</span>
+            </a>
+          ))}
+        </div>
+        <p className="lp-muted" style={{ marginTop: 14 }}>
+          還有消防車、吊車、公車拋錨、街頭拍 MV、臨時市集、道路積水、倒樹。共 21 種隨機路況，玩一局才知道今天撞見哪一種。
+        </p>
+        <div className="lp-hero-cta">
+          <a className="lp-btn" href="#play">進遊戲跑一班</a>
+        </div>
       </div>
     </section>
   );

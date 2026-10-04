@@ -679,8 +679,22 @@ export const LANDING_CSS = `
 .lp-heat.steady{background:#EAF1E3;color:#23301c}
 .lp-heat.cool{background:#eef6fb;color:#1e3a5f}
 .lp-heat.building{background:#F7F9F5;color:#3A3A3A}
-.lp-bars{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;margin-top:22px}
-.lp-bar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;min-width:0}
+.lp-bars{display:flex;gap:8px;align-items:flex-end;margin-top:22px;overflow-x:auto;padding-bottom:6px}
+.lp-bar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;min-width:44px;flex:1}
+.lp-scene-photos{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+.lp-scene-photos figure{margin:0}
+.lp-scene-photos img{width:100%;height:auto;border-radius:16px;display:block;box-shadow:0 10px 28px rgba(0,0,0,.06)}
+.lp-scene-photos figcaption{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.6}
+.lp-task-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+.lp-task{background:#fff;border:1px solid #E6E8E2;border-top:4px solid var(--c);border-radius:16px;padding:16px}
+.lp-task b{display:block;color:var(--ink);margin-bottom:6px}
+.lp-task p{margin:0;font-size:14px;line-height:1.7}
+.lp-task strong{display:block;margin-top:10px;font-size:20px;font-variant-numeric:tabular-nums}
+.lp-scene-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.lp-scene{display:grid;gap:4px;background:#fff;border:1px solid #E6E8E2;border-radius:14px;padding:12px 14px;text-decoration:none}
+.lp-scene:hover{border-color:var(--green)}
+.lp-scene b{color:var(--ink)}
+.lp-scene span{font-size:13px;line-height:1.55;color:#555}
 .lp-bar i{display:block;width:100%;max-width:42px;border-radius:8px 8px 4px 4px;background:#8CAA71}
 .lp-bar.today i{background:#ff6b1a}
 .lp-bar b{font-size:12px;font-variant-numeric:tabular-nums}
@@ -698,6 +712,8 @@ export const LANDING_CSS = `
 .lp-kind-picks button[aria-pressed=true]{background:var(--green);color:#fff;border-color:var(--green)}
 @media (max-width:900px){
   .lp-week-cards{grid-template-columns:1fr 1fr}
+  .lp-scene-photos,.lp-task-grid{grid-template-columns:1fr}
+  .lp-scene-grid{grid-template-columns:1fr 1fr}
 }
 `;
 

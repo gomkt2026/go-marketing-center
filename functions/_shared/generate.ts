@@ -1,7 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { generateImage } from './openai';
-import { socialChatJson } from './social-llm';
+import { seoChatJson, socialChatJson } from './social-llm';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
@@ -28,7 +28,7 @@ import {
 } from './brand-assets';
 import {
   websiteCta, websiteCtaRule, websiteAuthor, normalizeWebsiteSeoMeta,
-  ensureWebsiteSeoMetaLengths, reconcilePolicyCategory,
+  ensureWebsiteSeoMetaLengths, ensureWebsiteBody, reconcilePolicyCategory,
   applyWebsiteArticleMigration, isMissingWebsiteArticleSchema,
   type WebsiteSeoMeta,
 } from './website-articles';
@@ -1102,6 +1102,23 @@ interface SeoArticleLlmShape extends Omit<SeoArticleResult, 'seoMeta'> {
   editorial_qa?: string[];
 }
 
+async function loadSeoGuardrails(env: Env, brandId: string): Promise<string> {
+  try {
+    const sql = getSql(env);
+    const rows = await sql`
+      SELECT statement FROM brand_rules
+      WHERE brand_id = ${brandId}::uuid
+        AND rule_type IN ('cannot_claim', 'negative_rule')
+      ORDER BY sort_order
+      LIMIT 8
+    `;
+    const lines = (rows as { statement: string }[]).map((row) => `- ${row.statement}`).filter(Boolean);
+    return lines.length ? `不可宣稱:\n${lines.join('\n')}` : '';
+  } catch {
+    return '';
+  }
+}
+
 /** 從主題、簡報事實、已核准報導或定稿新聞稿寫官網 SEO 長文;GEO 順序固定 */
 export async function generateSeoArticle(
   env: Env,
@@ -1119,56 +1136,58 @@ export async function generateSeoArticle(
   const audience = seed?.audience ?? (slug === 'washgo' ? 'consumer' : undefined);
   const cta = websiteCta(slug, audience);
   const pitchFacts = brandSeoFacts(slug);
+  const guardrails = await loadSeoGuardrails(env, params.brandCtx.brandId);
   const relatedHint = (seed?.relatedTerms ?? []).join('、');
-  const article = await socialChatJson<SeoArticleLlmShape>(env, {
+  const summary = (params.sourceSummary || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+  const extra = (params.extraInstruction || '').trim().slice(0, 700);
+  // 不用社群 system prompt：那套規定主 CTA 只能寫匠管信箱，和官網長文的 LINE／試用 CTA 相反，也會把提示撐到產文逾時。
+  const article = await seoChatJson<SeoArticleLlmShape>(env, {
     messages: [
       {
         role: 'system',
         content: [
-          params.brandCtx.systemPrompt,
-          '',
-          '你現在要寫一篇給官網/部落格的原創 SEO／AEO 長文,不是社群貼文,也不是 Threads / IG 短文拉長。',
-          '必須改寫,不可整段複製媒體原文或新聞稿。引用媒體時只帶出處 + 一句事實 + 原文 URL。',
-          '不可發明媒體名稱、專訪、轉載數量、客戶數、營收或未經驗證的數據。',
-          '簡報或後台示意數字(例如每日 1,250 單)是畫面示範,不得當成真實業績。',
-          '繁體中文(台灣用語),正文 500 到 1800 字(不含答案區與 FAQ),超過 500 字即可作為 SEO 長文,至少 3 個 H2。不要為湊字數灌水。',
-          '語氣專業但不生硬。開頭不要故事、不要先打廣告。',
-          '寫作原則(Open SEO Advisor 文章寫手模式):',
-          '1. 先對準搜尋意圖,為讀者要完成的任務而寫,不為字數灌水。',
-          '2. 展示 E-E-A-T:用真實產品能力與可核實流程,不寫假案例、假數據、假得獎。',
-          '3. Trust 優先。不確定就不要寫成事實。YMYL(租屋契約、請款、金流)只寫產品怎麼協助,不給法律結論。',
-          '4. 避免空泛開場、重複段落、關鍵字堆砌、可套用任何產業的建議。',
-          '5. 全文一個 H1;H2/H3 對應子問題。結構化資料只能標記頁面上讀者看得到的內容。',
-          '固定順序:1) answer_box 先直接回答主關鍵字(一句定義+三點結論,80-150字,整段可被 AI 摘走) 2) 接下來 2-3 段把 related_terms 寫進真實場景 3) H2/H3 展開,適時用步驟或對照表 4) FAQ 3-5 題 5) 最後才品牌 CTA。',
-          '主關鍵字寫進 seo_title、seo_description、answer_box、一個 H2。相關詞自然出現,不要堆標題。',
-          'FAQ 問句接近搜尋原話,答案 2-4 句、可獨立被摘。禁止「歡迎詢問」「視情況而定」。Google 已不再用 FAQ rich result,FAQ 仍要寫成讀者可見內容。',
-          'slug 只用小寫英文、數字、連字號,反映主關鍵字語意,不用中文、不用日期。',
+          `你寫「${params.brandCtx.name}」官網 SEO／AEO 長文，給 Google 與 AI 搜尋收錄。不是 Threads、IG、FB 貼文，也不要把短文拉長。`,
+          '繁體中文（台灣用語）。開頭直接回答，不要故事、不要先廣告。',
+          '正文 700 到 1100 字（不含答案區與 FAQ），至少 3 個 H2。不要為了寫長而灌水，也不要少於 700 字。',
+          '順序：answer_box 先答主關鍵字（80-140 字）→ 正文把相關詞寫進真實場景 → FAQ 正好 3 題 → CTA 只放 cta 欄位，不要寫進 body。',
+          '主關鍵字寫進 title、seo_title、seo_description、answer_box、一個 H2。',
+          'FAQ 問句像搜尋原話，答案 2 句、可獨立被摘。禁止「歡迎詢問」「視情況而定」。',
+          'slug 只用小寫英文、數字、連字號。不可發明客戶數、營收、滿意度、媒體名稱或法律結論。簡報示意數字不是真實業績。',
+          '社群「主 CTA 一律匠管信箱」不適用這篇。',
           websiteCtaRule(slug, audience),
-          `結尾 CTA 必須寫成:${cta}`,
-          slug === 'washgo' ? 'Washgo 是衣物洗滌/乾洗,不是洗車。品牌名寫 Washgo。不可寫 5,000+ 客戶、98% 滿意度、保證不縮水。' : '',
-          pitchFacts ? `\n【可引用的產品/簡報事實(不可再發明)】\n${pitchFacts}` : '',
+          `cta 欄位必須原句使用：${cta}`,
+          slug === 'washgo' ? 'Washgo 是衣物洗滌，不是洗車。不可寫 5,000+ 客戶、98% 滿意度、保證不縮水。' : '',
+          pitchFacts ? `可引用的產品事實:\n${pitchFacts}` : '',
+          guardrails,
         ].filter(Boolean).join('\n'),
       },
       {
         role: 'user',
         content: [
-          `題目來源:${params.sourceTitle}`,
-          params.sourceSummary,
+          `題目:${params.sourceTitle}`,
+          summary,
           seed?.primaryKeyword ? `主關鍵字:${seed.primaryKeyword}` : '',
-          relatedHint ? `相關詞(必須自然寫進內文,6-12個):${relatedHint}` : '請自訂 6-12 個相關詞(長尾、同義、場景詞)。',
+          relatedHint ? `相關詞（自然寫進內文）:${relatedHint}` : '請自訂 6 個相關詞。',
           seed?.category ? `分類:${seed.category}` : '',
           seed?.searchIntent ? `搜尋意圖:${seed.searchIntent}` : '',
           audience ? `受眾:${audience}` : '',
-          params.extraInstruction ?? '',
+          extra,
           '',
-          `回傳 JSON:{"title":"12-60字 H1","description":"40-160字列表摘要不含空白至少40字","body":"500-1800字 markdown 正文,至少3個H2,不含答案區與FAQ","outline":["H2"],"answer_box":"80-150字","primary_keyword":"恰好1個","related_terms":["相關詞"],"search_intent":"informational或solution","category":"${params.marketSignalId ? 'pain|product|policy|trust|talk' : 'pain|product|trust|talk'}","audience":"consumer或merchant","faq":[{"question":"","answer":""}],"cta":"文末行動","editorial_qa":["需人工核實的點"],"seoMeta":{"slug":"english-slug","seo_title":"含主關鍵字","seo_description":"70-160字 meta 摘要,不可少於70字","schema_recommendation":["Article","FAQPage"]}}`,
+          `回傳 JSON:{"title":"12-32字","description":"40-90字","body":"markdown 正文，至少3個##，不要含FAQ","outline":["H2"],"answer_box":"80-140字","primary_keyword":"恰好1個","related_terms":["6個相關詞"],"search_intent":"informational或solution","category":"${params.marketSignalId ? 'pain|product|policy|trust|talk' : 'pain|product|trust|talk'}","audience":"consumer或merchant","faq":[{"question":"","answer":""},{"question":"","answer":""},{"question":"","answer":""}],"cta":"${cta}","seoMeta":{"slug":"english-slug","seo_title":"含主關鍵字，12-32字","seo_description":"70-120字"}}`,
         ].filter(Boolean).join('\n'),
       },
     ],
-    temperature: 0.6,
-    maxTokens: 6000,
+    temperature: 0.4,
+    maxTokens: 3200,
   });
-  article.body = normalizeMultilineText(article.body);
+  article.body = ensureWebsiteBody(normalizeMultilineText(article.body), {
+    slug,
+    topic: seed?.topic || params.sourceTitle,
+    angle: seed?.angle || summary,
+    primaryKeyword: article.primary_keyword || seed?.primaryKeyword,
+    relatedTerms: [...(article.related_terms ?? []), ...(seed?.relatedTerms ?? [])],
+    audience,
+  });
   article.cta = cta;
   const relatedRaw = article.related_terms?.length ? article.related_terms : [];
   const related = [...relatedRaw, ...(seed?.relatedTerms ?? [])];
@@ -1197,8 +1216,9 @@ export async function generateSeoArticle(
       ? article.editorial_qa
       : ['核實文中產品步驟是否與現況一致', '確認沒有發明客戶數、滿意度或保證效果'],
   }, slug), article.title, article.body, slug));
+  seoMeta.title = seoMeta.seo_title;
   return {
-    title: article.title,
+    title: seoMeta.seo_title,
     description: seoMeta.description || article.description || '',
     body: article.body,
     outline: article.outline ?? [],
@@ -1255,19 +1275,23 @@ export async function saveSeoArticle(
     article: SeoArticleResult;
     generatedByAgentId?: string | null;
     promptMeta?: Record<string, unknown>;
+    status?: 'draft' | 'pending_review' | 'published' | 'archived';
+    sourceMarketSignalId?: string | null;
   },
 ): Promise<SavedContent> {
   const sql = getSql(env);
   const body = params.article.body;
+  const status = params.status ?? 'pending_review';
   const insert = () => sql`
     INSERT INTO contents (
       campaign_id, brand_id, content_type, target_platform, title, status,
-      generated_by_agent_id, generation_prompt_meta
+      generated_by_agent_id, generation_prompt_meta, source_market_signal_id
     ) VALUES (
       NULL, ${params.brandCtx.brandId}::uuid, 'article', 'website',
-      ${params.article.title}, 'pending_review',
+      ${params.article.title}, ${status}::content_status,
       ${params.generatedByAgentId ?? null},
-      ${JSON.stringify(params.promptMeta ?? { source: 'seo_article' })}
+      ${JSON.stringify(params.promptMeta ?? { source: 'seo_article' })},
+      ${params.sourceMarketSignalId ?? null}
     ) RETURNING id
   `;
   let contentRows;

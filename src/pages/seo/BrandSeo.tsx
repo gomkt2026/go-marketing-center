@@ -220,6 +220,7 @@ export function BrandSeo() {
             <strong style={{ display: 'block', marginBottom: 8 }}>SEO 主題庫</strong>
             <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
               先搜尋官網與內容中心已有的文章，再只產還沒覆蓋的題。每次最多建議 3 篇，避免一次產太多長文。
+              另外每 3 天會自動輪一個品牌（Homigo、TaskGo、Washgo），從素材、新聞、時事或知識選一題，通過官網規範後直接發布，不進待審。這裡手動產生的長文仍要先審閱。
             </p>
           </div>
           <Button variant="primary" disabled={discovering || generating !== null} onClick={() => void discoverTopics()}>

@@ -5,7 +5,7 @@ import { getSql } from '../../../../../_shared/db';
 import { getBrandBySlug } from '../../../../../_shared/queries';
 import { json, error } from '../../../../../_shared/response';
 import { logActivity } from '../../../../../_shared/activity';
-import { buildBrandContext } from '../../../../../_shared/prompts';
+import type { BrandContext } from '../../../../../_shared/prompts';
 import { generateSeoArticle, saveSeoArticle, findBrandAgent } from '../../../../../_shared/generate';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -27,7 +27,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return error('需先審核通過或定稿,才能生成 SEO 長文', 400);
   }
 
-  const brandCtx = await buildBrandContext(context.env, brand.id);
+  const brandCtx: BrandContext = {
+    brandId: brand.id,
+    slug: brand.slug,
+    name: brand.name,
+    systemPrompt: '',
+  };
   const agentId = await findBrandAgent(context.env, brand.id);
   const article = await generateSeoArticle(context.env, {
     brandCtx,

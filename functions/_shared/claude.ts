@@ -37,7 +37,7 @@ function extractJson(raw: string): string {
 /** 發文文案。失敗拋 OpenAIError，讓呼叫端可以改走 OpenAI。 */
 export async function claudeChatJson<T>(
   env: Env,
-  params: { messages: ChatMessage[]; temperature?: number; maxTokens?: number },
+  params: { messages: ChatMessage[]; temperature?: number; maxTokens?: number; timeoutMs?: number },
 ): Promise<T> {
   if (!env.ANTHROPIC_API_KEY) {
     throw new OpenAIError(500, 'ANTHROPIC_API_KEY 尚未設定');
@@ -65,6 +65,7 @@ export async function claudeChatJson<T>(
       ...(system ? { system: `${system}\n\n只回傳一個 JSON 物件，不要 markdown。` } : {}),
       messages,
     }),
+    signal: params.timeoutMs ? AbortSignal.timeout(params.timeoutMs) : undefined,
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');

@@ -270,6 +270,13 @@ export function ContentCenter() {
           { to: `/${brand.slug}/editor`, label: '跟小編聊' },
         ]}
       />
+      {(seoGenerating || seoError) && (
+        <Card style={{ marginBottom: 12, borderLeft: seoError ? '4px solid #B85454' : '4px solid var(--color-primary)' }}>
+          <p style={{ fontSize: 13, color: seoError ? '#B85454' : 'var(--color-text)', margin: 0 }}>
+            {seoGenerating ? '正在寫官網長文，大約需要半分鐘，請留在這頁。' : seoError}
+          </p>
+        </Card>
+      )}
 
       <Card style={{ padding: 0, marginBottom: 16 }}>
         <div style={{ padding: '4px 16px 0' }}>
@@ -614,7 +621,6 @@ export function ContentCenter() {
                   可按上方「產生官網長文」,依搜尋詞寫一篇給 Google / AI 收錄的長文。批准後再發到官網 /blog。
                 </p>
               )}
-              {seoError && <p style={{ fontSize: 12.5, color: '#B85454', marginTop: 8 }}>{seoError}</p>}
             </Card>
           )}
         </AnimatePresence>

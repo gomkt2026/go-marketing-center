@@ -34,6 +34,9 @@ export function toClientError(err: unknown, action: string): ClientFacingError {
   if (status === 401 || /incorrect api key|invalid_api_key|invalid api key/.test(blob)) {
     return { status: 401, message: `${action}失敗:OpenAI API Key 無效,請檢查 Pages Secret OPENAI_API_KEY`, retryable: false };
   }
+  if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+    return { status: 504, message: `${action}逾時，模型還沒寫完。請再試一次，不要連按。`, retryable: true };
+  }
   if (
     /insufficient_quota|exceeded your (current )?quota|credit_balance_exhausted|no credits remaining|billing_not_active/.test(blob)
   ) {
@@ -76,7 +79,7 @@ function requireApiKey(env: Env): string {
 /** 呼叫 Chat Completions;jsonMode 開啟時強制回傳合法 JSON 物件 */
 export async function chatComplete(
   env: Env,
-  params: { messages: ChatMessage[]; temperature?: number; jsonMode?: boolean; maxTokens?: number },
+  params: { messages: ChatMessage[]; temperature?: number; jsonMode?: boolean; maxTokens?: number; timeoutMs?: number },
 ): Promise<string> {
   const apiKey = requireApiKey(env);
   const res = await fetch(`${OPENAI_BASE}/chat/completions`, {
@@ -89,6 +92,7 @@ export async function chatComplete(
       max_tokens: params.maxTokens ?? 2048,
       ...(params.jsonMode ? { response_format: { type: 'json_object' } } : {}),
     }),
+    signal: params.timeoutMs ? AbortSignal.timeout(params.timeoutMs) : undefined,
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -103,7 +107,7 @@ export async function chatComplete(
 /** 便利函式:chat + 解析 JSON 回傳 */
 export async function chatCompleteJson<T>(
   env: Env,
-  params: { messages: ChatMessage[]; temperature?: number; maxTokens?: number },
+  params: { messages: ChatMessage[]; temperature?: number; maxTokens?: number; timeoutMs?: number },
 ): Promise<T> {
   const raw = await chatComplete(env, { ...params, jsonMode: true });
   try {

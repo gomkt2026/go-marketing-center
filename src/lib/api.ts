@@ -9,6 +9,8 @@ export class ApiError extends Error {
 
 const DEFAULT_TIMEOUT_MS = 25_000;
 const WORKSPACE_TIMEOUT_MS = 40_000;
+/** 官網長文要等模型寫完 700 字以上，25 秒會被瀏覽器先中斷 */
+const SEO_ARTICLE_TIMEOUT_MS = 100_000;
 
 type RequestOpts = RequestInit & { timeoutMs?: number; retryOn5xx?: boolean };
 
@@ -527,12 +529,14 @@ export const api = {
     }>(`/api/brands/${slug}/seo-articles`, {
       method: 'POST',
       body: JSON.stringify({ action: 'discover' }),
+      timeoutMs: SEO_ARTICLE_TIMEOUT_MS,
     }),
 
   generateSeoFromTopic: (slug: string, body?: { topic?: string; instruction?: string }) =>
     request<{ contentId: string; title: string; topic: string }>(`/api/brands/${slug}/seo-articles`, {
       method: 'POST',
       body: JSON.stringify(body ?? {}),
+      timeoutMs: SEO_ARTICLE_TIMEOUT_MS,
     }),
 
   seoReport: (slug: string) =>
@@ -854,7 +858,7 @@ export const api = {
   regenerateContent: (contentId: string, body?: { instruction?: string }) =>
     request<{ ok: boolean; versionNumber: number; predictedEngagementScore: number; imageUrl: string | null; imageError: string | null }>(
       `/api/contents/${contentId}/regenerate`,
-      { method: 'POST', body: JSON.stringify(body ?? {}) },
+      { method: 'POST', body: JSON.stringify(body ?? {}), timeoutMs: SEO_ARTICLE_TIMEOUT_MS },
     ),
 
   // -- 社群帳號串接 ----------------------------------------------------------

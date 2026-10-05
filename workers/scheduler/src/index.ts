@@ -37,6 +37,7 @@ import { syncPerformanceInsights, syncRecentPerformanceInsights } from '../../..
 import { analyzeAllBrandPerformance } from '../../../functions/_shared/performance-learn';
 import { notifyPendingReviewDigest, notifyPublishFailed } from '../../../functions/_shared/line-ops';
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from '../../../functions/_shared/auto-post-brands';
+import { runSeoAutoPublish } from '../../../functions/_shared/seo-autopublish';
 
 const AUTO_DRAFT_THRESHOLD = 0.75;
 
@@ -1550,6 +1551,8 @@ export default {
       case '30 18 * * *':
         ctx.waitUntil(cleanupOldMedia(env));
         ctx.waitUntil(refreshThreadsTokens(env).catch((e) => console.error('[token-refresh] 整輪失敗', e)));
+        // 台灣 02:30。函式內再判斷是否已滿 3 天，輪流發一個品牌的官網長文。
+        ctx.waitUntil(runSeoAutoPublish(env).catch((e) => console.error('[seo-auto] 整輪失敗', e)));
         break;
       case '0 23 * * 1,4':
         // 台灣週二、五早上 7 點:生成 Podcast 逐字稿(語音合成由人工在後台觸發,控 ElevenLabs 用量)
@@ -1589,14 +1592,15 @@ export default {
       if (task === 'insights') return syncPerformanceInsights(env);
       if (task === 'learn') return analyzeAllBrandPerformance(env);
       if (task === 'podcast') return createPodcastEpisode(env);
+      if (task === 'seo') return runSeoAutoPublish(env);
       return null;
     };
-    const known = ['collect', 'press', 'drafts', 'threads', 'offtopic', 'replies', 'themes', 'catchup', 'ecosystem', 'ecosystem-x', 'publish', 'cleanup', 'podcast', 'refresh-tokens', 'refresh-x-tokens', 'insights', 'learn'];
+    const known = ['collect', 'press', 'drafts', 'threads', 'offtopic', 'replies', 'themes', 'catchup', 'ecosystem', 'ecosystem-x', 'publish', 'cleanup', 'podcast', 'refresh-tokens', 'refresh-x-tokens', 'insights', 'learn', 'seo'];
     if (!task || !known.includes(task)) {
       return new Response(`task 必須為 ${known.join(' / ')}`, { status: 400 });
     }
     // catchup / 生成必須等做完:waitUntil 在 HTTP 回應後約 30 秒就會被取消,補檔會做到一半被砍
-    const awaitTasks = ['catchup', 'threads', 'offtopic', 'themes', 'publish'];
+    const awaitTasks = ['catchup', 'threads', 'offtopic', 'themes', 'publish', 'seo'];
     if (awaitTasks.includes(task)) {
       try {
         await run();

@@ -258,6 +258,103 @@ export function ensureZhRange(text: string, min: number, max: number, extras: st
   return clipZh(current, max);
 }
 
+function clipBodyParagraphs(body: string, max: number): string {
+  const parts = body.split(/\n{2,}/);
+  let out = '';
+  for (const part of parts) {
+    const next = out ? `${out}\n\n${part}` : part;
+    if (zhCharCount(next) > max) break;
+    out = next;
+  }
+  return out.trim() || clipZh(body, max);
+}
+
+/** 模型寫太短時補上可核實的段落，讓三品牌長文都能過 500 字、不必再打一輪模型。 */
+export function ensureWebsiteBody(
+  body: string,
+  params: {
+    slug: string;
+    topic: string;
+    angle?: string;
+    primaryKeyword?: string;
+    relatedTerms?: string[];
+    audience?: string | null;
+  },
+): string {
+  let current = (body || '').trim();
+  if (zhCharCount(current) > WEBSITE_BODY_MAX_CHARS) return clipBodyParagraphs(current, WEBSITE_BODY_MAX_CHARS);
+
+  const keyword = (params.primaryKeyword || params.topic || '這件事').replace(/\s+/g, ' ').trim();
+  const angle = (params.angle || '').replace(/\s+/g, ' ').trim();
+  const terms = (params.relatedTerms ?? []).map((t) => t.replace(/\s+/g, ' ').trim()).filter((t) => t.length >= 2).slice(0, 6);
+  const checklist = terms.length
+    ? terms.map((term) => `- ${term}：先看紀錄現在在哪、誰會知道沒做完、下次對帳能不能對上。`).join('\n')
+    : '- 先把現在用的表格、聊天紀錄和口頭交代列出來，再決定哪一段要留在同一個地方。';
+  const supplements = [
+    [
+      `## ${keyword}實際會卡在哪`,
+      angle || '多數人不是不會做，而是同一件事分在聊天室、表格和口頭交代，下次對不上。',
+      '先問三件事：這筆記錄現在在哪、逾期或未完成誰會知道、月底對帳時項目能不能對上。對不上的時候，再考慮要不要換工具，不要一開始就整套重來。',
+    ].join('\n\n'),
+    [
+      '## 開始前可以先核對',
+      checklist,
+      '核對完再把提醒改到同一個管道。做得到的做法是：該看的紀錄留在同一處、未完成會被看到、對帳時項目對得上。',
+    ].join('\n\n'),
+    websiteBodyCloser(params.slug, params.audience),
+  ];
+  const headingCount = (text: string) => (text.match(/^##\s+\S/gm) ?? []).length;
+  for (const section of supplements) {
+    const longEnough = zhCharCount(current) >= WEBSITE_BODY_MIN_CHARS;
+    const headed = headingCount(current) >= 3;
+    if (longEnough && headed) break;
+    if (zhCharCount(current) > WEBSITE_BODY_MAX_CHARS - 80) break;
+    const marker = section.slice(0, 18);
+    if (marker && current.includes(marker)) continue;
+    current = `${current}\n\n${section}`.trim();
+  }
+  if (zhCharCount(current) < WEBSITE_BODY_MIN_CHARS) {
+    current = `${current}\n\n把上面幾段對過一次：紀錄在哪、誰會看到沒做完、月底能不能對上。這三件對得上，再決定要不要把提醒改到同一個管道。不確定的數字、客戶數與保證成效都不要寫成事實。`.trim();
+  }
+  if (zhCharCount(current) > WEBSITE_BODY_MAX_CHARS) return clipBodyParagraphs(current, WEBSITE_BODY_MAX_CHARS);
+  return current;
+}
+
+function websiteBodyCloser(slug: string, audience?: string | null): string {
+  if (slug === 'homigo') {
+    return [
+      '## 紀錄放回同一處之後',
+      'Homigo 把收租、報修與合約留在同一個地方：帳單與逾期看得到，修繕進度可以回查，租約與點交照片不會只留在聊天室。',
+      '它不保證收租率，也不代替租賃契約的法律判斷。適合不想再用試算表和 LINE 群追每一間房子的房東或代管。',
+    ].join('\n\n');
+  }
+  if (slug === 'taskgo') {
+    return [
+      '## 現場回報怎麼對上請款',
+      'TaskGo 把打卡、排班、施工回報和請款留在同一處。現場照片、簽名與出勤可以回查，月底才不會只靠聊天紀錄翻進度。',
+      '定位與照片是為了讓出勤和施工對得上，不是用來監控員工。它不保證接案量，也不保證請款一定準時入帳。',
+    ].join('\n\n');
+  }
+  if (slug === 'washgo' && audience === 'merchant') {
+    return [
+      '## 店裡可以先改哪一段',
+      '洗衣店可以把手寫單改成雲端訂單，門市與洗廠的流轉留在後台，司機任務與簽收也不必再翻群組。客戶與門市員工都不必另外下載 App。',
+      'Washgo 是衣物洗滌，不是洗車。不要把未核實的客戶數、門市數或滿意度寫成事實。',
+    ].join('\n\n');
+  }
+  if (slug === 'washgo') {
+    return [
+      '## 衣服送洗前可以先確認',
+      'Washgo 是衣物洗滌與到府收送，不是洗車。送洗前先看洗標，線上報價確認後才洗，衣物走到哪個節點可以在 LINE 回查。',
+      '它不保證布料不縮水，也不用未核實的客戶數當證據。週末洗衣店沒開、衣服堆在家，是這套收送要解決的情境。',
+    ].join('\n\n');
+  }
+  return [
+    '## 先留紀錄再決定要不要換工具',
+    '把現在散落的表格、聊天與口頭交代收成可以回查的紀錄。不確定的數字、客戶數與保證成效都不要寫成事實。',
+  ].join('\n\n');
+}
+
 function bodySentences(bodyMd: string): string[] {
   return (bodyMd || '')
     .replace(/```[\s\S]*?```/g, ' ')

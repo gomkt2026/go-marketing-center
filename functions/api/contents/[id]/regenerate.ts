@@ -50,20 +50,25 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
   }
 
-  const brandCtx = await buildBrandContext(context.env, content.brand_id);
   const agentId = await findBrandAgent(context.env, content.brand_id);
 
-  const extraInstruction = [
-    latest?.body ? `上一版內容如下,請寫一個角度或切入點明顯不同的新版本,不要只是改寫:\n---\n${latest.body}\n---` : '',
-    body.instruction ? `修改要求:${body.instruction}` : '',
-  ].filter(Boolean).join('\n');
-
   if (isSeo) {
+    const brandRows = await sql`SELECT id, slug, name FROM brands WHERE id = ${content.brand_id}::uuid LIMIT 1`;
+    if (!brandRows.length) return error('找不到品牌', 404);
+    const brandRow = brandRows[0] as { id: string; slug: string; name: string };
+    const excerpt = (latest?.body ?? '').replace(/\s+/g, ' ').trim().slice(0, 280);
     const article = await generateSeoArticle(context.env, {
-      brandCtx,
+      brandCtx: {
+        brandId: brandRow.id,
+        slug: brandRow.slug,
+        name: brandRow.name,
+        systemPrompt: '',
+      },
       sourceTitle: content.title ?? '同主題長文',
-      sourceSummary: latest?.body?.slice(0, 2000) ?? '',
-      extraInstruction: extraInstruction || '請換一個讀者會搜的切入點重寫,不可整段沿用上一版。開頭先給 answer_box。',
+      sourceSummary: excerpt ? `上一版開頭：${excerpt}` : '',
+      extraInstruction: body.instruction
+        ? `修改要求:${body.instruction}。請換切入點重寫，不可整段沿用上一版。`
+        : '請換一個讀者會搜的切入點重寫，不可整段沿用上一版。開頭先給 answer_box。',
     });
     const nextVersion = (latest?.version_number ?? 0) + 1;
     const versionRows = await sql`
@@ -100,6 +105,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     });
     return json({ ok: true, versionNumber: nextVersion, title: article.title }, 201);
   }
+
+  const brandCtx = await buildBrandContext(context.env, content.brand_id);
+  const extraInstruction = [
+    latest?.body ? `上一版內容如下,請寫一個角度或切入點明顯不同的新版本,不要只是改寫:\n---\n${latest.body}\n---` : '',
+    body.instruction ? `修改要求:${body.instruction}` : '',
+  ].filter(Boolean).join('\n');
 
   const result = await generatePlatformPost(context.env, {
     brandCtx, platform, topic, topicSummary, extraInstruction,

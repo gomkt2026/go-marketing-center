@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { ProofTrend, type TrendWeek } from '@/pages/public/site/ProofTrend';
 
 export const CONTACT_EMAIL = 'service@inforcraft.com.tw';
 
@@ -240,6 +241,7 @@ interface ShowcaseResults {
   last28: ShowcaseMetric;
   brands: Array<{ slug: string; totals: ShowcaseMetric; last28: ShowcaseMetric }>;
   platforms: Array<{ platform: string; totals: ShowcaseMetric; last28: ShowcaseMetric }>;
+  weeks?: TrendWeek[];
 }
 
 function fmt(n: number): string {
@@ -307,6 +309,16 @@ export function BrandResults() {
           <small>按讚 {fmt(last28.likes)}、留言 {fmt(last28.comments)}、分享 {fmt(last28.shares)}、收藏 {fmt(last28.saves)}</small>
         </div>
       </div>
+
+      <ProofTrend
+        weeks={data.weeks ?? []}
+        brands={BRANDS.map((b) => ({
+          slug: b.slug,
+          name: b.name,
+          color: b.color,
+          recentImpressions: data.brands.find((x) => x.slug === b.slug)?.last28.impressions ?? 0,
+        }))}
+      />
 
       <h3 className="lp-proof-title">三個品牌各自的成果</h3>
       <div className="lp-brands">
@@ -771,6 +783,50 @@ export const LANDING_CSS = `
 .lp-barline{height:8px;border-radius:999px;background:#F7F9F5;margin-top:12px;overflow:hidden}
 .lp-barline i{display:block;height:100%;background:#8CAA71;border-radius:999px;min-width:0}
 .lp-proof .lp-note{margin:8px 0 0}
+.lp-trend{margin-top:18px;background:#fff;border:1px solid #E6E8E2;border-radius:18px;padding:18px 18px 14px}
+.lp-trend-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-end}
+.lp-trend-head h3{margin:0;font-size:20px;color:var(--ink)}
+.lp-trend-head p{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.6;max-width:46em}
+.lp-trend-head > b{text-align:right;font-size:28px;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lp-trend-head small{display:block;margin-top:6px;font-size:12px;font-weight:700;color:var(--muted)}
+.lp-trend svg{width:100%;height:auto;display:block;margin-top:8px}
+.lp-trend svg text{font-family:inherit}
+.lp-trend-grid{stroke:#E6E8E2;stroke-width:1}
+.lp-trend-tick{font-size:11px;fill:#6C6C6C;text-anchor:end}
+.lp-trend-x{font-size:11px;fill:#6C6C6C;text-anchor:middle}
+.lp-trend-x.on{fill:#23301c;font-weight:700}
+.lp-trend-cursor{stroke:transparent;stroke-width:1}
+.lp-trend-cursor.on{stroke:#23301c;stroke-dasharray:3 4;opacity:.35}
+.lp-trend-area{opacity:.12}
+.lp-trend-line{fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;animation:lp-draw 1.15s ease forwards}
+.lp-trend-line.d1{animation-delay:.08s}
+.lp-trend-line.d2{animation-delay:.18s}
+.lp-trend-dot{stroke:#fff;stroke-width:1.5}
+.lp-trend-hit{fill:transparent;cursor:pointer}
+.lp-trend-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;font-size:13px;font-weight:700;color:var(--ink)}
+.lp-trend-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.lp-trend-detail{margin:12px 0 0;font-size:14px;line-height:1.6}
+.lp-trend-split{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.lp-trend-split div{background:#F7F9F5;border-radius:12px;padding:10px 12px}
+.lp-trend-split span{display:block;font-size:12px;font-weight:800}
+.lp-trend-split b{display:block;margin-top:2px;font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums}
+.lp-trend-split small{color:var(--muted);font-size:12px}
+.lp-reach{margin-top:16px;display:grid;gap:8px}
+.lp-reach p{margin:0 0 2px;font-size:13px;font-weight:800;color:var(--ink)}
+.lp-reach-row{display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:center;font-size:13px}
+.lp-reach-row span{font-weight:700;color:var(--ink)}
+.lp-reach-row b{font-variant-numeric:tabular-nums;color:var(--ink)}
+.lp-reach-track{height:10px;border-radius:999px;background:#F7F9F5;overflow:hidden}
+.lp-reach-track i{display:block;height:100%;width:0;border-radius:999px;transition:width .9s cubic-bezier(.2,.7,.2,1)}
+.lp-reach.on .lp-reach-track i{width:var(--w)}
+.lp-weeks{display:flex;gap:6px;overflow-x:auto;margin-top:12px;padding-bottom:2px}
+.lp-weeks button{flex:none;border:1px solid #E6E8E2;background:#fff;border-radius:999px;padding:6px 10px;font:700 12px inherit;color:var(--muted);cursor:pointer}
+.lp-weeks button[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+@keyframes lp-draw{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){
+  .lp-trend-line{animation:none;stroke-dashoffset:0}
+  .lp-reach-track i{transition:none;width:var(--w)}
+}
 .lp-press{text-decoration:none;transition:transform .15s,box-shadow .15s}
 .lp-press:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.06)}
 .lp-podcast{display:grid;grid-template-columns:320px 1fr;gap:32px;align-items:center;margin-top:28px}
@@ -806,7 +862,9 @@ export const LANDING_CSS = `
   .lp-hero{padding:48px 0}
   .lp-hero-inner,.lp-game-grid,.lp-podcast,.lp-integ{grid-template-columns:1fr}
   .lp-podcast-cover{max-width:320px}
-  .lp-brands,.lp-modules,.lp-results,.lp-plat-grid{grid-template-columns:1fr}
+  .lp-brands,.lp-modules,.lp-results,.lp-plat-grid,.lp-trend-split{grid-template-columns:1fr}
+  .lp-trend-head{flex-direction:column;align-items:flex-start}
+  .lp-reach-row{grid-template-columns:72px 1fr auto}
   .lp-results{grid-template-columns:1fr 1fr}
   .lp-flow{grid-template-columns:1fr 1fr}
   .lp-nav-inner{height:auto;flex-wrap:wrap;padding:10px 0;gap:10px}

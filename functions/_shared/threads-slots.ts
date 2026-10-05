@@ -3,8 +3,9 @@ import { getSql } from './db';
 import {
   buildBrandContext,
   THREADS_HOURLY_CATEGORIES, pickThreadsHourlyCategory, type ThreadsHourlyCategoryId,
-  GAME_PUBLIC_STILLS, pickGamePromoAngle,
+  GAME_PUBLIC_STILLS,
 } from './prompts';
+import { loadGamePromoBrief } from './game-daily';
 import {
   generatePlatformPost, generateOfftopicPost, generateThreadsFromImage, generateGamePromoPost,
   saveGeneratedContent, findBrandAgent,
@@ -25,15 +26,15 @@ import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from './auto-post-brands';
 export const THREADS_POST_HOURS_TW: readonly number[] = [0, 6, 12, 18];
 /** 生活哏文 / 愛情散文時段(台灣時間) */
 export const THREADS_OFFTOPIC_HOURS_TW: readonly number[] = [9, 21];
-/** 匠城出任務推廣(台灣時間),加在跟風與生活文之外 */
-export const THREADS_GAME_HOURS_TW: readonly number[] = [10, 15, 20];
+/** 匠城出任務推廣(台灣時間)。一天一篇，用昨天的局數、排行榜或今日路況。 */
+export const THREADS_GAME_HOURS_TW: readonly number[] = [10];
 /** 小編工作台一天 9 檔 */
 export const THREADS_DESK_HOURS_TW: readonly number[] = [0, 6, 9, 10, 12, 15, 18, 20, 21];
 
 export const THREADS_SLOT_BRANDS = ['homigo', 'taskgo', 'washgo'] as const;
 const THREADS_DAILY_CAP = 4;
 const THREADS_OFFTOPIC_DAILY_CAP = 2;
-const THREADS_GAME_DAILY_CAP = 3;
+const THREADS_GAME_DAILY_CAP = 1;
 const THREADS_BRANDS_PER_TICK = 3;
 
 export type ThreadsSlotSource = PostingSlotKind;
@@ -407,7 +408,8 @@ export async function generateThreadsOfftopicSlot(
 }
 
 /**
- * 匠城出任務推廣:每天 10 / 15 / 20,每品牌最多 3 篇。
+ * 匠城出任務推廣:每天 10 點一篇。
+ * 三個品牌各講一件當天的事實：昨天局數、本週排行榜、今日路況。
  * 不走跟風池,也不吃跟風的每日上限。
  */
 export async function generateThreadsGameSlot(
@@ -461,7 +463,8 @@ export async function generateThreadsGameSlot(
       const usedAngles = (usedRows as { angle: string | null }[])
         .map((r) => r.angle)
         .filter((a): a is string => !!a);
-      const angle = pickGamePromoAngle(usedAngles);
+      const brief = await loadGamePromoBrief(env, brand.slug);
+      const angle = { id: `today-${brief.focus}-${brief.date}`, hook: brief.headline, fact: brief.fact };
 
       const assetRows = await sql`
         SELECT id, file_url FROM brand_assets

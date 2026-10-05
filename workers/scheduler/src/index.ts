@@ -33,7 +33,7 @@ import { fetchGoogleNews, fetchTaiwanNews } from '../../../functions/_shared/sou
 import { collectSignals, BRAND_SOURCES, findMarketAnalystAgent } from '../../../functions/_shared/market-collect';
 import { createPodcastEpisode } from '../../../functions/_shared/podcast';
 import { slugifyStoryKey } from '../../../functions/_shared/press';
-import { syncPerformanceInsights } from '../../../functions/_shared/insights';
+import { syncPerformanceInsights, syncRecentPerformanceInsights } from '../../../functions/_shared/insights';
 import { analyzeAllBrandPerformance } from '../../../functions/_shared/performance-learn';
 import { notifyPendingReviewDigest, notifyPublishFailed } from '../../../functions/_shared/line-ops';
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from '../../../functions/_shared/auto-post-brands';
@@ -1140,7 +1140,7 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
     const due = configured.filter((s) => s.hourTw === genHour);
     const needHourly = due.some((s) => isHourlyFamily(s.slotKind)) || (!configured.length && THREADS_POST_HOURS_TW.includes(genHour));
     const needOfftopic = due.some((s) => isOfftopicFamily(s.slotKind)) || (!configured.length && THREADS_OFFTOPIC_HOURS_TW.includes(genHour));
-    const needGame = due.some((s) => s.slotKind === 'threads_game') || (!configured.length && (genHour === 10 || genHour === 15 || genHour === 20));
+    const needGame = due.some((s) => s.slotKind === 'threads_game') || (!configured.length && genHour === 10);
     const needTheme = due.some((s) => s.slotKind === 'daily_theme') || (!configured.length && genHour === DAILY_THEME_HOUR_TW);
     const autoSlugs = due.length ? [...new Set(due.map((s) => s.brandSlug))] : await listAutoPostSlugs(env);
 
@@ -1540,6 +1540,12 @@ export default {
         break;
       case '*/30 * * * *':
         ctx.waitUntil(halfHourlyDispatch(env));
+        if (new Date().getUTCMinutes() >= 15 && new Date().getUTCMinutes() < 45) {
+          ctx.waitUntil(
+            syncRecentPerformanceInsights(env)
+              .catch((e) => console.error('[insights] 近期成效回收失敗', e)),
+          );
+        }
         break;
       case '30 18 * * *':
         ctx.waitUntil(cleanupOldMedia(env));

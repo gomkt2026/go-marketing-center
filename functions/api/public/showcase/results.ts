@@ -25,6 +25,7 @@ export interface ShowcaseMetric {
 export interface ShowcaseResults {
   asOf: string;
   since: string | null;
+  insightsAt: string | null;
   totals: ShowcaseMetric;
   last28: ShowcaseMetric;
   brands: Array<{
@@ -113,12 +114,23 @@ function iso(value: unknown): string | null {
 let memo: { exp: number; value: ShowcaseResults } | null = null;
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const headers = { 'Cache-Control': 'public, max-age=300' };
+  const headers = { 'Cache-Control': 'public, max-age=120' };
   if (memo && memo.exp > Date.now()) return json(memo.value, 200, headers);
   try {
     const sql = getSql(context.env);
     const rows = await sql`
       SELECT
+        (
+          SELECT max(pr.captured_at)
+          FROM performance_reports pr
+          JOIN publishing_jobs pj ON pj.id = pr.publishing_job_id
+          JOIN contents c ON c.id = pj.content_id
+          JOIN brands b ON b.id = c.brand_id
+          WHERE pj.status = 'published'
+            AND pj.platform IN ('facebook', 'instagram', 'threads')
+            AND b.is_active
+            AND lower(b.slug) IN ('taskgo', 'homigo', 'washgo')
+        ) AS insights_at,
         (SELECT COALESCE(json_agg(x), '[]'::json) FROM (
           SELECT
             lower(b.slug) AS slug,
@@ -165,7 +177,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           GROUP BY lower(b.slug)
         ) y) AS by_brand
     `;
-    const bundle = (rows[0] ?? {}) as { by_platform?: unknown; by_brand?: unknown };
+    const bundle = (rows[0] ?? {}) as { by_platform?: unknown; by_brand?: unknown; insights_at?: unknown };
     const platformRows = asRows<PlatformRow>(bundle.by_platform);
     const brandRows = asRows<BrandRow>(bundle.by_brand);
 
@@ -203,6 +215,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
     const value: ShowcaseResults = {
       asOf: new Date().toISOString(),
+      insightsAt: iso(bundle.insights_at),
       since,
       totals: finish(totals),
       last28: finish(last28),
@@ -221,7 +234,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         return { platform, totals: finish(bucket.totals), last28: finish(bucket.last28) };
       }),
     };
-    memo = { exp: Date.now() + 60_000, value };
+    memo = { exp: Date.now() + 30_000, value };
     return json(value, 200, headers);
   } catch (e) {
     console.error('[showcase/results]', e);

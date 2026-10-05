@@ -8,8 +8,9 @@ import { getXAccount, refreshXToken } from './x';
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 const X_API = 'https://api.x.com/2';
 
-/** 單次 HTTP / cron 只處理這麼多篇,避免 Pages Function 子請求上限與逾時變成 500 */
-const MAX_JOBS_PER_RUN = 8;
+/** 三小時補檔一次的上限。近期貼文另有每小時的小批回收。 */
+const MAX_JOBS_PER_RUN = 12;
+const RECENT_JOBS_PER_RUN = 6;
 
 export interface NormalizedMetrics {
   impressions: number;
@@ -94,6 +95,13 @@ function insightValue(item: InsightMetric): number {
   return numericInsight(item.values?.[0]?.value);
 }
 
+function firstPositive(...values: Array<number | undefined>): number {
+  for (const value of values) {
+    if (typeof value === 'number' && value > 0) return value;
+  }
+  return 0;
+}
+
 function mapInsights(data: InsightMetric[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const item of data) {
@@ -122,7 +130,7 @@ async function fetchThreadsInsights(account: ThreadsAccount, postId: string): Pr
   if (insights.ok) {
     const mapped = mapInsights((insights.data.data as InsightMetric[]) ?? []);
     const metrics = {
-      impressions: mapped.views ?? 0,
+      impressions: firstPositive(mapped.views),
       clicks: 0,
       comments: mapped.replies ?? 0,
       shares: mapped.reposts ?? 0,
@@ -165,6 +173,8 @@ async function fetchFacebookInsights(account: MetaAccount, postId: string): Prom
     { metric: 'post_media_view,post_total_media_view_unique', period: 'lifetime' },
     { metric: 'post_media_view', period: 'lifetime' },
     { metric: 'post_total_media_view_unique', period: 'lifetime' },
+    { metric: 'post_impressions,post_impressions_unique', period: 'lifetime' },
+    { metric: 'post_impressions_unique', period: 'lifetime' },
   ];
   let mapped: Record<string, number> = {};
   let lastError = '';
@@ -188,7 +198,12 @@ async function fetchFacebookInsights(account: MetaAccount, postId: string): Prom
     access_token: pageToken,
   });
   const post = await fetchJson(`${GRAPH_API}/${encodeURIComponent(postId)}?${fields}`);
-  const hasInsightNumbers = (mapped.post_media_view ?? mapped.post_total_media_view_unique ?? mapped.post_impressions ?? 0) > 0;
+  const hasInsightNumbers = firstPositive(
+    mapped.post_media_view,
+    mapped.post_total_media_view_unique,
+    mapped.post_impressions,
+    mapped.post_impressions_unique,
+  ) > 0;
   if (!hasInsightNumbers && !post.ok) {
     const blob = lastError || JSON.stringify(post.data);
     if (blob.includes('2069032') || blob.includes('不支援用戶存取權杖')) {
@@ -204,7 +219,12 @@ async function fetchFacebookInsights(account: MetaAccount, postId: string): Prom
   const comments = Number((post.data.comments as { summary?: { total_count?: number } } | undefined)?.summary?.total_count ?? 0);
   const likes = Number((post.data.reactions as { summary?: { total_count?: number } } | undefined)?.summary?.total_count ?? 0);
   const metrics = {
-    impressions: mapped.post_media_view ?? mapped.post_total_media_view_unique ?? mapped.post_impressions ?? 0,
+    impressions: firstPositive(
+      mapped.post_media_view,
+      mapped.post_total_media_view_unique,
+      mapped.post_impressions,
+      mapped.post_impressions_unique,
+    ),
     clicks: mapped.post_clicks ?? 0,
     comments,
     shares,
@@ -235,7 +255,7 @@ async function fetchInstagramInsights(account: { accessToken: string }, mediaId:
     const insights = await fetchJson(`${GRAPH_API}/${encodeURIComponent(mediaId)}/insights?${params}`);
     if (insights.ok) {
       mapped = mapInsights((insights.data.data as InsightMetric[]) ?? []);
-      if ((mapped.views ?? mapped.impressions ?? mapped.reach ?? 0) > 0 || mapped.total_interactions || mapped.saved) {
+      if (firstPositive(mapped.views, mapped.impressions, mapped.reach) > 0 || mapped.total_interactions || mapped.saved) {
         lastError = '';
         break;
       }
@@ -258,7 +278,7 @@ async function fetchInstagramInsights(account: { accessToken: string }, mediaId:
   }
 
   const metrics = {
-    impressions: mapped.views ?? mapped.impressions ?? mapped.reach ?? 0,
+    impressions: firstPositive(mapped.views, mapped.impressions, mapped.reach),
     clicks: 0,
     comments: mapped.comments ?? Number(media.data.comments_count ?? 0),
     shares: mapped.shares ?? 0,
@@ -494,7 +514,10 @@ export async function upsertPerformanceReport(env: Env, jobId: string, metrics: 
       ${metrics.shares}, ${metrics.saves}, ${metrics.engagementRate}, ${JSON.stringify(raw)}::jsonb, now()
     )
     ON CONFLICT (publishing_job_id) DO UPDATE SET
-      impressions = EXCLUDED.impressions,
+      impressions = CASE
+        WHEN EXCLUDED.impressions > 0 THEN EXCLUDED.impressions
+        ELSE performance_reports.impressions
+      END,
       clicks = EXCLUDED.clicks,
       comments = EXCLUDED.comments,
       shares = EXCLUDED.shares,
@@ -505,7 +528,7 @@ export async function upsertPerformanceReport(env: Env, jobId: string, metrics: 
   `;
 }
 
-async function loadPublishedJobs(env: Env, brandId?: string, jobId?: string): Promise<PublishedJob[]> {
+async function loadPublishedJobs(env: Env, brandId?: string, jobId?: string, recentOnly = false): Promise<PublishedJob[]> {
   const sql = getSql(env);
   if (jobId) {
     const rows = await sql`
@@ -514,6 +537,23 @@ async function loadPublishedJobs(env: Env, brandId?: string, jobId?: string): Pr
       JOIN contents c ON c.id = pj.content_id
       WHERE pj.id = ${jobId}::uuid AND pj.status = 'published' AND pj.external_post_id IS NOT NULL
       LIMIT 1
+    `;
+    return (rows as Record<string, unknown>[]).map(mapJob);
+  }
+
+  if (brandId && recentOnly) {
+    const rows = await sql`
+      SELECT pj.id, pj.platform, pj.external_post_id, c.brand_id, c.collaboration_id
+      FROM publishing_jobs pj
+      JOIN contents c ON c.id = pj.content_id
+      LEFT JOIN performance_reports pr ON pr.publishing_job_id = pj.id
+      WHERE c.brand_id = ${brandId}::uuid
+        AND pj.status = 'published'
+        AND pj.external_post_id IS NOT NULL
+        AND pj.published_at >= now() - interval '48 hours'
+        AND (pr.captured_at IS NULL OR pr.captured_at < now() - interval '90 minutes')
+      ORDER BY (pr.id IS NULL) DESC, pj.published_at DESC
+      LIMIT ${RECENT_JOBS_PER_RUN}
     `;
     return (rows as Record<string, unknown>[]).map(mapJob);
   }
@@ -528,7 +568,9 @@ async function loadPublishedJobs(env: Env, brandId?: string, jobId?: string): Pr
         AND pj.status = 'published'
         AND pj.external_post_id IS NOT NULL
         AND pj.published_at >= now() - interval '28 days'
-      ORDER BY (pr.id IS NULL) DESC,
+      ORDER BY
+        (pj.published_at >= now() - interval '48 hours' AND (pr.id IS NULL OR pr.captured_at < now() - interval '90 minutes')) DESC,
+        (pr.id IS NULL) DESC,
         (pr.id IS NOT NULL AND pr.impressions = 0 AND pj.platform IN ('facebook', 'instagram')) DESC,
         pj.published_at DESC
       LIMIT ${MAX_JOBS_PER_RUN}
@@ -589,8 +631,8 @@ async function countRemaining(env: Env, brandId?: string): Promise<number> {
   return rows.length ? (rows[0] as { n: number }).n : 0;
 }
 
-export async function syncJobs(env: Env, params: { brandId?: string; jobId?: string } = {}): Promise<SyncBrandResult> {
-  const jobs = await loadPublishedJobs(env, params.brandId, params.jobId);
+export async function syncJobs(env: Env, params: { brandId?: string; jobId?: string; recentOnly?: boolean } = {}): Promise<SyncBrandResult> {
+  const jobs = await loadPublishedJobs(env, params.brandId, params.jobId, params.recentOnly);
   const results: SyncJobResult[] = [];
   let synced = 0;
   let failed = 0;
@@ -637,6 +679,24 @@ export async function syncPerformanceInsights(env: Env): Promise<SyncBrandResult
       out.push(await syncJobs(env, { brandId: row.id }));
     } catch (e) {
       console.error('[insights] 品牌同步失敗', row.id, e);
+    }
+  }
+  return out;
+}
+
+/** 每小時補近兩天、超過 90 分鐘沒更新的貼文。三小時那輪繼續清舊的缺口。 */
+export async function syncRecentPerformanceInsights(env: Env): Promise<SyncBrandResult[]> {
+  const sql = getSql(env);
+  const brands = await sql`
+    SELECT id FROM brands
+    WHERE is_active = true AND lower(slug) IN ('taskgo', 'homigo', 'washgo')
+  `;
+  const out: SyncBrandResult[] = [];
+  for (const row of brands as { id: string }[]) {
+    try {
+      out.push(await syncJobs(env, { brandId: row.id, recentOnly: true }));
+    } catch (e) {
+      console.error('[insights] 近期同步失敗', row.id, e);
     }
   }
   return out;

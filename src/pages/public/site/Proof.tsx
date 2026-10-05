@@ -20,7 +20,7 @@ export function Proof() {
           <div className="lp-eyebrow">發文成效</div>
           <h2>整體成果，一眼看完</h2>
           <p className="lp-muted lp-sub">
-            有興趣的客戶可以直接看匠管自己三個品牌的發文量、曝光與互動。數字每幾分鐘更新一次。
+            有興趣的客戶可以直接看匠管自己三個品牌的發文量、曝光與互動。已發篇數大約每兩分鐘更新；曝光與互動約每小時向平台回收，平台數字本身還會再晚幾個小時才補齊。
           </p>
           <BrandResults />
         </div>

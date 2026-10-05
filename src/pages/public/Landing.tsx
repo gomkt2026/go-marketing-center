@@ -235,6 +235,7 @@ interface ShowcaseMetric {
 
 interface ShowcaseResults {
   since: string | null;
+  insightsAt?: string | null;
   totals: ShowcaseMetric;
   last28: ShowcaseMetric;
   brands: Array<{ slug: string; totals: ShowcaseMetric; last28: ShowcaseMetric }>;
@@ -247,6 +248,17 @@ function fmt(n: number): string {
 
 function formatYm(iso: string): string {
   return new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: 'long' }).format(new Date(iso));
+}
+
+function formatStamp(iso: string): string {
+  return new Intl.DateTimeFormat('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(iso));
 }
 
 export function BrandResults() {
@@ -351,7 +363,7 @@ export function BrandResults() {
       </div>
 
       <p className="lp-note">
-        數字來自各平台官方成效，不含廣告。一則內容發到幾個平台，就各算一則。
+        {`已發篇數約每兩分鐘更新。曝光與互動約每小時向各平台回收${data.insightsAt ? `，最近一次回收是 ${formatStamp(data.insightsAt)}` : ''}。數字來自各平台官方成效，不含廣告。一則內容發到幾個平台，就各算一則。`}
         {threadsShare >= 0.6 ? '目前看得到的曝光，主要來自 Threads。' : ''}
         {totals.clicks > 0 ? `另有累計連結點擊 ${fmt(totals.clicks)}。` : ''}
       </p>

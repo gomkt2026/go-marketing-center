@@ -108,8 +108,8 @@ export const DEFAULT_SLOT_DEFS: Array<{
   { platform: 'threads', hourTw: 9, slotKind: 'threads_offtopic' },
   { platform: 'threads', hourTw: 21, slotKind: 'threads_offtopic' },
   { platform: 'threads', hourTw: 10, slotKind: 'threads_game' },
-  { platform: 'threads', hourTw: 15, slotKind: 'threads_game' },
-  { platform: 'threads', hourTw: 20, slotKind: 'threads_game' },
+  { platform: 'threads', hourTw: 15, slotKind: 'threads_hourly' },
+  { platform: 'threads', hourTw: 20, slotKind: 'threads_hourly' },
 ];
 
 export function slotKindLabel(kind: PostingSlotKind): string {
@@ -215,7 +215,7 @@ export async function ensurePostingOpsTables(env: Env): Promise<void> {
   `;
 
   await ensureSlotKindConstraint(env);
-  const gameHours = [10, 15, 20];
+  const gameHours = [10];
   const gameSlugs = ['homigo', 'taskgo', 'washgo'];
   await sql`
     INSERT INTO brand_posting_slots (brand_id, platform, hour_tw, slot_kind, enabled)
@@ -225,6 +225,27 @@ export async function ensurePostingOpsTables(env: Env): Promise<void> {
     WHERE b.is_active = true
       AND b.slug = ANY(${gameSlugs}::text[])
     ON CONFLICT (brand_id, platform, hour_tw, slot_kind) DO NOTHING
+  `;
+  await sql`
+    UPDATE brand_posting_slots AS g
+    SET slot_kind = 'threads_hourly', updated_at = now()
+    WHERE g.platform = 'threads'
+      AND g.hour_tw IN (15, 20)
+      AND g.slot_kind = 'threads_game'
+      AND NOT EXISTS (
+        SELECT 1 FROM brand_posting_slots s
+        WHERE s.brand_id = g.brand_id
+          AND s.platform = g.platform
+          AND s.hour_tw = g.hour_tw
+          AND s.slot_kind = 'threads_hourly'
+      )
+  `;
+  await sql`
+    UPDATE brand_posting_slots
+    SET enabled = false, updated_at = now()
+    WHERE platform = 'threads'
+      AND hour_tw IN (15, 20)
+      AND slot_kind = 'threads_game'
   `;
 
   await sql`
@@ -297,7 +318,45 @@ function fallbackSlots(brands: Array<{ id: string; slug: string }>): PostingSlot
   return out;
 }
 
+let gameSlotsRetired = false;
+
+/** 既有品牌的 15:00、20:00 匠城檔改回跟風，一天只留 10:00 一篇。回傳這次有沒有真的去改。 */
+export async function retireAfternoonGameSlots(env: Env): Promise<boolean> {
+  if (gameSlotsRetired) return false;
+  gameSlotsRetired = true;
+  try {
+    const sql = getSql(env);
+    await sql`
+      UPDATE brand_posting_slots AS g
+      SET slot_kind = 'threads_hourly', updated_at = now()
+      WHERE g.platform = 'threads'
+        AND g.hour_tw IN (15, 20)
+        AND g.slot_kind = 'threads_game'
+        AND NOT EXISTS (
+          SELECT 1 FROM brand_posting_slots s
+          WHERE s.brand_id = g.brand_id
+            AND s.platform = g.platform
+            AND s.hour_tw = g.hour_tw
+            AND s.slot_kind = 'threads_hourly'
+        )
+    `;
+    await sql`
+      UPDATE brand_posting_slots
+      SET enabled = false, updated_at = now()
+      WHERE platform = 'threads'
+        AND hour_tw IN (15, 20)
+        AND slot_kind = 'threads_game'
+    `;
+    return true;
+  } catch (e) {
+    gameSlotsRetired = false;
+    if (!isMissingSlots(e)) console.warn('[slots] 下午匠城檔改回跟風失敗', e);
+    return false;
+  }
+}
+
 export async function listAllPostingSlots(env: Env, opts?: { enabledOnly?: boolean }): Promise<PostingSlot[]> {
+  await retireAfternoonGameSlots(env);
   const sql = getSql(env);
   try {
     const rows = opts?.enabledOnly
@@ -329,8 +388,11 @@ export async function listAllPostingSlots(env: Env, opts?: { enabledOnly?: boole
 }
 
 export async function listBrandPostingSlots(env: Env, brandId: string): Promise<PostingSlot[]> {
-  const cached = await cacheGet<PostingSlot[]>(env, cacheKeys.slots(brandId));
-  if (cached) return cached;
+  const justRetired = await retireAfternoonGameSlots(env);
+  if (!justRetired) {
+    const cached = await cacheGet<PostingSlot[]>(env, cacheKeys.slots(brandId));
+    if (cached) return cached;
+  }
   const sql = getSql(env);
   try {
     const rows = await sql`
@@ -373,7 +435,7 @@ export function threadHoursFromSlots(slots: PostingSlot[]): number[] {
 export function sourceFromSlots(slots: PostingSlot[], hourTw: number): PostingSlotKind {
   const hit = slots.find((s) => s.platform === 'threads' && s.enabled && s.hourTw === hourTw);
   if (hit) return hit.slotKind;
-  if (hourTw === 10 || hourTw === 15 || hourTw === 20) return 'threads_game';
+  if (hourTw === 10) return 'threads_game';
   return hourTw === 9 || hourTw === 21 ? 'threads_offtopic' : 'threads_hourly';
 }
 

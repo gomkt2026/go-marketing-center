@@ -204,6 +204,7 @@ h1{margin:0;font-family:var(--disp);font-weight:400;font-size:clamp(46px,13vw,68
 .mini{appearance:none;border:2px solid var(--ink);background:#fff;color:var(--ink);border-radius:999px;padding:6px 14px;font-weight:900;font-size:13px;cursor:pointer;margin-left:auto;white-space:nowrap;box-shadow:0 3px 0 var(--ink)}
 .mini:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
 .daily{display:flex;align-items:center;gap:10px;background:#fff;border-radius:14px;padding:9px 12px;font-size:13px;font-weight:700;line-height:1.4}
+#roadTitle{margin-top:8px;background:#fff7e8}
 .daily .dl{font-size:11px;font-weight:900;letter-spacing:.08em;color:var(--tg);white-space:nowrap}
 .daily em{margin-left:auto;font-style:normal;color:#a87800;font-weight:900;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .daily.ok em{color:var(--hm)}
@@ -441,6 +442,7 @@ html:not([data-lang="zh"]) .rank b{font-size:17px}
     <div class="challenge" id="challenge" hidden></div>
     <div class="prof"><span class="coinpill"><i class="coin"></i><span id="coinTitle">0</span> 匠幣</span><span id="streakTitle"></span><button class="mini" id="btnGarage">車庫・換造型</button></div>
     <div class="daily" id="dailyTitle"></div>
+    <div class="daily" id="roadTitle" hidden></div>
     <a class="promo" id="promoTitle" hidden target="_blank" rel="noopener"><span><b>🎁 路況名場面分享活動</b>21 種突發路況等你撞見，糗照分享到 Threads，回匠管活動貼文留言，每週抽 10 份小禮物</span><em>怎麼參加</em></a>
     <div class="mapsh"><span class="eyebrow">選擇地圖</span><button class="mini" id="btnBoard" type="button">排行榜</button></div>
     <div class="maps" id="maps" role="radiogroup" aria-label="選擇地圖"></div>
@@ -485,7 +487,8 @@ html:not([data-lang="zh"]) .rank b{font-size:17px}
     </div>
     <div class="reward" id="reward"></div>
     <p class="line-note" id="lineNote"></p>
-    <div class="row"><button class="go-btn" id="btnAgain">再跑一班</button><button class="btn2" id="btnShare">分享成績</button></div>
+    <button class="ghost" id="btnOverInvite" type="button" hidden>再一人從你的連結玩完，台灣地圖就開</button>
+    <div class="row"><button class="go-btn" id="btnNext" type="button" hidden>換中地圖再跑</button><button class="go-btn" id="btnAgain">再跑一班</button><button class="btn2" id="btnShare">分享成績</button></div>
     <div class="cta-h">把遊戲裡的順暢，帶回真實工作</div>
     <div class="cta" id="cta"></div>
     <button class="ghost" id="btnHome">回到標題</button>
@@ -1333,7 +1336,7 @@ function newPid(){const a=new Uint8Array(12);try{crypto.getRandomValues(a);}catc
 function loadProf(){let d={coins:0,runs:0,owned:[],bike:'std',outfit:'vest',ach:[],streak:0,lastDay:-99,dailyDone:-99};
   try{const s=JSON.parse(localStorage.getItem(PKEY)||'null');if(s&&typeof s==='object')d=Object.assign(d,s);}catch(e){}
   if(!d.best)d.best={s:legacyBest()};if(!Array.isArray(d.landmarks))d.landmarks=[];if(!Array.isArray(d.incSeen))d.incSeen=[];if(!d.tw||typeof d.tw!=='object')d.tw={trial:0,shared:false,unlocked:false,friends:0};
-  if(!d.refCode||!/^[a-z0-9]{8,16}$/.test(d.refCode))d.refCode=newPid().slice(0,10);if(!d.map||!MAPS[d.map])d.map='s';if(!d.pid)d.pid=newPid();if(typeof d.name!=='string')d.name='';
+  if(!d.refCode||!/^[a-z0-9]{8,16}$/.test(d.refCode))d.refCode=newPid().slice(0,10);if(!d.map||!MAPS[d.map])d.map='s';if(!d.pid)d.pid=newPid();if(typeof d.name!=='string')d.name='';if(typeof d.passM!=='number')d.passM=0;
   if(typeof d.earned!=='number'){const spent=[...BIKES,...OUTFITS].filter(x=>d.owned.includes(x.id)).reduce((a,x)=>a+(x.price||0),0);d.earned=d.coins+spent;}
   return d;}
 function saveProf(){try{localStorage.setItem(PKEY,JSON.stringify(prof));}catch(e){}}
@@ -1519,6 +1522,7 @@ function grantRewards(){const today=dayNum();
   const newAch=ACH.filter(a=>!prof.ach.includes(a.id)&&a.test(c));let achSum=0;newAch.forEach(a=>{prof.ach.push(a.id);achSum+=a.coins;track('achievement',{id:a.id});});
   if(newAch.length){coins+=achSum;lines.push([newAch.length===1?`成就「${newAch[0].name}」`:`達成 ${newAch.length} 個新成就`,achSum]);}
   const before=prof.earned;prof.coins+=coins;prof.earned+=coins;
+  if(MAP.id==='s'&&prof.runs===1&&prof.earned<MAPS.m.unlock)prof.passM=Math.max(1,prof.passM||0);
   const newMaps=['m','l'].filter(k=>before<MAPS[k].unlock&&prof.earned>=MAPS[k].unlock);saveProf();return {coins,lines,newAch,newMaps};}
 function nextUnlock(){const all=[...BIKES.map(x=>['機車',x]),...OUTFITS.map(x=>['服裝',x])].filter(([,x])=>!isOwned(x)&&x.price);
   const can=all.filter(([,x])=>x.price<=prof.coins).sort((a,b)=>b[1].price-a[1].price)[0];if(can)return {can:true,kind:can[0],it:can[1]};
@@ -1527,6 +1531,7 @@ function renderReward(r){const nu=nextUnlock();
   let h=`<div class="rw-top"><i class="coin"></i><b>+${fmt(r.coins)} 匠幣</b><span>目前共 ${fmt(prof.coins)} 枚</span></div>`;
   h+=`<ul class="rw-lines">${r.lines.map(([t,v])=>`<li>${t}<span>+${v}</span></li>`).join('')}</ul>`;
   if(r.newMaps&&r.newMaps.length)h+=`<div class="rw-ach">${r.newMaps.map(k=>`<span style="background:var(--tg)">🗺️ 解鎖${MAPS[k].name}！</span>`).join('')}</div>`;
+  if(MAP.id==='s'&&prof.passM>0&&prof.earned<MAPS.m.unlock)h+=`<div class="rw-next can"><span>這一班送你中地圖體驗。120 秒，天氣和路上的狀況不一樣。</span></div>`;
   if(r.newAch.length)h+=`<div class="rw-ach">${r.newAch.map((a,i)=>`<span style="animation-delay:${.2+i*.12}s">🏅 ${a.name}${a.unlock?`・解鎖${a.unlock}`:''}</span>`).join('')}</div>`;
   if(nu)h+=`<div class="rw-next${nu.can?' can':''}"><span>${nu.can?`匠幣夠了！可以解鎖${nu.kind}「${nu.it.name}」`:`再 ${fmt(nu.it.price-prof.coins)} 匠幣，就能解鎖${nu.kind}「${nu.it.name}」`}</span><button class="mini" data-garage="1">去車庫</button></div>`;
   else h+=`<div class="rw-next"><span>商店的造型都收集齊了，去成就頁看看還差哪些。</span><button class="mini" data-garage="1">去車庫</button></div>`;
@@ -1581,11 +1586,12 @@ canvas.addEventListener('pointermove',e=>{if(state==='garage'&&gDrag)player.h=gD
 const endG=()=>{gDrag=null;};canvas.addEventListener('pointerup',endG);canvas.addEventListener('pointercancel',endG);
 let lastReward=null;
 /* ---------- map selector ---------- */
-const isMapOpen=id=>id==='t'?(prof.tw.unlocked||prof.tw.trial>0||challengeMap==='t'):(prof.earned>=MAPS[id].unlock||id===challengeMap);
+const isMapOpen=id=>id==='t'?(prof.tw.unlocked||prof.tw.trial>0||challengeMap==='t'):(prof.earned>=MAPS[id].unlock||id===challengeMap||(id==='m'&&prof.passM>0));
 function renderMaps(){const cols=[BR.taskgo.color,BR.homigo.color,BR.washgo.color];
   $('#maps').innerHTML=['s','m','l'].map(id=>{const m=MAPS[id],open=isMapOpen(id),own=prof.earned>=m.unlock,best=getBest(id),on=MAP&&MAP.id===id;
     const mg=`<span class="mg" style="grid-template-columns:repeat(${m.n},1fr)">${Array.from({length:m.n*m.n},(_,k)=>`<i style="--c:${cols[k%3]}"></i>`).join('')}</span>`;
-    const info=own?`<small>${best?'最佳 NT$'+fmt(best):'還沒跑過'}</small>`:open?'<small>朋友的挑戰</small>':`<small>累積 ${m.unlock} 匠幣解鎖</small><span class="pb"><i style="width:${Math.min(100,prof.earned/m.unlock*100)}%"></i></span>`;
+    const trial=id==='m'&&prof.passM>0&&prof.earned<m.unlock;
+    const info=own?`<small>${best?'最佳 NT$'+fmt(best):'還沒跑過'}</small>`:trial?'<small>體驗一班</small>':open?'<small>朋友的挑戰</small>':`<small>累積 ${m.unlock} 匠幣解鎖</small><span class="pb"><i style="width:${Math.min(100,prof.earned/m.unlock*100)}%"></i></span>`;
     return `<button class="mapc${on?' on':''}${open?'':' lock'}" data-id="${id}" role="radio" aria-checked="${on}">${!own&&open?'<span class="pass">挑戰通行</span>':''}${mg}<b>${m.name}</b><span>${m.dur} 秒・${m.sub}</span>${info}</button>`;}).join('')+twCard();
   showBest();}
 function twIcon(){const T=MAPS.t;return T.layout.map(r=>r.map(c=>`<i style="--c:${c==='.'?'transparent':c==='mount'||c==='peak'?'#6f9d57':'#ff6b1a'}"></i>`).join('')).join('');}
@@ -1751,12 +1757,15 @@ function perfTick(now){if(state!=='play'||perf.done)return;if(!perf.t0){perf.t0=
       if(fps<28){sun.shadow.mapSize.set(512,512);}resize();track('quality_low',{fps:Math.round(fps),env:ENV.name});}}}
 let countT=0,countLast=-1;
 function startGame(){if(state==='count'||state==='play'||state==='loading'||state==='garage'||$('#btnStart').disabled&&state==='title')return;
-  if(MAP.id==='t'&&!prof.tw.unlocked&&challengeMap!=='t'){if(prof.tw.trial>0){prof.tw.trial--;saveProf();}else{toTitle();openInvite();return;}}$('#board').hidden=true;$('#submitBox').hidden=true;AU.init();resetWorld();showScreen(null);$('#hud').hidden=false;$('#hint').style.opacity=1;
+  if(MAP.id==='t'&&!prof.tw.unlocked&&challengeMap!=='t'){if(prof.tw.trial>0){prof.tw.trial--;saveProf();}else{toTitle();openInvite();return;}}
+  if(MAP.id==='m'&&prof.earned<MAPS.m.unlock&&challengeMap!=='m'){if(prof.passM>0){prof.passM--;saveProf();}else{toTitle();return;}}
+  $('#board').hidden=true;$('#submitBox').hidden=true;AU.init();resetWorld();showScreen(null);$('#hud').hidden=false;$('#hint').style.opacity=1;
   weather=pickWeather();resetEvents();setupWeatherFx();showWeatherCard();
   track('game_start',{challenge:challenge||0,env:ENV.name,map:MAP.id,weather:weather.id,lang:LANG});beginRun();perf.t0=0;perf.f=0;
   $('#hint').textContent=isTouch?'按住畫面任意處拖曳，騎向發光的任務點':'用 WASD 或方向鍵，騎向發光的任務點';moved=0;
   state='count';countT=3.8;countLast=-1;$('#count').hidden=false;canvas.focus({preventScroll:true});}
 function beginPlay(){state='play';setTimeout(()=>{$('#count').hidden=true;},650);setTimeout(()=>{$('#wxCard').hidden=true;},2200);AU.startMusic();AU.ambient(weather.id);
+  if(todayRoad)setTimeout(()=>{if(state==='play')toastEv('今日路況',todayRoad.title,'#e5484d',todayRoad.emoji||'🚧');},1200);
   if(weather.id==='snow')captureMoment(MAP.ocean?'全台下雪了？！師傅照樣上工':'高雄下雪了？！我還在送洗衣','snow',6000);
   if(weather.id==='rain'&&prof.outfit!=='rain')captureMoment('下大雨沒穿雨衣，全身濕透照樣送件','rain',9000);
   const near=siteIds(['house']).sort((a,b)=>Math.hypot(S[a].dx-player.x,S[a].dz-player.z)-Math.hypot(S[b].dx-player.x,S[b].dz-player.z));
@@ -1784,10 +1793,17 @@ function endGame(){state='over';AU.stopMusic();AU.stopAmbient();AU.done();ev.che
   const rows=[['taskgo','報修結案',`施工照 ${stats.taskgo*3} 張`,stats.taskgo,'件'],['homigo','新房客入住',stats.homigo?`亮了 ${stats.homigo} 盞燈`:'還在等房客',stats.homigo,'戶'],['washgo','衣物收送','LINE 接單',stats.washgo,'袋']];
   $('#stats').innerHTML=rows.map(([k,a,b,n,u])=>`<div class="stat" style="--c:${BR[k].color}"><div class="top2">${chipHTML(k)}<div class="n">${n}<small>${u}</small></div></div><div class="d"><b>${a}</b>${b}</div></div>`).join('');
   lastReward=grantRewards();renderReward(lastReward);ping(true);setupSubmit();reportReferral();loadStats();renderMoments();
+  const nextBtn=$('#btnNext');
+  if(MAP.id==='s'&&(prof.earned>=MAPS.m.unlock||prof.passM>0)){nextBtn.hidden=false;nextBtn.textContent=prof.earned>=MAPS.m.unlock?'換中地圖再跑':'中地圖體驗一班';}
+  else if(MAP.id==='m'&&prof.earned>=MAPS.l.unlock){nextBtn.hidden=false;nextBtn.textContent='換大地圖再跑';}
+  else nextBtn.hidden=true;
+  const invBtn=$('#btnOverInvite');if(invBtn)invBtn.hidden=!!prof.tw.unlocked;
   const evs=[stats.dogsCaught?`被土狗包圍 ${stats.dogsCaught} 次`:stats.dogsEscaped?'甩掉土狗大隊':'',stats.tickets?`吃了 ${stats.tickets} 張罰單`:'',stats.lawful?'臨檢乖乖停車':'',stats.tools?'忘了帶扳手':'',stats.battery?(isEV()?'換了一次電池':'加了一次油'):'',stats.garbage?'幫忙追垃圾車':'',stats.tea?`喝了 ${stats.tea} 杯手搖飲`:'',stats.checkins?`打卡 ${stats.checkins} 個地標`:'',stats.incidents?`遇到 ${stats.incidents} 個突發路況`:''].filter(Boolean);
   $('#lineNote').textContent=LANG==='zh'?`今天${weather.name}${weather.id==='snow'?'（對，下雪）':''}，騎了 ${(player.dist*.002).toFixed(1)} 公里，完成 ${total} 張工單，最高連單 ×${stats.maxCombo.toFixed(1)}${stats.expired?`，逾時 ${stats.expired} 張`:''}${evs.length?'，'+evs.join('、'):''}。三個品牌的通知都從 LINE 進來，現場人員不用另外裝 App。`:[T('今天{0}，騎了 {1} 公里，完成 {2} 張工單，最高連單 ×{3}。',T(weather.name)+(weather.id==='snow'?T('（對，下雪）'):''),(player.dist*.002).toFixed(1),total,stats.maxCombo.toFixed(1)),stats.expired?T('有 {0} 張工單逾時。',stats.expired):'',evs.length?T('路上還{0}。',evs.map(e=>T(e)).join(T('、'))):'',T('三個品牌的通知都從 LINE 進來，現場人員不用另外裝 App。')].filter(Boolean).join(LSEP);
   showScreen('#over');const fs=$('#finalScore');const t0=performance.now();(function cnt(){const k=Math.min(1,(performance.now()-t0)/1100);fs.textContent=fmt(score*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(cnt);})();}
 $('#btnStart').addEventListener('click',startGame);$('#btnAgain').addEventListener('click',startGame);
+$('#btnNext').addEventListener('click',()=>{const id=MAP.id==='s'?'m':MAP.id==='m'?'l':null;if(!id||!isMapOpen(id))return;if(MAP.id!==id)loadMap(id);startGame();});
+$('#btnOverInvite').addEventListener('click',openInvite);
 $('#btnHome').addEventListener('click',toTitle);$('#btnPause').addEventListener('click',pauseGame);
 $('#btnResume').addEventListener('click',resumeGame);$('#btnQuit').addEventListener('click',toTitle);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseGame();});
@@ -2318,13 +2334,24 @@ const INC_MAKE={
         emit(player.x,.4,player.z,10,['#6b6f78','#8a8f98','#3d4048'],{smin:1,smax:3,vmin:2,vmax:4,lmin:.4,lmax:.8,szmin:.1,szmax:.2});stats.potholes=(stats.potholes||0)+1;captureMoment('全速撞進坑洞，工具箱差點飛出去','pothole',80);}
       else floatText('慢慢過～',player.x,2.6,player.z,'#fff','say');}}
 };
+const ROAD_IDS=['election','fire','works','dogrun','chicken','cat','unload','crane','riders','hazard','bus','ambulance','filming','wedding','temple','market','school','storm','flood','tree','pothole'];
+let todayRoad=null;
+function localRoad(){const key=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  let hash=0;for(let i=0;i<key.length;i++)hash=(Math.imul(hash,33)+key.charCodeAt(i))>>>0;
+  const id=ROAD_IDS[hash%ROAD_IDS.length];const d=INC_DEFS[id];return {id,title:d.n,emoji:d.e,line:''};}
+function paintRoad(road){todayRoad=road;const el=$('#roadTitle');if(!el||!road)return;el.hidden=false;el.textContent='';
+  el.innerHTML=`<span class="dl">今日路況</span><span>${road.emoji||''} ${road.title}</span>`;}
+function loadToday(){paintRoad(localRoad());
+  fetch((CONFIG.api||'/api/public/game')+'/today').then(r=>r.ok?r.json():null).then(d=>{if(d&&d.road&&INC_DEFS[d.road.id])paintRoad({id:d.road.id,title:d.road.title||INC_DEFS[d.road.id].n,emoji:INC_DEFS[d.road.id].e,line:d.road.line||''});}).catch(()=>{});}
 function incWeight(k){const d=INC_DEFS[k];let w=d.w;const p=gt/DUR;const wet=weather.id==='rain';
-  if(k==='school'){const h=9+p*9;if(h<15.25||h>17.5)return 0;}
-  if(k==='storm'&&(weather.id==='rain'||weather.id==='snow'||p>.75))return 0;
+  if(k==='school'){const h=9+p*9;if(h<15.25||h>17.5)w=0;}
+  if(k==='storm'&&(weather.id==='rain'||weather.id==='snow'||p>.75))w=0;
   if(k==='flood')w*=wet?3:.5;if(k==='tree')w*=wet||weather.id==='wind'?2.5:.6;
+  if(todayRoad&&k===todayRoad.id){if(w<=0)w=d.w;w*=8;}
   return w;}
 function spawnIncident(){const opts=INC_KEYS.filter(k=>!inc.used.has(k)).map(k=>[k,incWeight(k)]).filter(o=>o[1]>0);if(!opts.length)return;
   let r=Math.random()*opts.reduce((a,o)=>a+o[1],0),k=opts[0][0];for(const o of opts){r-=o[1];if(r<0){k=o[0];break;}}
+  if(todayRoad&&!inc.used.has(todayRoad.id)&&inc.list.length===0&&gt<40&&incWeight(todayRoad.id)>0&&Math.random()<0.72)k=todayRoad.id;
   const o={key:k,t:0,cols:[],veh:[],say:rnd(.5,1.5),pop:1,sir:0,cd:0};
   if(k!=='ambulance'&&k!=='wedding'&&k!=='storm'){const seg=incSeg(16,MAP.ocean?60:44);if(!seg){inc.used.add(k);return;}o.seg=seg;o.x=seg.x;o.z=seg.z;}
   const ok=INC_MAKE[k](o);if(ok===false){inc.used.add(k);return;}
@@ -2537,7 +2564,7 @@ function checkLandmarks(){landmarks.forEach(l=>{if(l.hit)return;if(Math.hypot(pl
 async function boot(){
   try{await Promise.race([Promise.all([document.fonts.load('40px Huninn','Homigo社宅包租代管中心Washgo洗衣TaskGo工務所匠城便利商店檳榔林王張黃吳宅中華路四維林森三多×'),
     document.fonts.load('700 20px "Noto Sans TC"','待轉慢'),i18nFonts()]),new Promise(r=>setTimeout(r,2500))]);}catch(e){}
-  const first=challengeMap&&isMapOpen(challengeMap)?challengeMap:(isMapOpen(prof.map)&&prof.map!=='t'?prof.map:(prof.map==='t'&&prof.tw.unlocked?'t':'s'));loadMap(first);checkApi().then(()=>checkReferral(true));
+  const first=challengeMap&&isMapOpen(challengeMap)?challengeMap:(isMapOpen(prof.map)&&prof.map!=='t'?prof.map:(prof.map==='t'&&prof.tw.unlocked?'t':'s'));loadMap(first);checkApi().then(()=>checkReferral(true));loadToday();
   if(refIncoming&&!challenge&&!imported){const c=$('#challenge');c.hidden=false;c.innerHTML='朋友邀請你來匠城跑一班！你玩完一班，他就能解鎖<b>隱藏版台灣地圖</b>。';}
   setDay(.2);state='title';renderProfile();renderMaps();if(imported){const c=$('#challenge');c.hidden=false;c.innerHTML=(challenge?c.innerHTML+'<br>':'')+`已帶入你的進度：<b>${fmt(prof.coins)}</b> 匠幣，造型和成就也都在。`;}const b=$('#btnStart');b.disabled=false;b.textContent='開始上工';
 }

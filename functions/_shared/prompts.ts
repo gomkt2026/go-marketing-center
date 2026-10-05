@@ -1166,7 +1166,7 @@ export function buildGamePromoPrompt(params: {
         : '';
   return [
     voice.threadsCraft ?? '',
-    '這篇是「匠城出任務」遊戲推廣。只講下面這一個事實，不要加沒寫到的功能、分數、獎品、下載量或活動。',
+    '這篇是「匠城出任務」今天的實況。只講下面這一個事實，數字不要改，不要加沒寫到的功能、分數、獎品、下載量或活動。',
     `角度:${params.angle.hook}`,
     `可講的事實:${params.angle.fact}`,
     '需要收尾時只能再帶一句：手機瀏覽器就能玩。網址必須原樣出現一次：',
@@ -1174,7 +1174,7 @@ export function buildGamePromoPrompt(params: {
     cut,
     `字數不超過 ${limit} 字。2-4 個短段落、一句一行。`,
     params.usedHooks.length ? `這些鉤子最近用過，不要重寫同一個開頭：${params.usedHooks.join('、')}` : '',
-    `posterHeadline 用「${params.angle.hook}」，或同義的 4-10 字繁中。`,
+    `posterHeadline 用「${params.angle.hook}」，超過 10 字就改成同義的 4-10 字繁中。`,
     '回傳 JSON: {"title":"內部標題","body":"貼文全文","hashtags":["不含#的標籤"],"cta":"一句","posterHeadline":"4-10字","posterAccent":""}',
   ].filter(Boolean).join('\n');
 }

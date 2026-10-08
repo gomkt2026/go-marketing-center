@@ -61,6 +61,13 @@ function zhLen(text?: string | null) {
   return (text || '').replace(/\s+/g, '').length;
 }
 
+/** 與官網 ingest 相同：Homigo／TaskGo 含換行，Washgo 不含空白。 */
+function websiteBodyLen(text: string | null | undefined, slug?: string) {
+  const trimmed = (text || '').trim();
+  if (slug === 'washgo') return Array.from(trimmed.replace(/\s+/g, '')).length;
+  return Array.from(trimmed).length;
+}
+
 function ZhCount({ n, min, max }: { n: number; min: number; max: number }) {
   const ok = n >= min && n <= max;
   return (
@@ -407,7 +414,7 @@ export function ContentCenter() {
                   {isWebsiteArticle(selected) && (
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
                       正文
-                      <ZhCount n={zhLen(latestVersion(selected).body)} min={800} max={1800} />
+                      <ZhCount n={websiteBodyLen(latestVersion(selected).body, slug)} min={800} max={1800} />
                     </div>
                   )}
                   <p style={{ fontSize: 14, color: 'var(--color-text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{latestVersion(selected).body}</p>

@@ -1148,7 +1148,8 @@ export async function generateSeoArticle(
         content: [
           `你寫「${params.brandCtx.name}」官網 SEO／AEO 長文，給 Google 與 AI 搜尋收錄。不是 Threads、IG、FB 貼文，也不要把短文拉長。`,
           '繁體中文（台灣用語）。開頭直接回答，不要故事、不要先廣告。',
-          '正文 900 到 1500 字（不含答案區與 FAQ），至少 3 個 H2。不可少於 800 字，也不可超過 1800 字。',
+          '正文 1000 到 1400 個漢字（不含答案區與 FAQ），至少 3 個 H2。',
+          'Homigo、TaskGo 連換行也算進 800–1800；Washgo 不算空白。含換行的整篇不要超過 1600，也不要少於 900 個漢字。',
           '順序：answer_box 先答主關鍵字（80-140 字）→ 正文把相關詞寫進真實場景 → FAQ 正好 3 題 → CTA 只放 cta 欄位，不要寫進 body。',
           '主關鍵字寫進 title、seo_title、seo_description、answer_box、一個 H2。',
           'FAQ 問句像搜尋原話，答案 2 句、可獨立被摘。禁止「歡迎詢問」「視情況而定」。',
@@ -1173,7 +1174,7 @@ export async function generateSeoArticle(
           audience ? `受眾:${audience}` : '',
           extra,
           '',
-          `回傳 JSON:{"title":"12-32字","description":"40-90字","body":"900-1500字 markdown，至少3個##，不要含FAQ，不要超過1800字","outline":["H2"],"answer_box":"80-140字","primary_keyword":"恰好1個","related_terms":["6個相關詞"],"search_intent":"informational或solution","category":"${params.marketSignalId ? 'pain|product|policy|trust|talk' : 'pain|product|trust|talk'}","audience":"consumer或merchant","faq":[{"question":"","answer":""},{"question":"","answer":""},{"question":"","answer":""}],"cta":"${cta}","seoMeta":{"slug":"english-slug","seo_title":"含主關鍵字，12-32字","seo_description":"70-120字"}}`,
+          `回傳 JSON:{"title":"12-32字","description":"40-90字","body":"1000-1400個漢字的 markdown，至少3個##，不要含FAQ，含換行不要超過1600","outline":["H2"],"answer_box":"80-140字","primary_keyword":"恰好1個","related_terms":["6個相關詞"],"search_intent":"informational或solution","category":"${params.marketSignalId ? 'pain|product|policy|trust|talk' : 'pain|product|trust|talk'}","audience":"consumer或merchant","faq":[{"question":"","answer":""},{"question":"","answer":""},{"question":"","answer":""}],"cta":"${cta}","seoMeta":{"slug":"english-slug","seo_title":"含主關鍵字，12-32字","seo_description":"70-120字"}}`,
         ].filter(Boolean).join('\n'),
       },
     ],

@@ -16,6 +16,7 @@ import {
   buildWebsitePayload,
   ensureWebsiteBody,
   loadWebsiteDestination,
+  websiteBodyChars,
   publishWebsiteArticle,
   validateWebsitePayload,
   websiteCta,
@@ -351,24 +352,38 @@ async function writeUntilValid(
     searchIntent: pick.searchIntent,
     audience: pick.audience,
   };
-  let extra = '這篇會直接發到官網。開頭先回答搜尋題，文末才放指定 CTA。不要寫成政策時事分類。';
-  let article = await generateSeoArticle(env, {
+  const fit = (article: SeoArticleResult): SeoArticleResult => ({
+    ...article,
+    body: ensureWebsiteBody(article.body, {
+      slug: brandCtx.slug,
+      topic: article.title,
+      angle: article.answer_box,
+      primaryKeyword: article.primary_keyword,
+      relatedTerms: article.related_terms,
+      audience: article.audience,
+    }),
+  });
+  let extra = '這篇會直接發到官網，沒有人工審閱。開頭先回答搜尋題，文末才放指定 CTA。不要寫成政策時事分類。正文用該品牌官網算法落在 800–1800：Homigo、TaskGo 含換行，Washgo 不含空白。';
+  let article = fit(await generateSeoArticle(env, {
     brandCtx,
     sourceTitle: pick.topic,
     sourceSummary,
     topicSeed: seed,
     extraInstruction: extra,
-  });
+  }));
   let problems = articleProblems(brandCtx.slug, article);
   if (!problems.length) return article;
-  extra = `上一稿未通過，必須改正後才能發布：${problems.slice(0, 6).join('；')}。仍然只能用原本提供的事實。`;
-  article = await generateSeoArticle(env, {
+  if (problems.every((item) => item.startsWith('body_md'))) {
+    throw new Error(`未通過發布規範：${problems.slice(0, 6).join('；')}`);
+  }
+  extra = `上一稿未通過，必須改正後才能發布：${problems.slice(0, 6).join('；')}。仍然只能用原本提供的事實。正文維持該品牌 800–1800 字。`;
+  article = fit(await generateSeoArticle(env, {
     brandCtx,
     sourceTitle: pick.topic,
     sourceSummary,
     topicSeed: seed,
     extraInstruction: extra,
-  });
+  }));
   problems = articleProblems(brandCtx.slug, article);
   if (problems.length) throw new Error(`未通過發布規範：${problems.slice(0, 6).join('；')}`);
   return article;
@@ -393,6 +408,10 @@ async function publishNow(
     relatedTerms: article.related_terms,
     audience: article.audience,
   });
+  const fitted = websiteBodyChars(bodyMd, brand.slug);
+  if (fitted < 800 || fitted > 1800) {
+    throw new Error(`body_md 須 800–1800 字（目前 ${fitted}）`);
+  }
   const send = async () => {
     const payload = buildWebsitePayload({
       contentId,

@@ -404,6 +404,12 @@ export function ContentCenter() {
                     background: 'var(--color-bg-soft)', borderRadius: 12, padding: 18, marginBottom: 14,
                   }}
                 >
+                  {isWebsiteArticle(selected) && (
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+                      正文
+                      <ZhCount n={zhLen(latestVersion(selected).body)} min={800} max={1800} />
+                    </div>
+                  )}
                   <p style={{ fontSize: 14, color: 'var(--color-text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{latestVersion(selected).body}</p>
                   {selected.generationPromptMeta?.replyBody && (
                     <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--color-border)' }}>

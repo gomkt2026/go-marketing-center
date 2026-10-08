@@ -75,8 +75,8 @@ export interface WebsiteDestination {
   ingestKeyEnc: string | null;
 }
 
-/** 官網 SEO 長文正文（不含答案區與 FAQ）。500 字以上即可發布。 */
-export const WEBSITE_BODY_MIN_CHARS = 500;
+/** 官網 SEO 長文正文（不含答案區與 FAQ）。三品牌 ingest 都要求 800–1800 字。 */
+export const WEBSITE_BODY_MIN_CHARS = 800;
 export const WEBSITE_BODY_MAX_CHARS = 1800;
 
 const DEFAULT_DESTINATIONS: Record<string, { blogBaseUrl: string; ingestBaseUrl: string }> = {
@@ -269,7 +269,7 @@ function clipBodyParagraphs(body: string, max: number): string {
   return out.trim() || clipZh(body, max);
 }
 
-/** 模型寫太短時補上可核實的段落，讓三品牌長文都能過 500 字、不必再打一輪模型。 */
+/** 模型寫太短時補上可核實的段落，讓三品牌長文都落在 800–1800 字。 */
 export function ensureWebsiteBody(
   body: string,
   params: {
@@ -304,20 +304,63 @@ export function ensureWebsiteBody(
     websiteBodyCloser(params.slug, params.audience),
   ];
   const headingCount = (text: string) => (text.match(/^##\s+\S/gm) ?? []).length;
-  for (const section of supplements) {
-    const longEnough = zhCharCount(current) >= WEBSITE_BODY_MIN_CHARS;
-    const headed = headingCount(current) >= 3;
-    if (longEnough && headed) break;
-    if (zhCharCount(current) > WEBSITE_BODY_MAX_CHARS - 80) break;
-    const marker = section.slice(0, 18);
-    if (marker && current.includes(marker)) continue;
-    current = `${current}\n\n${section}`.trim();
+  const alreadyUsable = zhCharCount(current) >= 500 && headingCount(current) >= 3;
+  if (!alreadyUsable) {
+    for (const section of supplements) {
+      const longEnough = zhCharCount(current) >= WEBSITE_BODY_MIN_CHARS;
+      const headed = headingCount(current) >= 3;
+      if (longEnough && headed) break;
+      if (zhCharCount(current) > WEBSITE_BODY_MAX_CHARS - 80) break;
+      const marker = section.slice(0, 18);
+      if (marker && current.includes(marker)) continue;
+      current = `${current}\n\n${section}`.trim();
+    }
   }
-  if (zhCharCount(current) < WEBSITE_BODY_MIN_CHARS) {
-    current = `${current}\n\n把上面幾段對過一次：紀錄在哪、誰會看到沒做完、月底能不能對上。這三件對得上，再決定要不要把提醒改到同一個管道。不確定的數字、客戶數與保證成效都不要寫成事實。`.trim();
+  for (const piece of websiteBodyPads(params.slug, params.audience)) {
+    if (zhCharCount(current) >= WEBSITE_BODY_MIN_CHARS) break;
+    if (zhCharCount(current) > WEBSITE_BODY_MAX_CHARS - 80) break;
+    if (current.includes(piece.slice(0, 16))) continue;
+    current = `${current}\n\n${piece}`.trim();
+  }
+  if (zhCharCount(current) < WEBSITE_BODY_MIN_CHARS && zhCharCount(current) <= WEBSITE_BODY_MAX_CHARS - 80) {
+    current = `${current}\n\n做得到的做法是：該看的紀錄留在同一處、未完成的事會被看到、對帳時項目對得上。先把現在散落的表格與聊天紀錄對過一次，再決定哪一段要改到同一個管道。先核對帳單、進度與通知是不是留在同一筆，再決定要不要改流程。不確定的數字、客戶數與保證成效都不要寫成事實。`.trim();
   }
   if (zhCharCount(current) > WEBSITE_BODY_MAX_CHARS) return clipBodyParagraphs(current, WEBSITE_BODY_MAX_CHARS);
   return current;
+}
+
+function websiteBodyPads(slug: string, audience?: string | null): string[] {
+  if (slug === 'homigo') {
+    return [
+      '催繳可以先看這一期還沒付的帳單，再決定要不要發 LINE 通知。通知只講金額與截止日，不要把所有歷史一次洗版。逾期幾天、有沒有部分付款，都留在同一筆紀錄裡，下次對帳才對得上。',
+      '報修則把房客回報、照片與目前進度放在同一筆。房東不用在聊天室翻「修好了沒」，房客也看得到處理到哪一步。結案時留下時間與照片，之後退租或押金爭議才有得對。',
+      '合約與點交照片分開存，到期前提醒續約或退租。押金怎麼算仍以契約為準，系統只幫你把入住、修繕與繳款紀錄留在同一個地方，不代替法律判斷，也不保證收租率。',
+    ];
+  }
+  if (slug === 'taskgo') {
+    return [
+      '派工當天先看誰被排到哪個案場、有沒有打卡。沒到的人要能從名單裡看出來，而不是等師傅回覆聊天室。出勤、定位與照片是為了讓現場和請款對得上，不是用來監控員工。',
+      '施工回報至少留下做了什麼、拍了哪裡、誰簽名。浮水印照片和簽名之後才能拿來對帳。月底才發現案子賠錢，通常是因為這些紀錄散在不同群組，而不是因為沒有人做事。',
+      '請款時把打卡、回報與成本放在同一處對。對不上的項目先標出來，不要先保證幾天內入帳，也不要寫成接案量會因此增加。TaskGo 只把現場已經發生的事留成可以回查的紀錄。',
+    ];
+  }
+  if (slug === 'washgo' && audience === 'merchant') {
+    return [
+      '店裡可以先改收件這一段：手寫單改成雲端訂單，品項、洗標與報價留在同一筆。關店對帳時不用再翻紙本。沒有寫在訂單上的客戶數、門市數或滿意度，都不要當成事實。',
+      '門市和洗廠之間的衣物調撥，用任務而不是群組訊息。司機取件、簽收與回貨要能對到原來那一筆訂單。Washgo 是衣物洗滌，不是洗車，也不保證布料不縮水。',
+      '客人問衣服洗到哪，店主要能回答現在在門市、在途中還是在洗廠。這個節點來自訂單紀錄，不是事後回想。客戶與門市員工都不必另外下載 App。',
+    ];
+  }
+  if (slug === 'washgo') {
+    return [
+      '送洗前先看洗標，線上報價確認後才洗。羽絨、大衣或容易縮水的材質，不要自己保證洗完跟新的一樣。到府收送是為了避開洗衣店上班時間，不是把店裡的流程省略掉。',
+      '衣服走出門之後，要能在 LINE 看到收到、清洗、可取件這幾個節點。問「洗到哪了」時，答案來自這筆記錄，而不是請店家再翻一次單。Washgo 是衣物洗滌，不是洗車。',
+      '週末衣服堆在家、平日店沒開，是到府收送要處理的情境。取件範圍、時段與報價以當次訂單為準。不要寫未核實的客戶數，也不要寫保證不縮水。',
+    ];
+  }
+  return [
+    '先把紀錄現在放在哪裡寫下來：表格、聊天室，還是口頭交代。沒做完的事要有人看得到，月底對帳時項目要對得上。不確定的數字不要寫成事實。',
+  ];
 }
 
 function websiteBodyCloser(slug: string, audience?: string | null): string {
@@ -609,8 +652,9 @@ export function validateWebsitePayload(params: {
     errors.push(`answer_box 須 80–150 字（目前 ${answerLen}）`);
   }
   const bodyLen = zhCharCount(bodyMd);
-  if (bodyLen < WEBSITE_BODY_MIN_CHARS) errors.push(`正文須至少 ${WEBSITE_BODY_MIN_CHARS} 字（目前 ${bodyLen}）`);
-  if (bodyLen > WEBSITE_BODY_MAX_CHARS) errors.push(`正文勿超過 ${WEBSITE_BODY_MAX_CHARS} 字（目前 ${bodyLen}）`);
+  if (bodyLen < WEBSITE_BODY_MIN_CHARS || bodyLen > WEBSITE_BODY_MAX_CHARS) {
+    errors.push(`body_md 須 ${WEBSITE_BODY_MIN_CHARS}–${WEBSITE_BODY_MAX_CHARS} 字（目前 ${bodyLen}）`);
+  }
   if (new TextEncoder().encode(bodyMd).length > 50 * 1024) errors.push('body_md 過長');
   if (seoMeta.faq.length < 3) errors.push('FAQ 至少 3 題');
   if (seoMeta.category === 'policy' && !seoMeta.market_signal_id) {

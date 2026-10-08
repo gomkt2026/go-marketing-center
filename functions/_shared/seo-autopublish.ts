@@ -14,6 +14,7 @@ import {
 } from './seo-topics';
 import {
   buildWebsitePayload,
+  ensureWebsiteBody,
   loadWebsiteDestination,
   publishWebsiteArticle,
   validateWebsitePayload,
@@ -384,11 +385,19 @@ async function publishNow(
   if (!dest?.ingestBaseUrl || !dest.hasIngestKey) throw new Error('官網 ingest 尚未設定，不能直接發布');
   const sql = getSql(env);
   let seoMeta: WebsiteSeoMeta = article.seoMeta;
+  const bodyMd = ensureWebsiteBody(article.body, {
+    slug: brand.slug,
+    topic: article.title,
+    angle: article.answer_box,
+    primaryKeyword: article.primary_keyword,
+    relatedTerms: article.related_terms,
+    audience: article.audience,
+  });
   const send = async () => {
     const payload = buildWebsitePayload({
       contentId,
       title: article.title,
-      bodyMd: article.body,
+      bodyMd,
       cta: websiteCta(brand.slug, seoMeta.audience),
       seoMeta,
     });
@@ -405,7 +414,7 @@ async function publishNow(
   }
   seoMeta = { ...seoMeta, public_url: published.article.public_url };
   await sql`
-    UPDATE content_versions SET seo_meta = ${JSON.stringify(seoMeta)}
+    UPDATE content_versions SET body = ${bodyMd}, seo_meta = ${JSON.stringify(seoMeta)}
     WHERE id = ${versionId}::uuid
   `;
   const jobRows = await sql`

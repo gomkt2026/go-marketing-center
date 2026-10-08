@@ -11,8 +11,8 @@ import { json, error } from '../../../_shared/response';
 import {
   loadWebsiteDestination, normalizeWebsiteSeoMeta, validateWebsitePayload,
   buildWebsitePayload, publishWebsiteArticle, isWebsiteSeoContent,
-  applyWebsiteArticleMigration, isMissingWebsiteArticleSchema, websiteCta,
-  ensureWebsiteSeoMetaLengths, reconcilePolicyCategory,
+  applyWebsiteArticleMigration, isMissingWebsiteArticleSchema,   websiteCta,
+  ensureWebsiteSeoMetaLengths, ensureWebsiteBody, reconcilePolicyCategory,
 } from '../../../_shared/website-articles';
 
 const PLATFORM_LABELS: Record<string, string> = { threads: 'Threads', facebook: 'Facebook', instagram: 'Instagram', website: '官網' };
@@ -65,13 +65,21 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         || (version.seo_meta as { title?: string } | null)?.title
         || content.title,
     }, dest.slug), content.title, version.body || '', dest.slug), content.source_market_signal_id);
+    const bodyMd = ensureWebsiteBody(version.body || '', {
+      slug: dest.slug,
+      topic: content.title || seoMeta.primary_keyword || '這件事',
+      angle: seoMeta.answer_box,
+      primaryKeyword: seoMeta.primary_keyword,
+      relatedTerms: seoMeta.related_terms,
+      audience: seoMeta.audience,
+    });
     const cta = websiteCta(dest.slug, seoMeta.audience);
     const payloadErrors = validateWebsitePayload({
       slug: dest.slug,
       title: content.title,
       description: seoMeta.description || seoMeta.seo_description,
       seoMeta,
-      bodyMd: version.body || '',
+      bodyMd,
       cta,
     });
     if (payloadErrors.length) {
@@ -80,7 +88,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const payload = buildWebsitePayload({
       contentId,
       title: content.title,
-      bodyMd: version.body || '',
+      bodyMd,
       cta,
       seoMeta,
     });
@@ -93,7 +101,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
     seoMeta.public_url = published.public_url;
     await sql`
-      UPDATE content_versions SET seo_meta = ${JSON.stringify(seoMeta)}, cta = ${cta}
+      UPDATE content_versions SET body = ${bodyMd}, seo_meta = ${JSON.stringify(seoMeta)}, cta = ${cta}
       WHERE id = ${version.id}::uuid
     `;
     let jobRows;

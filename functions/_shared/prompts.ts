@@ -1516,6 +1516,225 @@ export function buildOfftopicUserPrompt(usedTopics: string[], brandSlug?: string
 }
 
 // ============================================================================
+// Threads 流量文。非匠城檔拿來引發留言，不拿來介紹產品。
+// Threads 上容易被討論的包裝：兩性、感情、搞笑、知識點、冷笑話、一句話有共鳴。
+// 三個帳號各有一個被驗證過的題：
+//   TaskGo：移工。台灣人對這個群體有歧視，也有共感，所以會站隊、會講自己遇過的。
+//     10/7 那篇 113,281 次瀏覽就是這個題。
+//   Homigo：租客的早餐。樓下那家、最怪的組合、最好喝的飲料。10/7 早餐店死循環 11,770 次。
+//   Washgo：洗過最特別的、最貴的，或自助洗衣看過最奇葩的衣物。目的是讓人回自己的故事。
+// ============================================================================
+
+export type TrafficFormulaId =
+  | 'migrant_line' | 'migrant_joke' | 'migrant_love' | 'migrant_scene' | 'migrant_fact' | 'migrant_turn'
+  | 'breakfast_shop' | 'breakfast_combo' | 'breakfast_drink' | 'breakfast_loop' | 'breakfast_line' | 'breakfast_move'
+  | 'laundry_special' | 'laundry_price' | 'laundry_weird' | 'laundry_joke' | 'laundry_line' | 'laundry_couple';
+
+interface TrafficAngle {
+  id: TrafficFormulaId;
+  label: string;
+  maxChars: number;
+  instruction: string;
+}
+
+const TRAFFIC_ANGLES: Record<string, TrafficAngle[]> = {
+  taskgo: [
+    {
+      id: 'migrant_line',
+      label: '移工一句話',
+      maxChars: 220,
+      instruction:
+        '包裝是「一句話有共鳴」。寫台灣人在工地很順口的一句話，例如把人叫成便宜勞力、覺得他們吃很少就飽。' +
+        '先放出那句話，再給一個具體的人如何反應。最後問：你有沒有講過類似的話，或是聽到會不舒服？' +
+        '讓人想站隊，不要寫成人權論文。',
+    },
+    {
+      id: 'migrant_joke',
+      label: '移工冷笑話',
+      maxChars: 260,
+      instruction:
+        '包裝是冷笑話或搞笑。寫一個跟移工相處時語言、便當、名字叫錯的具體笑點，要好笑，也要讓人想回「我也遇過」。' +
+        '不要嘲笑對方的口音到傷人，笑點放在台灣人自己的尷尬。',
+    },
+    {
+      id: 'migrant_love',
+      label: '移工感情',
+      maxChars: 280,
+      instruction:
+        '包裝是兩性或感情。寫跟移工談戀愛、或移工的另一半被親戚問「他是做什麼的」的一個畫面。' +
+        '短，有一句對話。最後邀請大家講自己看過的。不要寫成長篇散文，不要色情。',
+    },
+    {
+      id: 'migrant_scene',
+      label: '移工被留下',
+      maxChars: 220,
+      instruction:
+        '包裝是一個現場。昨天，一個移工被一句話看不起，然後用兩三個動作讓對方改口。' +
+        '看不起的話和改口的話都用引號。最後問：你身邊有沒有這種後來被留下的人？' +
+        '不要再寫越南師傅砌磚、不要寫「怎麼派個外勞來」。',
+    },
+    {
+      id: 'migrant_fact',
+      label: '移工知識點',
+      maxChars: 220,
+      instruction:
+        '包裝是知識點，但只能是一個生活畫面，例如他們自己帶便當、薪水怎麼寄回家、休息時在跟誰視訊。' +
+        '不要政策、不要法規、不要數字堆疊。最後留一個「你知道嗎」之後的提問，讓人補自己看過的。',
+    },
+    {
+      id: 'migrant_turn',
+      label: '移工改觀',
+      maxChars: 240,
+      instruction:
+        '包裝是共感。寫一個原本跟著偏見走、後來因為一件小事改觀的瞬間。' +
+        '最後直接問：你遇過哪個移工，讓你沒辦法再把他們講成同一種人？',
+    },
+  ],
+  homigo: [
+    {
+      id: 'breakfast_shop',
+      label: '樓下早餐',
+      maxChars: 240,
+      instruction:
+        '你是租客。寫搬家之後才發現，一家的個性都在樓下那家早餐店。' +
+        '給一個具體的店、一個你固定點的東西。最後問：你住的地方，樓下那家你最常點什麼？' +
+        '不要寫押金、合約、房東房客糾紛。',
+    },
+    {
+      id: 'breakfast_combo',
+      label: '怪早餐組合',
+      maxChars: 240,
+      instruction:
+        '發明一份菜單上沒有、但某群租客真的會點的早餐。味道可以怪，食物必須是新的。' +
+        '禁止蘿蔔糕、土司夾起司、起司蛋。老闆用一句話反應。最後問：你吃過哪一份組合，講出來朋友會覺得你有病？',
+    },
+    {
+      id: 'breakfast_drink',
+      label: '早餐飲料',
+      maxChars: 220,
+      instruction:
+        '寫租屋樓下早餐店的一杯飲料。紅茶、豆漿、米漿、咖啡都可以，但只寫一杯，寫出它為什麼好喝或為什麼雷。' +
+        '最後問：你在早餐店喝過最好喝的是哪一杯？',
+    },
+    {
+      id: 'breakfast_loop',
+      label: '早餐店死循環',
+      maxChars: 280,
+      instruction:
+        '寫早餐店點餐的對話死循環，來回至少三輪，邏輯越講越死。敘事者當下僵住，最後用「現在我學乖了」收成一個閃避句。' +
+        '不要複製「起司蛋要不要加起司」。最後仍要讓人想回自己遇過的點餐災難。',
+    },
+    {
+      id: 'breakfast_line',
+      label: '租屋早餐一句話',
+      maxChars: 180,
+      instruction:
+        '一句話有共鳴。只講租客才懂的早餐，例如搬家第一週還不知道哪家不會把蛋餅煎焦。' +
+        '短。最後問一個大家想回的問題。',
+    },
+    {
+      id: 'breakfast_move',
+      label: '搬幾次換幾家',
+      maxChars: 240,
+      instruction:
+        '寫搬過幾次家、樓下早餐就換過幾次個性。每家用一個食物當標籤。' +
+        '最後問：你為了一家早餐店留下來過嗎？不要寫租金和合約。',
+    },
+  ],
+  washgo: [
+    {
+      id: 'laundry_special',
+      label: '洗過最特別的',
+      maxChars: 240,
+      instruction:
+        '寫一件你洗過最特別的衣服或物品，具體到顏色、場合、為什麼特別。' +
+        '最後問：你洗過最特別的是什麼？不要教洗法，不要推產品。',
+    },
+    {
+      id: 'laundry_price',
+      label: '洗過最貴的',
+      maxChars: 240,
+      instruction:
+        '寫一件貴到洗的時候手會抖的衣服。可以講大概的心疼，不要捏造精確牌價。' +
+        '最後問：你洗過最貴、最不敢搞砸的是哪一件？',
+    },
+    {
+      id: 'laundry_weird',
+      label: '自助洗衣奇葩',
+      maxChars: 260,
+      instruction:
+        '寫自助洗衣店裡一件不該出現在機器裡的東西。借「什麼都洗得進去」的感覺，但東西要新發明。' +
+        '禁止直接寫黑色蕾絲吊帶。可以是一只鞋、頭紗、安全帽、布偶、窗簾，或一件誰都不想承認的衣服。' +
+        '主人用一句話反應。不寫身體，不色情。最後問一個別人想用自己的奇葩回覆的問題。',
+    },
+    {
+      id: 'laundry_joke',
+      label: '洗衣冷笑話',
+      maxChars: 240,
+      instruction:
+        '一個洗衣冷笑話或死循環，例如洗標越看越不懂、烘衣機前的人各說各話。要短、要好笑。' +
+        '不要複製「快了但還有一件」。最後讓人想回自己的版本。',
+    },
+    {
+      id: 'laundry_line',
+      label: '洗衣一句話',
+      maxChars: 180,
+      instruction:
+        '一句話有共鳴。例如有些衣服洗完就再也不是原來那件。短，然後問大家同意不同意，或問他們犧牲過哪一件。',
+    },
+    {
+      id: 'laundry_couple',
+      label: '情侶的衣服',
+      maxChars: 260,
+      instruction:
+        '包裝是兩性。寫情侶或室友之間，有一件誰都不想承認的衣服出現在洗衣袋裡。' +
+        '可以點到情趣內衣，但只寫發現的當下和好笑，不寫身體。' +
+        '最後問：你有沒有洗到一件不敢問是誰的？',
+    },
+  ],
+};
+
+const TRAFFIC_HOURS = [0, 6, 9, 12, 18, 21];
+
+export function trafficFormulaFor(slug: string, hourTw: number): TrafficFormulaId {
+  const angles = TRAFFIC_ANGLES[slug] ?? TRAFFIC_ANGLES.homigo;
+  const index = Math.max(0, TRAFFIC_HOURS.indexOf(hourTw));
+  return angles[index % angles.length].id;
+}
+
+export const TRAFFIC_SYSTEM_PROMPT =
+  '你是會在 Threads 上引發討論的台灣人，不是品牌小編，也不是老師。' +
+  '題目只做一個。先想一個沒被寫過的具體東西，再讓一個人講一句話。' +
+  '範例只是燃料：借它的情緒和討論點，禁止把範例原句、原食物、原衣服寫進正文。' +
+  '有流量的形狀是：一個現場、一句引號、一個轉折、最後一個陌生人用十個字就回得了的問題。不要下結論，不要教人該怎麼想。' +
+  '禁止品牌名、產品、系統、App、連結、hashtag、促銷、教學條列。' +
+  '禁止這些已用過的橋：越南師傅砌磚、怎麼派個外勞、外勞比較便宜、起司蛋要不要加、蘿蔔糕塞土司、瘦學徒爬鷹架、女師傅抓漏、室友倒垃圾、捷運讓座、烘衣機快了、黑色蕾絲吊帶、室友問這件是誰的。';
+
+export function composeTrafficPrompt(opts: {
+  brandSlug: string;
+  formula: TrafficFormulaId;
+  usedTopics: string[];
+}): { prompt: string; category: TrafficFormulaId; label: string; maxChars: number } {
+  const angles = TRAFFIC_ANGLES[opts.brandSlug] ?? TRAFFIC_ANGLES.homigo;
+  const angle = angles.find((item) => item.id === opts.formula) ?? angles[0];
+  return {
+    category: angle.id,
+    label: angle.label,
+    maxChars: angle.maxChars,
+    prompt: [
+      '寫一則 Threads。目的是讓陌生人留言講自己的版本，不是介紹任何品牌。',
+      `這一則的題目是「${angle.label}」。題目是方向，不是句子。`,
+      angle.instruction,
+      '創意要求：正文裡要有一個題目說明沒寫過的具體名詞。對話只留一句最狠的。不要解釋笑點，不要收成道理。',
+      `正文 ${Math.max(80, angle.maxChars - 80)} 到 ${angle.maxChars} 字，一句一行。`,
+      '不要 hashtag，不要連結，不要第二則回覆。',
+      opts.usedTopics.length ? `這些標題和開頭最近用過，場景、食物、衣服、人名都要換：\n${opts.usedTopics.join('\n')}` : '',
+      '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","hashtags":[],"cta":""}',
+    ].filter(Boolean).join('\n'),
+  };
+}
+
+// ============================================================================
 // Go 生態系 X(Twitter) 帳號:全新的英文獨立人格,不代表任何單一品牌的翻譯版。
 // 素材只能來自 buildCollaborationContext() 讀到的 Go 生態系 Collaboration Brief
 // (含各品牌 can_claim 等級的公開事實),絕對不能碰任一品牌完整的 Brand Knowledge。

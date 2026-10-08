@@ -43,8 +43,8 @@ export const THREADS_OFFTOPIC_FAMILY: PostingSlotKind[] = [
 
 export const THREADS_KIND_LABEL: Record<PostingSlotKind, string> = {
   daily_theme: '每日主題',
-  threads_hourly: '熱議跟風',
-  threads_offtopic: '生活梗文',
+  threads_hourly: '流量文',
+  threads_offtopic: '流量文',
   threads_love: '感情散文',
   threads_weather: '天氣季節',
   threads_entertainment: '娛樂影視',
@@ -319,6 +319,56 @@ function fallbackSlots(brands: Array<{ id: string; slug: string }>): PostingSlot
 }
 
 let gameSlotsRetired = false;
+let trafficMixEnsured = false;
+
+const TRAFFIC_BRANDS = ['homigo', 'taskgo', 'washgo'];
+const TRAFFIC_HOURS = [0, 6, 9, 10, 12, 18, 21];
+const TRAFFIC_KINDS = [
+  'threads_hourly', 'threads_hourly', 'threads_offtopic', 'threads_game',
+  'threads_hourly', 'threads_hourly', 'threads_offtopic',
+];
+
+/** 三品牌 Threads：只留 10:00 匠城，其餘時段改成流量文。 */
+export async function ensureThreadsTrafficMix(env: Env): Promise<void> {
+  if (trafficMixEnsured) return;
+  trafficMixEnsured = true;
+  try {
+    const sql = getSql(env);
+    await sql`
+      INSERT INTO brand_posting_slots (brand_id, platform, hour_tw, slot_kind, enabled)
+      SELECT b.id, 'threads'::publishing_platform, h.hour_tw, h.slot_kind, true
+      FROM brands b
+      CROSS JOIN unnest(${TRAFFIC_HOURS}::int[], ${TRAFFIC_KINDS}::text[]) AS h(hour_tw, slot_kind)
+      WHERE b.is_active = true
+        AND b.slug = ANY(${TRAFFIC_BRANDS}::text[])
+      ON CONFLICT (brand_id, platform, hour_tw, slot_kind) DO UPDATE
+      SET enabled = true, updated_at = now()
+    `;
+    await sql`
+      UPDATE brand_posting_slots AS s
+      SET enabled = false, updated_at = now()
+      FROM brands b
+      WHERE s.brand_id = b.id
+        AND b.slug = ANY(${TRAFFIC_BRANDS}::text[])
+        AND s.platform = 'threads'
+        AND s.enabled = true
+        AND NOT (
+          (s.hour_tw = 0 AND s.slot_kind = 'threads_hourly')
+          OR (s.hour_tw = 6 AND s.slot_kind = 'threads_hourly')
+          OR (s.hour_tw = 9 AND s.slot_kind = 'threads_offtopic')
+          OR (s.hour_tw = 10 AND s.slot_kind = 'threads_game')
+          OR (s.hour_tw = 12 AND s.slot_kind = 'threads_hourly')
+          OR (s.hour_tw = 18 AND s.slot_kind = 'threads_hourly')
+          OR (s.hour_tw = 21 AND s.slot_kind = 'threads_offtopic')
+        )
+    `;
+    const ids = await sql`SELECT id FROM brands WHERE slug = ANY(${TRAFFIC_BRANDS}::text[])`;
+    await cacheDelete(env, ...(ids as { id: string }[]).map((row) => cacheKeys.slots(row.id)));
+  } catch (e) {
+    trafficMixEnsured = false;
+    if (!isMissingSlots(e) && !isSlotKindCheck(e)) console.warn('[slots] 流量檔對齊失敗', e);
+  }
+}
 
 /** 既有品牌的 15:00、20:00 匠城檔改回跟風，一天只留 10:00 一篇。回傳這次有沒有真的去改。 */
 export async function retireAfternoonGameSlots(env: Env): Promise<boolean> {
@@ -357,6 +407,7 @@ export async function retireAfternoonGameSlots(env: Env): Promise<boolean> {
 
 export async function listAllPostingSlots(env: Env, opts?: { enabledOnly?: boolean }): Promise<PostingSlot[]> {
   await retireAfternoonGameSlots(env);
+  await ensureThreadsTrafficMix(env);
   const sql = getSql(env);
   try {
     const rows = opts?.enabledOnly
@@ -388,6 +439,7 @@ export async function listAllPostingSlots(env: Env, opts?: { enabledOnly?: boole
 }
 
 export async function listBrandPostingSlots(env: Env, brandId: string): Promise<PostingSlot[]> {
+  await ensureThreadsTrafficMix(env);
   const justRetired = await retireAfternoonGameSlots(env);
   if (!justRetired) {
     const cached = await cacheGet<PostingSlot[]>(env, cacheKeys.slots(brandId));

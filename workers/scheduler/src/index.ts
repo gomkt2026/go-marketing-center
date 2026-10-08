@@ -298,12 +298,15 @@ async function findNextMissingThreadsSlot(
   const sql = getSql(env);
   const now = new Date();
   const configured = await listAllPostingSlots(env, { enabledOnly: true });
-  const dueSlots = configured.filter((s) =>
-    s.platform === 'threads'
-    && slugs.includes(s.brandSlug)
-    && isThreadsSlotKind(s.slotKind)
-    && slotGenerationDue(s.hourTw, now)
-  );
+  const dueSlots = configured.filter((s) => {
+    if (s.platform !== 'threads' || !slugs.includes(s.brandSlug) || !isThreadsSlotKind(s.slotKind)) return false;
+    if (!slotGenerationDue(s.hourTw, now)) return false;
+    if (s.slotKind === 'threads_game') {
+      const ageMs = now.getTime() - slotAtToday(s.hourTw, now).getTime();
+      if (ageMs > 90 * 60 * 1000) return false;
+    }
+    return true;
+  });
   const due = dueSlots.length
     ? dueSlots.map((s) => ({ slug: s.brandSlug, hour: s.hourTw, source: s.slotKind }))
     : [
@@ -327,14 +330,14 @@ async function findNextMissingThreadsSlot(
       AND (c.generation_prompt_meta->>'slotAt')::timestamptz
           < date_trunc('day', now() AT TIME ZONE 'Asia/Taipei') AT TIME ZONE 'Asia/Taipei' + interval '1 day'
   `;
-  const have = new Set((rows as { slug: string; source: string; hour: number }[])
-    .map((r) => `${r.slug}|${r.source}|${r.hour}`));
+  const have = new Set((rows as { slug: string; hour: number }[])
+    .map((r) => `${r.slug}|${r.hour}`));
 
   for (const slot of due) {
     const slug = 'slug' in slot ? slot.slug : undefined;
     const candidates = slug ? [slug] : targetSlugs;
     for (const nextSlug of candidates) {
-      if (!have.has(`${nextSlug}|${slot.source}|${slot.hour}`)) {
+      if (!have.has(`${nextSlug}|${slot.hour}`)) {
         return { slug: nextSlug, hour: slot.hour, source: slot.source, slotAt: slotAtToday(slot.hour, now) };
       }
     }

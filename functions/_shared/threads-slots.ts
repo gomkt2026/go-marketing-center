@@ -2,22 +2,18 @@ import type { Env } from './env';
 import { getSql } from './db';
 import {
   buildBrandContext,
-  THREADS_HOURLY_CATEGORIES, pickThreadsHourlyCategory, type ThreadsHourlyCategoryId,
+  trafficFormulaFor,
   GAME_PUBLIC_STILLS,
 } from './prompts';
 import { loadGamePromoBrief } from './game-daily';
 import {
-  generatePlatformPost, generateOfftopicPost, generateThreadsFromImage, generateGamePromoPost,
+  generateTrafficPost, generateGamePromoPost,
   saveGeneratedContent, findBrandAgent,
 } from './generate';
-import { getThreadsAccount } from './threads';
-import { toPublicMediaUrl } from './media';
-import { pickBrandAsset } from './brand-assets';
-import { fetchGoogleTrendsTW } from './sources';
 import { logActivity } from './activity';
 import {
   countSlotsByBrand, listBrandThreadHours, sourceForBrandHour, listBrandPostingSlots,
-  hourlyCategoryForKind, isHourlyFamily, isOfftopicFamily, slotKindLabel,
+  isHourlyFamily, isOfftopicFamily, slotKindLabel,
   type PostingSlotKind,
 } from './posting-slots';
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from './auto-post-brands';
@@ -103,8 +99,70 @@ export async function brandHasSlotContent(
   return rows.length > 0;
 }
 
+/** 非匠城檔一律寫成已驗證的流量結構，待審後由安全網到期發布。 */
+async function writeTrafficDraft(
+  env: Env,
+  brand: { id: string; slug: string; name: string },
+  slotAt: Date,
+  slotKind: PostingSlotKind,
+): Promise<{ contentId: string; category: string }> {
+  const sql = getSql(env);
+  const hourTW = (slotAt.getUTCHours() + 8) % 24;
+  const formula = trafficFormulaFor(brand.slug, hourTW);
+  const usedRows = await sql`
+    SELECT c.title,
+           left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 42) AS opening
+    FROM contents c
+    LEFT JOIN LATERAL (
+      SELECT body FROM content_versions
+      WHERE content_id = c.id
+      ORDER BY version_number DESC
+      LIMIT 1
+    ) cv ON true
+    WHERE c.brand_id = ${brand.id}::uuid
+      AND c.target_platform = 'threads'
+      AND c.created_at > now() - interval '14 days'
+    ORDER BY c.created_at DESC
+    LIMIT 12
+  `;
+  const usedTopics = (usedRows as { title: string | null; opening: string | null }[])
+    .map((r) => [r.title, r.opening].filter(Boolean).join('｜'))
+    .filter((t) => t.length > 0);
+  const agentId = await findBrandAgent(env, brand.id);
+  const post = await generateTrafficPost(env, {
+    brandSlug: brand.slug,
+    formula,
+    usedTopics,
+    skipPrediction: true,
+  });
+  const { contentId } = await saveGeneratedContent(env, {
+    brandCtx: { brandId: brand.id, slug: brand.slug, name: brand.name, systemPrompt: '' },
+    platform: 'threads',
+    result: post,
+    generatedByAgentId: agentId,
+    status: 'pending_review',
+    promptMeta: {
+      source: slotKind,
+      category: formula,
+      trafficFormula: formula,
+      slotAt: slotAt.toISOString(),
+      audienceLane: 'b2c',
+    },
+  });
+  await logActivity(env, {
+    brandId: brand.id,
+    actorType: 'ai_agent',
+    actorAgentId: agentId,
+    action: 'content.generated',
+    entityType: 'content',
+    entityId: contentId,
+    afterState: { platform: 'threads', source: slotKind, category: formula, scheduled: false, slotAt: slotAt.toISOString() },
+  });
+  return { contentId, category: formula };
+}
+
 /**
- * Threads 跟風檔:一律寫 pending_review,不建 publishing_jobs。
+ * Threads 流量檔:一律寫 pending_review,不建 publishing_jobs。
  * auto_publish 改成到期安全網,由 promoteDueThreadsSafetyNet 在 slot 到了才補單。
  */
 export async function generateThreadsSlot(
@@ -114,10 +172,6 @@ export async function generateThreadsSlot(
 ): Promise<ThreadsSlotBatchResult> {
   const sql = getSql(env);
   const result: ThreadsSlotBatchResult = { generated: [], skipped: [] };
-  const trends = await fetchGoogleTrendsTW(8);
-  if (!trends.length) {
-    console.warn('[threads] Google Trends 為空,改走非時事類型,不略過整檔');
-  }
 
   const brands = await sql`
     SELECT b.id, b.slug, b.name,
@@ -182,112 +236,9 @@ export async function generateThreadsSlot(
       continue;
     }
     try {
-      const brandCtx = await buildBrandContext(env, brand.id);
-      const agentId = await findBrandAgent(env, brand.id);
-      const trendList = trends.map((t) => t.title).join('、');
-
-      const socialRows = await sql`
-        SELECT title FROM market_signals
-        WHERE brand_id = ${brand.id}::uuid
-          AND source_platform IN ('ptt', 'dcard')
-          AND discovered_at > now() - interval '48 hours'
-        ORDER BY relevance_score DESC LIMIT 5
-      `;
-      const socialTopics = (socialRows as { title: string }[]).map((r) => r.title);
-
-      const pickedImage = await pickBrandAsset(env, brand.id, { query: trendList || undefined }).catch(() => null);
-      const candidateImage = pickedImage
-        ? {
-          id: pickedImage.id,
-          file_url: pickedImage.fileUrl,
-          caption: pickedImage.caption,
-          image_category: pickedImage.imageCategory,
-          name: pickedImage.name,
-          asset_role: pickedImage.assetRole,
-          feature: pickedImage.feature,
-          usage_context: pickedImage.usageContext,
-        }
-        : null;
-
-      const lockedId = hourlyCategoryForKind(slotKind) as ThreadsHourlyCategoryId | null;
-      const recentCategoryIds = (brand.recent_categories ?? []).filter((c): c is string => !!c) as ThreadsHourlyCategoryId[];
-      const availableCategoryIds = (candidateImage
-        ? THREADS_HOURLY_CATEGORIES
-        : THREADS_HOURLY_CATEGORIES.filter((c) => c.id !== 'image_inspired')
-      ).filter((c) => trends.length > 0 || c.id !== 'seasonal_trend')
-        .map((c) => c.id);
-      if (isOfftopicFamily(slotKind)) {
-        result.skipped.push({ slug: brand.slug, reason: '這一檔是生活／感情主題，改走另一條產稿' });
-        continue;
-      }
-      const locked = lockedId ? THREADS_HOURLY_CATEGORIES.find((c) => c.id === lockedId) : undefined;
-      const category = (locked?.id === 'image_inspired' && !candidateImage)
-        ? pickThreadsHourlyCategory(recentCategoryIds, availableCategoryIds.filter((id) => id !== 'image_inspired'))
-        : locked ?? pickThreadsHourlyCategory(recentCategoryIds, availableCategoryIds);
-
-      let post;
-      if (category.id === 'image_inspired' && candidateImage) {
-        const publicImageUrl = toPublicMediaUrl(env, candidateImage.file_url);
-        if (!publicImageUrl) throw new Error('圖片素材缺少可用網址');
-        post = await generateThreadsFromImage(env, {
-          brandCtx,
-          imageUrl: publicImageUrl,
-          caption: candidateImage.caption ?? undefined,
-          imageCategory: candidateImage.image_category ?? undefined,
-          assetName: candidateImage.name ?? undefined,
-          assetRole: candidateImage.asset_role ?? undefined,
-          feature: candidateImage.feature ?? undefined,
-          usageContext: candidateImage.usage_context ?? undefined,
-          assetId: candidateImage.id,
-          skipPrediction: true,
-        });
-      } else {
-        const trendsBlock = [
-          `台灣現在的熱門話題:${trendList}`,
-          socialTopics.length
-            ? `目前社群(PTT/Dcard)正在討論的行業話題,也可以從這裡取材:\n${socialTopics.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
-            : '',
-        ].filter(Boolean).join('\n\n');
-        const topic = category.id === 'seasonal_trend' ? `台灣現在的熱門話題:${trendList}` : `Threads 貼文類型:${category.label}`;
-        post = await generatePlatformPost(env, {
-          brandCtx,
-          platform: 'threads',
-          topic,
-          extraInstruction: category.instruction.replace('{{TRENDS}}', trendsBlock),
-          audienceLane: 'b2c',
-          skipPrediction: true,
-        });
-      }
-
-      const { contentId } = await saveGeneratedContent(env, {
-        brandCtx,
-        platform: 'threads',
-        result: post,
-        generatedByAgentId: agentId,
-        status: 'pending_review',
-        promptMeta: {
-          source: slotKind, category: category.id, trends: trends.map((t) => t.title), socialTopics,
-          slotAt: slotAt.toISOString(),
-          audienceLane: 'b2c',
-          audienceName: post.audienceName,
-          assetId: category.id === 'image_inspired' && candidateImage ? candidateImage.id : undefined,
-        },
-        imageAssetMeta: category.id === 'image_inspired' && candidateImage
-          ? { sourceAssetId: candidateImage.id, generated: false, reused: true }
-          : undefined,
-      });
-
-      await logActivity(env, {
-        brandId: brand.id,
-        actorType: 'ai_agent',
-        actorAgentId: agentId,
-        action: 'content.generated',
-        entityType: 'content',
-        entityId: contentId,
-        afterState: { platform: 'threads', category: category.id, auto: false, scheduled: false, slotAt: slotAt.toISOString() },
-      });
-      result.generated.push({ slug: brand.slug, contentId, category: category.id });
-      console.log(`[threads] ${brand.slug} 已產 ${slotAt.toISOString()} 跟風稿(類型:${category.label},待工作台審核)`);
+      const written = await writeTrafficDraft(env, brand, slotAt, slotKind);
+      result.generated.push({ slug: brand.slug, contentId: written.contentId, category: written.category });
+      console.log(`[threads] ${brand.slug} 已產 ${slotAt.toISOString()} 流量稿(${written.category},待工作台審核)`);
     } catch (e) {
       const reason = e instanceof Error ? e.message : '生成失敗';
       result.skipped.push({ slug: brand.slug, reason });
@@ -346,58 +297,9 @@ export async function generateThreadsOfftopicSlot(
         continue;
       }
 
-      const usedRows = await sql`
-        SELECT title, generation_prompt_meta->>'loveAngle' AS angle FROM contents
-        WHERE brand_id = ${brand.id}::uuid AND generation_prompt_meta->>'source' LIKE 'threads_%'
-          AND created_at > now() - interval '14 days'
-        ORDER BY created_at DESC LIMIT 20
-      `;
-      const usedTopics = (usedRows as { title: string; angle: string | null }[]).map((r) => r.title);
-      const usedAngles = (usedRows as { angle: string | null }[])
-        .map((r) => r.angle)
-        .filter((a): a is string => !!a);
-      const forceLoveStory = slotKind === 'threads_love' || (slotKind === 'threads_offtopic' && hourTW === 21);
-
-      const agentId = await findBrandAgent(env, brand.id);
-      const post = await generateOfftopicPost(env, {
-        usedTopics,
-        brandSlug: brand.slug,
-        forceLoveStory,
-        usedAngles,
-        skipPrediction: true,
-      });
-
-      const { contentId } = await saveGeneratedContent(env, {
-        brandCtx: { brandId: brand.id, slug: brand.slug, name: brand.name, systemPrompt: '' },
-        platform: 'threads',
-        result: post,
-        generatedByAgentId: agentId,
-        status: 'pending_review',
-        promptMeta: {
-          source: slotKind,
-          category: post.offtopicCategory ?? 'life_gag',
-          loveAngle: post.loveAngle,
-          slotAt: slotAt.toISOString(),
-          audienceLane: 'b2c',
-          replyBody: post.post.replyBody || undefined,
-        },
-      });
-
-      await logActivity(env, {
-        brandId: brand.id,
-        actorType: 'ai_agent',
-        actorAgentId: agentId,
-        action: 'content.generated',
-        entityType: 'content',
-        entityId: contentId,
-        afterState: { platform: 'threads', source: slotKind, scheduled: false, slotAt: slotAt.toISOString() },
-      });
-      result.generated.push({
-        slug: brand.slug,
-        contentId,
-        category: post.offtopicCategory ?? (forceLoveStory ? 'love_story' : 'life_gag'),
-      });
-      console.log(`[offtopic] ${brand.slug} 已產${slotKindLabel(slotKind)},${slotAt.toISOString()}(待工作台審核)`);
+      const written = await writeTrafficDraft(env, brand, slotAt, slotKind);
+      result.generated.push({ slug: brand.slug, contentId: written.contentId, category: written.category });
+      console.log(`[offtopic] ${brand.slug} 已產流量稿 ${written.category},${slotAt.toISOString()}(待工作台審核)`);
     } catch (e) {
       const reason = e instanceof Error ? e.message : '生成失敗';
       result.skipped.push({ slug, reason });

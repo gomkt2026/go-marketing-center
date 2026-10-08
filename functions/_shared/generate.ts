@@ -5,6 +5,7 @@ import { seoChatJson, socialChatJson } from './social-llm';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
+  TRAFFIC_SYSTEM_PROMPT, composeTrafficPrompt, type TrafficFormulaId,
   buildImageInspiredPostPrompt, buildGamePromoPrompt, GAME_PROMO_URL,
   type GamePromoAngle,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
@@ -648,6 +649,66 @@ export async function generateOfftopicPost(
     });
 
   return { post, prediction, imageUrl: null, imageError: null, offtopicCategory: spec.category, loveAngle: spec.loveAngle };
+}
+
+/**
+ * Threads 非匠城檔。不帶品牌知識庫，只套用已驗證的高瀏覽結構。
+ */
+export async function generateTrafficPost(
+  env: Env,
+  params: { brandSlug: string; formula: TrafficFormulaId; usedTopics: string[]; skipPrediction?: boolean },
+): Promise<GenerationResult> {
+  const spec = composeTrafficPrompt(params);
+  const limit = spec.maxChars + 40;
+  const userPrompt = spec.prompt;
+  let post = await socialChatJson<GeneratedPost>(env, {
+    messages: [
+      { role: 'system', content: TRAFFIC_SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.9,
+  });
+  post.body = normalizeMultilineText(post.body);
+  post.hashtags = [];
+  post.cta = '';
+  post.replyBody = '';
+  post.imagePrompt = undefined;
+  const leaked = /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\//i.test(post.body);
+  if (post.body.length > limit || leaked || post.body.length < 80) {
+    post = await socialChatJson<GeneratedPost>(env, {
+      messages: [
+        { role: 'system', content: TRAFFIC_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+        { role: 'assistant', content: JSON.stringify(post) },
+        {
+          role: 'user',
+          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現品牌、產品或連結' : ''}）。` +
+            `重寫到 ${spec.maxChars} 字以內，保留同一個題目，刪掉品牌與說教，最後仍要有一個讓人想留言的問題。回傳同格式 JSON。`,
+        },
+      ],
+      temperature: 0.7,
+    });
+    post.body = normalizeMultilineText(post.body);
+    post.hashtags = [];
+    post.cta = '';
+    post.replyBody = '';
+    post.imagePrompt = undefined;
+  }
+
+  const prediction = params.skipPrediction
+    ? { score: 0, analysis: '', suggestions: [] }
+    : await socialChatJson<EngagementPrediction>(env, {
+      messages: [
+        { role: 'system', content: '你是台灣社群數據分析師,擅長預估貼文互動表現。' },
+        { role: 'user', content: buildEngagementEvalPrompt({ platform: 'threads', body: post.body }) },
+      ],
+      temperature: 0.3,
+    });
+
+  return {
+    post, prediction, imageUrl: null, imageError: null,
+    offtopicCategory: spec.category,
+  };
 }
 
 /**

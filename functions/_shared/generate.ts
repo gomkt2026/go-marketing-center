@@ -656,7 +656,14 @@ export async function generateOfftopicPost(
  */
 export async function generateTrafficPost(
   env: Env,
-  params: { brandSlug: string; formula: TrafficFormulaId; usedTopics: string[]; skipPrediction?: boolean },
+  params: {
+    brandSlug: string;
+    formula: TrafficFormulaId;
+    usedTopics: string[];
+    theme: string;
+    siblings?: string[];
+    skipPrediction?: boolean;
+  },
 ): Promise<GenerationResult> {
   const spec = composeTrafficPrompt(params);
   const limit = spec.maxChars + 40;

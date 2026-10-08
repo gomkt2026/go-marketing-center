@@ -2,7 +2,7 @@ import type { Env } from './env';
 import { getSql } from './db';
 import {
   buildBrandContext,
-  trafficFormulaFor,
+  trafficFormulaFor, pickTrafficTheme,
   GAME_PUBLIC_STILLS,
 } from './prompts';
 import { loadGamePromoBrief } from './game-daily';
@@ -11,6 +11,7 @@ import {
   saveGeneratedContent, findBrandAgent,
 } from './generate';
 import { logActivity } from './activity';
+import { fetchGoogleTrendsTW } from './sources';
 import {
   countSlotsByBrand, listBrandThreadHours, sourceForBrandHour, listBrandPostingSlots,
   isHourlyFamily, isOfftopicFamily, slotKindLabel,
@@ -128,11 +129,36 @@ async function writeTrafficDraft(
   const usedTopics = (usedRows as { title: string | null; opening: string | null }[])
     .map((r) => [r.title, r.opening].filter(Boolean).join('｜'))
     .filter((t) => t.length > 0);
+  const trends = await fetchGoogleTrendsTW(6).catch(() => []);
+  const theme = pickTrafficTheme(trends.map((item) => item.title), slotAt.getTime());
+  const siblingRows = await sql`
+    SELECT b.slug, c.title,
+           left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 36) AS opening
+    FROM contents c
+    JOIN brands b ON b.id = c.brand_id
+    LEFT JOIN LATERAL (
+      SELECT body FROM content_versions
+      WHERE content_id = c.id
+      ORDER BY version_number DESC
+      LIMIT 1
+    ) cv ON true
+    WHERE b.slug IN ('taskgo', 'homigo', 'washgo')
+      AND b.slug <> ${brand.slug}
+      AND c.target_platform = 'threads'
+      AND c.generation_prompt_meta->>'trafficTheme' = ${theme}
+      AND c.created_at > now() - interval '2 days'
+    ORDER BY c.created_at DESC
+    LIMIT 4
+  `;
+  const siblings = (siblingRows as { slug: string; title: string | null; opening: string | null }[])
+    .map((r) => [r.slug, r.title, r.opening].filter(Boolean).join('｜'));
   const agentId = await findBrandAgent(env, brand.id);
   const post = await generateTrafficPost(env, {
     brandSlug: brand.slug,
     formula,
     usedTopics,
+    theme,
+    siblings,
     skipPrediction: true,
   });
   const { contentId } = await saveGeneratedContent(env, {
@@ -145,6 +171,7 @@ async function writeTrafficDraft(
       source: slotKind,
       category: formula,
       trafficFormula: formula,
+      trafficTheme: theme,
       slotAt: slotAt.toISOString(),
       audienceLane: 'b2c',
     },
@@ -156,7 +183,7 @@ async function writeTrafficDraft(
     action: 'content.generated',
     entityType: 'content',
     entityId: contentId,
-    afterState: { platform: 'threads', source: slotKind, category: formula, scheduled: false, slotAt: slotAt.toISOString() },
+    afterState: { platform: 'threads', source: slotKind, category: formula, trafficTheme: theme, scheduled: false, slotAt: slotAt.toISOString() },
   });
   return { contentId, category: formula };
 }

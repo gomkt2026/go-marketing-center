@@ -48,7 +48,7 @@ AI小編 阿豪：好，不排半夜。師傅滑手機的時段我幫你卡進�
 
 ## Threads／FB／IG
 
-- Threads 排程除每天 10:00 一篇匠城出任務外，其餘都談移工：歧視、共感、冷笑話、感情、一句話。讓人站隊或講自己遇過的。不推產品。
+- Threads 排程除每天 10:00 一篇匠城出任務外，其餘跟當天時事走。三個帳號接同一件事，TaskGo 從工地走進。移工只是接得上時才用的入口。不推產品。
 - Facebook／Instagram 寫作細節以 `BRAND_VOICES.taskgo` 為準。
 - FB／IG 圖文必須走海軍藍斜切工地風，見 `taskgo-social-graphic` Skill 與 `.cursor/rules/taskgo-social-graphic.mdc`。不要深灰橘色語錄卡。
 - 短影音阿豪卡仍用橘 `#ED9121`。

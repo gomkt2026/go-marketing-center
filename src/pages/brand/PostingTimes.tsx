@@ -31,11 +31,11 @@ const KIND_LABEL: Record<PostingSlotKind, string> = {
 };
 
 const THREADS_KIND_OPTIONS: Array<{ value: PostingSlotKind; label: string; group: string; hint: string }> = [
-  { value: 'threads_hourly', label: '流量文', group: '話題', hint: 'TaskGo 談移工，Homigo 談租客早餐，Washgo 談洗過最怪最貴的。讓人想留言' },
+  { value: 'threads_hourly', label: '流量文', group: '話題', hint: '跟當天時事。三個帳號接同一件事，各自從工地、租屋、洗衣走進' },
   { value: 'threads_weather', label: '天氣季節', group: '話題', hint: '梅雨、颱風、換季等台灣天氣' },
   { value: 'threads_entertainment', label: '娛樂影視', group: '話題', hint: '影劇、綜藝、明星、動漫話題' },
   { value: 'threads_sports', label: '運動賽事', group: '話題', hint: '棒球、籃球、路跑、健身風潮' },
-  { value: 'threads_offtopic', label: '流量文', group: '生活', hint: '用兩性、感情、搞笑、冷笑話或一句話共鳴來包裝品牌那個題，不推產品' },
+  { value: 'threads_offtopic', label: '流量文', group: '生活', hint: '用兩性、感情、搞笑、冷笑話或一句話接同一個時事，不推產品' },
   { value: 'threads_love', label: '感情散文', group: '生活', hint: '品牌世界當場景的感情長文' },
   { value: 'threads_emotion', label: '人際視角', group: '生活', hint: '房東房客、工班、洗衣店的人際現場' },
   { value: 'threads_workplace', label: '行業現場', group: '品牌', hint: '第一線具體畫面與真實對話' },

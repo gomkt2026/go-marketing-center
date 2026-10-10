@@ -1516,119 +1516,98 @@ export function buildOfftopicUserPrompt(usedTopics: string[], brandSlug?: string
 }
 
 // ============================================================================
-// Threads 流量文。非匠城檔拿來引發留言，不拿來介紹產品。
-// 題目跟當天時事走，三個帳號接同一件事，但各自從自己的生活走進。
-// 移工、租客早餐、洗進機器的怪東西是接得上時才用的入口，不是每天的固定題。
-// 包裝仍是兩性、感情、搞笑、知識點、冷笑話、一句話有共鳴。
-// 淺淺跟風再轉成產品的貼文，瀏覽大多停在幾百次，所以時事只借人會站隊的那一層。
+// Threads 流量文。非匠城檔不介紹品牌。
+// 10/9–10/10 三個帳號被綁在同一則時事（美債、金馬、英超、法甲），
+// 再硬套進工地、租屋、自助洗衣，帖文幾乎同一張臉，瀏覽大多停在幾百次。
+// 之後各寫各的：家庭、兩性、感情。時事只有能放進飯桌或感情裡才用。
 // ============================================================================
 
-export type TrafficFormulaId = 'line' | 'joke' | 'love' | 'scene' | 'fact' | 'turn';
+export type TrafficFormulaId = 'family' | 'gender' | 'feeling' | 'news';
 
-interface TrafficWrapper {
-  id: TrafficFormulaId;
-  label: string;
-  maxChars: number;
-  instruction: string;
-}
-
-const TRAFFIC_WRAPPERS: TrafficWrapper[] = [
-  {
-    id: 'line', label: '一句話', maxChars: 200,
-    instruction: '用一句話有共鳴來寫。先丟出那句話，再給一個具體的人怎麼接。最後問讀者有沒有講過，或聽到會怎樣。',
+const TRAFFIC_LANES: Record<TrafficFormulaId, { label: string; maxChars: number; instruction: string }> = {
+  family: {
+    label: '家庭',
+    maxChars: 240,
+    instruction:
+      '寫家庭。爸媽、手足、公婆、過年、誰洗碗、家族群組、一句話讓飯桌安靜。' +
+      '一個具體的人講一句話。最後問：你家也這樣嗎？',
   },
-  {
-    id: 'joke', label: '冷笑話', maxChars: 260,
-    instruction: '用冷笑話或對話死循環來寫。好笑的是人的尷尬，不是嘲笑某群人。最後讓人想回自己的版本。',
+  gender: {
+    label: '兩性',
+    maxChars: 240,
+    instruction:
+      '寫兩性相處裡一個會讓人想回覆的瞬間：誰先傳訊息、誰付錢、婚前那句話、被問什麼時候生。' +
+      '可以是對話死循環。不色情，不站隊罵某一性。最後留一個好回答的問題。',
   },
-  {
-    id: 'love', label: '感情', maxChars: 260,
-    instruction: '用兩性或感情來寫。一個畫面、一句對話。可以是被問職業、被看輕、沒講出口。短，不寫散文，不色情。',
+  feeling: {
+    label: '感情',
+    maxChars: 220,
+    instruction:
+      '寫感情裡沒講出口的那句。一個晚上、一個人、一句話。不要散文，不要道理。' +
+      '最後問讀者有沒有一句話到現在還卡著。',
   },
-  {
-    id: 'scene', label: '現場', maxChars: 220,
-    instruction: '寫一個昨天的現場。有人被一句話看輕或誤會，然後用一個動作讓場面轉過去。兩句引號。最後問讀者遇過沒有。',
+  news: {
+    label: '時事',
+    maxChars: 220,
+    instruction:
+      '只有這則時事能自然變成家庭、感情或兩性的一句話才可以用，而且專有名詞最多一次。' +
+      '寫的是人怎麼反應，不是新聞整理。接不上就完全不要提那則時事，改寫家裡的一句話。',
   },
-  {
-    id: 'fact', label: '知識點', maxChars: 200,
-    instruction: '只給一個生活畫面當知識點。不要政策、不要法規、不要新聞整理。最後問讀者自己看過的版本。',
-  },
-  {
-    id: 'turn', label: '改觀', maxChars: 240,
-    instruction: '寫一個原本跟著講、後來因為一件小事改觀的瞬間。最後問一個會讓人站隊的問題。',
-  },
-];
-
-const TRAFFIC_HOURS = [0, 6, 9, 12, 18, 21];
-
-const BRAND_DOORS: Record<string, string> = {
-  taskgo: '你從工地走進這件事。移工、學徒、業主都只是可能出現的人，這篇不強制寫移工。',
-  homigo: '你從租屋生活走進這件事。樓下早餐、室友、搬家都只是可能的場景，這篇不強制寫早餐。',
-  washgo: '你從衣服和洗衣走進這件事。奇葩衣物、自助洗衣都只是可能的現場，這篇不強制寫它們。',
 };
 
-const TREND_SKIP = /地震|颱風|豪雨|死亡|命案|戰爭|選舉|罷免|股票|股價|比特幣|比分|冠軍|自殺|色情|未成年/;
+const TRAFFIC_HOURS = [0, 6, 9, 12, 18, 21];
+const TRAFFIC_LANE_ORDER: TrafficFormulaId[] = ['family', 'gender', 'feeling', 'news'];
 
-const FALLBACK_THEMES = [
-  '一句讓人想站隊的話',
-  '一份只屬於某群人的食物',
-  '一件不該出現在那裡的東西',
-  '感情裡沒講出口的那句',
-  '兩個人都以為對方懂的事',
-  '物價或天氣讓生活露出來的那一下',
-];
+const TREND_SKIP = /地震|颱風|豪雨|死亡|命案|戰爭|選舉|罷免|股票|股價|美債|殖利率|比特幣|比分|冠軍|英超|法甲|中職|金馬|自殺|色情|未成年|愛豆|韓星/;
+const LIFE_TREND = /結婚|離婚|生子|生育|小孩|孩子|爸|媽|家庭|薪水|房租|物價|性別|婚姻|婆家|單身|約會|分手|家暴|長照|過年|彩禮|同居|家務/;
 
-export function trafficFormulaFor(_slug: string, hourTw: number): TrafficFormulaId {
-  const index = Math.max(0, TRAFFIC_HOURS.indexOf(hourTw));
-  return TRAFFIC_WRAPPERS[index % TRAFFIC_WRAPPERS.length].id;
+export function trafficFormulaFor(slug: string, hourTw: number, now = Date.now()): TrafficFormulaId {
+  const brand = slug === 'taskgo' ? 0 : slug === 'washgo' ? 2 : 1;
+  const hourIndex = Math.max(0, TRAFFIC_HOURS.indexOf(hourTw));
+  const day = Math.floor((now + 8 * 60 * 60 * 1000) / 86400000);
+  return TRAFFIC_LANE_ORDER[(day + brand + hourIndex) % TRAFFIC_LANE_ORDER.length];
 }
 
-/** 當天三個帳號共用一個時事。沒有能討論的趨勢時，才退回生活題，而且每天換。 */
-export function pickTrafficTheme(trends: string[], now = Date.now()): string {
-  const usable = trends
+/** 只留下能放進家庭或感情的時事。運動、債市、頒獎、人名不拿來硬套。 */
+export function pickLifeTrend(trends: string[]): string | null {
+  const hit = trends
     .map((item) => item.replace(/\s+/g, ' ').trim())
-    .filter((item) => item.length >= 2 && item.length <= 28 && !TREND_SKIP.test(item));
-  if (usable.length) return usable[0];
-  const day = Math.floor((now + 8 * 60 * 60 * 1000) / 86400000);
-  return FALLBACK_THEMES[day % FALLBACK_THEMES.length];
+    .find((item) => item.length >= 2 && item.length <= 24 && LIFE_TREND.test(item) && !TREND_SKIP.test(item));
+  return hit ?? null;
 }
 
 export const TRAFFIC_SYSTEM_PROMPT =
-  '你是會在 Threads 上引發討論的台灣人，不是品牌小編，也不是老師。' +
-  '題目只做一個。先想一個沒被寫過的具體東西，再讓一個人講一句話。' +
-  '範例只是燃料：借它的情緒和討論點，禁止把範例原句、原食物、原衣服寫進正文。' +
-  '有流量的形狀是：一個現場、一句引號、一個轉折、最後一個陌生人用十個字就回得了的問題。不要下結論，不要教人該怎麼想。' +
-  '禁止品牌名、產品、系統、App、連結、hashtag、促銷、教學條列。' +
-  '禁止這些已用過的橋：越南師傅砌磚、怎麼派個外勞、外勞比較便宜、起司蛋要不要加、蘿蔔糕塞土司、瘦學徒爬鷹架、女師傅抓漏、室友倒垃圾、捷運讓座、烘衣機快了、黑色蕾絲吊帶、室友問這件是誰的。';
+  '你是會在 Threads 上引發共鳴的台灣人，不是任何品牌的小編。' +
+  '這篇不要出現工地、業主、師傅、移工、租屋、房東、早餐店、自助洗衣、烘衣機、甩乾、只有一件。' +
+  '那些場景這兩天已經發到沒有瀏覽。寫家庭、兩性、感情，或一件大家真的會在飯桌上吵的事。' +
+  '一個具體的人，一句引號，最後一個十個字就回得了的問題。不要下結論，不要新聞稿。' +
+  '禁止品牌名、產品、系統、App、連結、hashtag、促銷。';
 
 export function composeTrafficPrompt(opts: {
   brandSlug: string;
   formula: TrafficFormulaId;
   usedTopics: string[];
-  theme: string;
+  theme?: string | null;
   siblings?: string[];
 }): { prompt: string; category: TrafficFormulaId; label: string; maxChars: number; theme: string } {
-  const wrapper = TRAFFIC_WRAPPERS.find((item) => item.id === opts.formula) ?? TRAFFIC_WRAPPERS[0];
-  const door = BRAND_DOORS[opts.brandSlug] ?? BRAND_DOORS.homigo;
+  const lane = TRAFFIC_LANES[opts.formula] ?? TRAFFIC_LANES.feeling;
+  const theme = opts.formula === 'news' && opts.theme ? opts.theme : lane.label;
   return {
-    category: wrapper.id,
-    label: wrapper.label,
-    maxChars: wrapper.maxChars,
-    theme: opts.theme,
+    category: opts.formula,
+    label: lane.label,
+    maxChars: lane.maxChars,
+    theme,
     prompt: [
-      '寫一則 Threads。目的是讓陌生人留言，不是介紹任何品牌。',
-      `今天三個生活場景都在談同一件事：${opts.theme}。`,
-      door,
-      `寫法是「${wrapper.label}」。`,
-      wrapper.instruction,
-      '時事只借人會站隊、想分享的那一層。不要轉述新聞，不要點名政治人物，不要消費災難。',
-      '套不上就寫這件事裡的人，用你的場景當背景。不要寫成產業評論，也不要每篇都回到移工、早餐或自助洗衣。',
-      '另外兩個生活場景今天也會接同一件事。可以讓人感覺這件事不只發生在你這裡，但不要點名品牌，不要複述別人的句子。',
-      opts.siblings?.length ? `其他場景今天已經這樣碰過，你要換一個門進去：\n${opts.siblings.join('\n')}` : '',
-      '正文要有一個題目說明沒寫過的具體名詞。對話只留一句最狠的。不要下結論。',
-      `正文 ${Math.max(80, wrapper.maxChars - 80)} 到 ${wrapper.maxChars} 字，一句一行。`,
+      '寫一則 Threads。讓陌生人覺得這是自己的家或自己的感情，不是一則品牌貼文。',
+      `這一則只寫「${lane.label}」。`,
+      lane.instruction,
+      opts.formula === 'news' && opts.theme ? `可以借用的時事只有這一則：${opts.theme}。接不上就不要提。` : '不要提新聞、運動、明星、債市、頒獎。',
+      '三個帳號今天各寫各的，不要寫成同一件事的三種版本。',
+      opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
+      '開頭不要用「自助洗衣」「工地」「房東」。直接從人說的話或家裡的畫面開始。',
+      `正文 ${Math.max(80, lane.maxChars - 80)} 到 ${lane.maxChars} 字，一句一行。`,
       '不要 hashtag，不要連結，不要第二則回覆。',
-      opts.usedTopics.length ? `這些標題和開頭最近用過，場景、食物、衣服、人名都要換：\n${opts.usedTopics.join('\n')}` : '',
+      opts.usedTopics.length ? `這些標題和開頭最近用過，換一個家裡的人或一句話：\n${opts.usedTopics.join('\n')}` : '',
       '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","hashtags":[],"cta":""}',
     ].filter(Boolean).join('\n'),
   };

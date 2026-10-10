@@ -660,7 +660,7 @@ export async function generateTrafficPost(
     brandSlug: string;
     formula: TrafficFormulaId;
     usedTopics: string[];
-    theme: string;
+    theme?: string | null;
     siblings?: string[];
     skipPrediction?: boolean;
   },
@@ -680,7 +680,7 @@ export async function generateTrafficPost(
   post.cta = '';
   post.replyBody = '';
   post.imagePrompt = undefined;
-  const leaked = /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\//i.test(post.body);
+  const leaked = /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|只有一件|工地|業主|房東/.test(post.body);
   if (post.body.length > limit || leaked || post.body.length < 80) {
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
@@ -689,8 +689,8 @@ export async function generateTrafficPost(
         { role: 'assistant', content: JSON.stringify(post) },
         {
           role: 'user',
-          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現品牌、產品或連結' : ''}）。` +
-            `重寫到 ${spec.maxChars} 字以內，保留同一個題目，刪掉品牌與說教，最後仍要有一個讓人想留言的問題。回傳同格式 JSON。`,
+          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現品牌、工地、租屋或自助洗衣' : ''}）。` +
+            `重寫到 ${spec.maxChars} 字以內，改成家庭、兩性或感情，開頭不要用工地、房東、自助洗衣，最後仍要有一個讓人想留言的問題。回傳同格式 JSON。`,
         },
       ],
       temperature: 0.7,

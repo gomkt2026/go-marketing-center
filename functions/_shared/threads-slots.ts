@@ -2,7 +2,7 @@ import type { Env } from './env';
 import { getSql } from './db';
 import {
   buildBrandContext,
-  trafficFormulaFor, pickTrafficTheme,
+  trafficFormulaFor, pickLifeTrend,
   GAME_PUBLIC_STILLS,
 } from './prompts';
 import { loadGamePromoBrief } from './game-daily';
@@ -109,7 +109,7 @@ async function writeTrafficDraft(
 ): Promise<{ contentId: string; category: string }> {
   const sql = getSql(env);
   const hourTW = (slotAt.getUTCHours() + 8) % 24;
-  const formula = trafficFormulaFor(brand.slug, hourTW);
+  const formula = trafficFormulaFor(brand.slug, hourTW, slotAt.getTime());
   const usedRows = await sql`
     SELECT c.title,
            left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 42) AS opening
@@ -129,10 +129,10 @@ async function writeTrafficDraft(
   const usedTopics = (usedRows as { title: string | null; opening: string | null }[])
     .map((r) => [r.title, r.opening].filter(Boolean).join('｜'))
     .filter((t) => t.length > 0);
-  const trends = await fetchGoogleTrendsTW(6).catch(() => []);
-  const theme = pickTrafficTheme(trends.map((item) => item.title), slotAt.getTime());
+  const trends = formula === 'news' ? await fetchGoogleTrendsTW(8).catch(() => []) : [];
+  const theme = pickLifeTrend(trends.map((item) => item.title));
   const siblingRows = await sql`
-    SELECT b.slug, c.title,
+    SELECT b.slug,
            left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 36) AS opening
     FROM contents c
     JOIN brands b ON b.id = c.brand_id
@@ -143,15 +143,13 @@ async function writeTrafficDraft(
       LIMIT 1
     ) cv ON true
     WHERE b.slug IN ('taskgo', 'homigo', 'washgo')
-      AND b.slug <> ${brand.slug}
       AND c.target_platform = 'threads'
-      AND c.generation_prompt_meta->>'trafficTheme' = ${theme}
       AND c.created_at > now() - interval '2 days'
     ORDER BY c.created_at DESC
-    LIMIT 4
+    LIMIT 8
   `;
-  const siblings = (siblingRows as { slug: string; title: string | null; opening: string | null }[])
-    .map((r) => [r.slug, r.title, r.opening].filter(Boolean).join('｜'));
+  const siblings = (siblingRows as { slug: string; opening: string | null }[])
+    .map((r) => [r.slug, r.opening].filter(Boolean).join('｜'));
   const agentId = await findBrandAgent(env, brand.id);
   const post = await generateTrafficPost(env, {
     brandSlug: brand.slug,
@@ -171,7 +169,7 @@ async function writeTrafficDraft(
       source: slotKind,
       category: formula,
       trafficFormula: formula,
-      trafficTheme: theme,
+      trafficTheme: theme ?? formula,
       slotAt: slotAt.toISOString(),
       audienceLane: 'b2c',
     },

@@ -1,18 +1,19 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ProofTrend, type TrendWeek } from '@/pages/public/site/ProofTrend';
+import { LanguageSwitch, LocalLink, useCopy, useFormat, useLocale } from '@/pages/public/locale';
 
 export const CONTACT_EMAIL = 'service@inforcraft.com.tw';
 
 const NAV = [
-  { to: '/welcome', label: '首頁' },
-  { to: '/go-posting', label: 'Go幫你發文' },
-  { to: '/proof', label: '品牌成果' },
-  { to: '/show', label: 'Podcast' },
-  { to: '/jiangcheng', label: '遊戲' },
-  { to: '/center', label: '怎麼運作' },
-];
+  { to: '/welcome', key: 'home' },
+  { to: '/go-posting', key: 'posting' },
+  { to: '/proof', key: 'proof' },
+  { to: '/show', key: 'show' },
+  { to: '/jiangcheng', key: 'game' },
+  { to: '/center', key: 'center' },
+] as const;
 
 interface LeaderboardEntry {
   rank: number;
@@ -32,7 +33,6 @@ interface GameSeason {
 }
 
 type GameMap = 's' | 'm' | 'l' | 't';
-const MAP_LABELS: Record<GameMap, string> = { s: '小地圖', m: '中地圖', l: '大地圖', t: '台灣地圖' };
 
 interface GameStats {
   live: { count: number; players: { name: string; score: number; seconds: number }[] };
@@ -46,105 +46,79 @@ interface LeaderboardResponse {
   entries: LeaderboardEntry[];
 }
 
-export const BRANDS = [
-  {
-    slug: 'taskgo',
-    name: 'TaskGo 匠管',
-    color: '#ff6b1a',
-    logo: '/brands/taskgo-logo.png',
-    editor: '/brands/taskgo-ahao.png',
-    editorName: '阿豪',
-    tagline: '讓工程專案管理更簡單、更智能',
-    body: '給工班、統包與修繕團隊的案場管理系統。報修派工、場勘報價、施工照回報、請款結案都在同一條工單上，現場師傅用 LINE 就能接收通知。',
-    cta: { label: '免費試用 14 天', url: 'https://app.taskgo.com.tw/register' },
-  },
-  {
-    slug: 'homigo',
-    name: 'Homigo',
-    color: '#1fae78',
-    logo: '/brands/homigo-logo.png',
-    editor: '/brands/homigo-xiaomi.png',
-    editorName: '小咪',
-    tagline: '不是管理房子，而是讓房子自己運作',
-    body: '給房東與包租代管的租務平台。物件上架、看房、簽約交屋、收租提醒、房客報修，都能透過 LINE 與房客即時串起來。',
-    cta: { label: '免費開始，不綁信用卡', url: 'https://www.homigo.com.tw' },
-  },
-  {
-    slug: 'washgo',
-    name: 'Washgo',
-    color: '#3a8dde',
-    logo: '/brands/washgo-logo.png',
-    editor: '/brands/washgo-ale.png',
-    editorName: '阿樂',
-    tagline: '衣物送洗，交給 Washgo',
-    body: '給洗衣店與消費者的收送洗服務。LINE 下單、到府收件、洗護進度通知、送回簽收，讓洗衣店不用另外做 App 也能接線上訂單。',
-    cta: { label: '前往 Washgo 官網', url: 'https://washgo.com.tw' },
-  },
+const BRAND_META = [
+  { slug: 'taskgo', color: '#ff6b1a', logo: '/brands/taskgo-logo.png', editor: '/brands/taskgo-ahao.png', ctaUrl: 'https://app.taskgo.com.tw/register' },
+  { slug: 'homigo', color: '#1fae78', logo: '/brands/homigo-logo.png', editor: '/brands/homigo-xiaomi.png', ctaUrl: 'https://www.homigo.com.tw' },
+  { slug: 'washgo', color: '#3a8dde', logo: '/brands/washgo-logo.png', editor: '/brands/washgo-ale.png', ctaUrl: 'https://washgo.com.tw' },
+] as const;
+
+export function useBrands() {
+  const copy = useCopy();
+  return BRAND_META.map((meta, i) => ({
+    slug: meta.slug,
+    color: meta.color,
+    logo: meta.logo,
+    editor: meta.editor,
+    name: copy.brands[i].name,
+    editorName: copy.brands[i].editorName,
+    tagline: copy.brands[i].tagline,
+    body: copy.brands[i].body,
+    cta: { label: copy.brands[i].cta, url: meta.ctaUrl },
+  }));
+}
+
+export function brandOf<T extends { slug: string }>(brands: readonly T[], slug: string): T {
+  return brands.find((b) => b.slug === slug)!;
+}
+
+export function useModules() {
+  return useCopy().modules;
+}
+
+export function useFlow() {
+  return useCopy().flow;
+}
+
+const PRESS_META = [
+  { brand: 'taskgo', date: '2025/10/20', url: 'https://money.udn.com/money/story/5635/9082541' },
+  { brand: 'homigo', date: '2026/07/01', url: 'https://money.udn.com/money/story/5635/9726282' },
+  { brand: 'washgo', date: '2026/09/16', url: 'https://money.udn.com/money/story/5635/9756429' },
 ];
 
-export const MODULES = [
-  { title: '品牌工作台', body: '每個品牌一個儀表板：待審內容、今日發布、成效摘要與待辦一眼看完。' },
-  { title: '內容中心與審閱', body: 'AI 依品牌規範產出文案與配圖，經過核准、修改、退回、延期等審閱流程才發布，每一版都留紀錄。' },
-  { title: '一鍵多平台發布', body: 'Threads、Facebook、Instagram 走官方 API 直接發布，官網 SEO 長文也能推到各品牌部落格。' },
-  { title: '行程表與最佳時段', body: '跨品牌發文行程表，依歷史互動數據建議每個平台的發文時段。' },
-  { title: 'AI 小編團隊', body: '阿豪、小咪、阿樂各有口吻與品牌知識，負責日常貼文、Threads 回覆與社群互動。' },
-  { title: '品牌智慧庫', body: '品牌定位、語氣規範、產品資料與素材圖庫集中管理，所有 AI 產出都以此為準。' },
-  { title: '市場情報與趨勢', body: '蒐集產業新聞、政策與熱門話題，自動標出與品牌相關的訊號，轉成內容題材。' },
-  { title: 'SEO / GEO', body: '規劃關鍵字與長文主題，並針對 AI 搜尋引擎優化品牌被引用的機會。' },
-  { title: '客服知識庫', body: '產品說明文件轉成可嵌入官網的客服小工具，常見問題由 AI 先回答。' },
-  { title: 'Podcast 與短影音', body: 'Podcast 集數管理、剪成 9:16 短影音、燒錄字幕與配音，延伸成社群素材。' },
-  { title: '活動報名與報到', body: '活動頁、線上報名、QR Code 電子票與現場掃碼報到一次完成。' },
-  { title: '會議、決策與協作', body: '會議紀錄 AI 摘要、決策追蹤、跨品牌合作排程，讓團隊知道誰在做什麼。' },
-  { title: '成效分析與學習', body: '彙整各平台互動數據，找出表現好的題材與格式，回饋到下一輪內容生成。' },
+export function usePress() {
+  const copy = useCopy();
+  return PRESS_META.map((meta, i) => ({
+    ...meta,
+    title: copy.press.items[i].title,
+    note: copy.press.items[i].note,
+  }));
+}
+
+const PODCAST_PAGE = 'https://player.soundon.fm/p/e70c6ec4-699d-4972-a735-88447eaa2d09';
+const PODCAST_FEEDS = [
+  'https://feeds.soundon.fm/podcasts/e70c6ec4-699d-4972-a735-88447eaa2d09.xml',
+  'https://feeds.soundon.fm/podcasts/e70c6ec4-699d-4972-a735-88447eaa2d09/yt.xml',
+  'https://feeds.soundon.fm/podcasts/e70c6ec4-699d-4972-a735-88447eaa2d09/spotify.xml',
 ];
 
-export const PRESS = [
-  {
-    brand: 'taskgo',
-    date: '2025/10/20',
-    title: '數位工具平民化 匠管 Task Go 助攻工班資訊透明',
-    note: '師傅用手機拍照、語音回報，施工紀錄不再靠紙本。',
-    url: 'https://money.udn.com/money/story/5635/9082541',
-  },
-  {
-    brand: 'homigo',
-    date: '2026/07/01',
-    title: '匠管攜手達觀跨足 PropTech 市場 推出 Homigo 智慧租屋管理平台',
-    note: '從 TaskGo 的工單經驗延伸到租屋管理，房東房客用 LINE 就能報修。',
-    url: 'https://money.udn.com/money/story/5635/9726282',
-  },
-  {
-    brand: 'washgo',
-    date: '2026/09/16',
-    title: '傳統洗衣店也拚 AI 數位轉型！匠管 Washgo 中部落地、開放品牌加入',
-    note: '收件、品管、收送串成一條流程，已在中部洗衣店實際上線。',
-    url: 'https://money.udn.com/money/story/5635/9756429',
-  },
+export function usePodcast() {
+  const copy = useCopy();
+  return {
+    page: PODCAST_PAGE,
+    feeds: PODCAST_FEEDS.map((url, i) => ({ url, label: copy.podcast.feeds[i] })),
+    copy: copy.podcast,
+  };
+}
+
+const INTEGRATION_META = [
+  { brand: 'taskgo', url: 'https://dev.taskgo.com.tw/project-case-report/6cMnEQRUbnwau4fRTYFL8oJ1tapbNrinlC_wXn0ykfGnohTfYgooXqBb9RZN17Gd/play' },
+  { brand: 'washgo', url: 'https://washgo-liff.pages.dev/track/4e3271fc4a/play' },
 ];
 
-export const PODCAST = {
-  page: 'https://player.soundon.fm/p/e70c6ec4-699d-4972-a735-88447eaa2d09',
-  feeds: [
-    { label: 'SoundOn 訂閱', url: 'https://feeds.soundon.fm/podcasts/e70c6ec4-699d-4972-a735-88447eaa2d09.xml' },
-    { label: 'YouTube 訂閱', url: 'https://feeds.soundon.fm/podcasts/e70c6ec4-699d-4972-a735-88447eaa2d09/yt.xml' },
-    { label: 'Spotify 訂閱', url: 'https://feeds.soundon.fm/podcasts/e70c6ec4-699d-4972-a735-88447eaa2d09/spotify.xml' },
-  ],
-};
-
-export const INTEGRATIONS = [
-  {
-    brand: 'taskgo',
-    title: 'TaskGo 結案報告：匠城呈現',
-    body: '修繕案結案後，系統把派工、到場、施工、驗收變成一段匠城出任務動畫，業主點開就看得懂這次修了什麼。',
-    url: 'https://dev.taskgo.com.tw/project-case-report/6cMnEQRUbnwau4fRTYFL8oJ1tapbNrinlC_wXn0ykfGnohTfYgooXqBb9RZN17Gd/play',
-  },
-  {
-    brand: 'washgo',
-    title: 'Washgo 洗滌追蹤：匠城呈現',
-    body: '客人查送洗進度時，收件、洗護、品管、送回會以匠城動畫一路播完，等衣服的時間也有東西看。',
-    url: 'https://washgo-liff.pages.dev/track/4e3271fc4a/play',
-  },
-];
+export function useIntegrations() {
+  const copy = useCopy();
+  return INTEGRATION_META.map((meta, i) => ({ ...meta, ...copy.integrations[i] }));
+}
 
 /** 遊戲截圖放在 public/game/shots/。截圖不可出現真實姓名、電話或地址。 */
 export const GAME_SHOTS: { src: string; caption: string }[] = [];
@@ -180,15 +154,13 @@ function useJson<T>(url: string): T | null {
   return data;
 }
 
-export function brandOf(slug: string) {
-  return BRANDS.find((b) => b.slug === slug)!;
-}
-
 export function BrandPosts() {
+  const copy = useCopy();
+  const brands = useBrands();
   const data = useJson<{ posts: ShowcasePost[] }>('/api/public/showcase/posts');
   return (
     <div className="lp-brands">
-      {BRANDS.map((b) => {
+      {brands.map((b) => {
         const post = data?.posts.find((p) => p.brandSlug === b.slug);
         return (
           <article key={b.slug} className="lp-post" style={{ ['--c' as string]: b.color }}>
@@ -196,7 +168,7 @@ export function BrandPosts() {
               <img src={b.editor} alt={b.editorName} />
               <div>
                 <b>{b.name}</b>
-                <small>AI 小編 {b.editorName}</small>
+                <small>{copy.common.aiEditor(b.editorName)}</small>
               </div>
             </header>
             {post ? (
@@ -208,11 +180,11 @@ export function BrandPosts() {
                 {post.title && <h3>{post.title}</h3>}
                 <p>{post.excerpt}</p>
                 {post.permalink && (
-                  <a className="lp-link" href={post.permalink} target="_blank" rel="noopener">看這則貼文</a>
+                  <a className="lp-link" href={post.permalink} target="_blank" rel="noopener">{copy.common.viewPost}</a>
                 )}
               </>
             ) : (
-              <p className="lp-muted">{data ? '最近一則貼文準備中。' : '載入中…'}</p>
+              <p className="lp-muted">{data ? copy.common.postSoon : copy.common.loading}</p>
             )}
           </article>
         );
@@ -244,26 +216,11 @@ interface ShowcaseResults {
   weeks?: TrendWeek[];
 }
 
-function fmt(n: number): string {
-  return Math.round(n).toLocaleString('zh-TW');
-}
-
-function formatYm(iso: string): string {
-  return new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: 'long' }).format(new Date(iso));
-}
-
-function formatStamp(iso: string): string {
-  return new Intl.DateTimeFormat('zh-TW', {
-    timeZone: 'Asia/Taipei',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(new Date(iso));
-}
-
 export function BrandResults() {
+  const copy = useCopy();
+  const text = copy.results;
+  const brands = useBrands();
+  const format = useFormat();
   const [data, setData] = useState<ShowcaseResults | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -276,8 +233,8 @@ export function BrandResults() {
     return () => { alive = false; };
   }, []);
 
-  if (failed) return <p className="lp-muted">成效數字暫時載入不到。下面仍可看最新貼文與報導。</p>;
-  if (!data) return <p className="lp-muted">成效載入中…</p>;
+  if (failed) return <p className="lp-muted">{text.fail}</p>;
+  if (!data) return <p className="lp-muted">{text.loading}</p>;
 
   const { totals, last28 } = data;
   const maxImp = Math.max(1, ...data.platforms.map((p) => p.totals.impressions));
@@ -289,30 +246,30 @@ export function BrandResults() {
     <div className="lp-proof">
       <div className="lp-results">
         <div className="lp-result">
-          <b>{fmt(totals.published)}</b>
-          <span>累計已發</span>
-          <small>三個平台合計</small>
+          <b>{format.n(totals.published)}</b>
+          <span>{text.published}</span>
+          <small>{text.publishedHint}</small>
         </div>
         <div className="lp-result">
-          <b>{fmt(totals.impressions)}</b>
-          <span>累計曝光</span>
-          <small>{data.since ? `${formatYm(data.since)}起，被看到的次數` : '已發出貼文被看到的次數'}</small>
+          <b>{format.n(totals.impressions)}</b>
+          <span>{text.impressions}</span>
+          <small>{text.since(data.since ? format.ym(data.since) : null)}</small>
         </div>
         <div className="lp-result">
-          <b>{fmt(last28.impressions)}</b>
-          <span>近 28 天曝光</span>
-          <small>近 28 天發出 {fmt(last28.published)} 則</small>
+          <b>{format.n(last28.impressions)}</b>
+          <span>{text.last28Impressions}</span>
+          <small>{text.last28Posts(format.n(last28.published))}</small>
         </div>
         <div className="lp-result">
-          <b>{fmt(last28.interactions)}</b>
-          <span>近 28 天互動</span>
-          <small>按讚 {fmt(last28.likes)}、留言 {fmt(last28.comments)}、分享 {fmt(last28.shares)}、收藏 {fmt(last28.saves)}</small>
+          <b>{format.n(last28.interactions)}</b>
+          <span>{text.last28Interactions}</span>
+          <small>{text.interactionDetail(format.n(last28.likes), format.n(last28.comments), format.n(last28.shares), format.n(last28.saves))}</small>
         </div>
       </div>
 
       <ProofTrend
         weeks={data.weeks ?? []}
-        brands={BRANDS.map((b) => ({
+        brands={brands.map((b) => ({
           slug: b.slug,
           name: b.name,
           color: b.color,
@@ -320,9 +277,9 @@ export function BrandResults() {
         }))}
       />
 
-      <h3 className="lp-proof-title">三個品牌各自的成果</h3>
+      <h3 className="lp-proof-title">{text.byBrand}</h3>
       <div className="lp-brands">
-        {BRANDS.map((b) => {
+        {brands.map((b) => {
           const row = data.brands.find((x) => x.slug === b.slug);
           const all = row?.totals;
           const recent = row?.last28;
@@ -332,84 +289,91 @@ export function BrandResults() {
                 <img src={b.editor} alt={b.editorName} />
                 <div>
                   <b>{b.name}</b>
-                  <small>AI 小編 {b.editorName}</small>
+                  <small>{copy.common.aiEditor(b.editorName)}</small>
                 </div>
               </header>
               <div className="lp-metric-grid">
-                <div className="lp-metric"><b>{fmt(all?.published ?? 0)}</b><small>累計已發</small></div>
-                <div className="lp-metric"><b>{fmt(recent?.published ?? 0)}</b><small>近 28 天已發</small></div>
-                <div className="lp-metric"><b>{fmt(all?.impressions ?? 0)}</b><small>累計曝光</small></div>
-                <div className="lp-metric"><b>{fmt(recent?.impressions ?? 0)}</b><small>近 28 天曝光</small></div>
+                <div className="lp-metric"><b>{format.n(all?.published ?? 0)}</b><small>{text.allPublished}</small></div>
+                <div className="lp-metric"><b>{format.n(recent?.published ?? 0)}</b><small>{text.recentPublished}</small></div>
+                <div className="lp-metric"><b>{format.n(all?.impressions ?? 0)}</b><small>{text.allImpressions}</small></div>
+                <div className="lp-metric"><b>{format.n(recent?.impressions ?? 0)}</b><small>{text.recentImpressions}</small></div>
                 <div className="lp-metric wide">
-                  <b>{fmt(recent?.interactions ?? 0)}</b>
-                  <small>近 28 天互動</small>
+                  <b>{format.n(recent?.interactions ?? 0)}</b>
+                  <small>{text.recentInteractions}</small>
                 </div>
               </div>
               <p className="lp-mix">
-                按讚 {fmt(recent?.likes ?? 0)} · 留言 {fmt(recent?.comments ?? 0)} · 分享 {fmt(recent?.shares ?? 0)} · 收藏 {fmt(recent?.saves ?? 0)}
-                {(recent?.clicks ?? 0) > 0 ? ` · 連結點擊 ${fmt(recent?.clicks ?? 0)}` : ''}
+                {text.mix(
+                  format.n(recent?.likes ?? 0),
+                  format.n(recent?.comments ?? 0),
+                  format.n(recent?.shares ?? 0),
+                  format.n(recent?.saves ?? 0),
+                  (recent?.clicks ?? 0) > 0 ? format.n(recent?.clicks ?? 0) : null,
+                )}
               </p>
             </article>
           );
         })}
       </div>
 
-      <h3 className="lp-proof-title">三個平台各自貢獻多少</h3>
+      <h3 className="lp-proof-title">{text.byPlatform}</h3>
       <div className="lp-plat-grid">
         {data.platforms.map((p) => (
           <article key={p.platform} className="lp-plat-card">
             <div className="lp-post-meta">{PLATFORM_LABELS[p.platform] ?? p.platform}</div>
-            <b>{fmt(p.totals.published)}</b>
-            <small>累計已發</small>
+            <b>{format.n(p.totals.published)}</b>
+            <small>{text.allPublished}</small>
             <div className="lp-barline" aria-hidden="true">
               <i style={{ width: `${Math.round((p.totals.impressions / maxImp) * 100)}%` }} />
             </div>
             <p>
               {p.totals.impressions > 0
-                ? `累計曝光 ${fmt(p.totals.impressions)} · 近 28 天 ${fmt(p.last28.impressions)}`
-                : '曝光還在向平台回收'}
+                ? text.platformCounts(format.n(p.totals.impressions), format.n(p.last28.impressions))
+                : text.platformPending}
             </p>
-            <p className="lp-muted">近 28 天已發 {fmt(p.last28.published)} 則 · 互動 {fmt(p.last28.interactions)}</p>
+            <p className="lp-muted">{text.platformRecent(format.n(p.last28.published), format.n(p.last28.interactions))}</p>
           </article>
         ))}
       </div>
 
       <p className="lp-note">
-        {`已發篇數約每兩分鐘更新。曝光與互動約每小時向各平台回收${data.insightsAt ? `，最近一次回收是 ${formatStamp(data.insightsAt)}` : ''}。數字來自各平台官方成效，不含廣告。一則內容發到幾個平台，就各算一則。`}
-        {threadsShare >= 0.6 ? '目前看得到的曝光，主要來自 Threads。' : ''}
-        {totals.clicks > 0 ? `另有累計連結點擊 ${fmt(totals.clicks)}。` : ''}
+        {text.footnote(
+          data.insightsAt ? format.stamp(data.insightsAt) : null,
+          threadsShare >= 0.6,
+          totals.clicks > 0 ? format.n(totals.clicks) : null,
+        )}
       </p>
     </div>
   );
 }
 
 export function PodcastBlock() {
+  const podcast = usePodcast();
   const data = useJson<{ episode: ShowcaseEpisode | null }>('/api/public/showcase/podcast');
   const ep = data?.episode;
+  const { locale } = useLocale();
   return (
     <div className="lp-podcast">
-      <a href={PODCAST.page} target="_blank" rel="noopener" className="lp-podcast-cover">
-        <img src="/podcast/cover.jpg" alt="GO三小編熱聊：阿豪、小咪、阿樂" loading="lazy" />
+      <a href={podcast.page} target="_blank" rel="noopener" className="lp-podcast-cover">
+        <img src="/podcast/cover.jpg" alt={podcast.copy.coverAlt} loading="lazy" />
       </a>
       <div className="lp-podcast-body">
-        <h3>GO三小編熱聊</h3>
-        <p className="lp-muted">
-          工班出身的阿豪、包租管家小咪、洗衣店店員阿樂，每週聊工地、租屋、洗衣的熱門話題。
-          三個人的聲音、腳本與上架都由行銷中心產出。
-        </p>
+        <h3>{podcast.copy.title}</h3>
+        <p className="lp-muted">{podcast.copy.body}</p>
         {ep && (
           <div className="lp-episode">
-            <div className="lp-post-meta">最新一集{ep.publishedAt ? `・${formatDate(ep.publishedAt)}` : ''}</div>
+            <div className="lp-post-meta">{podcast.copy.latest(ep.publishedAt ? formatDate(ep.publishedAt) : '')}</div>
             <b>{ep.title}</b>
             <p>{ep.summary}</p>
-            {ep.url && <a className="lp-link" href={ep.url} target="_blank" rel="noopener">收聽這一集</a>}
+            {locale !== 'zh' && podcast.copy.originalNote && <p className="lp-muted">{podcast.copy.originalNote}</p>}
+            {ep.url && <a className="lp-link" href={ep.url} target="_blank" rel="noopener">{podcast.copy.listen}</a>}
           </div>
         )}
         <div className="lp-hero-cta">
-          <a className="lp-btn" href={PODCAST.page} target="_blank" rel="noopener">到 SoundOn 收聽</a>
+          <a className="lp-btn" href={podcast.page} target="_blank" rel="noopener">{podcast.copy.soundon}</a>
         </div>
         <div className="lp-feeds">
-          {PODCAST.feeds.map((f) => (
+          {podcast.feeds.map((f) => (
             <a key={f.url} href={f.url} target="_blank" rel="noopener">{f.label}</a>
           ))}
         </div>
@@ -418,25 +382,15 @@ export function PodcastBlock() {
   );
 }
 
-export const FLOW = [
-  { step: '1', title: '蒐集', body: '市場情報、品牌知識、過往成效' },
-  { step: '2', title: '生成', body: 'AI 小編依品牌口吻產文案與圖' },
-  { step: '3', title: '審閱', body: '人工核准、修改或退回' },
-  { step: '4', title: '發布', body: '社群與官網排程或一鍵發布' },
-  { step: '5', title: '學習', body: '成效回流，下一篇更準' },
-];
-
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-function formatStay(seconds: number): string {
-  if (seconds < 60) return `${seconds} 秒`;
-  return `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
-}
-
 export function Leaderboard() {
+  const copy = useCopy();
+  const text = copy.board;
+  const format = useFormat();
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [failed, setFailed] = useState(false);
   const [stats, setStats] = useState<GameStats | null>(null);
@@ -465,34 +419,40 @@ export function Leaderboard() {
   }, []);
 
   const season = data?.season;
+  const mapName = copy.map[data?.map ?? 's'];
   return (
     <div className="lp-board">
       <div className="lp-board-head">
-        <div className="lp-eyebrow">排行榜・{MAP_LABELS[data?.map ?? 's']}</div>
-        <h3>{season ? season.name : '全站排行'}</h3>
+        <div className="lp-eyebrow">{text.eyebrow(mapName)}</div>
+        <h3>{season ? season.name : text.fallbackTitle}</h3>
         {season && (
           <p className="lp-muted">
-            活動期間 {formatDate(season.startsAt)} – {formatDate(season.endsAt)}，{MAP_LABELS[season.prizeMap]}前 {season.topN} 名可獲獎
+            {text.season(formatDate(season.startsAt), formatDate(season.endsAt), copy.map[season.prizeMap], season.topN)}
           </p>
         )}
       </div>
       {stats && (
         <div className="lp-stats">
-          <div><b className="lp-live">{stats.live.count}</b><small>正在上工</small></div>
-          <div><b>{stats.totals.plays.toLocaleString('en-US')}</b><small>累計遊玩（局）</small></div>
-          <div><b>{stats.totals.minutes.toLocaleString('en-US')}</b><small>累計上工（分鐘）</small></div>
-          <div><b>{stats.totals.players.toLocaleString('en-US')}</b><small>玩家人數</small></div>
+          <div><b className="lp-live">{stats.live.count}</b><small>{text.onShiftNow}</small></div>
+          <div><b>{format.n(stats.totals.plays)}</b><small>{text.totalPlays}</small></div>
+          <div><b>{format.n(stats.totals.minutes)}</b><small>{text.totalMinutes}</small></div>
+          <div><b>{format.n(stats.totals.players)}</b><small>{text.playerCount}</small></div>
         </div>
       )}
       <div className="lp-tabs" role="tablist">
-        {([['rank', '排行榜'], ['live', '正在玩'], ['loyal', '最常上工']] as const).map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>
+        {(['rank', 'live', 'loyal'] as const).map((id) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{text.tabs[id]}</button>
         ))}
       </div>
-      {season?.prize && tab === 'rank' && <div className="lp-prize">{season.prize}</div>}
-      {tab === 'rank' && failed && <p className="lp-muted">排行榜暫時載入失敗，請稍後再試。</p>}
-      {tab === 'rank' && !failed && !data && <p className="lp-muted">載入中…</p>}
-      {tab === 'rank' && data && data.entries.length === 0 && <p className="lp-muted">還沒有人上榜，第一名等你來拿。</p>}
+      {season?.prize && tab === 'rank' && (
+        <div className="lp-prize">
+          {season.prize}
+          {text.prizeOriginal && <div>{text.prizeOriginal}</div>}
+        </div>
+      )}
+      {tab === 'rank' && failed && <p className="lp-muted">{text.rankFail}</p>}
+      {tab === 'rank' && !failed && !data && <p className="lp-muted">{copy.common.loading}</p>}
+      {tab === 'rank' && data && data.entries.length === 0 && <p className="lp-muted">{text.emptyRank}</p>}
       {tab === 'rank' && data && data.entries.length > 0 && (
         <ol className="lp-rank">
           {data.entries.map((e) => (
@@ -502,21 +462,21 @@ export function Leaderboard() {
                 {e.nickname}
                 <small>{e.phoneMasked}</small>
               </span>
-              <span className="lp-rank-score">NT$ {e.score.toLocaleString('en-US')}</span>
+              <span className="lp-rank-score">NT$ {format.n(e.score)}</span>
             </li>
           ))}
         </ol>
       )}
       {tab === 'live' && (
         (stats?.live.players.length ?? 0) === 0
-          ? <p className="lp-muted">現在沒有人在跑單。</p>
+          ? <p className="lp-muted">{text.emptyLive}</p>
           : (
             <ol className="lp-rank">
               {stats!.live.players.map((p, i) => (
                 <li key={`${p.name}-${i}`}>
                   <span className={`lp-rank-no${i < 3 ? ' top' : ''}`}>{i + 1}</span>
-                  <span className="lp-rank-name">{p.name}<small>已上工 {formatStay(p.seconds)}</small></span>
-                  <span className="lp-rank-score">NT$ {p.score.toLocaleString('en-US')}</span>
+                  <span className="lp-rank-name">{p.name}<small>{text.onShift(text.stay(p.seconds))}</small></span>
+                  <span className="lp-rank-score">NT$ {format.n(p.score)}</span>
                 </li>
               ))}
             </ol>
@@ -524,85 +484,78 @@ export function Leaderboard() {
       )}
       {tab === 'loyal' && (
         (stats?.topPlayers.length ?? 0) === 0
-          ? <p className="lp-muted">還沒有常客。玩完送出成績後會出現在這裡。</p>
+          ? <p className="lp-muted">{text.emptyLoyal}</p>
           : (
             <ol className="lp-rank">
               {stats!.topPlayers.map((p, i) => (
                 <li key={p.phoneMasked}>
                   <span className={`lp-rank-no${i < 3 ? ' top' : ''}`}>{i + 1}</span>
-                  <span className="lp-rank-name">{p.nickname}<small>{p.phoneMasked}・{p.minutes} 分鐘</small></span>
-                  <span className="lp-rank-score">{p.plays} 局</span>
+                  <span className="lp-rank-name">{p.nickname}<small>{text.loyalMeta(p.phoneMasked, p.minutes)}</small></span>
+                  <span className="lp-rank-score">{text.rounds(p.plays)}</span>
                 </li>
               ))}
             </ol>
           )
       )}
-      <a className="lp-link" href="/legal/game-rules/">活動辦法與領獎方式</a>
+      <a className="lp-link" href="/legal/game-rules/">{text.rules}</a>
     </div>
   );
 }
 
 export function GameFrame() {
+  const frame = useCopy().gameFrame;
   const [playing, setPlaying] = useState(false);
   return (
     <div className="lp-game">
       {playing ? (
         <iframe
           src="/game/index.html?embed=1"
-          title="匠城出任務"
+          title={frame.title}
           allow="autoplay; fullscreen"
           allowFullScreen
         />
       ) : (
         <button type="button" className="lp-game-cover" onClick={() => setPlaying(true)}>
-          <img src="/game/og-image.jpg?v=0930" alt="匠城出任務遊戲畫面" loading="lazy" />
-          <span className="lp-play">開始遊戲</span>
+          <img src="/game/og-image.jpg?v=0930" alt={frame.alt} loading="lazy" />
+          <span className="lp-play">{frame.play}</span>
         </button>
       )}
       <div className="lp-game-actions">
-        <a className="lp-btn ghost" href="/game/index.html" target="_blank" rel="noopener">全螢幕開啟</a>
-        <span className="lp-muted">手機直接點「全螢幕開啟」操作最順</span>
+        <a className="lp-btn ghost" href="/game/index.html" target="_blank" rel="noopener">{frame.fullscreen}</a>
+        <span className="lp-muted">{frame.hint}</span>
       </div>
     </div>
   );
 }
 
-const HOME_PAGES = [
-  { to: '/go-posting', title: 'Go 幫你發文', body: '工班不用自己顧粉專。每週兩則，一個月 999。', cta: '看價格表' },
-  { to: '/proof', title: '三品牌發文與報導', body: '三個品牌的累計發文、曝光與互動，加上最新貼文和經濟日報。', cta: '看成果' },
-  { to: '/show', title: '三小編熱聊', body: '同一套中心做出的 Podcast，SoundOn、YouTube、Spotify 都能聽。', cta: '去收聽' },
-  { to: '/jiangcheng', title: '匠城出任務', body: '收工後跑一班。遊戲也接進 TaskGo 結案報告和 Washgo 洗滌追蹤。', cta: '玩一局' },
-  { to: '/center', title: '行銷中心怎麼跑', body: '題材、生成、審閱、發布、學習。工班看到的貼文都從這裡出來。', cta: '看流程' },
-];
+const HOME_PATHS = ['/go-posting', '/proof', '/show', '/jiangcheng', '/center'] as const;
 
 export function Landing() {
+  const copy = useCopy();
+  const home = copy.home;
+  const brands = useBrands();
+  const pages = copy.homePages.map((page, i) => ({ ...page, to: HOME_PATHS[i] }));
   return (
-    <PublicFrame title="匠管的 AI 行銷中心">
+    <PublicFrame title={home.title}>
       <section id="top" className="lp-hero">
         <div className="lp-wrap lp-hero-inner">
           <div>
-            <div className="lp-eyebrow">GO Marketing Center</div>
-            <h1>匠管為三個品牌<br />打造的 AI 行銷中心</h1>
-            <p className="lp-lead">
-              匠管同時經營 TaskGo、Homigo、Washgo，人手不可能每天顧三組粉專。
-              所以我們做了 GO 行銷中心：它會自己在 Facebook、Instagram、Threads 發文，
-              三位小編阿豪、小咪、阿樂各有固定人設與口吻，還能自己錄 Podcast。
-            </p>
-            <p className="lp-lead">
-              我們也做了小遊戲「匠城出任務」讓師傅收工後舒壓，並把它接進 TaskGo 與 Washgo 系統裡。
-            </p>
+            <div className="lp-eyebrow">{home.eyebrow}</div>
+            <h1>{home.h1a}<br />{home.h1b}</h1>
+            <p className="lp-lead">{home.lead1}</p>
+            <p className="lp-lead">{home.lead2}</p>
             <div className="lp-hero-cta">
-              <a className="lp-btn" href="#game">直接玩匠城出任務</a>
-              <Link className="lp-btn ghost" to="/go-posting">每週兩篇，一個月 999</Link>
+              <a className="lp-btn" href="#game">{home.ctaGame}</a>
+              <LocalLink className="lp-btn ghost" to="/go-posting">{home.ctaPrice}</LocalLink>
             </div>
           </div>
           <div className="lp-hero-art">
-            {BRANDS.map((b) => (
+            {brands.map((b) => (
               <div key={b.slug} className="lp-hero-chip" style={{ borderColor: b.color }}>
                 <img src={b.editor} alt={b.editorName} />
                 <div>
                   <b style={{ color: b.color }}>{b.name}</b>
-                  <small>AI 小編 {b.editorName}</small>
+                  <small>{copy.common.aiEditor(b.editorName)}</small>
                 </div>
               </div>
             ))}
@@ -612,48 +565,45 @@ export function Landing() {
 
       <section id="game" className="lp-section game">
         <div className="lp-wrap">
-          <div className="lp-eyebrow">先玩一局</div>
-          <h2>匠城出任務</h2>
-          <p className="lp-muted lp-sub">
-            騎車接 TaskGo 報修、Homigo 送鑰匙、Washgo 收衣服。90 秒就能開跑，不用註冊。
-            想全螢幕玩，直接開遊戲頁。
-          </p>
+          <div className="lp-eyebrow">{home.gameEyebrow}</div>
+          <h2>{home.gameTitle}</h2>
+          <p className="lp-muted lp-sub">{home.gameSub}</p>
           <div className="lp-game-grid">
             <GameFrame />
             <Leaderboard />
           </div>
           <div className="lp-hero-cta">
-            <a className="lp-btn" href="/game/index.html" target="_blank" rel="noopener">開啟完整遊戲</a>
-            <Link className="lp-btn ghost" to="/jiangcheng">地圖、排行榜與系統裡的匠城呈現</Link>
+            <a className="lp-btn" href="/game/index.html" target="_blank" rel="noopener">{home.openGame}</a>
+            <LocalLink className="lp-btn ghost" to="/jiangcheng">{home.gameMore}</LocalLink>
           </div>
         </div>
       </section>
 
       <section id="posts" className="lp-section">
         <div className="lp-wrap">
-          <div className="lp-eyebrow">品牌發文</div>
-          <h2>三位 AI 小編，各自顧一個品牌</h2>
-          <p className="lp-muted lp-sub">每個品牌只放最新發出去的一則，內容由小編依品牌口吻產出、團隊審過才上線。</p>
+          <div className="lp-eyebrow">{home.postsEyebrow}</div>
+          <h2>{home.postsTitle}</h2>
+          <p className="lp-muted lp-sub">{home.postsSub}</p>
           <BrandPosts />
         </div>
       </section>
 
       <section className="lp-section soft">
         <div className="lp-wrap">
-          <div className="lp-eyebrow">給工班的方案</div>
-          <h2>Go 幫你發文，只收 999／月</h2>
-          <p className="lp-muted lp-sub">同一套會自己發文的中心，現在可以幫工班、店家每週寫兩則。不是另外一套系統的月費。</p>
+          <div className="lp-eyebrow">{home.priceEyebrow}</div>
+          <h2>{home.priceTitle}</h2>
+          <p className="lp-muted lp-sub">{home.priceSub}</p>
           <div className="lp-price">
             <div className="lp-price-hero">
-              <div className="lp-post-meta">每週 2 則 · Facebook、Instagram、Threads</div>
-              <div className="lp-amount">999<small> 元／月</small></div>
-              <p className="lp-muted">AI 小編撰寫，發布前有人看過才上線。沒有第二種方案。</p>
-              <Link className="lp-btn" to="/go-posting">看完整價格表</Link>
+              <div className="lp-post-meta">{home.priceMeta}</div>
+              <div className="lp-amount">999<small>{home.priceUnit}</small></div>
+              <p className="lp-muted">{home.priceNote}</p>
+              <LocalLink className="lp-btn" to="/go-posting">{home.priceCta}</LocalLink>
             </div>
             <div>
-              <p className="lp-muted">這套中心先拿來經營匠管自己的三個品牌。工班可以先看成果，再決定要不要讓 Go 幫你發。</p>
+              <p className="lp-muted">{home.priceAside}</p>
               <div className="lp-hero-cta">
-                <Link className="lp-btn ghost" to="/proof">看三品牌發文成果</Link>
+                <LocalLink className="lp-btn ghost" to="/proof">{home.priceProof}</LocalLink>
               </div>
             </div>
           </div>
@@ -662,15 +612,15 @@ export function Landing() {
 
       <section className="lp-section">
         <div className="lp-wrap">
-          <div className="lp-eyebrow">分頁看</div>
-          <h2>每一塊都可以單獨看完</h2>
+          <div className="lp-eyebrow">{home.pagesEyebrow}</div>
+          <h2>{home.pagesTitle}</h2>
           <div className="lp-pages" style={{ marginTop: 28 }}>
-            {HOME_PAGES.map((p) => (
-              <Link key={p.to} className="lp-page-card" to={p.to}>
+            {pages.map((p) => (
+              <LocalLink key={p.to} className="lp-page-card" to={p.to}>
                 <b>{p.title}</b>
                 <p>{p.body}</p>
                 <span>{p.cta}</span>
-              </Link>
+              </LocalLink>
             ))}
           </div>
         </div>
@@ -691,6 +641,11 @@ export const LANDING_CSS = `
 .lp-nav nav{display:flex;gap:18px;margin-left:auto;font-size:14px}
 .lp-nav nav a{text-decoration:none;color:var(--muted)}
 .lp-nav nav a:hover{color:var(--ink)}
+.lp-lang{display:flex;align-items:center;gap:2px;background:#F7F9F5;border:1px solid #E6E8E2;border-radius:999px;padding:3px;flex:none}
+.lp-lang button{border:0;background:transparent;border-radius:999px;padding:5px 9px;font:700 12px inherit;color:var(--muted);cursor:pointer;line-height:1.2;white-space:nowrap}
+.lp-lang button[aria-pressed=true]{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.lp[lang=en]{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",sans-serif}
+.lp[lang=ja]{font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","YuGothic","Noto Sans JP","PingFang TC",sans-serif}
 .lp-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--green);color:#fff !important;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px;border:0;cursor:pointer;font-size:15px}
 .lp-btn:hover{filter:brightness(.95)}
 .lp-btn.small{padding:8px 16px;font-size:14px}
@@ -950,38 +905,48 @@ export const LANDING_CSS = `
 
 export function PublicFrame({ title, children }: { title: string; children: ReactNode }) {
   const { user } = useAuth();
-  const { pathname } = useLocation();
-  const here = pathname === '/' ? '/welcome' : pathname;
+  const { locale, path } = useLocale();
+  const copy = useCopy();
+  const here = path === '/' ? '/welcome' : path;
 
   useEffect(() => {
-    document.title = `${title}｜GO 行銷中心`;
-  }, [title]);
+    const previousTitle = document.title;
+    const meta = document.querySelector('meta[name="description"]');
+    const previousDescription = meta?.getAttribute('content') ?? '';
+    document.title = `${title}${copy.titleJoin}${copy.brandName}`;
+    if (meta) meta.setAttribute('content', copy.metaDescription);
+    return () => {
+      document.title = previousTitle;
+      if (meta) meta.setAttribute('content', previousDescription);
+    };
+  }, [title, copy]);
 
   return (
-    <div className="lp">
+    <div className="lp" lang={locale === 'zh' ? 'zh-Hant' : locale}>
       <style>{LANDING_CSS}</style>
       <header className="lp-nav">
         <div className="lp-wrap lp-nav-inner">
-          <Link to="/welcome" className="lp-logo"><b>GO</b> 行銷中心</Link>
+          <LocalLink to="/welcome" className="lp-logo"><b>GO</b> {copy.brandName.replace(/^GO\s?/, '')}</LocalLink>
           <nav>
             {NAV.map((item) => (
-              <Link key={item.to} to={item.to} aria-current={here === item.to ? 'page' : undefined}>{item.label}</Link>
+              <LocalLink key={item.to} to={item.to} aria-current={here === item.to ? 'page' : undefined}>{copy.nav[item.key]}</LocalLink>
             ))}
           </nav>
+          <LanguageSwitch />
           {user
-            ? <Link className="lp-btn small" to="/home">進入行銷中心</Link>
-            : <Link className="lp-btn small" to="/login">登入</Link>}
+            ? <Link className="lp-btn small" to="/home">{copy.nav.enter}</Link>
+            : <Link className="lp-btn small" to="/login">{copy.nav.login}</Link>}
         </div>
       </header>
       {children}
       <footer className="lp-footer">
         <div className="lp-wrap lp-footer-inner">
-          <span>© {new Date().getFullYear()} GO 行銷中心</span>
+          <span>© {new Date().getFullYear()} {copy.brandName}</span>
           <nav>
-            <Link to="/go-posting">Go幫你發文</Link>
-            <a href="/privacy">隱私權政策</a>
-            <a href="/legal/game-rules/">遊戲活動辦法</a>
-            {user ? <Link to="/home">進入行銷中心</Link> : <Link to="/login">團隊登入</Link>}
+            <LocalLink to="/go-posting">{copy.footer.posting}</LocalLink>
+            <a href="/privacy">{copy.footer.privacy}</a>
+            <a href="/legal/game-rules/">{copy.footer.rules}</a>
+            {user ? <Link to="/home">{copy.footer.enter}</Link> : <Link to="/login">{copy.footer.teamLogin}</Link>}
           </nav>
         </div>
       </footer>

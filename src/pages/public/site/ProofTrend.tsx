@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useCopy, useFormat } from '@/pages/public/locale';
 
 export interface TrendWeekBrand {
   published: number;
@@ -22,19 +23,6 @@ const W = 720;
 const H = 248;
 const PAD = { l: 48, r: 14, t: 16, b: 30 };
 
-function fmt(n: number): string {
-  return Math.round(n).toLocaleString('zh-TW');
-}
-
-function compact(n: number): string {
-  if (n >= 10000) {
-    const v = n / 10000;
-    return `${v >= 10 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, '')}萬`;
-  }
-  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}千`;
-  return String(Math.round(n));
-}
-
 function weekLabel(iso: string): string {
   const [, m, d] = iso.split('-');
   return `${Number(m)}/${Number(d)}`;
@@ -53,6 +41,8 @@ function linePath(pts: Array<[number, number]>): string {
 }
 
 export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: TrendBrand[] }) {
+  const copy = useCopy().trend;
+  const format = useFormat();
   const [active, setActive] = useState(Math.max(0, weeks.length - 1));
   const [drawn, setDrawn] = useState(false);
 
@@ -82,22 +72,22 @@ export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: Tren
   );
 
   return (
-    <section className="lp-trend" aria-label="近八週曝光走勢">
+    <section className="lp-trend" aria-label={copy.aria}>
       <div className="lp-trend-head">
         <div>
-          <h3>三個品牌在台灣的曝光走勢</h3>
-          <p>近八週發出的貼文，到目前被看到的次數。受眾在台灣，這張圖看的是發文成效。</p>
+          <h3>{copy.title}</h3>
+          <p>{copy.sub}</p>
         </div>
-        <b>{fmt(windowImpressions)}<small>近八週曝光</small></b>
+        <b>{format.n(windowImpressions)}<small>{copy.total}</small></b>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="近八週三品牌曝光折線">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={copy.chartAria}>
         {ticks.map((tick) => {
           const y = yAt(tick);
           return (
             <g key={tick}>
               <line x1={PAD.l} x2={W - PAD.r} y1={y} y2={y} className="lp-trend-grid" />
-              <text x={PAD.l - 8} y={y + 4} className="lp-trend-tick">{compact(tick)}</text>
+              <text x={PAD.l - 8} y={y + 4} className="lp-trend-tick">{format.compact(tick)}</text>
             </g>
           );
         })}
@@ -141,7 +131,7 @@ export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: Tren
               onFocus={() => setActive(i)}
               onClick={() => setActive(i)}
             >
-              <title>{`${weekLabel(item.week)} 被看到 ${fmt(brands.reduce((sum, b) => sum + brandOf(item, b.slug).impressions, 0))} 次`}</title>
+              <title>{copy.tooltip(weekLabel(item.week), format.n(brands.reduce((sum, b) => sum + brandOf(item, b.slug).impressions, 0)))}</title>
             </rect>
           );
         })}
@@ -154,7 +144,7 @@ export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: Tren
       </div>
 
       <p className="lp-trend-detail">
-        {weekLabel(week.week)} 那週發出 {fmt(weekPublished)} 則，到目前被看到 {fmt(weekImpressions)} 次，互動 {fmt(weekInteractions)} 次。
+        {copy.detail(weekLabel(week.week), format.n(weekPublished), format.n(weekImpressions), format.n(weekInteractions))}
       </p>
       <div className="lp-trend-split">
         {brands.map((brand) => {
@@ -162,27 +152,27 @@ export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: Tren
           return (
             <div key={brand.slug}>
               <span style={{ color: brand.color }}>{brand.name}</span>
-              <b>{fmt(row.impressions)}</b>
-              <small>曝光 · 互動 {fmt(row.interactions)}</small>
+              <b>{format.n(row.impressions)}</b>
+              <small>{copy.split(format.n(row.interactions))}</small>
             </div>
           );
         })}
       </div>
 
       <div className={`lp-reach${drawn ? ' on' : ''}`}>
-        <p>近 28 天，誰被看到比較多</p>
+        <p>{copy.reach}</p>
         {brands.map((brand) => (
           <div key={brand.slug} className="lp-reach-row">
             <span>{brand.name}</span>
             <div className="lp-reach-track" aria-hidden="true">
               <i style={{ background: brand.color, ['--w' as string]: `${Math.round((brand.recentImpressions / recentMax) * 100)}%` }} />
             </div>
-            <b>{fmt(brand.recentImpressions)}</b>
+            <b>{format.n(brand.recentImpressions)}</b>
           </div>
         ))}
       </div>
 
-      <div className="lp-weeks" role="tablist" aria-label="選擇週次">
+      <div className="lp-weeks" role="tablist" aria-label={copy.weeksAria}>
         {weeks.map((item, i) => (
           <button key={item.week} type="button" role="tab" aria-selected={i === active} onClick={() => setActive(i)}>
             {weekLabel(item.week)}

@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { MetaProvider } from '@/context/MetaContext';
 import { BrandProvider } from '@/context/BrandContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -10,7 +10,7 @@ import { LoadingState } from '@/hooks/useAsyncData';
 import { lazyPage } from '@/lib/lazy-page';
 import { Login } from '@/pages/Login';
 import { HomeRedirect } from '@/pages/HomeRedirect';
-import { useAuth } from '@/context/AuthContext';
+import { LocaleProvider, useCopy } from '@/pages/public/locale';
 
 const Dashboard = lazyPage(() => import('@/pages/Dashboard'), 'Dashboard');
 const BrandWorkspace = lazyPage(() => import('@/pages/brand/BrandWorkspace'), 'BrandWorkspace');
@@ -65,10 +65,15 @@ function RootGate() {
   if (loading) return <LoadingState />;
   if (user) return <Navigate to="/home" replace />;
   return (
-    <Suspense fallback={<LoadingState />}>
+    <Suspense fallback={<PublicFallback />}>
       <Landing />
     </Suspense>
   );
+}
+
+function PublicFallback() {
+  const copy = useCopy();
+  return <LoadingState label={copy.common.loading} />;
 }
 
 function AppRoutes() {
@@ -126,39 +131,45 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <LocaleProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<RootGate />} />
-          <Route
-            path="/welcome"
-            element={(
-              <Suspense fallback={<LoadingState />}>
-                <Landing />
-              </Suspense>
-            )}
-          />
           {([
+            ['/welcome', Landing],
             ['/go-posting', GoPosting],
             ['/proof', Proof],
             ['/show', Show],
             ['/jiangcheng', Jiangcheng],
             ['/center', Center],
-          ] as const).map(([path, Page]) => (
-            <Route
-              key={path}
-              path={path}
-              element={(
-                <Suspense fallback={<LoadingState />}>
-                  <Page />
-                </Suspense>
-              )}
-            />
+          ] as const).flatMap(([path, Page]) => (
+            (['', '/en', '/ja'] as const).map((prefix) => (
+              <Route
+                key={`${prefix}${path}`}
+                path={`${prefix}${path}`}
+                element={(
+                  <Suspense fallback={<PublicFallback />}>
+                    <Page />
+                  </Suspense>
+                )}
+              />
+            ))
           ))}
+          <Route path="/en" element={(
+            <Suspense fallback={<PublicFallback />}>
+              <Landing />
+            </Suspense>
+          )} />
+          <Route path="/ja" element={(
+            <Suspense fallback={<PublicFallback />}>
+              <Landing />
+            </Suspense>
+          )} />
 
           <Route
             path="/e/:slug"
             element={(
-              <Suspense fallback={<LoadingState />}>
+              <Suspense fallback={<PublicFallback />}>
                 <EventRegister />
               </Suspense>
             )}
@@ -166,7 +177,7 @@ export default function App() {
           <Route
             path="/e/:slug/ticket"
             element={(
-              <Suspense fallback={<LoadingState />}>
+              <Suspense fallback={<PublicFallback />}>
                 <EventTicket />
               </Suspense>
             )}
@@ -174,7 +185,7 @@ export default function App() {
           <Route
             path="/checkin"
             element={(
-              <Suspense fallback={<LoadingState />}>
+              <Suspense fallback={<PublicFallback />}>
                 <CheckinEntry />
               </Suspense>
             )}
@@ -182,7 +193,7 @@ export default function App() {
           <Route
             path="/checkin/:eventId"
             element={(
-              <Suspense fallback={<LoadingState />}>
+              <Suspense fallback={<PublicFallback />}>
                 <CheckinScan />
               </Suspense>
             )}
@@ -191,7 +202,7 @@ export default function App() {
           <Route
             path="/privacy"
             element={(
-              <Suspense fallback={<LoadingState />}>
+              <Suspense fallback={<PublicFallback />}>
                 <PrivacyPolicy />
               </Suspense>
             )}
@@ -199,7 +210,7 @@ export default function App() {
           <Route
             path="/privacy/:brand"
             element={(
-              <Suspense fallback={<LoadingState />}>
+              <Suspense fallback={<PublicFallback />}>
                 <PrivacyPolicy />
               </Suspense>
             )}
@@ -223,6 +234,7 @@ export default function App() {
             }
           />
         </Routes>
+        </LocaleProvider>
       </BrowserRouter>
     </AuthProvider>
   );

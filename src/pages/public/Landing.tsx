@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { ProofTrend, type TrendDay, type TrendKeyword } from '@/pages/public/site/ProofTrend';
+import { ProofTrend, type TrendWeek, type TrendKeyword } from '@/pages/public/site/ProofTrend';
 import { LanguageSwitch, LocalLink, useCopy, useFormat, useLocale } from '@/pages/public/locale';
 
 export const CONTACT_EMAIL = 'service@inforcraft.com.tw';
@@ -213,7 +213,7 @@ interface ShowcaseResults {
   last28: ShowcaseMetric;
   brands: Array<{ slug: string; totals: ShowcaseMetric; last28: ShowcaseMetric }>;
   platforms: Array<{ platform: string; totals: ShowcaseMetric; last28: ShowcaseMetric }>;
-  days?: TrendDay[];
+  weeks?: TrendWeek[];
   keywords?: TrendKeyword[];
 }
 
@@ -268,15 +268,7 @@ export function BrandResults() {
         </div>
       </div>
 
-      <ProofTrend
-        days={data.days ?? []}
-        keywords={data.keywords ?? []}
-        brands={brands.map((b) => ({
-          slug: b.slug,
-          name: b.name,
-          color: b.color,
-        }))}
-      />
+      <ProofTrend weeks={data.weeks ?? []} keywords={data.keywords ?? []} />
 
       <h3 className="lp-proof-title">{text.byBrand}</h3>
       <div className="lp-brands">
@@ -768,11 +760,17 @@ export const LANDING_CSS = `
 .lp-trend-x.on{fill:#23301c;font-weight:700}
 .lp-trend-cursor{stroke:transparent;stroke-width:1}
 .lp-trend-cursor.on{stroke:#23301c;stroke-dasharray:3 4;opacity:.35}
-.lp-trend-area{opacity:.12}
-.lp-trend-line{fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;animation:lp-draw 1.15s ease forwards}
+.lp-trend-area{fill:#8CAA71;opacity:.16}
+.lp-trend-line{fill:none;stroke:#23301c;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;animation:lp-draw 1.15s ease forwards}
 .lp-trend-line.d1{animation-delay:.08s}
 .lp-trend-line.d2{animation-delay:.18s}
-.lp-trend-dot{stroke:#fff;stroke-width:1.5}
+.lp-trend-dot{fill:#23301c;stroke:#fff;stroke-width:1.5}
+.lp-week-scroll{overflow-x:auto;margin-top:2px;-webkit-overflow-scrolling:touch}
+.lp-week-table{width:100%;border-collapse:collapse;font-size:13px;min-width:280px}
+.lp-week-table th,.lp-week-table td{padding:7px 6px;border-bottom:1px solid #E6E8E2;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.lp-week-table th:first-child,.lp-week-table td:first-child{text-align:left;font-weight:800;color:var(--ink)}
+.lp-week-table th{font-size:11px;color:var(--muted);font-weight:700}
+.lp-week-table td{color:var(--ink)}
 .lp-trend-hit{fill:transparent;cursor:pointer}
 .lp-trend-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;font-size:13px;font-weight:700;color:var(--ink)}
 .lp-trend-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
@@ -837,6 +835,11 @@ export const LANDING_CSS = `
   .lp-trend-head{flex-direction:column;align-items:flex-start}
   .lp-reach-row{grid-template-columns:72px 1fr auto}
   .lp-results,.lp-trend-stats{grid-template-columns:1fr 1fr}
+  .lp-result{padding:12px 10px}
+  .lp-result b{font-size:22px}
+  .lp-trend{margin-top:12px;padding:12px 10px}
+  .lp-trend-head > b{font-size:22px}
+  .lp-trend svg{max-height:148px}
   .lp-flow{grid-template-columns:1fr 1fr}
   .lp-nav-inner{height:auto;flex-wrap:wrap;padding:10px 0;gap:10px}
   .lp-nav nav{display:flex;order:3;width:100%;margin-left:0;overflow-x:auto;gap:14px;padding-bottom:6px}

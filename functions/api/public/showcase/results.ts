@@ -40,9 +40,12 @@ export interface ShowcaseResults {
     totals: ShowcaseMetric;
     last28: ShowcaseMetric;
   }>;
-  days: Array<{
-    day: string;
-    brands: Record<BrandSlug, { published: number; views: number; interactions: number; followersGained: number }>;
+  weeks: Array<{
+    week: string;
+    published: number;
+    views: number;
+    interactions: number;
+    followersGained: number;
   }>;
   keywords: ResonantKeyword[];
 }
@@ -111,17 +114,15 @@ interface BrandRow {
   first_at: string | null;
 }
 
-interface DayRow {
-  day: string;
-  slug: string;
+interface WeekRow {
+  week: string;
   published: number;
   impressions: number;
   interactions: number;
 }
 
 interface AudienceRow {
-  slug: string;
-  day: string;
+  week: string;
   gained: number;
 }
 
@@ -135,7 +136,7 @@ function dayKey(value: unknown): string {
   return String(value ?? '').slice(0, 10);
 }
 
-function emptyDayBrand() {
+function emptyWeek() {
   return { published: 0, views: 0, interactions: 0, followersGained: 0 };
 }
 
@@ -210,25 +211,22 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
             AND lower(b.slug) IN ('taskgo', 'homigo', 'washgo')
           GROUP BY lower(b.slug)
         ) y) AS by_brand,
-        (SELECT COALESCE(json_agg(z ORDER BY z.day, z.slug), '[]'::json) FROM (
+        (SELECT COALESCE(json_agg(z ORDER BY z.week), '[]'::json) FROM (
           SELECT
-            d.day,
-            s.slug,
+            w.week,
             coalesce(p.published, 0)::int AS published,
             coalesce(p.impressions, 0)::bigint AS impressions,
             coalesce(p.interactions, 0)::bigint AS interactions
           FROM (
             SELECT generate_series(
-              ((now() AT TIME ZONE 'Asia/Taipei')::date - 27),
-              (now() AT TIME ZONE 'Asia/Taipei')::date,
-              interval '1 day'
-            )::date AS day
-          ) d
-          CROSS JOIN unnest(ARRAY['taskgo', 'homigo', 'washgo']) AS s(slug)
+              date_trunc('week', (now() AT TIME ZONE 'Asia/Taipei') - interval '7 weeks')::date,
+              date_trunc('week', now() AT TIME ZONE 'Asia/Taipei')::date,
+              interval '1 week'
+            )::date AS week
+          ) w
           LEFT JOIN (
             SELECT
-              lower(b.slug) AS slug,
-              (pj.published_at AT TIME ZONE 'Asia/Taipei')::date AS day,
+              date_trunc('week', pj.published_at AT TIME ZONE 'Asia/Taipei')::date AS week,
               count(*)::int AS published,
               coalesce(sum(pr.impressions), 0)::bigint AS impressions,
               (
@@ -246,17 +244,17 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
               AND b.is_active
               AND lower(b.slug) IN ('taskgo', 'homigo', 'washgo')
               AND pj.published_at >= (
-                (((now() AT TIME ZONE 'Asia/Taipei')::date - 27)::timestamp)
+                date_trunc('week', (now() AT TIME ZONE 'Asia/Taipei') - interval '7 weeks')
                 AT TIME ZONE 'Asia/Taipei'
               )
-            GROUP BY 1, 2
-          ) p ON p.day = d.day AND p.slug = s.slug
-        ) z) AS by_day
+            GROUP BY 1
+          ) p ON p.week = w.week
+        ) z) AS by_week
     `;
-    const bundle = (rows[0] ?? {}) as { by_platform?: unknown; by_brand?: unknown; by_day?: unknown; insights_at?: unknown };
+    const bundle = (rows[0] ?? {}) as { by_platform?: unknown; by_brand?: unknown; by_week?: unknown; insights_at?: unknown };
     const platformRows = asRows<PlatformRow>(bundle.by_platform);
     const brandRows = asRows<BrandRow>(bundle.by_brand);
-    const dayRows = asRows<DayRow>(bundle.by_day);
+    const weekRows = asRows<WeekRow>(bundle.by_week);
 
     const totals = blank();
     const last28 = blank();
@@ -290,51 +288,32 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       if (first && (!since || first < since)) since = first;
     }
 
-    const dayMap = new Map<string, ShowcaseResults['days'][number]>();
-    for (const row of dayRows) {
-      const key = dayKey(row.day);
+    const weekMap = new Map<string, ShowcaseResults['weeks'][number]>();
+    for (const row of weekRows) {
+      const key = dayKey(row.week);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
-      let bucket = dayMap.get(key);
-      if (!bucket) {
-        bucket = {
-          day: key,
-          brands: { taskgo: emptyDayBrand(), homigo: emptyDayBrand(), washgo: emptyDayBrand() },
-        };
-        dayMap.set(key, bucket);
-      }
-      if (row.slug === 'taskgo' || row.slug === 'homigo' || row.slug === 'washgo') {
-        bucket.brands[row.slug] = {
-          published: num(row.published),
-          views: num(row.impressions),
-          interactions: num(row.interactions),
-          followersGained: 0,
-        };
-      }
+      weekMap.set(key, { week: key, ...emptyWeek(), published: num(row.published), views: num(row.impressions), interactions: num(row.interactions) });
     }
 
     let audienceRows: AudienceRow[] = [];
     try {
       audienceRows = asRows<AudienceRow>(await sql`
-        SELECT lower(b.slug) AS slug, a.day, coalesce(sum(a.gained), 0)::int AS gained
+        SELECT date_trunc('week', a.day::timestamp)::date AS week, coalesce(sum(a.gained), 0)::int AS gained
         FROM audience_daily a
         JOIN brands b ON b.id = a.brand_id
-        WHERE a.day >= ((now() AT TIME ZONE 'Asia/Taipei')::date - 27)
+        WHERE a.day >= date_trunc('week', (now() AT TIME ZONE 'Asia/Taipei') - interval '7 weeks')::date
           AND lower(b.slug) IN ('taskgo', 'homigo', 'washgo')
-        GROUP BY 1, 2
+        GROUP BY 1
       `);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       if (!/audience_daily/i.test(message)) throw e;
     }
     for (const row of audienceRows) {
-      const key = dayKey(row.day);
-      const bucket = dayMap.get(key);
-      if (!bucket) continue;
-      if (row.slug === 'taskgo' || row.slug === 'homigo' || row.slug === 'washgo') {
-        bucket.brands[row.slug].followersGained = num(row.gained);
-      }
+      const bucket = weekMap.get(dayKey(row.week));
+      if (bucket) bucket.followersGained = num(row.gained);
     }
-    const days = [...dayMap.values()].sort((a, b) => a.day.localeCompare(b.day));
+    const weeks = [...weekMap.values()].sort((a, b) => a.week.localeCompare(b.week)).slice(-8);
     const keywords = await loadResonantKeywords(context.env).catch((e) => {
       console.error('[showcase/results] keywords', e);
       return [] as ResonantKeyword[];
@@ -360,7 +339,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         const bucket = byPlatform.get(platform)!;
         return { platform, totals: finish(bucket.totals), last28: finish(bucket.last28) };
       }),
-      days,
+      weeks,
       keywords,
     };
     memo = { exp: Date.now() + 30_000, value };

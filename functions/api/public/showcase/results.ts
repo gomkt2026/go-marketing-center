@@ -46,6 +46,7 @@ export interface ShowcaseResults {
     views: number;
     interactions: number;
     followersGained: number;
+    brands: Record<BrandSlug, number>;
   }>;
   keywords: ResonantKeyword[];
 }
@@ -116,6 +117,7 @@ interface BrandRow {
 
 interface WeekRow {
   week: string;
+  slug: string;
   published: number;
   impressions: number;
   interactions: number;
@@ -137,7 +139,13 @@ function dayKey(value: unknown): string {
 }
 
 function emptyWeek() {
-  return { published: 0, views: 0, interactions: 0, followersGained: 0 };
+  return {
+    published: 0,
+    views: 0,
+    interactions: 0,
+    followersGained: 0,
+    brands: { taskgo: 0, homigo: 0, washgo: 0 },
+  };
 }
 
 function iso(value: unknown): string | null {
@@ -211,9 +219,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
             AND lower(b.slug) IN ('taskgo', 'homigo', 'washgo')
           GROUP BY lower(b.slug)
         ) y) AS by_brand,
-        (SELECT COALESCE(json_agg(z ORDER BY z.week), '[]'::json) FROM (
+        (SELECT COALESCE(json_agg(z ORDER BY z.week, z.slug), '[]'::json) FROM (
           SELECT
             w.week,
+            s.slug,
             coalesce(p.published, 0)::int AS published,
             coalesce(p.impressions, 0)::bigint AS impressions,
             coalesce(p.interactions, 0)::bigint AS interactions
@@ -224,8 +233,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
               interval '1 week'
             )::date AS week
           ) w
+          CROSS JOIN unnest(ARRAY['taskgo', 'homigo', 'washgo']) AS s(slug)
           LEFT JOIN (
             SELECT
+              lower(b.slug) AS slug,
               date_trunc('week', pj.published_at AT TIME ZONE 'Asia/Taipei')::date AS week,
               count(*)::int AS published,
               coalesce(sum(pr.impressions), 0)::bigint AS impressions,
@@ -247,8 +258,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
                 date_trunc('week', (now() AT TIME ZONE 'Asia/Taipei') - interval '7 weeks')
                 AT TIME ZONE 'Asia/Taipei'
               )
-            GROUP BY 1
-          ) p ON p.week = w.week
+            GROUP BY 1, 2
+          ) p ON p.week = w.week AND p.slug = s.slug
         ) z) AS by_week
     `;
     const bundle = (rows[0] ?? {}) as { by_platform?: unknown; by_brand?: unknown; by_week?: unknown; insights_at?: unknown };
@@ -292,7 +303,18 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     for (const row of weekRows) {
       const key = dayKey(row.week);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
-      weekMap.set(key, { week: key, ...emptyWeek(), published: num(row.published), views: num(row.impressions), interactions: num(row.interactions) });
+      let bucket = weekMap.get(key);
+      if (!bucket) {
+        bucket = { week: key, ...emptyWeek() };
+        weekMap.set(key, bucket);
+      }
+      const views = num(row.impressions);
+      bucket.published += num(row.published);
+      bucket.views += views;
+      bucket.interactions += num(row.interactions);
+      if (row.slug === 'taskgo' || row.slug === 'homigo' || row.slug === 'washgo') {
+        bucket.brands[row.slug] += views;
+      }
     }
 
     let audienceRows: AudienceRow[] = [];

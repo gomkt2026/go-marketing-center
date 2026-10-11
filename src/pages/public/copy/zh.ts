@@ -175,8 +175,7 @@ export const zh = {
     followers: '新增粉絲',
     followersTotal: (n: string) => `這八週三個平台合計新增粉絲 ${n}。`,
     followersPending: '新增粉絲還沒從平台回收，表上先顯示 —。',
-    keywordsTitle: '被看到比較多的題材',
-    keywordMeta: (views: string, posts: string) => `${views} · ${posts} 則`,
+    byBrand: '各品牌這八週的瀏覽',
   },
   map: { s: '小地圖', m: '中地圖', l: '大地圖', t: '台灣地圖' },
   board: {

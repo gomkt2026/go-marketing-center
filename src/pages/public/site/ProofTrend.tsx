@@ -6,12 +6,13 @@ export interface TrendWeek {
   views: number;
   interactions: number;
   followersGained: number;
+  brands?: Record<string, number>;
 }
 
-export interface TrendKeyword {
-  word: string;
-  views: number;
-  posts: number;
+export interface TrendBrand {
+  slug: string;
+  name: string;
+  color: string;
 }
 
 const W = 360;
@@ -27,7 +28,7 @@ function linePath(pts: Array<[number, number]>): string {
   return pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('');
 }
 
-export function ProofTrend({ weeks, keywords }: { weeks: TrendWeek[]; keywords: TrendKeyword[] }) {
+export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: TrendBrand[] }) {
   const copy = useCopy().trend;
   const format = useFormat();
   if (weeks.length < 2) return null;
@@ -104,19 +105,20 @@ export function ProofTrend({ weeks, keywords }: { weeks: TrendWeek[]; keywords: 
         {hasFollowers ? copy.followersTotal(format.n(totalFollowers)) : copy.followersPending}
       </p>
 
-      {keywords.length > 0 && (
-        <div className="lp-keys-block">
-          <p>{copy.keywordsTitle}</p>
-          <div className="lp-keys">
-            {keywords.map((item) => (
-              <div key={item.word} className="lp-key">
-                <b>{item.word}</b>
-                <small>{copy.keywordMeta(format.n(item.views), format.n(item.posts))}</small>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="lp-contrib">
+        <p>{copy.byBrand}</p>
+        <ul>
+          {brands.map((brand) => {
+            const views = shown.reduce((sum, week) => sum + (week.brands?.[brand.slug] ?? 0), 0);
+            return (
+              <li key={brand.slug}>
+                <span><i style={{ background: brand.color }} />{brand.name}</span>
+                <b>{format.n(views)}</b>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </section>
   );
 }

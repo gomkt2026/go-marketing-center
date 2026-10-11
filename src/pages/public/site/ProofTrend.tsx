@@ -16,7 +16,7 @@ export interface TrendKeyword {
 
 const W = 360;
 const H = 132;
-const PAD = { l: 36, r: 8, t: 12, b: 22 };
+const PAD = { l: 34, r: 22, t: 12, b: 22 };
 
 function weekLabel(iso: string): string {
   const [, m, d] = iso.split('-');

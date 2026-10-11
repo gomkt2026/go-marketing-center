@@ -756,7 +756,7 @@ export const LANDING_CSS = `
 .lp-trend svg text{font-family:inherit}
 .lp-trend-grid{stroke:#E6E8E2;stroke-width:1}
 .lp-trend-tick{font-size:11px;fill:#6C6C6C;text-anchor:end}
-.lp-trend-x{font-size:11px;fill:#6C6C6C;text-anchor:middle}
+.lp-trend-x{font-size:10px;fill:#6C6C6C;text-anchor:middle}
 .lp-trend-x.on{fill:#23301c;font-weight:700}
 .lp-trend-cursor{stroke:transparent;stroke-width:1}
 .lp-trend-cursor.on{stroke:#23301c;stroke-dasharray:3 4;opacity:.35}

@@ -18,6 +18,7 @@ import {
   type PostingSlotKind,
 } from './posting-slots';
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from './auto-post-brands';
+import { focusKeywordFor, loadResonantKeywords } from './resonance';
 
 /** 品牌相關跟風文時段(台灣時間) */
 export const THREADS_POST_HOURS_TW: readonly number[] = [0, 6, 12, 18];
@@ -150,6 +151,11 @@ async function writeTrafficDraft(
   `;
   const siblings = (siblingRows as { slug: string; opening: string | null }[])
     .map((r) => [r.slug, r.opening].filter(Boolean).join('｜'));
+  const keywords = await loadResonantKeywords(env).catch((e) => {
+    console.error('[threads] 高瀏覽題材讀取失敗', e);
+    return [];
+  });
+  const focusKeyword = focusKeywordFor(keywords, brand.slug, hourTW);
   const agentId = await findBrandAgent(env, brand.id);
   const post = await generateTrafficPost(env, {
     brandSlug: brand.slug,
@@ -157,6 +163,7 @@ async function writeTrafficDraft(
     usedTopics,
     theme,
     siblings,
+    focusKeyword,
     skipPrediction: true,
   });
   const { contentId } = await saveGeneratedContent(env, {
@@ -169,7 +176,8 @@ async function writeTrafficDraft(
       source: slotKind,
       category: formula,
       trafficFormula: formula,
-      trafficTheme: theme ?? formula,
+      trafficTheme: focusKeyword ?? theme ?? formula,
+      focusKeyword,
       slotAt: slotAt.toISOString(),
       audienceLane: 'b2c',
     },
@@ -181,7 +189,7 @@ async function writeTrafficDraft(
     action: 'content.generated',
     entityType: 'content',
     entityId: contentId,
-    afterState: { platform: 'threads', source: slotKind, category: formula, trafficTheme: theme, scheduled: false, slotAt: slotAt.toISOString() },
+    afterState: { platform: 'threads', source: slotKind, category: formula, trafficTheme: focusKeyword ?? theme, scheduled: false, slotAt: slotAt.toISOString() },
   });
   return { contentId, category: formula };
 }

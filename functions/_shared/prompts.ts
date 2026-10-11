@@ -1578,8 +1578,9 @@ export function pickLifeTrend(trends: string[]): string | null {
 
 export const TRAFFIC_SYSTEM_PROMPT =
   '你是會在 Threads 上引發共鳴的台灣人，不是任何品牌的小編。' +
-  '這篇不要出現工地、業主、師傅、移工、租屋、房東、早餐店、自助洗衣、烘衣機、甩乾、只有一件。' +
-  '那些場景這兩天已經發到沒有瀏覽。寫家庭、兩性、感情，或一件大家真的會在飯桌上吵的事。' +
+  '這篇不要出現品牌、產品、工地報價、業主、師傅在工地、租屋平台、房東收租、早餐店、自助洗衣、烘衣機、甩乾、只有一件。' +
+  '婆媳、移工、家裡的一句話可以寫，但要寫一個具體的人，不要寫成廣告、新聞，也不要站隊攻擊某一個族群。' +
+  '寫家庭、兩性、感情，或一件大家真的會在飯桌上吵的事。' +
   '一個具體的人，一句引號，最後一個十個字就回得了的問題。不要下結論，不要新聞稿。' +
   '禁止品牌名、產品、系統、App、連結、hashtag、促銷。';
 
@@ -1589,9 +1590,10 @@ export function composeTrafficPrompt(opts: {
   usedTopics: string[];
   theme?: string | null;
   siblings?: string[];
+  focusKeyword?: string | null;
 }): { prompt: string; category: TrafficFormulaId; label: string; maxChars: number; theme: string } {
   const lane = TRAFFIC_LANES[opts.formula] ?? TRAFFIC_LANES.feeling;
-  const theme = opts.formula === 'news' && opts.theme ? opts.theme : lane.label;
+  const theme = opts.focusKeyword || (opts.formula === 'news' && opts.theme ? opts.theme : lane.label);
   return {
     category: opts.formula,
     label: lane.label,
@@ -1599,9 +1601,11 @@ export function composeTrafficPrompt(opts: {
     theme,
     prompt: [
       '寫一則 Threads。讓陌生人覺得這是自己的家或自己的感情，不是一則品牌貼文。',
-      `這一則只寫「${lane.label}」。`,
+      opts.focusKeyword
+        ? `這一則的場面就是「${opts.focusKeyword}」。這個詞近 28 天的貼文瀏覽明顯比較高，請寫成一個具體的人講一句跟這件事有關的話，讓人想回自己的故事。不要寫成議題整理，不要站隊。`
+        : `這一則只寫「${lane.label}」。`,
       lane.instruction,
-      opts.formula === 'news' && opts.theme ? `可以借用的時事只有這一則：${opts.theme}。接不上就不要提。` : '不要提新聞、運動、明星、債市、頒獎。',
+      opts.focusKeyword ? '' : (opts.formula === 'news' && opts.theme ? `可以借用的時事只有這一則：${opts.theme}。接不上就不要提。` : '不要提新聞、運動、明星、債市、頒獎。'),
       '三個帳號今天各寫各的，不要寫成同一件事的三種版本。',
       opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
       '開頭不要用「自助洗衣」「工地」「房東」。直接從人說的話或家裡的畫面開始。',

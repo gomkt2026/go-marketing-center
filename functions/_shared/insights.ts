@@ -4,6 +4,7 @@ import { getThreadsAccount, threadsCtx, THREADS_API, type ThreadsAccount } from 
 import { threadsFetch, type ThreadsCallContext } from './threads-api-log';
 import { getMetaAccount, resolvePageToken, type MetaAccount } from './meta';
 import { getXAccount, refreshXToken } from './x';
+import { captureAudience } from './audience';
 
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 const X_API = 'https://api.x.com/2';
@@ -681,6 +682,7 @@ export async function syncPerformanceInsights(env: Env): Promise<SyncBrandResult
       console.error('[insights] 品牌同步失敗', row.id, e);
     }
   }
+  await captureAudience(env).catch((e) => console.error('[insights] 粉絲回收失敗', e));
   return out;
 }
 
@@ -699,5 +701,6 @@ export async function syncRecentPerformanceInsights(env: Env): Promise<SyncBrand
       console.error('[insights] 近期同步失敗', row.id, e);
     }
   }
+  await captureAudience(env).catch((e) => console.error('[insights] 粉絲回收失敗', e));
   return out;
 }

@@ -664,11 +664,13 @@ export async function generateTrafficPost(
     usedTopics: string[];
     theme?: string | null;
     siblings?: string[];
+    focusKeyword?: string | null;
     skipPrediction?: boolean;
   },
 ): Promise<GenerationResult> {
   const spec = composeTrafficPrompt(params);
   const limit = spec.maxChars + 40;
+  const focus = params.focusKeyword?.trim() || '';
   const userPrompt = spec.prompt;
   let post = await socialChatJson<GeneratedPost>(env, {
     messages: [
@@ -683,7 +685,8 @@ export async function generateTrafficPost(
   post.replyBody = '';
   post.imagePrompt = undefined;
   const leaked = /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|只有一件|工地|業主|房東/.test(post.body);
-  if (post.body.length > limit || leaked || post.body.length < 80) {
+  const missed = Boolean(focus) && !post.body.includes(focus);
+  if (post.body.length > limit || leaked || missed || post.body.length < 80) {
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: TRAFFIC_SYSTEM_PROMPT },
@@ -691,8 +694,8 @@ export async function generateTrafficPost(
         { role: 'assistant', content: JSON.stringify(post) },
         {
           role: 'user',
-          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現品牌、工地、租屋或自助洗衣' : ''}）。` +
-            `重寫到 ${spec.maxChars} 字以內，改成家庭、兩性或感情，開頭不要用工地、房東、自助洗衣，最後仍要有一個讓人想留言的問題。回傳同格式 JSON。`,
+          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現品牌、工地、租屋或自助洗衣' : ''}${missed ? `，而且沒有寫到「${focus}」` : ''}）。` +
+            `重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : '，改成家庭、兩性或感情'}，開頭不要用工地、房東、自助洗衣，最後仍要有一個讓人想留言的問題。回傳同格式 JSON。`,
         },
       ],
       temperature: 0.7,

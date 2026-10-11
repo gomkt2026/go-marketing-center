@@ -25,7 +25,7 @@ import { isThreadsSafetyBlocked } from '../../../functions/_shared/social-safety
 import { threadsFetch } from '../../../functions/_shared/threads-api-log';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, metaTokenInvalidNoteFromMessage } from '../../../functions/_shared/meta';
 import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '../../../functions/_shared/x';
-import { toPublicMediaUrl } from '../../../functions/_shared/media';
+import { resolvePublishableMedia, toPublicMediaUrl } from '../../../functions/_shared/media';
 import { processBrandReplyRound } from '../../../functions/_shared/threads-reply-round';
 import { encryptToken, decryptToken } from '../../../functions/_shared/crypto';
 import { logActivity } from '../../../functions/_shared/activity';
@@ -525,7 +525,9 @@ async function generateDailyThemePlatforms(
       });
 
       const account = await getMetaAccount(env, brand.id, platform);
-      const publicImage = toPublicMediaUrl(env, result.imageUrl);
+      const preparedImage = await resolvePublishableMedia(env, result.imageUrl, brand.slug);
+      if (preparedImage.rehosted && preparedImage.storedPath) result.imageUrl = preparedImage.storedPath;
+      const publicImage = preparedImage.publicUrl;
       const willAutoPublish = !!account?.autoPublish && (platform !== 'instagram' || !!publicImage);
 
       const { contentId, versionId } = await saveGeneratedContent(env, {
@@ -1278,13 +1280,55 @@ async function requeueRecentFailedThreads(env: Env): Promise<void> {
   }
 }
 
+async function imageForPublish(
+  env: Env,
+  versionId: string,
+  fileUrl: string | null,
+  brandSlug: string | null,
+): Promise<string | null> {
+  const resolved = await resolvePublishableMedia(env, fileUrl, brandSlug ?? 'shared');
+  if (resolved.rehosted && resolved.storedPath && fileUrl) {
+    const sql = getSql(env);
+    await sql`
+      UPDATE content_assets SET file_url = ${resolved.storedPath}
+      WHERE content_version_id = ${versionId}::uuid AND asset_type = 'image' AND file_url = ${fileUrl}
+    `;
+  }
+  return resolved.publicUrl;
+}
+
 function threadsReplyBody(meta: unknown): string | undefined {
   if (!meta || typeof meta !== 'object') return undefined;
   const reply = (meta as { replyBody?: unknown }).replyBody;
   return typeof reply === 'string' && reply.trim() ? reply.trim() : undefined;
 }
 
+/** 把素材庫與待發貼文裡的 data URI 轉成 R2 公開路徑，避免 Graph API 9004 / 324。 */
+async function rehostBrokenMedia(env: Env): Promise<void> {
+  try {
+    const sql = getSql(env);
+    const rows = await sql`
+      SELECT file_url FROM brand_assets
+      WHERE file_url LIKE 'data:image%' OR file_url LIKE '%/data:image%'
+      UNION
+      SELECT file_url FROM content_assets
+      WHERE file_url LIKE 'data:image%' OR file_url LIKE '%/data:image%'
+      LIMIT 5
+    `;
+    for (const row of rows as { file_url: string }[]) {
+      const resolved = await resolvePublishableMedia(env, row.file_url, 'library');
+      if (!resolved.rehosted || !resolved.storedPath) continue;
+      await sql`UPDATE brand_assets SET file_url = ${resolved.storedPath} WHERE file_url = ${row.file_url}`;
+      await sql`UPDATE content_assets SET file_url = ${resolved.storedPath} WHERE file_url = ${row.file_url}`;
+      console.log(`[publish] 內嵌圖片已改存 ${resolved.storedPath}`);
+    }
+  } catch (e) {
+    console.error('[publish] 內嵌圖片轉存失敗', e);
+  }
+}
+
 async function publishDueJobs(env: Env): Promise<void> {
+  await rehostBrokenMedia(env);
   const sql = getSql(env);
   const rows = await sql`
     SELECT pj.id AS job_id, pj.content_id, pj.content_version_id, pj.platform,
@@ -1330,7 +1374,7 @@ async function publishDueJobs(env: Env): Promise<void> {
         threadsAccountId = account.accountId;
         published = await publishThreadsPost(account, {
           text: row.body,
-          imageUrl: toPublicMediaUrl(env, row.image_url),
+          imageUrl: await imageForPublish(env, row.content_version_id, row.image_url, row.brand_slug),
           videoUrl: toPublicMediaUrl(env, row.video_url),
           replyText: threadsReplyBody(row.generation_prompt_meta),
         });
@@ -1338,10 +1382,13 @@ async function publishDueJobs(env: Env): Promise<void> {
         const account = await getMetaAccount(env, row.brand_id, 'facebook');
         if (!account) throw new Error('Facebook 帳號未連線或憑證失效');
         const message = composePostMessage(row.body, row.hashtags);
-        published = await publishFacebookPost(account, { message, imageUrl: toPublicMediaUrl(env, row.image_url) });
+        published = await publishFacebookPost(account, {
+          message,
+          imageUrl: await imageForPublish(env, row.content_version_id, row.image_url, row.brand_slug),
+        });
       } else if (row.platform === 'instagram' && row.brand_id) {
         const account = await getMetaAccount(env, row.brand_id, 'instagram');
-        const publicImage = toPublicMediaUrl(env, row.image_url);
+        const publicImage = await imageForPublish(env, row.content_version_id, row.image_url, row.brand_slug);
         const publicVideo = toPublicMediaUrl(env, row.video_url);
         if (!account) throw new Error('Instagram 帳號未連線或憑證失效');
         const message = composePostMessage(row.body, row.hashtags);
@@ -1357,7 +1404,7 @@ async function publishDueJobs(env: Env): Promise<void> {
         if (!account) throw new Error('X 帳號未連線或憑證失效');
         // Thread 的多則推文存成同一個 body,用 "\n---\n" 分隔(見 saveEcosystemXContent)
         const tweets = row.body.split('\n---\n').map((t) => t.trim()).filter(Boolean);
-        const publicImage = toPublicMediaUrl(env, row.image_url);
+        const publicImage = await imageForPublish(env, row.content_version_id, row.image_url, row.brand_slug);
         const firstTweet = tweets.length > 1
           ? (await publishTweetThread(account, tweets, publicImage))[0]
           : await publishTweet(account, { text: tweets[0] ?? row.body, imageUrl: publicImage });

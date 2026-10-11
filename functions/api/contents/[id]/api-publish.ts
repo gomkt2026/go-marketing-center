@@ -4,7 +4,7 @@ import { requireAuth } from '../../../_shared/auth';
 import { getSql } from '../../../_shared/db';
 import { getThreadsAccount, publishThreadsPost } from '../../../_shared/threads';
 import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage } from '../../../_shared/meta';
-import { toPublicMediaUrl } from '../../../_shared/media';
+import { resolvePublishableMedia, toPublicMediaUrl } from '../../../_shared/media';
 import { isThreadsSafetyBlocked } from '../../../_shared/social-safety';
 import { logActivity } from '../../../_shared/activity';
 import { json, error } from '../../../_shared/response';
@@ -148,7 +148,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   `;
   const imageRow = (assetRows as { file_url: string; asset_type: string }[]).find((a) => a.asset_type === 'image');
   const videoRow = (assetRows as { file_url: string; asset_type: string }[]).find((a) => a.asset_type === 'video');
-  const imageUrl = toPublicMediaUrl(context.env, imageRow?.file_url ?? null);
+  const preparedImage = await resolvePublishableMedia(context.env, imageRow?.file_url ?? null, 'shared');
+  if (preparedImage.rehosted && preparedImage.storedPath && imageRow?.file_url) {
+    await sql`
+      UPDATE content_assets SET file_url = ${preparedImage.storedPath}
+      WHERE content_version_id = ${version.id}::uuid AND asset_type = 'image' AND file_url = ${imageRow.file_url}
+    `;
+  }
+  const imageUrl = preparedImage.publicUrl;
   const videoUrl = toPublicMediaUrl(context.env, videoRow?.file_url ?? null);
 
   let published: { postId: string; permalink: string | null };

@@ -31,9 +31,44 @@ export function buildVideoJobKey(jobId: string, filename: string): string {
   return `videos/${jobId}/${filename.replace(/^\/+/, '')}`;
 }
 
+const EMBEDDED_IMAGE = /data:image\/([a-z0-9.+-]+);base64,([a-z0-9+/=\r\n]+)/i;
+
+/**
+ * data URI，或被網站網址接錯的 data URI
+ * （https://站台/data:image/jpeg;base64,...）。Meta 無法用這種網址抓圖。
+ */
+export function isEmbeddedImageUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /^(?:https?:\/\/[^/?#]+\/)?data:image\/[a-z0-9.+-]+;base64,/i.test(url.trim());
+}
+
+/** 從 data URI 還原圖片 bytes。不是內嵌圖時回 null。 */
+export function decodeEmbeddedImage(url: string | null | undefined): { mime: string; bytes: Uint8Array } | null {
+  if (!isEmbeddedImageUrl(url) || !url) return null;
+  const match = url.trim().match(EMBEDDED_IMAGE);
+  if (!match) return null;
+  const subtype = match[1].toLowerCase();
+  const mime = subtype === 'jpg' ? 'image/jpeg' : `image/${subtype}`;
+  try {
+    const binary = atob(match[2].replace(/\s/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.length ? { mime, bytes } : null;
+  } catch {
+    return null;
+  }
+}
+
+function extForImageMime(mime: string): string {
+  if (mime.includes('png')) return 'png';
+  if (mime.includes('webp')) return 'webp';
+  if (mime.includes('gif')) return 'gif';
+  return 'jpg';
+}
+
 /** 從 /api/media/{key} 或完整 URL 還原 R2 object key */
 export function mediaUrlToKey(url: string | null | undefined): string | null {
-  if (!url) return null;
+  if (!url || isEmbeddedImageUrl(url)) return null;
   const trimmed = url.split('?')[0];
   const marker = '/api/media/';
   const idx = trimmed.indexOf(marker);
@@ -90,10 +125,40 @@ export const DEFAULT_PUBLIC_BASE = 'https://go-marketing-center.pages.dev';
 /**
  * 把站內相對媒體路徑(/api/media/...)轉成公開絕對 URL。
  * Meta / Threads 的 image_url 參數是由對方伺服器抓圖,必須是公開絕對網址。
+ * data URI 不能接在站台後面假裝成網址,否則 Graph API 會 9004 / 324。
  */
 export function toPublicMediaUrl(env: Env, url: string | null | undefined): string | null {
-  if (!url) return null;
+  if (!url || isEmbeddedImageUrl(url)) return null;
   if (/^https?:\/\//i.test(url)) return url;
   const base = (env.PUBLIC_BASE_URL ?? DEFAULT_PUBLIC_BASE).replace(/\/$/, '');
   return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+/** 把 data URI 寫進素材庫 R2（不受 31 天清理），回傳 /api/media/... */
+export async function storeEmbeddedImage(env: Env, url: string, brandSlug = 'shared'): Promise<string | null> {
+  const image = decodeEmbeddedImage(url);
+  if (!image) return null;
+  const key = buildBrandLibraryKey(brandSlug, extForImageMime(image.mime));
+  return putMedia(env, key, image.bytes, image.mime);
+}
+
+export interface PublishableMedia {
+  publicUrl: string | null;
+  /** 寫回 file_url 的值。轉存後是 /api/media/... */
+  storedPath: string | null;
+  rehosted: boolean;
+}
+
+/** 發文前把配圖變成 Meta / Threads 抓得到的公開網址。 */
+export async function resolvePublishableMedia(
+  env: Env,
+  url: string | null | undefined,
+  brandSlug = 'shared',
+): Promise<PublishableMedia> {
+  if (!url) return { publicUrl: null, storedPath: null, rehosted: false };
+  if (isEmbeddedImageUrl(url)) {
+    const storedPath = await storeEmbeddedImage(env, url, brandSlug);
+    return { publicUrl: toPublicMediaUrl(env, storedPath), storedPath, rehosted: !!storedPath };
+  }
+  return { publicUrl: toPublicMediaUrl(env, url), storedPath: url, rehosted: false };
 }

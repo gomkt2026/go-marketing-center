@@ -16,7 +16,7 @@ import {
   type GeneratedXPost, type EcosystemXAngle,
   type AudienceLane, type ImageStyleId,
 } from './prompts';
-import { buildMediaKey, getMediaBytes, mediaUrlToKey, putMedia } from './media';
+import { buildMediaKey, decodeEmbeddedImage, getMediaBytes, isEmbeddedImageUrl, mediaUrlToKey, putMedia, storeEmbeddedImage } from './media';
 import { compositeLogo } from './watermark';
 import { composeAssetOnBrandCard, frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
@@ -97,6 +97,8 @@ function isSystemScreenshot(asset: { imageCategory?: string | null } | null | un
 }
 
 async function loadAssetBytes(env: Env, fileUrl: string): Promise<Uint8Array | null> {
+  const embedded = decodeEmbeddedImage(fileUrl);
+  if (embedded) return embedded.bytes;
   const key = mediaUrlToKey(fileUrl);
   if (key) {
     const stored = await getMediaBytes(env, key);
@@ -983,6 +985,11 @@ export async function saveGeneratedContent(
   `;
   const versionId = (versionRows[0] as { id: string }).id;
 
+  if (result.imageUrl && isEmbeddedImageUrl(result.imageUrl)) {
+    const stored = await storeEmbeddedImage(env, result.imageUrl, brandCtx.slug);
+    if (stored) result.imageUrl = stored;
+  }
+
   if (result.imageUrl) {
     await sql`
       INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
@@ -1128,6 +1135,11 @@ export async function saveEcosystemXContent(
     RETURNING id
   `;
   const versionId = (versionRows[0] as { id: string }).id;
+
+  if (result.imageUrl && isEmbeddedImageUrl(result.imageUrl)) {
+    const stored = await storeEmbeddedImage(env, result.imageUrl, 'go-ecosystem');
+    if (stored) result.imageUrl = stored;
+  }
 
   if (result.imageUrl) {
     await sql`

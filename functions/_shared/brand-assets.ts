@@ -1,6 +1,6 @@
 import type { Env } from './env';
 import { getSql } from './db';
-import { toPublicMediaUrl } from './media';
+import { isEmbeddedImageUrl, storeEmbeddedImage, toPublicMediaUrl } from './media';
 
 export const IMAGE_CATEGORIES = [
   'system_screenshot',
@@ -237,6 +237,26 @@ type AssetRow = {
   used_in_threads_count?: number | null;
 };
 
+/** 素材庫裡的 data URI 改存進 R2，避免發文時被接成站台網址。 */
+async function healEmbeddedBrandAssets(env: Env, rows: AssetRow[]): Promise<void> {
+  const broken = rows.filter((row) => row.id && isEmbeddedImageUrl(row.file_url));
+  if (!broken.length) return;
+  const sql = getSql(env);
+  for (const row of broken) {
+    try {
+      const stored = await storeEmbeddedImage(env, row.file_url!, 'library');
+      if (!stored) continue;
+      await sql`
+        UPDATE brand_assets SET file_url = ${stored}
+        WHERE id = ${row.id}::uuid AND file_url = ${row.file_url}
+      `;
+      row.file_url = stored;
+    } catch (e) {
+      console.error('[assets] data URI 轉存 R2 失敗', row.id, e);
+    }
+  }
+}
+
 function toAssetPick(env: Env, row: AssetRow): BrandAssetPick | null {
   const fileUrl = toPublicMediaUrl(env, row.file_url);
   if (!fileUrl) return null;
@@ -308,6 +328,8 @@ export async function searchBrandAssets(
     WHERE brand_id = ${brandId}::uuid AND asset_type = 'image'
     ORDER BY used_in_threads_count ASC, last_used_at ASC NULLS FIRST
   `) as AssetRow[];
+
+  await healEmbeddedBrandAssets(env, rows);
 
   return rows
     .filter((row) => isUsableForAi(row, opts))

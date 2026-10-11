@@ -170,7 +170,7 @@ export const en: PublicCopy = {
   trend: {
     aria: 'Cumulative view growth, last eight weeks',
     title: 'Growth over eight weeks',
-    sub: 'One row per calendar week, eight weeks at most. The line is cumulative views for all three brands together.',
+    sub: 'One row per calendar week, eight weeks at most. Each line is that brand’s cumulative views.',
     chartAria: 'Cumulative views over eight weeks',
     cumulative: 'Cumulative views',
     week: 'Week',

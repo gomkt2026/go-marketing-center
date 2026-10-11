@@ -38,12 +38,18 @@ export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: Tren
   shown.forEach((week, i) => {
     cumulative.push((cumulative[i - 1] ?? 0) + week.views);
   });
-  const max = Math.max(1, cumulative[cumulative.length - 1] ?? 0);
+  const series = brands.map((brand) => {
+    const values: number[] = [];
+    shown.forEach((week, i) => {
+      values.push((values[i - 1] ?? 0) + (week.brands?.[brand.slug] ?? 0));
+    });
+    return { brand, values, total: values[values.length - 1] ?? 0 };
+  });
+  const max = Math.max(1, ...series.map((item) => item.total));
   const innerW = W - PAD.l - PAD.r;
   const innerH = H - PAD.t - PAD.b;
   const xAt = (i: number) => PAD.l + (shown.length === 1 ? innerW / 2 : (i / (shown.length - 1)) * innerW);
   const yAt = (v: number) => PAD.t + innerH - (v / max) * innerH;
-  const pts = cumulative.map((v, i) => [xAt(i), yAt(v)] as [number, number]);
   const hasFollowers = shown.some((week) => week.followersGained > 0);
   const totalFollowers = shown.reduce((sum, week) => sum + week.followersGained, 0);
 
@@ -67,15 +73,29 @@ export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: Tren
             </g>
           );
         })}
-        <path d={`${linePath(pts)} L${pts[pts.length - 1][0].toFixed(1)},${yAt(0)} L${pts[0][0].toFixed(1)},${yAt(0)} Z`} className="lp-trend-area" />
-        <path d={linePath(pts)} className="lp-trend-line" pathLength={1} />
-        {pts.map((p, i) => (
-          <circle key={shown[i].week} cx={p[0]} cy={p[1]} r={3} className="lp-trend-dot" />
-        ))}
+        {series.map((item) => {
+          const pts = item.values.map((v, i) => [xAt(i), yAt(v)] as [number, number]);
+          const end = pts[pts.length - 1];
+          return (
+            <g key={item.brand.slug}>
+              <path d={linePath(pts)} className="lp-trend-line" pathLength={1} style={{ stroke: item.brand.color }} />
+              <circle cx={end[0]} cy={end[1]} r={3.5} fill={item.brand.color} className="lp-trend-dot" />
+            </g>
+          );
+        })}
         {shown.map((week, i) => (
           <text key={week.week} x={xAt(i)} y={H - 6} className="lp-trend-x">{weekLabel(week.week)}</text>
         ))}
       </svg>
+
+      <ul className="lp-chart-values">
+        {series.map((item) => (
+          <li key={item.brand.slug}>
+            <span><i style={{ background: item.brand.color }} />{item.brand.name}</span>
+            <b>{format.n(item.total)}</b>
+          </li>
+        ))}
+      </ul>
 
       <div className="lp-week-scroll">
         <table className="lp-week-table">
@@ -104,21 +124,6 @@ export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: Tren
       <p className="lp-fan-note">
         {hasFollowers ? copy.followersTotal(format.n(totalFollowers)) : copy.followersPending}
       </p>
-
-      <div className="lp-contrib">
-        <p>{copy.byBrand}</p>
-        <ul>
-          {brands.map((brand) => {
-            const views = shown.reduce((sum, week) => sum + (week.brands?.[brand.slug] ?? 0), 0);
-            return (
-              <li key={brand.slug}>
-                <span><i style={{ background: brand.color }} />{brand.name}</span>
-                <b>{format.n(views)}</b>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
     </section>
   );
 }

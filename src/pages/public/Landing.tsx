@@ -747,13 +747,11 @@ export const LANDING_CSS = `
 .lp-fan-chart{margin-top:2px}
 .lp-fan-label{font-size:11px;font-weight:700;fill:#6C6C6C}
 .lp-fan-note{margin:10px 0 0;font-size:13px;line-height:1.6;color:var(--muted)}
-.lp-contrib{margin-top:12px}
-.lp-contrib p{margin:0 0 4px;font-size:13px;font-weight:800;color:var(--ink)}
-.lp-contrib ul{list-style:none;margin:0;padding:0}
-.lp-contrib li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #E6E8E2;font-size:14px}
-.lp-contrib li span{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--ink);min-width:0}
-.lp-contrib li i{width:8px;height:8px;border-radius:50%;flex:none}
-.lp-contrib li b{font-variant-numeric:tabular-nums;color:var(--ink)}
+.lp-chart-values{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 0;padding:0}
+.lp-chart-values li{background:#F7F9F5;border-radius:12px;padding:8px 10px;min-width:0}
+.lp-chart-values span{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink)}
+.lp-chart-values i{width:8px;height:8px;border-radius:50%;flex:none}
+.lp-chart-values b{display:block;margin-top:2px;font-size:16px;font-variant-numeric:tabular-nums;color:var(--ink)}
 .lp-trend svg{width:100%;height:auto;display:block;margin-top:8px}
 .lp-trend svg text{font-family:inherit}
 .lp-trend-grid{stroke:#E6E8E2;stroke-width:1}
@@ -842,6 +840,7 @@ export const LANDING_CSS = `
   .lp-trend{margin-top:12px;padding:12px 10px}
   .lp-trend-head > b{font-size:22px}
   .lp-trend svg{max-height:148px}
+  .lp-chart-values b{font-size:14px}
   .lp-flow{grid-template-columns:1fr 1fr}
   .lp-nav-inner{height:auto;flex-wrap:wrap;padding:10px 0;gap:10px}
   .lp-nav nav{display:flex;order:3;width:100%;margin-left:0;overflow-x:auto;gap:14px;padding-bottom:6px}

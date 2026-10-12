@@ -4,7 +4,8 @@ import { recordSocialApiRequest, textHashOf } from './threads-api-log';
 
 // ============================================================================
 // 社群對外操作安全閘門(目前套用在 Threads 發文與回覆)
-//   依序檢查:組織停止開關 → 帳號停止開關 → 每日操作預算 → 作者冷卻(回覆) → 重複內容視窗
+//   依序檢查:組織停止開關 → 帳號停止開關 → 每日回覆預算 → 作者冷卻(回覆) → 重複內容視窗
+//   發文不計入每日預算,避免排程貼文被回覆次數擋住。相同文字仍不重發。
 //   被擋下不算失敗:呼叫端不重試、不發失敗通知,原因寫進 job / 回覆佇列。
 // ============================================================================
 
@@ -81,12 +82,13 @@ export function isThreadsSafetyBlocked(e: unknown): e is ThreadsSafetyBlockedErr
     || (e instanceof Error && e.name === 'ThreadsSafetyBlockedError');
 }
 
-/** 台北時間今天 00:00 起,這個帳號成功的對外動作數(發文 + 回覆) */
+/** 台北時間今天 00:00 起,這個帳號成功的回覆數。發文不計入。 */
 export async function countTodayActions(env: Env, accountId: string): Promise<number> {
   const sql = getSql(env);
   const rows = await sql`
     SELECT count(*)::int AS n FROM social_api_requests
     WHERE account_id = ${accountId}::uuid
+      AND action = 'reply'
       AND text_hash IS NOT NULL
       AND http_status BETWEEN 200 AND 299
       AND created_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Taipei') AT TIME ZONE 'Asia/Taipei')
@@ -139,14 +141,16 @@ export async function checkThreadsSafety(env: Env, params: SafetyCheckParams): P
     return block('account_paused', `安全閘門:${label} 已開啟帳號停止開關,暫停對外發文與回覆`);
   }
 
-  const budget = account?.daily_action_budget ?? policy.dailyActionBudget;
-  try {
-    const used = await countTodayActions(env, params.accountId);
-    if (used >= budget) {
-      return block('budget', `安全閘門:${label} 今日對外操作已達預算 ${budget} 次(已用 ${used}),明天 00:00 重置`);
+  if (params.action === 'reply') {
+    const budget = account?.daily_action_budget ?? policy.dailyActionBudget;
+    try {
+      const used = await countTodayActions(env, params.accountId);
+      if (used >= budget) {
+        return block('budget', `安全閘門:${label} 今日回覆已達預算 ${budget} 次(已用 ${used}),明天 00:00 重置。發文不受此限。`);
+      }
+    } catch (e) {
+      console.warn('[social-safety] 計算今日回覆數失敗', e instanceof Error ? e.message : e);
     }
-  } catch (e) {
-    console.warn('[social-safety] 計算今日操作數失敗', e instanceof Error ? e.message : e);
   }
 
   if (params.action === 'reply' && params.targetUsername && policy.authorCooldownSeconds > 0) {

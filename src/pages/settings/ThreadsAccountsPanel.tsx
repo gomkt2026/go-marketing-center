@@ -312,7 +312,7 @@ function SafetyPolicySection({ slug, accounts, initialPolicy, busy, setBusy, not
             </span>
           </div>
         </div>
-        {numberField('每日操作預算(每帳號)', policy.dailyActionBudget, 1, 'dailyActionBudget', '發文 + 回覆,台北時間 00:00 重置')}
+        {numberField('每日回覆預算(每帳號)', policy.dailyActionBudget, 1, 'dailyActionBudget', '只計算回覆,發文不計入。台北時間 00:00 重置')}
         {numberField('重複內容視窗(小時)', policy.duplicateWindowHours, 24, 'duplicateWindowHours', '視窗內同帳號不發相同文字,0 = 不檢查')}
         {numberField('作者冷卻(秒)', policy.authorCooldownSeconds, 3600, 'authorCooldownSeconds', `同一作者回覆間隔,目前約 ${Math.round(policy.authorCooldownSeconds / 3600)} 小時`)}
       </div>
@@ -324,8 +324,8 @@ function SafetyPolicySection({ slug, accounts, initialPolicy, busy, setBusy, not
               <tr>
                 <th style={thStyle}>帳號</th>
                 <th style={thStyle}>帳號停止開關</th>
-                <th style={thStyle}>帳號每日預算(空白 = 沿用組織 {policy.dailyActionBudget})</th>
-                <th style={thStyle}>今日已用</th>
+                <th style={thStyle}>帳號回覆預算(空白 = 沿用組織 {policy.dailyActionBudget})</th>
+                <th style={thStyle}>今日回覆</th>
                 <th style={{ ...thStyle, textAlign: 'right' }}>操作</th>
               </tr>
             </thead>
@@ -422,7 +422,7 @@ export function ThreadsAccountsPanel({ slug, accounts, meta, notify, reload }: {
         />
         <SummaryCard
           label="安全閘門"
-          value={policy ? `預算 ${policy.dailyActionBudget}/日` : '—'}
+          value={policy ? `回覆 ${policy.dailyActionBudget}/日` : '—'}
         />
       </div>
 

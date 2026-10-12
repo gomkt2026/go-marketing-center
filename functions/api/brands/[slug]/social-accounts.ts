@@ -34,7 +34,7 @@ async function loadUsage(env: Env, brandId: string): Promise<Map<string, UsageRo
         count(*) FILTER (WHERE created_at > now() - interval '24 hours' AND blocked_reason IS NULL
                          AND (http_status IS NULL OR http_status >= 400))::int AS failed_24h,
         count(*) FILTER (WHERE created_at > now() - interval '24 hours' AND blocked_reason IS NOT NULL)::int AS blocked_24h,
-        count(*) FILTER (WHERE text_hash IS NOT NULL AND http_status BETWEEN 200 AND 299
+        count(*) FILTER (WHERE action = 'reply' AND text_hash IS NOT NULL AND http_status BETWEEN 200 AND 299
                          AND created_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Taipei') AT TIME ZONE 'Asia/Taipei'))::int AS actions_today
       FROM social_api_requests
       WHERE brand_id = ${brandId}::uuid AND created_at > now() - interval '24 hours' AND account_id IS NOT NULL

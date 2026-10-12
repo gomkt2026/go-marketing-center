@@ -14,12 +14,16 @@ export const TAIWAN_LOCAL_VOICE = [
   '不要寫「外籍配偶從越南、印尼、泰國或菲律賓嫁來幾十年，在廚房被婆婆考試，好媳婦沒有標準答案」。',
   '也不要寫三天換三道菜、天天都被嫌的飯桌劇本。那不是台灣人會發的文。',
   '家庭就寫一個具體的台灣人、一句話、一個會讓人想回自己家的畫面。不要下結論教人做人。',
+  '三個品牌的貼文都先讓人認同。寫溫暖、溫馨、具體的被在乎：阿嬤把肉夾進碗裡卻說自己吃飽了、爸爸在捷運口說到了傳個訊、他記得你不吃香菜、電鍋裡多留一碗。',
+  '可以有一點委屈，但要收在被懂的那一下。不要寫成兩邊開戰，不要逼人站隊，不要誰對誰錯，不要挑起性別、世代或族群對立。',
+  '結尾問「你家也有這種很小的溫柔嗎」，不要問「你站哪邊」。',
 ].join('');
 
 const SIMPLIFIED = /[这说们过对时为会来个国与发经还让现样问应视质软东么吗]/;
 const MAINLAND_WORD = /視頻|質量|網絡|信息|軟件|硬件|土豆|西紅柿|公交車|地鐵|小區|外賣|彩禮|灶火|灶台|回門|酸奶|方便麵|盒飯|空調|激光|打印|默認|屏幕|人工智能|支付寶|美團|餓了麼|春運|戶口|居委會|快遞|靠譜|老鐵|絕絕子|yyds|聊么|微信|淘寶|高考/i;
 const FOREIGN_SPOUSE_SCRIPT = /外籍[\s\S]{0,40}(越南|印尼|泰國|菲律賓|嫁過來)|從(越南|印尼|泰國|菲律賓)嫁/;
 const THREE_DAY_MEAL_SCRIPT = /第一天[\s\S]{0,160}第二天[\s\S]{0,160}第三天[\s\S]{0,120}(標準答案|浪費|清淡|隨便)/;
+const OPPOSITION = /你站哪|站隊|誰對誰錯|牆頭草|選邊|好媳婦應該|應該要察言|男生都|女生都|飯桌安靜/;
 
 /** 回傳這篇為什麼不像台灣人寫的；過關則是 null。 */
 export function taiwanVoiceIssue(text: string): string | null {
@@ -29,5 +33,6 @@ export function taiwanVoiceIssue(text: string): string | null {
   if (mainland) return `出現大陸用語「${mainland[0]}」`;
   if (THREE_DAY_MEAL_SCRIPT.test(text) || /好媳婦(好像)?沒有標準答案/.test(text)) return '寫成三天飯桌都被嫌的短影音劇本';
   if (FOREIGN_SPOUSE_SCRIPT.test(text)) return '寫成外籍配偶融入台灣的心靈雞湯';
+  if (OPPOSITION.test(text)) return '寫成逼人站隊的對立文';
   return null;
 }

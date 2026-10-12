@@ -446,7 +446,7 @@ export async function generatePlatformPost(
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇不合格：${reasons}。用台灣人日常會講的話重寫${hardLimit && post.body.length > hardLimit ? `，縮短到 ${hardLimit} 字以內` : ''}。禁止簡體、大陸用語、外籍配偶心靈雞湯。回傳同格式 JSON(imagePrompt、posterHeadline、posterAdvantage 若重寫主標也必須是台灣繁中)。` },
+        { role: 'user', content: `這篇不合格：${reasons}。用台灣人日常會講的話重寫${hardLimit && post.body.length > hardLimit ? `，縮短到 ${hardLimit} 字以內` : ''}。要溫暖、讓人認同，不要寫成對立或逼人站隊。禁止簡體、大陸用語、外籍配偶心靈雞湯。回傳同格式 JSON(imagePrompt、posterHeadline、posterAdvantage 若重寫主標也必須是台灣繁中)。` },
       ],
       temperature: 0.5,
     });
@@ -638,7 +638,7 @@ export async function generateOfftopicPost(
         { role: 'assistant', content: JSON.stringify(post) },
         {
           role: 'user',
-          content: `這篇不合格：${post.body.length > 500 ? `body ${post.body.length} 字,超過 500 字` : ''}${offtopicVoice ? `；${offtopicVoice}` : ''}。用台灣口語重寫，禁止簡體、大陸用語、外籍配偶心靈雞湯。只保留一個核心重點，縮短到 500 字以內，回傳同格式 JSON。`,
+          content: `這篇不合格：${post.body.length > 500 ? `body ${post.body.length} 字,超過 500 字` : ''}${offtopicVoice ? `；${offtopicVoice}` : ''}。用台灣口語重寫成溫暖、讓人想說我家也是的畫面，不要對立、不要逼人站隊。禁止簡體、大陸用語、外籍配偶心靈雞湯。只保留一個核心重點，縮短到 500 字以內，回傳同格式 JSON。`,
         },
       ],
       temperature: 0.7,
@@ -706,8 +706,8 @@ export async function generateTrafficPost(
         {
           role: 'user',
           content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現品牌、工地、租屋或自助洗衣' : ''}${missed ? `，而且沒有寫到「${focus}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}）。` +
-            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : '，改成家庭、兩性或感情'}。` +
-            '場景用電鍋、家族 LINE、圍爐、夜市、捷運這種台灣日常。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌。開頭不要用工地、房東、自助洗衣，最後仍要有一個讓人想留言的問題。回傳同格式 JSON。',
+            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : '，改成家庭、兩性或感情裡被在乎的那一下'}。` +
+            '場景用電鍋、家族 LINE、圍爐、夜市、捷運這種台灣日常，語氣溫暖。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌、逼人站隊。開頭不要用工地、房東、自助洗衣，最後問你家有沒有這種很小的溫柔。回傳同格式 JSON。',
         },
       ],
       temperature: 0.7,

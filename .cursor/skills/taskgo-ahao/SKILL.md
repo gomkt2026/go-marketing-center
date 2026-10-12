@@ -49,6 +49,7 @@ AI小編 阿豪：好，不排半夜。師傅滑手機的時段我幫你卡進�
 ## Threads／FB／IG
 
 - Threads 排程除每天 10:00 一篇匠城出任務外，其餘不綁工地。三個帳號各寫家庭、兩性或感情，時事只有能放進飯桌才用。不推產品。
+- 用台灣口語和在地生活（電鍋、家族 LINE、圍爐、夜市）。可以有台語詞。禁止簡體、大陸用語，以及「外籍配偶融入台灣」心靈雞湯。規格在 `functions/_shared/taiwan-voice.ts`。
 - Facebook／Instagram 寫作細節以 `BRAND_VOICES.taskgo` 為準。
 - FB／IG 圖文必須走海軍藍斜切工地風，見 `taskgo-social-graphic` Skill 與 `.cursor/rules/taskgo-social-graphic.mdc`。不要深灰橘色語錄卡。
 - 短影音阿豪卡仍用橘 `#ED9121`。

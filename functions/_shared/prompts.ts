@@ -4,6 +4,7 @@ import { loadPublishedPrimaryCoverages, publishedCoveragePrompt } from './press'
 import { loadBrandCollaterals, collateralPrompt } from './documents';
 import { officialWebsitePrompt, loadBrandWebsite } from './brand-profile';
 import { isMissingLaneColumn } from './audience-lane';
+import { TAIWAN_LOCAL_VOICE } from './taiwan-voice';
 
 // ============================================================================
 // 品牌第一線角色視角:讓 AI 用「行業最前端人員」的思維寫貼文,而不是 AI 腔
@@ -378,8 +379,8 @@ export const ANTI_AI_RULES =
   '4. 具體勝過抽象:寫「上週有個房東半夜打來說熱水器爆了」而不是「我們提供全天候服務」。' +
   '5. 不要每句都完美通順,真人發文有節奏變化。' +
   '6. 絕對不捏造數據、優惠、法規;不確定的就不寫。' +
-  '7. 只用台灣用語,出現中國用語就重寫:影片(不是視頻)、品質(不是質量)、網路(不是網絡)、資訊(不是信息)、馬鈴薯(不是土豆)。' +
-  '8. 內容要長在台灣的生活場景裡:超商、騎樓、捷運、機車、夜市、梅雨、颱風假、報稅季…讓台灣讀者一看就覺得「這就是我的日常」。' +
+  '7. ' + TAIWAN_LOCAL_VOICE +
+  '8. 內容要長在台灣的生活場景裡:超商、騎樓、捷運、機車、夜市、電鍋、家族 LINE、圍爐、梅雨、颱風假、報稅季。讓台灣讀者一看就覺得「這就是我的日常」。' +
   '9. 沒有「已驗證媒體報導」清單時,禁止寫「媒體報導」「登上 XX」「全台媒體」。有清單也只能引用列出的出處與事實,不可發明媒體名或把轉載算成多次專訪。' +
   '9b. 有「品牌官方 EDM／簡報」清單時,優先用裡面的賣點、活動與 CTA 來寫社群;沒列出的優惠、價格、截止日不准發明。' +
   '10. Homigo / TaskGo / Washgo 主 CTA 一律寫匠管聯絡:Service@inforcraft.com.tw、電話 0972-395-117。禁止寫各品牌 LINE、官網註冊、hello@washgo、加 LINE 免費開始。';
@@ -1189,7 +1190,8 @@ export function buildGamePromoPrompt(params: {
 export const OFFTOPIC_SYSTEM_PROMPT =
   '你是一個 20-35 歲的台灣人,平常就愛在 Threads 上分享生活觀察、幹話、感情觀,完全不是任何品牌的代言人或行銷帳號。' +
   '你講話很真實、有個人風格,偶爾自嘲、偶爾毒舌,像朋友圈裡那個很會講話又敢講真心話的人。' +
-  '寫感情文時要像深夜散文:具體畫面、內心小劇場、一句讓人想截圖的立場,結尾邀請大家分享自己的故事。';
+  '寫感情文時要像深夜散文:具體畫面、內心小劇場、一句讓人想截圖的立場,結尾邀請大家分享自己的故事。' +
+  TAIWAN_LOCAL_VOICE;
 
 interface OfftopicPostType {
   label: string;
@@ -1559,7 +1561,7 @@ const TRAFFIC_HOURS = [0, 6, 9, 12, 18, 21];
 const TRAFFIC_LANE_ORDER: TrafficFormulaId[] = ['family', 'gender', 'feeling', 'news'];
 
 const TREND_SKIP = /地震|颱風|豪雨|死亡|命案|戰爭|選舉|罷免|股票|股價|美債|殖利率|比特幣|比分|冠軍|英超|法甲|中職|金馬|自殺|色情|未成年|愛豆|韓星/;
-const LIFE_TREND = /結婚|離婚|生子|生育|小孩|孩子|爸|媽|家庭|薪水|房租|物價|性別|婚姻|婆家|單身|約會|分手|家暴|長照|過年|彩禮|同居|家務/;
+const LIFE_TREND = /結婚|離婚|生子|生育|小孩|孩子|爸|媽|家庭|薪水|房租|物價|性別|婚姻|婆家|單身|約會|分手|家暴|長照|過年|圍爐|紅包|回娘家|聘金|同居|家務/;
 
 export function trafficFormulaFor(slug: string, hourTw: number, now = Date.now()): TrafficFormulaId {
   const brand = slug === 'taskgo' ? 0 : slug === 'washgo' ? 2 : 1;
@@ -1579,10 +1581,11 @@ export function pickLifeTrend(trends: string[]): string | null {
 export const TRAFFIC_SYSTEM_PROMPT =
   '你是會在 Threads 上引發共鳴的台灣人，不是任何品牌的小編。' +
   '這篇不要出現品牌、產品、工地報價、業主、師傅在工地、租屋平台、房東收租、早餐店、自助洗衣、烘衣機、甩乾、只有一件。' +
-  '婆媳、移工、家裡的一句話可以寫，但要寫一個具體的人，不要寫成廣告、新聞，也不要站隊攻擊某一個族群。' +
+  '婆媳、家裡的一句話可以寫，但要寫一個具體的台灣人，用台灣人會講的話。不要寫成廣告、新聞，不要站隊攻擊某一個族群，不要寫外籍配偶融入台灣的心靈雞湯。' +
   '寫家庭、兩性、感情，或一件大家真的會在飯桌上吵的事。' +
   '一個具體的人，一句引號，最後一個十個字就回得了的問題。不要下結論，不要新聞稿。' +
-  '禁止品牌名、產品、系統、App、連結、hashtag、促銷。';
+  '禁止品牌名、產品、系統、App、連結、hashtag、促銷。' +
+  TAIWAN_LOCAL_VOICE;
 
 export function composeTrafficPrompt(opts: {
   brandSlug: string;
@@ -1609,6 +1612,7 @@ export function composeTrafficPrompt(opts: {
       '三個帳號今天各寫各的，不要寫成同一件事的三種版本。',
       opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
       '開頭不要用「自助洗衣」「工地」「房東」。直接從人說的話或家裡的畫面開始。',
+      '用台灣口語和在地生活。禁止簡體、大陸用語，以及外籍配偶廚房考試、三天飯桌都被嫌這種劇本。',
       `正文 ${Math.max(80, lane.maxChars - 80)} 到 ${lane.maxChars} 字，一句一行。`,
       '不要 hashtag，不要連結，不要第二則回覆。',
       opts.usedTopics.length ? `這些標題和開頭最近用過，換一個家裡的人或一句話：\n${opts.usedTopics.join('\n')}` : '',

@@ -20,6 +20,7 @@ import { buildMediaKey, decodeEmbeddedImage, getMediaBytes, isEmbeddedImageUrl, 
 import { compositeLogo } from './watermark';
 import { composeAssetOnBrandCard, frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
+import { taiwanVoiceIssue } from './taiwan-voice';
 import { X_TWEET_MAX_CHARS } from './x';
 import { burnPainBar, burnPosterHeadline } from './poster-text';
 import { loadBrandImagePromptPack } from './image-prompts';
@@ -434,13 +435,18 @@ export async function generatePlatformPost(
     : platform === 'instagram' ? (brandVoice.instagramMaxChars ?? 220)
     : platform === 'threads' && brandVoice.threadsMaxChars ? brandVoice.threadsMaxChars
     : null;
-  if (hardLimit && post.body.length > hardLimit) {
+  const voiceIssue = taiwanVoiceIssue([post.body, post.posterHeadline, post.posterAdvantage].filter(Boolean).join('\n'));
+  if ((hardLimit && post.body.length > hardLimit) || voiceIssue) {
+    const reasons = [
+      hardLimit && post.body.length > hardLimit ? `${post.body.length} 字,超過 ${hardLimit} 字上限` : '',
+      voiceIssue ?? '',
+    ].filter(Boolean).join('；');
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${hardLimit} 字上限。請只保留一個核心重點,縮短到 ${hardLimit} 字以內,回傳同格式 JSON(imagePrompt、posterHeadline、posterAdvantage 保留不變)。` },
+        { role: 'user', content: `這篇不合格：${reasons}。用台灣人日常會講的話重寫${hardLimit && post.body.length > hardLimit ? `，縮短到 ${hardLimit} 字以內` : ''}。禁止簡體、大陸用語、外籍配偶心靈雞湯。回傳同格式 JSON(imagePrompt、posterHeadline、posterAdvantage 若重寫主標也必須是台灣繁中)。` },
       ],
       temperature: 0.5,
     });
@@ -623,13 +629,17 @@ export async function generateOfftopicPost(
   post.imagePrompt = undefined;
   if (spec.isLoveStory && !post.replyBody && spec.replyHint) post.replyBody = spec.replyHint;
 
-  if (post.body.length > 500) {
+  const offtopicVoice = taiwanVoiceIssue(`${post.body}\n${post.replyBody ?? ''}`);
+  if (post.body.length > 500 || offtopicVoice) {
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: OFFTOPIC_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇 body ${post.body.length} 字,超過 Threads 500 字上限。只保留一個核心重點,縮短到 500 字以內,回傳同格式 JSON。` },
+        {
+          role: 'user',
+          content: `這篇不合格：${post.body.length > 500 ? `body ${post.body.length} 字,超過 500 字` : ''}${offtopicVoice ? `；${offtopicVoice}` : ''}。用台灣口語重寫，禁止簡體、大陸用語、外籍配偶心靈雞湯。只保留一個核心重點，縮短到 500 字以內，回傳同格式 JSON。`,
+        },
       ],
       temperature: 0.7,
     });
@@ -686,7 +696,8 @@ export async function generateTrafficPost(
   post.imagePrompt = undefined;
   const leaked = /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|只有一件|工地|業主|房東/.test(post.body);
   const missed = Boolean(focus) && !post.body.includes(focus);
-  if (post.body.length > limit || leaked || missed || post.body.length < 80) {
+  const trafficVoice = taiwanVoiceIssue(post.body);
+  if (post.body.length > limit || leaked || missed || post.body.length < 80 || trafficVoice) {
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: TRAFFIC_SYSTEM_PROMPT },
@@ -694,8 +705,9 @@ export async function generateTrafficPost(
         { role: 'assistant', content: JSON.stringify(post) },
         {
           role: 'user',
-          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現品牌、工地、租屋或自助洗衣' : ''}${missed ? `，而且沒有寫到「${focus}」` : ''}）。` +
-            `重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : '，改成家庭、兩性或感情'}，開頭不要用工地、房東、自助洗衣，最後仍要有一個讓人想留言的問題。回傳同格式 JSON。`,
+          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現品牌、工地、租屋或自助洗衣' : ''}${missed ? `，而且沒有寫到「${focus}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}）。` +
+            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : '，改成家庭、兩性或感情'}。` +
+            '場景用電鍋、家族 LINE、圍爐、夜市、捷運這種台灣日常。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌。開頭不要用工地、房東、自助洗衣，最後仍要有一個讓人想留言的問題。回傳同格式 JSON。',
         },
       ],
       temperature: 0.7,

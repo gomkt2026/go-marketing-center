@@ -1553,8 +1553,8 @@ const TRAFFIC_LANES: Record<TrafficFormulaId, { label: string; maxChars: number;
     label: '時事',
     maxChars: 220,
     instruction:
-      '只有這則時事能自然變成家庭、感情或兩性的一句話才可以用，而且專有名詞最多一次。' +
-      '寫的是這件事進到家裡之後，有人說的那一句讓人想回嘴的話。不是新聞整理。接不上就完全不要提那則時事，改寫家裡那一句沒被接住的話。',
+      '時事要直接寫大家正在氣的那一件事和那一句話，不要改成工地、房租、洗衣的比喻。' +
+      '專有名詞可以出現。沒有那種讓人想回嘴的事，就改寫家裡或現場一句沒被接住的話。',
   },
 };
 
@@ -1581,10 +1581,17 @@ export function pickLifeTrend(trends: string[]): string | null {
 
 export const WASHGO_TRAFFIC_SYSTEM_PROMPT =
   '你是台灣洗衣店的年輕店員，在 Threads 講一件櫃檯上剛發生的事。' +
-  '這篇只寫送洗進度：客人不知道衣服洗好了沒、還要再打一通電話、不知道衣服在烘還是在等、不知道什麼時候可以拿。' +
-  '用一個具體的人和一句問話。問完之後，進度其實已經看得到，店員不用再翻手寫單。寫到這裡就停。' +
-  '不要寫成廣告、不要列功能、不要 hashtag、不要連結、不要叫人加 LINE、不要提別的洗衣店名字。' +
-  '不要寫婆媳、兩性對立、外籍配偶。不要寫品牌名。' +
+  '三選一，不要三件一起寫：客人問洗好了沒；一件衣服洗壞了；袋子裡有不方便在櫃檯打開的東西，單獨裝箱，備註不寫在外面。' +
+  '個人物品可以是按摩棒這類，只出現一次，不描述外形，不笑客人，櫃檯沒有人把箱子打開。' +
+  '一句問話之後停住。不要寫成廣告、不要列功能、不要 hashtag、不要連結、不要叫人加 LINE、不要提別的洗衣店名字。' +
+  '不要寫婆媳、電鍋、圍爐。不要寫品牌名。' +
+  TAIWAN_LOCAL_VOICE;
+
+export const TASKGO_TRAFFIC_SYSTEM_PROMPT =
+  '你是台灣工地的帶班，在 Threads 講現場一句沒被接住的話。' +
+  '有人看不起一個具體的師傅或一件具體的活，話講完，敘事者沒有幫腔，也沒有下結論。' +
+  '可以寫工地、業主、砌磚、叫料。不要寫電鍋、圍爐、盛飯、保溫。' +
+  '不要寫成一整群人的結論，不要寫外勞都、某國人都。不要寫品牌名、報價、連結、hashtag。' +
   TAIWAN_LOCAL_VOICE;
 
 export const TRAFFIC_SYSTEM_PROMPT =
@@ -1606,18 +1613,40 @@ export function composeTrafficPrompt(opts: {
 }): { prompt: string; category: TrafficFormulaId; label: string; maxChars: number; theme: string } {
   const lane = TRAFFIC_LANES[opts.formula] ?? TRAFFIC_LANES.feeling;
   const theme = opts.focusKeyword || (opts.formula === 'news' && opts.theme ? opts.theme : lane.label);
-  if (opts.brandSlug === 'washgo') {
+  if (opts.brandSlug === 'taskgo') {
     return {
       category: opts.formula,
-      label: '送洗進度',
+      label: '現場一句話',
+      maxChars: 220,
+      theme: '現場一句話',
+      prompt: [
+        '寫一則工地 Threads。一個具體的人講一句看不起人或看不起這件活的話。',
+        '話講完就停。敘事者沒有幫腔，沒有說其實他很厲害，沒有金句。',
+        '不要寫電鍋、圍爐、盛飯、保溫、家族群。不要寫外勞都、某國人都。',
+        '不要出現品牌名、報價、連結、hashtag。',
+        opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
+        opts.usedTopics.length ? `這些標題和開頭最近用過，換一句現場的話：\n${opts.usedTopics.join('\n')}` : '',
+        '正文 80 到 220 字，一句一行。',
+        '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","hashtags":[],"cta":""}',
+      ].filter(Boolean).join('\n'),
+    };
+  }
+  if (opts.brandSlug === 'washgo') {
+    const washgoScene = [
+      '只寫客人問「洗好了沒」。進度已經看得到，店員沒有再解釋系統。',
+      '只寫一件洗壞的衣服，和客人的一句話。不要教洗法。',
+      '只寫袋子裡一件不方便當面打開的東西。單獨裝箱，備註不寫在外面。可以點到按摩棒一次，不描述、不笑客人。',
+    ][(opts.usedTopics.length + new Date().getDate()) % 3];
+    return {
+      category: opts.formula,
+      label: '櫃檯一句話',
       maxChars: 150,
-      theme: '送洗進度',
+      theme: '櫃檯一句話',
       prompt: [
         '寫一則洗衣店店員的 Threads。像櫃檯隨手發的，不是品牌稿。',
-        '只寫一件事：衣服送出去之後，人還是想打電話問「洗好了沒」。',
-        '場面從這四個裡換一個，不要跟最近的開頭重複：客人第三天又打來、衣服不知道在烘還是在等、手寫單對不到這件是誰的、人還在上班就收到可以拿了。',
-        '一句問話用引號。問完就讓進度自己出現，不要解釋系統，不要列四個勾勾。',
-        '不要寫婆媳、家事對立、兩性。不要出現品牌名、別的店名、連結、hashtag、電話。',
+        washgoScene,
+        '一句問話用引號。問完就停，不要列功能。',
+        '不要寫婆媳、電鍋、圍爐。不要出現品牌名、別的店名、連結、hashtag、電話。',
         opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
         opts.usedTopics.length ? `這些標題和開頭最近用過，換一句客人的問話：\n${opts.usedTopics.join('\n')}` : '',
         '正文 80 到 150 字，一句一行。',
@@ -1639,8 +1668,8 @@ export function composeTrafficPrompt(opts: {
       opts.focusKeyword ? '' : (opts.formula === 'news' && opts.theme ? `可以借用的時事只有這一則：${opts.theme}。接不上就不要提。` : '不要提新聞、運動、明星、債市、頒獎。'),
       '三個帳號今天各寫各的，不要寫成同一件事的三種版本。',
       opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
-      '開頭不要用「自助洗衣」「工地」「房東」。直接從人說的話或家裡的畫面開始。',
-      '用台灣口語和在地生活。一句不公平的話之後停住。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌，以及「男生都」「女生都」。',
+      '開頭不要用「自助洗衣」「工地」「房東」「電鍋」「圍爐」「盛飯」。直接從人說的那一句不公平的話開始。',
+      '用台灣口語。一句不公平的話之後停住。時事不要改成品牌比喻。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌，以及「男生都」「女生都」。',
       `正文 ${Math.max(80, lane.maxChars - 80)} 到 ${lane.maxChars} 字，一句一行。`,
       '不要 hashtag，不要連結，不要第二則回覆。',
       opts.usedTopics.length ? `這些標題和開頭最近用過，換一個家裡的人或一句話：\n${opts.usedTopics.join('\n')}` : '',

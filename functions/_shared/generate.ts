@@ -5,7 +5,7 @@ import { seoChatJson, socialChatJson } from './social-llm';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
-  TRAFFIC_SYSTEM_PROMPT, WASHGO_TRAFFIC_SYSTEM_PROMPT, composeTrafficPrompt, type TrafficFormulaId,
+  TRAFFIC_SYSTEM_PROMPT, WASHGO_TRAFFIC_SYSTEM_PROMPT, TASKGO_TRAFFIC_SYSTEM_PROMPT, composeTrafficPrompt, type TrafficFormulaId,
   buildImageInspiredPostPrompt, buildGamePromoPrompt, GAME_PROMO_URL,
   type GamePromoAngle,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
@@ -681,8 +681,13 @@ export async function generateTrafficPost(
   const spec = composeTrafficPrompt(params);
   const limit = spec.maxChars + 40;
   const washgo = params.brandSlug === 'washgo';
-  const focus = washgo ? '' : (params.focusKeyword?.trim() || '');
-  const systemPrompt = washgo ? WASHGO_TRAFFIC_SYSTEM_PROMPT : TRAFFIC_SYSTEM_PROMPT;
+  const taskgo = params.brandSlug === 'taskgo';
+  const focus = washgo || taskgo ? '' : (params.focusKeyword?.trim() || '');
+  const systemPrompt = washgo
+    ? WASHGO_TRAFFIC_SYSTEM_PROMPT
+    : taskgo
+      ? TASKGO_TRAFFIC_SYSTEM_PROMPT
+      : TRAFFIC_SYSTEM_PROMPT;
   const userPrompt = spec.prompt;
   let post = await socialChatJson<GeneratedPost>(env, {
     messages: [
@@ -698,7 +703,9 @@ export async function generateTrafficPost(
   post.imagePrompt = undefined;
   const leaked = (washgo
     ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|洗楽|HappyWash|happy415|https?:\/\/|工地|業主|房東/
-    : /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|只有一件|工地|業主|房東/
+    : taskgo
+      ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|房東|電鍋/
+      : /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|只有一件|工地|業主|房東|電鍋/
   ).test(post.body);
   const missed = Boolean(focus) && !post.body.includes(focus);
   const trafficVoice = taiwanVoiceIssue(post.body);
@@ -711,10 +718,12 @@ export async function generateTrafficPost(
         {
           role: 'user',
           content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${focus}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}）。` +
-            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : washgo ? '，改成客人問洗好了沒、進度已經看得到' : '，改成家庭、兩性或感情裡一句沒被接住的話'}。` +
+            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : washgo ? '，改成櫃檯一句問話' : taskgo ? '，改成工地一句看不起人的話，人沒有接' : '，改成一句讓人想回嘴的話，人沒有接'}。` +
             (washgo
-              ? '一句問話之後停住。不要列功能，不要提別的店。禁止簡體、大陸用語。回傳同格式 JSON。'
-              : '場景用電鍋、家族 LINE、圍爐、夜市、捷運這種台灣日常。一句不公平的話之後停住，不要和解。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌、「男生都」「女生都」。開頭不要用工地、房東、自助洗衣，不要問你家的溫柔。回傳同格式 JSON。'),
+              ? '一句問話之後停住。不要列功能，不要提別的店，不要寫電鍋。禁止簡體、大陸用語。回傳同格式 JSON。'
+              : taskgo
+                ? '可以寫工地。不要寫電鍋、圍爐、盛飯。不要寫外勞都。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
+                : '不要用電鍋、圍爐、盛飯當整篇。一句不公平的話之後停住。時事不要改成品牌比喻。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌、「男生都」「女生都」。回傳同格式 JSON。'),
         },
       ],
       temperature: 0.7,

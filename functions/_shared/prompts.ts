@@ -212,7 +212,8 @@ const B2B_LANE_INSTRUCTIONS: Record<string, string> = {
   washgo:
     '【本篇受眾車道:B 端】只寫給洗衣業者(店主/連鎖/想加盟者),不要寫成媽媽加班或上班族送洗故事。' +
     '你現在是懂洗衣連鎖營運的夥伴,不是櫃檯店員跟消費者聊天。' +
-    '用店裡手寫單、電話對單、多門市調撥、司機派車、客源老化的具體場景。語氣專業 7、親切 3。' +
+    '開頭就寫店裡最常接到的那一通：客人問衣服洗好了沒、在哪、什麼時候可以拿。' +
+    '再寫手寫單對不上、電話對單、多門市調撥。進度要讓人看得見，不要寫成功能清單。語氣專業 7、親切 3。' +
     SHARED_BRAND_CTA_RULE +
     '禁止「可愛洗衣機」「懶人福音」「加班到十點的媽媽」。' +
     '禁止「邁向數位化的未來就是現在」「告別繁瑣」「輕鬆數位化」「數位轉型解決方案」這類空心廣告句。' +
@@ -1578,6 +1579,14 @@ export function pickLifeTrend(trends: string[]): string | null {
   return hit ?? null;
 }
 
+export const WASHGO_TRAFFIC_SYSTEM_PROMPT =
+  '你是台灣洗衣店的年輕店員，在 Threads 講一件櫃檯上剛發生的事。' +
+  '這篇只寫送洗進度：客人不知道衣服洗好了沒、還要再打一通電話、不知道衣服在烘還是在等、不知道什麼時候可以拿。' +
+  '用一個具體的人和一句問話。問完之後，進度其實已經看得到，店員不用再翻手寫單。寫到這裡就停。' +
+  '不要寫成廣告、不要列功能、不要 hashtag、不要連結、不要叫人加 LINE、不要提別的洗衣店名字。' +
+  '不要寫婆媳、兩性對立、外籍配偶。不要寫品牌名。' +
+  TAIWAN_LOCAL_VOICE;
+
 export const TRAFFIC_SYSTEM_PROMPT =
   '你是會在 Threads 上引發共鳴的台灣人，不是任何品牌的小編。' +
   '這篇不要出現品牌、產品、工地報價、業主、師傅在工地、租屋平台、房東收租、早餐店、自助洗衣、烘衣機、甩乾、只有一件。' +
@@ -1597,6 +1606,25 @@ export function composeTrafficPrompt(opts: {
 }): { prompt: string; category: TrafficFormulaId; label: string; maxChars: number; theme: string } {
   const lane = TRAFFIC_LANES[opts.formula] ?? TRAFFIC_LANES.feeling;
   const theme = opts.focusKeyword || (opts.formula === 'news' && opts.theme ? opts.theme : lane.label);
+  if (opts.brandSlug === 'washgo') {
+    return {
+      category: opts.formula,
+      label: '送洗進度',
+      maxChars: 150,
+      theme: '送洗進度',
+      prompt: [
+        '寫一則洗衣店店員的 Threads。像櫃檯隨手發的，不是品牌稿。',
+        '只寫一件事：衣服送出去之後，人還是想打電話問「洗好了沒」。',
+        '場面從這四個裡換一個，不要跟最近的開頭重複：客人第三天又打來、衣服不知道在烘還是在等、手寫單對不到這件是誰的、人還在上班就收到可以拿了。',
+        '一句問話用引號。問完就讓進度自己出現，不要解釋系統，不要列四個勾勾。',
+        '不要寫婆媳、家事對立、兩性。不要出現品牌名、別的店名、連結、hashtag、電話。',
+        opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
+        opts.usedTopics.length ? `這些標題和開頭最近用過，換一句客人的問話：\n${opts.usedTopics.join('\n')}` : '',
+        '正文 80 到 150 字，一句一行。',
+        '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","hashtags":[],"cta":""}',
+      ].filter(Boolean).join('\n'),
+    };
+  }
   return {
     category: opts.formula,
     label: lane.label,

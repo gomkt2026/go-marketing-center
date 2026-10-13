@@ -5,7 +5,7 @@ import { seoChatJson, socialChatJson } from './social-llm';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
-  TRAFFIC_SYSTEM_PROMPT, composeTrafficPrompt, type TrafficFormulaId,
+  TRAFFIC_SYSTEM_PROMPT, WASHGO_TRAFFIC_SYSTEM_PROMPT, composeTrafficPrompt, type TrafficFormulaId,
   buildImageInspiredPostPrompt, buildGamePromoPrompt, GAME_PROMO_URL,
   type GamePromoAngle,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
@@ -680,11 +680,13 @@ export async function generateTrafficPost(
 ): Promise<GenerationResult> {
   const spec = composeTrafficPrompt(params);
   const limit = spec.maxChars + 40;
-  const focus = params.focusKeyword?.trim() || '';
+  const washgo = params.brandSlug === 'washgo';
+  const focus = washgo ? '' : (params.focusKeyword?.trim() || '');
+  const systemPrompt = washgo ? WASHGO_TRAFFIC_SYSTEM_PROMPT : TRAFFIC_SYSTEM_PROMPT;
   const userPrompt = spec.prompt;
   let post = await socialChatJson<GeneratedPost>(env, {
     messages: [
-      { role: 'system', content: TRAFFIC_SYSTEM_PROMPT },
+      { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
     temperature: 0.9,
@@ -694,20 +696,25 @@ export async function generateTrafficPost(
   post.cta = '';
   post.replyBody = '';
   post.imagePrompt = undefined;
-  const leaked = /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|只有一件|工地|業主|房東/.test(post.body);
+  const leaked = (washgo
+    ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|洗楽|HappyWash|happy415|https?:\/\/|工地|業主|房東/
+    : /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|只有一件|工地|業主|房東/
+  ).test(post.body);
   const missed = Boolean(focus) && !post.body.includes(focus);
   const trafficVoice = taiwanVoiceIssue(post.body);
   if (post.body.length > limit || leaked || missed || post.body.length < 80 || trafficVoice) {
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
-        { role: 'system', content: TRAFFIC_SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
         {
           role: 'user',
-          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現品牌、工地、租屋或自助洗衣' : ''}${missed ? `，而且沒有寫到「${focus}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}）。` +
-            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : '，改成家庭、兩性或感情裡一句沒被接住的話'}。` +
-            '場景用電鍋、家族 LINE、圍爐、夜市、捷運這種台灣日常。一句不公平的話之後停住，不要和解。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌、「男生都」「女生都」。開頭不要用工地、房東、自助洗衣，不要問你家的溫柔。回傳同格式 JSON。',
+          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${focus}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}）。` +
+            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : washgo ? '，改成客人問洗好了沒、進度已經看得到' : '，改成家庭、兩性或感情裡一句沒被接住的話'}。` +
+            (washgo
+              ? '一句問話之後停住。不要列功能，不要提別的店。禁止簡體、大陸用語。回傳同格式 JSON。'
+              : '場景用電鍋、家族 LINE、圍爐、夜市、捷運這種台灣日常。一句不公平的話之後停住，不要和解。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌、「男生都」「女生都」。開頭不要用工地、房東、自助洗衣，不要問你家的溫柔。回傳同格式 JSON。'),
         },
       ],
       temperature: 0.7,

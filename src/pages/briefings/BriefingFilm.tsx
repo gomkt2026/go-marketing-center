@@ -1,10 +1,22 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { briefingFilm } from '@/data/briefings';
+import { useParams } from 'react-router-dom';
+import { briefingCatalog } from '@/data/briefings';
+import { LocalLink, useCopy, useLocale } from '@/pages/public/locale';
 
 export function BriefingFilm() {
   const { slug } = useParams();
-  const film = briefingFilm(slug);
+  const { locale } = useLocale();
+  const copy = useCopy();
+  const { ui, films } = briefingCatalog(locale);
+  const film = films.find((item) => item.slug === slug);
+
+  useEffect(() => {
+    const previous = document.title;
+    document.title = `${film?.title ?? ui.pageTitle}${copy.titleJoin}${copy.brandName}`;
+    return () => {
+      document.title = previous;
+    };
+  }, [copy.brandName, copy.titleJoin, film?.title, ui.pageTitle]);
   const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
@@ -29,7 +41,7 @@ export function BriefingFilm() {
   if (!film) {
     return (
       <div className="briefing-present">
-        <p className="briefing-missing">找不到這支影片。<Link to="/briefings">回簡報專區</Link></p>
+        <p className="briefing-missing">{ui.missingFilm}<LocalLink to="/briefings">{ui.back}</LocalLink></p>
       </div>
     );
   }
@@ -37,7 +49,7 @@ export function BriefingFilm() {
   return (
     <div className="briefing-present">
       <header className="briefing-present-bar">
-        <Link to="/briefings">離開</Link>
+        <LocalLink to="/briefings">{ui.leave}</LocalLink>
         <div className="briefing-present-title">
           <strong>{film.title}</strong>
           <em>{film.duration} · {film.cue}</em>
@@ -50,7 +62,7 @@ export function BriefingFilm() {
               else void document.documentElement.requestFullscreen();
             }}
           >
-            {fullscreen ? '結束全螢幕' : '全螢幕'}
+            {fullscreen ? ui.exitFullscreen : ui.fullscreen}
           </button>
         </div>
       </header>

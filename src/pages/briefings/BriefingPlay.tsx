@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { briefingDeck, slideImage } from '@/data/briefings';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { briefingCatalog, slideImage } from '@/data/briefings';
+import { LocalLink, useCopy, useLocale } from '@/pages/public/locale';
 
 function clamp(value: number, max: number) {
   return Math.min(Math.max(value, 0), max);
@@ -9,7 +10,18 @@ function clamp(value: number, max: number) {
 export function BriefingPlay() {
   const { slug } = useParams();
   const [params] = useSearchParams();
-  const deck = briefingDeck(slug);
+  const { locale } = useLocale();
+  const copy = useCopy();
+  const { ui, decks } = briefingCatalog(locale);
+  const deck = decks.find((item) => item.slug === slug);
+
+  useEffect(() => {
+    const previous = document.title;
+    document.title = `${deck?.title ?? ui.pageTitle}${copy.titleJoin}${copy.brandName}`;
+    return () => {
+      document.title = previous;
+    };
+  }, [copy.brandName, copy.titleJoin, deck?.title, ui.pageTitle]);
   const start = clamp((Number(params.get('at')) || 1) - 1, (deck?.slides.length ?? 1) - 1);
   const [index, setIndex] = useState(start);
   const [notesOn, setNotesOn] = useState(false);
@@ -82,7 +94,7 @@ export function BriefingPlay() {
   if (!deck) {
     return (
       <div className="briefing-present">
-        <p className="briefing-missing">找不到這份簡報。<Link to="/briefings">回簡報專區</Link></p>
+        <p className="briefing-missing">{ui.missingDeck}<LocalLink to="/briefings">{ui.back}</LocalLink></p>
       </div>
     );
   }
@@ -93,15 +105,15 @@ export function BriefingPlay() {
   return (
     <div className="briefing-present">
       <header className="briefing-present-bar">
-        <Link to="/briefings">離開</Link>
+        <LocalLink to="/briefings">{ui.leave}</LocalLink>
         <div className="briefing-present-title">
           <span>{section?.label}</span>
           <strong>{index + 1} / {deck.slides.length}</strong>
           <em>{slide.title}</em>
         </div>
         <div className="briefing-present-tools">
-          <button type="button" onClick={() => setMenuOn((open) => !open)}>目錄</button>
-          <button type="button" onClick={() => setNotesOn((open) => !open)}>{notesOn ? '隱藏說明' : '說明'}</button>
+          <button type="button" onClick={() => setMenuOn((open) => !open)}>{ui.menu}</button>
+          <button type="button" onClick={() => setNotesOn((open) => !open)}>{notesOn ? ui.hideNotes : ui.showNotes}</button>
           <button
             type="button"
             onClick={() => {
@@ -109,7 +121,7 @@ export function BriefingPlay() {
               else void document.documentElement.requestFullscreen();
             }}
           >
-            {fullscreen ? '結束全螢幕' : '全螢幕'}
+            {fullscreen ? ui.exitFullscreen : ui.fullscreen}
           </button>
         </div>
       </header>
@@ -141,12 +153,12 @@ export function BriefingPlay() {
               {slide.video.label}
             </button>
           )}
-          <button type="button" className="briefing-arrow is-prev" aria-label="上一頁" onClick={() => go(index - 1)}>‹</button>
-          <button type="button" className="briefing-arrow is-next" aria-label="下一頁" onClick={() => go(index + 1)}>›</button>
+          <button type="button" className="briefing-arrow is-prev" aria-label={ui.prev} onClick={() => go(index - 1)}>‹</button>
+          <button type="button" className="briefing-arrow is-next" aria-label={ui.next} onClick={() => go(index + 1)}>›</button>
         </div>
         {notesOn && (
           <aside className="briefing-notes">
-            <div className="briefing-notes-label">這一頁在說什麼</div>
+            <div className="briefing-notes-label">{ui.notesLabel}</div>
             <h3>{slide.title}</h3>
             {slide.notes.split('\n').map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}
           </aside>
@@ -176,10 +188,10 @@ export function BriefingPlay() {
         </div>
       )}
 
-      {blank && <button type="button" className="briefing-blank" aria-label="回到簡報" onClick={() => setBlank(false)} />}
+      {blank && <button type="button" className="briefing-blank" aria-label={ui.backToSlides} onClick={() => setBlank(false)} />}
 
       <footer className="briefing-present-foot">
-        ← → 翻頁 · 空白鍵下一頁 · P 播放影片 · N 說明 · M 目錄 · F 全螢幕 · B 黑屏 · Esc 離開全螢幕
+        {ui.shortcuts}
       </footer>
     </div>
   );

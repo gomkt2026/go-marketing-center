@@ -1,9 +1,8 @@
-import { Link } from 'react-router-dom';
 import { PublicFrame } from '@/pages/public/Landing';
+import { LocalLink, useLocale } from '@/pages/public/locale';
 import {
-  BRIEFING_DECKS,
-  BRIEFING_FILMS,
   BRAND_LABEL,
+  briefingCatalog,
   sectionSlides,
   slideImage,
   type BriefingBrand,
@@ -20,15 +19,19 @@ function BrandChips({ brands }: { brands: BriefingBrand[] }) {
 }
 
 export function BriefingHub() {
+  const { locale } = useLocale();
+  const { ui, decks, films } = briefingCatalog(locale);
+
   return (
-    <PublicFrame title="修繕聯盟與 Fixercowork">
+    <PublicFrame title={ui.pageTitle}>
     <section className="lp-section">
     <div className="lp-wrap briefing-hub">
-      <div className="lp-eyebrow">給工程夥伴</div>
-      <h1>修繕聯盟與 Fixercowork</h1>
-      <p className="lp-lead">不用登入。想了解案源怎麼進來、平台怎麼派工，直接看下面兩份說明。</p>
+      <div className="lp-eyebrow">{ui.eyebrow}</div>
+      <h1>{ui.pageTitle}</h1>
+      <p className="lp-lead">{ui.lead}</p>
+      {ui.artNote && <p className="lp-muted">{ui.artNote}</p>}
 
-      {BRIEFING_DECKS.map((deck) => (
+      {decks.map((deck) => (
         <section key={deck.slug} className="briefing-deck-card">
           <img className="briefing-deck-cover" src={slideImage(deck.slug, 0)} alt="" />
           <div className="briefing-deck-copy">
@@ -37,35 +40,35 @@ export function BriefingHub() {
             <p>{deck.summary}</p>
             <BrandChips brands={deck.brands} />
             <div className="briefing-meta">
-              <span>{deck.slides.length} 頁</span>
-              <span>對象：{deck.audience}</span>
-              <span>更新 {deck.updated}</span>
+              <span>{ui.pages(deck.slides.length)}</span>
+              <span>{ui.audiencePrefix}{deck.audience}</span>
+              <span>{ui.updatedPrefix} {deck.updated}</span>
             </div>
             <div className="briefing-actions">
-              <Link className="briefing-start" to={`/briefings/${deck.slug}/play`}>看這份說明</Link>
+              <LocalLink className="briefing-start" to={`/briefings/${deck.slug}/play`}>{ui.open}</LocalLink>
             </div>
             <div className="briefing-sections">
               {deck.sections.map((section) => (
-                <Link key={section.label} to={`/briefings/${deck.slug}/play?at=${section.at}`}>
+                <LocalLink key={section.at} to={`/briefings/${deck.slug}/play?at=${section.at}`}>
                   {section.label}
-                </Link>
+                </LocalLink>
               ))}
             </div>
           </div>
           <div className="briefing-outline">
             {deck.sections.map((section, sectionIndex) => (
-              <details key={section.label}>
+              <details key={section.at}>
                 <summary>{section.label}</summary>
                 <ol>
                   {sectionSlides(deck, sectionIndex).map(({ slide, at }) => (
                     <li key={at}>
-                      <Link to={`/briefings/${deck.slug}/play?at=${at}`}>
+                      <LocalLink to={`/briefings/${deck.slug}/play?at=${at}`}>
                         <img src={slideImage(deck.slug, at - 1)} alt="" loading="lazy" />
                         <span>
                           <strong>{at}. {slide.title}</strong>
-                          {slide.video && <em>含影片</em>}
+                          {slide.video && <em>{ui.hasVideo}</em>}
                         </span>
-                      </Link>
+                      </LocalLink>
                       <p>{slide.notes}</p>
                     </li>
                   ))}
@@ -77,11 +80,11 @@ export function BriefingHub() {
       ))}
 
       <section className="briefing-films">
-        <h2>看系統實際怎麼跑</h2>
-        <p>這幾支影片讓你直接看到報修、場勘、報價，以及修繕怎麼轉成洗衣。</p>
+        <h2>{ui.filmsTitle}</h2>
+        <p>{ui.filmsLead}</p>
         <div className="briefing-film-grid">
-          {BRIEFING_FILMS.map((film) => (
-            <Link key={film.slug} to={`/briefings/watch/${film.slug}`} className="briefing-film-card">
+          {films.map((film) => (
+            <LocalLink key={film.slug} to={`/briefings/watch/${film.slug}`} className="briefing-film-card">
               <img src={film.poster} alt="" />
               <div>
                 <BrandChips brands={film.brands} />
@@ -89,7 +92,7 @@ export function BriefingHub() {
                 <span>{film.duration} · {film.cue}</span>
                 <p>{film.summary}</p>
               </div>
-            </Link>
+            </LocalLink>
           ))}
         </div>
       </section>

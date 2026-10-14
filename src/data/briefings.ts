@@ -1,4 +1,8 @@
-/** 外地簡報用的簡報庫。投影片來自 2026/10/12 修繕聯盟簡報，講稿沿用該檔備註。 */
+/** 外地簡報用的簡報庫。投影片圖檔是中文原稿，標題與說明依語系切換。 */
+
+import { BRIEFING_COPY } from '@/data/briefing-copy';
+import type { DeckCopy } from '@/data/briefing-copy/types';
+import type { Locale } from '@/pages/public/copy';
 
 export type BriefingBrand = 'taskgo' | 'homigo' | 'washgo';
 
@@ -45,290 +49,110 @@ export interface BriefingFilm {
   cue: string;
 }
 
+export interface BriefingCatalog {
+  ui: (typeof BRIEFING_COPY)['zh']['ui'];
+  decks: BriefingDeck[];
+  films: BriefingFilm[];
+}
+
 export const BRAND_LABEL: Record<BriefingBrand, string> = {
   taskgo: 'TaskGo',
   homigo: 'Homigo',
   washgo: 'Washgo',
 };
 
+const ALLIANCE_AT = [1, 4, 15, 19, 27];
+const FIXER_AT = [1, 3, 8, 18, 56];
+const ALLIANCE_VIDEO: Record<number, { src: string; vertical?: boolean }> = {
+  8: { src: '/briefings/alliance-1012/washgo.mp4' },
+  21: { src: '/briefings/alliance-1012/jiangcheng.mp4', vertical: true },
+};
+
+const FILM_MEDIA: { slug: string; src: string; poster: string; brands: BriefingBrand[] }[] = [
+  {
+    slug: 'taskgo-washgo',
+    src: '/briefings/alliance-1012/washgo.mp4',
+    poster: '/briefings/alliance-1012/washgo-poster.jpg',
+    brands: ['taskgo', 'washgo'],
+  },
+  {
+    slug: 'jiangcheng-report',
+    src: '/briefings/alliance-1012/jiangcheng.mp4',
+    poster: '/briefings/alliance-1012/jiangcheng-poster.jpg',
+    brands: ['taskgo', 'homigo', 'washgo'],
+  },
+  {
+    slug: 'online-repair',
+    src: '/briefings/films/online-repair.mp4',
+    poster: '/briefings/films/online-repair.jpg',
+    brands: ['taskgo'],
+  },
+  {
+    slug: 'mobile-survey',
+    src: '/briefings/films/mobile-survey.mp4',
+    poster: '/briefings/films/mobile-survey.jpg',
+    brands: ['taskgo'],
+  },
+  {
+    slug: 'survey-quote',
+    src: '/briefings/films/survey-quote.mp4',
+    poster: '/briefings/films/survey-quote.jpg',
+    brands: ['taskgo'],
+  },
+];
+
 export function slideImage(slug: string, index: number): string {
   return `/briefings/${slug}/slides/s-${String(index + 1).padStart(2, '0')}.jpg`;
 }
 
-const ALLIANCE: BriefingDeck = {
-  slug: 'alliance-1012',
-  title: '修繕聯盟夥伴說明',
-  kicker: 'TaskGo × Homigo × Washgo',
-  summary: '看完可以知道：租屋報修怎麼變成工單、三個品牌各自做什麼、加入聯盟之後案子怎麼留紀錄。',
-  audience: '想加入修繕聯盟的工程夥伴',
-  updated: '2026/10/12',
-  brands: ['taskgo', 'homigo', 'washgo'],
-  sections: [
-    { label: '聯盟在做什麼', at: 1 },
-    { label: '三個品牌', at: 4 },
-    { label: '案子從哪來', at: 15 },
-    { label: '案子怎麼留紀錄', at: 19 },
-    { label: '加入之後', at: 27 },
-  ],
-  slides: [
-    {
-      title: '案源送上門，案子管得清楚',
-      notes: '加入修繕聯盟之後，案子從報修進來，派工、回報、請款都留在同一張工單上。',
-    },
-    {
-      title: '你是不是也這樣',
-      notes: '很多工班現在是靠熟客找案子，進度跟照片散在 LINE，請款要自己對。這一頁把這四件事攤開來。',
-    },
-    {
-      title: '修繕聯盟生態圈',
-      notes: 'Homigo 產生報修，TaskGo 負責派工與施工紀錄，聯盟廠商把案子做完。',
-    },
-    {
-      title: 'PART 1｜三個產業入口',
-      notes: '匠管有三個入口：TaskGo 管修繕與工程，Homigo 管租屋，Washgo 管洗衣。後面說明它們跟工程夥伴的關係。',
-    },
-    {
-      title: '生活工程管理生態系',
-      notes: '三個產品對應工作、居住、生活。它們現在各自服務自己的產業，需要合作時才把資料與服務接起來。',
-    },
-    {
-      title: '三品牌怎麼串',
-      notes: '已經在跑的是 Homigo 報修進 TaskGo，以及結案、洗滌追蹤用的匠城呈現。GoCoin 目前在 Washgo。\nWashgo 這條線是把修繕客人轉去洗衣，不是把修繕案派給聯盟廠商。報導裡提到的下一步，是逐步在做的方向。',
-    },
-    {
-      title: '修繕單轉成洗滌訂單',
-      notes: '客人在 TaskGo 報修時可以選洗滌服務，進到 Washgo「我要送洗」，這一單 95 折。介紹廠商有佣金，畫面裡的店名是示範資料。',
-    },
-    {
-      title: '客人選品牌、我要送洗',
-      notes: '客人選洗衣品牌之後，Washgo 會帶入 TaskGo 轉介紹，這一單享 95 折，並可約到府收送。畫面中的品牌是示範。',
-    },
-    {
-      title: '操作示範',
-      notes: '約 2 分鐘。TaskGo 由阿豪說明，Washgo 由阿樂說明，看報修怎麼走到送洗。',
-      video: {
-        src: '/briefings/alliance-1012/washgo.mp4',
-        label: '播放 TaskGo × Washgo 操作示範',
-      },
-    },
-    {
-      title: '媒體報導',
-      notes: '經濟日報「商情／熱門亮點」有三篇：TaskGo（2025/10/20）、Homigo（2026/07/01）、Washgo（2026/09/16），記者都是鄭芝珊。\nTaskGo 現在的免費試用是 14 天。',
-    },
-    {
-      title: '報導裡的原話',
-      notes: '這些句子都出自經濟日報原文。「300 萬租屋人口」是報導引用的市場統計。聯盟要做的，是把這些方向落到每一張修繕單上。',
-    },
-    {
-      title: 'Go 行銷中心',
-      notes: '三個品牌的社群都由這個中心產出，人看過才發布。2026/10/02 的發布任務是 TaskGo 231、Homigo 218、Washgo 381。\n工班可以用「Go 幫你發文」，每週 2 則、999 元／月。施工照片和結案報告就是素材。',
-    },
-    {
-      title: 'TaskGo 媒體與社群成績單',
-      notes: '這是 2026/10/12 的 TaskGo 成績。已發布 316 則。曝光、留言、分享目前只統計 Threads，其中一則貼文貢獻了大約一半曝光，所以這是單篇成績，不是每則的平均。\n工商時報 2026/07/11 的工程聯盟報導，寫到 TaskGo 補上工程履歷與施工透明化。',
-    },
-    {
-      title: '匠城出任務',
-      notes: '匠城出任務把一般人帶進平台。上線前 7 天（到 2026/10/02）有 1,125 位玩家、2,004 局。人潮主要來自分享。遊戲裡目前還沒有聯盟廠商看板。',
-    },
-    {
-      title: 'PART 2｜案源從哪裡來',
-      notes: '後面說明 Homigo 的報修怎麼變成廠商手上的工單。',
-    },
-    {
-      title: '三個入口，案子自己送上門',
-      notes: '案源有兩條。一條是 Homigo 的房東、代管、房客報修，分成房東負責的租屋修繕，和房客自費的生活修繕。另一條是廠商自己的客戶，直接用 TaskGo 管。',
-    },
-    {
-      title: '一張報修單走到請款',
-      notes: '一張報修單只建一次。房東、房客、廠商、後勤看的是同一個案號。TaskGo 會把進度回傳 Homigo。',
-    },
-    {
-      title: '房東看得到進度',
-      notes: '這是 Homigo 房東端。房東自己看得到進度與金額，廠商少接查進度的電話，金額也有同一份紀錄。畫面中的地址已模糊。',
-    },
-    {
-      title: 'PART 3｜案子怎麼管',
-      notes: '施工連結、照片、進度、報價、結案，都留在同一張案子裡。',
-    },
-    {
-      title: '一個連結，師傅打開就能做',
-      notes: '後勤把連結貼到 LINE，師傅用手機打開就能場勘，不用另外裝 App。畫面是示範資料。',
-    },
-    {
-      title: '施工前、中、後',
-      notes: '施工前、施工中、施工後都要有照片。事後如果對「本來就壞了」或「有沒有做」有爭議，照片就是紀錄。這些照片也會進結案報告。',
-    },
-    {
-      title: '施工照片與結案畫面',
-      notes: '左邊是流程與前中後照片，中間是結案工序，右邊可以播放約 37 秒的匠城結案。這是示範案件。',
-      video: {
-        src: '/briefings/alliance-1012/jiangcheng.mp4',
-        label: '播放匠城結案呈現',
-        vertical: true,
-      },
-    },
-    {
-      title: '後台看每案做到哪',
-      notes: '進度跟著現場回報走。後台還看得到派工行事曆、每日報告、改善任務和專案地圖。',
-    },
-    {
-      title: '報價與簽名',
-      notes: '場勘完成後，系統帶出報價草稿，業主可以在線上簽名。聯盟案件的分潤與請款，依聯盟確認的規則。',
-    },
-    {
-      title: '做完就變成作品集',
-      notes: '做完的案子會變成一份免登入的結案報告，回到 Homigo 給房東看，也可以用 LINE 傳。匠城呈現會把工序和現場照片走一遍。',
-    },
-    {
-      title: '客戶評分，廠商也評工班',
-      notes: '案子完成後，客戶可以評分，派工廠商也會依完成度、速度、服務評估工班。這是系統裡的評分畫面。',
-    },
-    {
-      title: 'PART 4｜加入聯盟拿到什麼',
-      notes: '加入之後，夥伴拿到的是案源、工具、留下紀錄的信任，以及看得到的請款。',
-    },
-    {
-      title: '四個好處',
-      notes: 'TaskGo 官網的客戶案例是 500+ 團隊，以及派工時間減少 70%。現在可免費試用 14 天。',
-    },
-    {
-      title: '五步驟接到第一張案',
-      notes: '從報名、開通 TaskGo，到接到第一張聯盟案件。畫面上已列出的步驟，是現在系統做得到的流程。',
-    },
-    {
-      title: 'Q & A',
-      notes: '想加入或想再問，來信 Service@inforcraft.com.tw，或來電 0972-395-117。',
-    },
-  ],
-};
-
-const FIELD_NAMED: Record<number, [string, string]> = {
-  18: ['馬桶更換', '住家裡的馬桶更換，從拆舊到裝好，過程留在平台上。'],
-  25: ['窗簾安裝', '窗簾從舊的拆下，到新的掛上。'],
-  30: ['抽油煙機清潔', '廚房抽油煙機的清潔過程。'],
-  35: ['插座與線路查修', '用電表確認插座與線路，再進行查修。'],
-  40: ['冷氣安裝', '室內機安裝與管路整理。'],
-  45: ['拉門調整', '拉門從調整到可以順暢開關。'],
-  50: ['水塔檢修', '水塔與水位開關的檢修。'],
-  55: ['外牆與窗邊', '窗邊與外牆的滲水、釘孔與修補。'],
-};
-
-function fieldSlides(): BriefingSlide[] {
-  const slides: BriefingSlide[] = [];
-  for (let page = 18; page <= 55; page += 1) {
-    const named = FIELD_NAMED[page];
-    slides.push(named
-      ? { title: named[0], notes: named[1] }
-      : { title: '現場實作', notes: '合作廠商在住家現場做的修繕、清潔或安裝，施工過程留在作業平台。' });
+function buildDeck(
+  slug: string,
+  brands: BriefingBrand[],
+  updated: string,
+  at: number[],
+  videos: Record<number, { src: string; vertical?: boolean }>,
+  text: DeckCopy,
+  expectedSlides: number,
+): BriefingDeck {
+  if (text.sections.length !== at.length || text.slides.length !== expectedSlides) {
+    throw new Error(`${slug} copy is ${text.sections.length} sections / ${text.slides.length} slides`);
   }
-  return slides;
+  return {
+    slug,
+    brands,
+    updated,
+    title: text.title,
+    kicker: text.kicker,
+    summary: text.summary,
+    audience: text.audience,
+    sections: text.sections.map((label, index) => ({ label, at: at[index] })),
+    slides: text.slides.map((slide, index) => {
+      const media = videos[index];
+      if (Boolean(media) !== Boolean(slide.videoLabel)) {
+        throw new Error(`${slug} slide ${index + 1} video label does not match the file`);
+      }
+      return {
+        title: slide.title,
+        notes: slide.notes,
+        video: media && slide.videoLabel ? { ...media, label: slide.videoLabel } : undefined,
+      };
+    }),
+  };
 }
 
-const FIXER: BriefingDeck = {
-  slug: 'fixercowork',
-  title: 'Fixercowork 作業平台',
-  kicker: '室內設備｜修繕服務｜作業平台',
-  summary: '看 Fixercowork 怎麼跟商會合作：轉介紹、派工、施工、驗收，以及一張單怎麼分。後面是平台畫面和現場實作。',
-  audience: '商會與想一起派工的工程夥伴',
-  updated: '2026/10/14',
-  brands: [],
-  sections: [
-    { label: '平台在做什麼', at: 1 },
-    { label: '跟商會怎麼合作', at: 3 },
-    { label: '作業平台', at: 8 },
-    { label: '現場實作', at: 18 },
-    { label: '地圖與接下來', at: 56 },
-  ],
-  slides: [
-    { title: 'Fixercowork', notes: 'Fixercowork 做室內設備、修繕服務、作業平台和商務合作。' },
-    { title: '清潔與工程範圍', notes: '清潔含細清、粗清、清運、拆除、搬家，以及沙發、床墊、冷氣、洗衣機、抽油煙機。工程含防水、泥作、裝潢、傢俱、木地板、遮雨棚、窗簾和家電。' },
-    { title: '合作原則', notes: '不收費、不排他、不強迫。追求高品質、高效率、高流量。夥伴之間自由發展、自由合作、自由交流。' },
-    { title: '作業方', notes: '商會把需求轉進來，Fixercowork 作為作業方，負責媒合、派工、施工和驗收。' },
-    { title: '承包方', notes: '商會成員也可以成為承包方，承接平台媒合過來的工程。' },
-    { title: '整合方', notes: '清潔與工程項目由 Fixercowork 整合成同一條服務，商會不用自己把每個工種串起來。' },
-    { title: '一張單怎麼分', notes: '作業方以含發票的底價計算，平台是 10%，指派方是 3% 再加差額。下面列的是作業費、廣告與年終分紅，以及年度轉介紹達到條件後的加碼。' },
-    { title: '全台線上派工', notes: '掃碼可以看全台線上派工。案子不限單一縣市，從平台派出去。' },
-    { title: '工程索引', notes: '平台上的工程索引，用來找到案件與工種。' },
-    { title: '作業指派', notes: '案子在平台上指派給作業方。' },
-    { title: '廠商指派', notes: '廠商被排進這張案子，看得到自己要做的內容。' },
-    { title: '派工及場勘', notes: '派工之後進行場勘，現場狀況回到平台。' },
-    { title: '介紹方追蹤進度', notes: '轉介紹的一方可以追蹤這張單做到哪。' },
-    { title: '介紹方看進度', notes: '同一張單的進度，介紹方不用再逐一打電話問。' },
-    { title: '作業方的物件', notes: '作業方在平台上看到自己負責的物件列表。' },
-    { title: '物件怎麼排', notes: '物件列表讓作業方知道手上有哪些案子、各在什麼狀態。' },
-    { title: '完工驗收', notes: '做完之後在平台上驗收，介紹方和作業方看的是同一份結果。' },
-    ...fieldSlides(),
-    { title: '作業地圖', notes: '高雄地區的作業點。每個點是平台上的合作廠商或作業位置。' },
-    { title: '夥伴課程', notes: '夥伴一起上課，把派工、施工和平台操作對齊。' },
-    { title: '合作說明會', notes: '對商會與工程夥伴說明平台怎麼一起做案子。' },
-    { title: 'Fixercowork 遠景', notes: '要成為讓人記得的修繕品牌：專業、迅速、品質、智能、價格透明。' },
-    { title: '商業模式布局', notes: '從傢俱租賃、交屋後一站式服務，到房屋修繕聯盟。修繕是其中一塊，旁邊還有居住與空間的服務。\n其他工程、裝修加盟的加盟金往往很高。這裡要的是一顆想賺錢的心，和把服務做好的熱忱。' },
-    { title: '一起往成功走', notes: '有想賺錢的心，也有服務的熱忱，就可以一起做。案子、平台和現場都在，我們一起把這件事做出來，一起往成功走。' },
-  ],
-};
-
-export const BRIEFING_DECKS: BriefingDeck[] = [ALLIANCE, FIXER];
-
-export const BRIEFING_FILMS: BriefingFilm[] = [
-  {
-    slug: 'taskgo-washgo',
-    title: 'TaskGo 轉 Washgo',
-    summary: '客人從報修選洗滌服務，進 Washgo 我要送洗，本單 95 折。阿豪講 TaskGo，阿樂講 Washgo。',
-    src: '/briefings/alliance-1012/washgo.mp4',
-    poster: '/briefings/alliance-1012/washgo-poster.jpg',
-    duration: '1 分 57 秒',
-    brands: ['taskgo', 'washgo'],
-    cue: '看報修怎麼走到送洗',
-  },
-  {
-    slug: 'jiangcheng-report',
-    title: '匠城結案呈現',
-    summary: '直式結案畫面。把真實施工收成可傳給房東的專案報告，約 37 秒。',
-    src: '/briefings/alliance-1012/jiangcheng.mp4',
-    poster: '/briefings/alliance-1012/jiangcheng-poster.jpg',
-    duration: '37 秒',
-    brands: ['taskgo', 'homigo', 'washgo'],
-    cue: '看做完的案子怎麼交給房東',
-  },
-  {
-    slug: 'online-repair',
-    title: '線上報修，建立場勘',
-    summary: '客人送出報修之後，後台出現案件，並複製場勘連結給工班。',
-    src: '/briefings/films/online-repair.mp4',
-    poster: '/briefings/films/online-repair.jpg',
-    duration: '2 分 24 秒',
-    brands: ['taskgo'],
-    cue: '看案子怎麼進系統',
-  },
-  {
-    slug: 'mobile-survey',
-    title: '手機場勘回報',
-    summary: '師傅打開連結，填漏水現況、工法與照片，送出完成回報。',
-    src: '/briefings/films/mobile-survey.mp4',
-    poster: '/briefings/films/mobile-survey.jpg',
-    duration: '1 分 38 秒',
-    brands: ['taskgo'],
-    cue: '看師傅手機怎麼回報',
-  },
-  {
-    slug: 'survey-quote',
-    title: '場勘帶入報價',
-    summary: '場勘完成後，後台把回報帶成報價草稿，再送給業主簽名。',
-    src: '/briefings/films/survey-quote.mp4',
-    poster: '/briefings/films/survey-quote.jpg',
-    duration: '1 分',
-    brands: ['taskgo'],
-    cue: '看報價怎麼出來',
-  },
-];
-
-export function briefingDeck(slug: string | undefined): BriefingDeck | undefined {
-  return BRIEFING_DECKS.find((deck) => deck.slug === slug);
-}
-
-export function briefingFilm(slug: string | undefined): BriefingFilm | undefined {
-  return BRIEFING_FILMS.find((film) => film.slug === slug);
+export function briefingCatalog(locale: Locale): BriefingCatalog {
+  const copy = BRIEFING_COPY[locale];
+  if (copy.films.length !== FILM_MEDIA.length) {
+    throw new Error('briefing film copy length does not match');
+  }
+  return {
+    ui: copy.ui,
+    decks: [
+      buildDeck('alliance-1012', ['taskgo', 'homigo', 'washgo'], '2026/10/12', ALLIANCE_AT, ALLIANCE_VIDEO, copy.alliance, 30),
+      buildDeck('fixercowork', [], '2026/10/14', FIXER_AT, {}, copy.fixer, 61),
+    ],
+    films: FILM_MEDIA.map((media, index) => ({ ...media, ...copy.films[index] })),
+  };
 }
 
 export function sectionSlides(deck: BriefingDeck, sectionIndex: number): { slide: BriefingSlide; at: number }[] {

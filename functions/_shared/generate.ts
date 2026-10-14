@@ -678,11 +678,12 @@ export async function generateTrafficPost(
     skipPrediction?: boolean;
   },
 ): Promise<GenerationResult> {
-  const spec = composeTrafficPrompt(params);
+  const focusKeyword = params.focusKeyword === '電鍋' || params.focusKeyword === '圍爐' ? null : params.focusKeyword;
+  const spec = composeTrafficPrompt({ ...params, focusKeyword });
   const limit = spec.maxChars + 40;
   const washgo = params.brandSlug === 'washgo';
   const taskgo = params.brandSlug === 'taskgo';
-  const focus = washgo || taskgo ? '' : (params.focusKeyword?.trim() || '');
+  const focus = washgo || taskgo ? '' : (focusKeyword?.trim() || '');
   const systemPrompt = washgo
     ? WASHGO_TRAFFIC_SYSTEM_PROMPT
     : taskgo
@@ -723,7 +724,7 @@ export async function generateTrafficPost(
               ? '一句問話之後停住。不要列功能，不要提別的店，不要寫電鍋。禁止簡體、大陸用語。回傳同格式 JSON。'
               : taskgo
                 ? '可以寫工地。不要寫電鍋、圍爐、盛飯。不要寫外勞都。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
-                : '不要用電鍋、圍爐、盛飯當整篇。一句不公平的話之後停住。時事不要改成品牌比喻。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌、「男生都」「女生都」。回傳同格式 JSON。'),
+                : '不要出現電鍋、圍爐、盛飯。引號是最後一行，人沒有接。時事不要改成品牌比喻。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌、「男生都」「女生都」。回傳同格式 JSON。'),
         },
       ],
       temperature: 0.7,

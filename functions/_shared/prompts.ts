@@ -1580,10 +1580,9 @@ export function pickLifeTrend(trends: string[]): string | null {
 }
 
 export const WASHGO_TRAFFIC_SYSTEM_PROMPT =
-  '你是台灣洗衣店的年輕店員，在 Threads 講一件櫃檯上剛發生的事。' +
-  '三選一，不要三件一起寫：客人問洗好了沒；一件衣服洗壞了；袋子裡有不方便在櫃檯打開的東西，單獨裝箱，備註不寫在外面。' +
-  '個人物品可以是按摩棒這類，只出現一次，不描述外形，不笑客人，櫃檯沒有人把箱子打開。' +
-  '一句問話之後停住。不要寫成廣告、不要列功能、不要 hashtag、不要連結、不要叫人加 LINE、不要提別的洗衣店名字。' +
+  '你是台灣洗衣店的年輕店員，在 Threads 講櫃檯上一句問話。' +
+  '問完就停。不要寫後面發生什麼，不要寫你怎麼回。' +
+  '不要寫成廣告、不要列功能、不要 hashtag、不要連結、不要叫人加 LINE、不要提別的洗衣店名字。' +
   '不要寫婆媳、電鍋、圍爐。不要寫品牌名。' +
   TAIWAN_LOCAL_VOICE;
 
@@ -1621,7 +1620,8 @@ export function composeTrafficPrompt(opts: {
       theme: '現場一句話',
       prompt: [
         '寫一則工地 Threads。一個具體的人講一句看不起人或看不起這件活的話。',
-        '話講完就停。敘事者沒有幫腔，沒有說其實他很厲害，沒有金句。',
+        '這句引號是最後一行。後面不要再寫師傅沒抬頭、繼續做、工序、調水泥、量尺寸。',
+        '敘事者沒有幫腔，沒有說其實他很厲害，沒有金句。',
         '不要寫電鍋、圍爐、盛飯、保溫、家族群。不要寫外勞都、某國人都。',
         '不要出現品牌名、報價、連結、hashtag。',
         opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
@@ -1632,11 +1632,27 @@ export function composeTrafficPrompt(opts: {
     };
   }
   if (opts.brandSlug === 'washgo') {
-    const washgoScene = [
-      '只寫客人問「洗好了沒」。進度已經看得到，店員沒有再解釋系統。',
-      '只寫一件洗壞的衣服，和客人的一句話。不要教洗法。',
-      '只寫袋子裡一件不方便當面打開的東西。單獨裝箱，備註不寫在外面。可以點到按摩棒一次，不描述、不笑客人。',
-    ][(opts.usedTopics.length + new Date().getDate()) % 3];
+    const washgoScenes = [
+      '只寫客人問「洗好了沒」。進度已經看得到。這句問話是最後一行，不要解釋系統。',
+      '只寫一件洗壞的衣服。客人的一句話放在最後一行。不要教洗法，不要寫你怎麼回。',
+      '只寫袋子裡一件不方便當面打開的東西。單獨裝箱，備註不寫在外面。可以點到按摩棒一次，不描述、不笑客人。問完就停。',
+    ];
+    const washgoSceneKeys = [
+      ['洗好了沒'],
+      ['洗壞', '縮水', '起毛', '穿不了'],
+      ['單獨裝', '按摩棒', '不寫在外面', '袋子裡'],
+    ];
+    const recentWashgo = opts.usedTopics.slice(0, 6).join('\n');
+    const taipeiHour = (new Date().getUTCHours() + 8) % 24;
+    const hourSlot = [0, 6, 9, 12, 18, 21].indexOf(taipeiHour);
+    let washgoScene = washgoScenes[Math.max(0, hourSlot) % 3];
+    for (let step = 0; step < 3; step += 1) {
+      const index = (Math.max(0, hourSlot) + step) % 3;
+      if (!washgoSceneKeys[index].some((key) => recentWashgo.includes(key))) {
+        washgoScene = washgoScenes[index];
+        break;
+      }
+    }
     return {
       category: opts.formula,
       label: '櫃檯一句話',
@@ -1668,8 +1684,8 @@ export function composeTrafficPrompt(opts: {
       opts.focusKeyword ? '' : (opts.formula === 'news' && opts.theme ? `可以借用的時事只有這一則：${opts.theme}。接不上就不要提。` : '不要提新聞、運動、明星、債市、頒獎。'),
       '三個帳號今天各寫各的，不要寫成同一件事的三種版本。',
       opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
-      '開頭不要用「自助洗衣」「工地」「房東」「電鍋」「圍爐」「盛飯」。直接從人說的那一句不公平的話開始。',
-      '用台灣口語。一句不公平的話之後停住。時事不要改成品牌比喻。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌，以及「男生都」「女生都」。',
+      '開頭不要用「自助洗衣」「工地」「房東」「電鍋」「圍爐」「盛飯」。正文不要出現電鍋。直接從人說的那一句不公平的話開始。',
+      '用台灣口語。引號那一句是最後一行，後面不要再寫敘事者怎麼回、全桌安靜、然後去做別的事。時事不要改成品牌比喻。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌，以及「男生都」「女生都」。',
       `正文 ${Math.max(80, lane.maxChars - 80)} 到 ${lane.maxChars} 字，一句一行。`,
       '不要 hashtag，不要連結，不要第二則回覆。',
       opts.usedTopics.length ? `這些標題和開頭最近用過，換一個家裡的人或一句話：\n${opts.usedTopics.join('\n')}` : '',

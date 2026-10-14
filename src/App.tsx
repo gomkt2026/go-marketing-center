@@ -58,6 +58,9 @@ const Jiangcheng = lazyPage(() => import('@/pages/public/site/Jiangcheng'), 'Jia
 const Center = lazyPage(() => import('@/pages/public/site/Center'), 'Center');
 const GameSeasons = lazyPage(() => import('@/pages/settings/GameSeasons'), 'GameSeasons');
 const Inquiries = lazyPage(() => import('@/pages/inquiries/Inquiries'), 'Inquiries');
+const BriefingHub = lazyPage(() => import('@/pages/briefings/BriefingHub'), 'BriefingHub');
+const BriefingPlay = lazyPage(() => import('@/pages/briefings/BriefingPlay'), 'BriefingPlay');
+const BriefingFilm = lazyPage(() => import('@/pages/briefings/BriefingFilm'), 'BriefingFilm');
 
 /** 未登入看公開首頁；已登入沿用原本的品牌工作台導向。 */
 function RootGate() {
@@ -120,6 +123,9 @@ function AppRoutes() {
         <Route path="/settings/meta-threads" element={<MetaThreadsPlaybook />} />
         <Route path="/settings/game" element={<GameSeasons />} />
         <Route path="/inquiries" element={<Inquiries />} />
+        <Route path="/briefings" element={<BriefingHub />} />
+        <Route path="/briefings/watch/:slug" element={<BriefingFilm />} />
+        <Route path="/briefings/:slug/play" element={<BriefingPlay />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

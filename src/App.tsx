@@ -123,9 +123,6 @@ function AppRoutes() {
         <Route path="/settings/meta-threads" element={<MetaThreadsPlaybook />} />
         <Route path="/settings/game" element={<GameSeasons />} />
         <Route path="/inquiries" element={<Inquiries />} />
-        <Route path="/briefings" element={<BriefingHub />} />
-        <Route path="/briefings/watch/:slug" element={<BriefingFilm />} />
-        <Route path="/briefings/:slug/play" element={<BriefingPlay />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -171,6 +168,11 @@ export default function App() {
               <Landing />
             </Suspense>
           )} />
+          {(['', '/en', '/ja'] as const).flatMap((prefix) => ([
+            <Route key={`${prefix}/briefings`} path={`${prefix}/briefings`} element={<Suspense fallback={<PublicFallback />}><BriefingHub /></Suspense>} />,
+            <Route key={`${prefix}/briefings/watch`} path={`${prefix}/briefings/watch/:slug`} element={<Suspense fallback={<PublicFallback />}><BriefingFilm /></Suspense>} />,
+            <Route key={`${prefix}/briefings/play`} path={`${prefix}/briefings/:slug/play`} element={<Suspense fallback={<PublicFallback />}><BriefingPlay /></Suspense>} />,
+          ]))}
 
           <Route
             path="/e/:slug"

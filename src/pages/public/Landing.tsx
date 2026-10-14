@@ -8,6 +8,7 @@ export const CONTACT_EMAIL = 'service@inforcraft.com.tw';
 
 const NAV = [
   { to: '/welcome', key: 'home' },
+  { to: '/briefings', key: 'alliance' },
   { to: '/go-posting', key: 'posting' },
   { to: '/proof', key: 'proof' },
   { to: '/show', key: 'show' },
@@ -540,8 +541,8 @@ export function Landing() {
             <p className="lp-lead">{home.lead1}</p>
             <p className="lp-lead">{home.lead2}</p>
             <div className="lp-hero-cta">
-              <a className="lp-btn" href="#game">{home.ctaGame}</a>
-              <LocalLink className="lp-btn ghost" to="/go-posting">{home.ctaPrice}</LocalLink>
+              <LocalLink className="lp-btn" to="/briefings">{home.allianceCta}</LocalLink>
+              <a className="lp-btn ghost" href="#game">{home.ctaGame}</a>
             </div>
           </div>
           <div className="lp-hero-art">
@@ -554,6 +555,17 @@ export function Landing() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="alliance" className="lp-section">
+        <div className="lp-wrap">
+          <div className="lp-eyebrow">{home.allianceEyebrow}</div>
+          <h2>{home.allianceTitle}</h2>
+          <p className="lp-muted lp-sub">{home.allianceLead}</p>
+          <div className="lp-hero-cta">
+            <LocalLink className="lp-btn" to="/briefings">{home.allianceCta}</LocalLink>
           </div>
         </div>
       </section>

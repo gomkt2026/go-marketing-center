@@ -101,7 +101,7 @@ export function BriefingPlay() {
         </div>
         <div className="briefing-present-tools">
           <button type="button" onClick={() => setMenuOn((open) => !open)}>目錄</button>
-          <button type="button" onClick={() => setNotesOn((open) => !open)}>{notesOn ? '隱藏講稿' : '講稿'}</button>
+          <button type="button" onClick={() => setNotesOn((open) => !open)}>{notesOn ? '隱藏說明' : '說明'}</button>
           <button
             type="button"
             onClick={() => {
@@ -146,9 +146,9 @@ export function BriefingPlay() {
         </div>
         {notesOn && (
           <aside className="briefing-notes">
-            <div className="briefing-notes-label">講者備註 · 投影時請關掉</div>
+            <div className="briefing-notes-label">這一頁在說什麼</div>
             <h3>{slide.title}</h3>
-            {slide.notes.split('\n').map((line) => <p key={line}>{line}</p>)}
+            {slide.notes.split('\n').map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}
           </aside>
         )}
       </div>
@@ -179,7 +179,7 @@ export function BriefingPlay() {
       {blank && <button type="button" className="briefing-blank" aria-label="回到簡報" onClick={() => setBlank(false)} />}
 
       <footer className="briefing-present-foot">
-        ← → 翻頁 · 空白鍵下一頁 · P 播放影片 · N 講稿 · M 目錄 · F 全螢幕 · B 黑屏 · Esc 離開全螢幕
+        ← → 翻頁 · 空白鍵下一頁 · P 播放影片 · N 說明 · M 目錄 · F 全螢幕 · B 黑屏 · Esc 離開全螢幕
       </footer>
     </div>
   );

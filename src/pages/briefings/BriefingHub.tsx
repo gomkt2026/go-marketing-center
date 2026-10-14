@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { PageHeader } from '@/components/ui/PageHeader';
+import { PublicFrame } from '@/pages/public/Landing';
 import {
   BRIEFING_DECKS,
   BRIEFING_FILMS,
@@ -21,11 +21,12 @@ function BrandChips({ brands }: { brands: BriefingBrand[] }) {
 
 export function BriefingHub() {
   return (
-    <div className="briefing-hub">
-      <PageHeader
-        title="簡報專區"
-        subtitle="外地簡報打開這一頁就能講。投影片和影片都在網站上，不用再傳檔。"
-      />
+    <PublicFrame title="修繕聯盟與 Fixercowork">
+    <section className="lp-section">
+    <div className="lp-wrap briefing-hub">
+      <div className="lp-eyebrow">給工程夥伴</div>
+      <h1>修繕聯盟與 Fixercowork</h1>
+      <p className="lp-lead">不用登入。想了解案源怎麼進來、平台怎麼派工，直接看下面兩份說明。</p>
 
       {BRIEFING_DECKS.map((deck) => (
         <section key={deck.slug} className="briefing-deck-card">
@@ -41,8 +42,7 @@ export function BriefingHub() {
               <span>更新 {deck.updated}</span>
             </div>
             <div className="briefing-actions">
-              <Link className="briefing-start" to={`/briefings/${deck.slug}/play`}>開始簡報</Link>
-              <Link className="briefing-start is-ghost" to={`/briefings/${deck.slug}/play?at=4`}>從三品牌開始</Link>
+              <Link className="briefing-start" to={`/briefings/${deck.slug}/play`}>看這份說明</Link>
             </div>
             <div className="briefing-sections">
               {deck.sections.map((section) => (
@@ -54,7 +54,7 @@ export function BriefingHub() {
           </div>
           <div className="briefing-outline">
             {deck.sections.map((section, sectionIndex) => (
-              <details key={section.label} open={sectionIndex === 0}>
+              <details key={section.label}>
                 <summary>{section.label}</summary>
                 <ol>
                   {sectionSlides(deck, sectionIndex).map(({ slide, at }) => (
@@ -77,8 +77,8 @@ export function BriefingHub() {
       ))}
 
       <section className="briefing-films">
-        <h2>可單獨播放的影片</h2>
-        <p>問到操作時直接播，不用切到別的資料夾。</p>
+        <h2>看系統實際怎麼跑</h2>
+        <p>這幾支影片讓你直接看到報修、場勘、報價，以及修繕怎麼轉成洗衣。</p>
         <div className="briefing-film-grid">
           {BRIEFING_FILMS.map((film) => (
             <Link key={film.slug} to={`/briefings/watch/${film.slug}`} className="briefing-film-card">
@@ -94,5 +94,7 @@ export function BriefingHub() {
         </div>
       </section>
     </div>
+    </section>
+    </PublicFrame>
   );
 }

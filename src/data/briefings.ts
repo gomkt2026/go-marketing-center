@@ -64,15 +64,15 @@ export const BRAND_LABEL: Record<BriefingBrand, string> = {
 const ALLIANCE_AT = [1, 4, 15, 19, 27];
 const FIXER_AT = [1, 3, 8, 18, 56];
 const ALLIANCE_VIDEO: Record<number, { src: string; vertical?: boolean }> = {
-  8: { src: '/briefings/alliance-1012/washgo.mp4' },
+  8: { src: '/briefings/alliance-1012/washgo.mp4?v=20261015' },
   21: { src: '/briefings/alliance-1012/jiangcheng.mp4', vertical: true },
 };
 
 const FILM_MEDIA: { slug: string; src: string; poster: string; brands: BriefingBrand[] }[] = [
   {
     slug: 'taskgo-washgo',
-    src: '/briefings/alliance-1012/washgo.mp4',
-    poster: '/briefings/alliance-1012/washgo-poster.jpg',
+    src: '/briefings/alliance-1012/washgo.mp4?v=20261015',
+    poster: '/briefings/alliance-1012/washgo-poster.jpg?v=20261015',
     brands: ['taskgo', 'washgo'],
   },
   {
@@ -148,7 +148,7 @@ export function briefingCatalog(locale: Locale): BriefingCatalog {
   return {
     ui: copy.ui,
     decks: [
-      buildDeck('alliance-1012', ['taskgo', 'homigo', 'washgo'], '2026/10/12', ALLIANCE_AT, ALLIANCE_VIDEO, copy.alliance, 30),
+      buildDeck('alliance-1012', ['taskgo', 'homigo', 'washgo'], '2026/10/15', ALLIANCE_AT, ALLIANCE_VIDEO, copy.alliance, 30),
       buildDeck('fixercowork', [], '2026/10/14', FIXER_AT, {}, copy.fixer, 61),
     ],
     films: FILM_MEDIA.map((media, index) => ({ ...media, ...copy.films[index] })),

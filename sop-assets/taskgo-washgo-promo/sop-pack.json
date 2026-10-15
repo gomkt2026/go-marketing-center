@@ -1,0 +1,35 @@
+{
+  "id": "taskgo-washgo-promo",
+  "title": "TaskGo × Washgo 系統串接宣傳版",
+  "sourcePath": "/Users/benchen/Downloads/TaskGo_Washgo_系統串接宣傳版_靜音.mp4",
+  "voices": {
+    "ahao": "auoHciLZJwKTwYUoRTYz",
+    "ale": "4aW8bNY2tSD8eaHmuXZ0"
+  },
+  "cues": [
+    { "id": "c01", "voice": "ahao", "startMs": 300, "endMs": 4800, "narration": "修繕報修單，一鍵變成洗衣訂單。" },
+    { "id": "c02", "voice": "ahao", "startMs": 5200, "endMs": 8100, "narration": "以前跨業，資料重填、佣金人工對帳。" },
+    { "id": "c03", "voice": "ahao", "startMs": 8200, "endMs": 9800, "narration": "現在，一次搞定！" },
+    { "id": "c04", "voice": "ale", "startMs": 10000, "endMs": 14200, "narration": "首先，洗衣品牌在 Washgo 後台，一鍵開放 TaskGo 轉介紹。" },
+    { "id": "c05", "voice": "ale", "startMs": 14200, "endMs": 18200, "narration": "客人折扣、介紹佣金、Homigo 拆分，通通自己設定。" },
+    { "id": "c06", "voice": "ahao", "startMs": 18462, "endMs": 22262, "narration": "接著在 TaskGo 修繕管理，新增「洗滌服務」案件類型。" },
+    { "id": "c07", "voice": "ahao", "startMs": 22262, "endMs": 25662, "narration": "客戶報修時，就能直接選擇送洗。" },
+    { "id": "c08", "voice": "ahao", "startMs": 25928, "endMs": 29928, "narration": "每家修繕廠商都有專屬報修連結和 QR Code。" },
+    { "id": "c09", "voice": "ahao", "startMs": 29928, "endMs": 33328, "narration": "還能為合作夥伴建立介紹廠商專屬連結。" },
+    { "id": "c10", "voice": "ahao", "startMs": 33328, "endMs": 37028, "narration": "每一筆轉介來源、佣金比例，系統自動記錄。" },
+    { "id": "c11", "voice": "ahao", "startMs": 37203, "endMs": 40803, "narration": "客戶從介紹連結進來，介紹廠商自動帶入。" },
+    { "id": "c12", "voice": "ahao", "startMs": 40903, "endMs": 44703, "narration": "點選「洗滌服務」，系統列出合作的洗衣品牌。" },
+    { "id": "c13", "voice": "ahao", "startMs": 44703, "endMs": 48403, "narration": "選擇洗樂專業洗衣，TaskGo 客戶直接享九五折。" },
+    { "id": "c14", "voice": "ale", "startMs": 48603, "endMs": 52903, "narration": "案件、組織、優惠自動帶入 Washgo，客戶完全不用重填。" },
+    { "id": "c15", "voice": "ale", "startMs": 53203, "endMs": 57603, "narration": "Washgo 送洗頁自動顯示 TaskGo 轉介紹與九五折優惠。" },
+    { "id": "c16", "voice": "ale", "startMs": 57603, "endMs": 62603, "narration": "免運門檻、儲值方案、免責聲明，線上一次完成。" },
+    { "id": "c17", "voice": "ahao", "startMs": 62846, "endMs": 64946, "narration": "串接整合，四大優勢：" },
+    { "id": "c18", "voice": "ahao", "startMs": 64946, "endMs": 67446, "narration": "一、一張報修單，跨業接單。" },
+    { "id": "c19", "voice": "ahao", "startMs": 67446, "endMs": 69946, "narration": "二、轉介來源，全程追蹤。" },
+    { "id": "c20", "voice": "ahao", "startMs": 69946, "endMs": 72446, "narration": "三、折扣佣金，自動分潤。" },
+    { "id": "c21", "voice": "ahao", "startMs": 72446, "endMs": 75346, "narration": "四、品牌一鍵開關，自主控管。" },
+    { "id": "c22", "voice": "ahao", "startMs": 75646, "endMs": 78546, "narration": "客戶省事又省錢，修繕廠商多賺佣金。" },
+    { "id": "c23", "voice": "ahao", "startMs": 78546, "endMs": 81546, "narration": "洗衣品牌多了穩定客源，三方共贏。" },
+    { "id": "c24", "voice": "ahao", "startMs": 81946, "endMs": 85646, "narration": "TaskGo 跟 Washgo，一張報修單，串起修繕與洗滌。" }
+  ]
+}

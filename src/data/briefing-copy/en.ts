@@ -48,7 +48,7 @@ export const en: BriefingCopy = {
       { title: 'How the three brands connect', notes: 'Already running: Homigo repair requests go into TaskGo, and Craft City playback is used for close-out and laundry tracking. GoCoin is on Washgo today.\nThe Washgo line sends a repair customer to laundry. It does not dispatch the repair itself to an alliance vendor. What the press called a next step is being built in stages.' },
       { title: 'A repair can become a laundry order', notes: 'On a TaskGo repair, the customer can add laundry. That opens Washgo “I want this washed,” and this order is 5% off. The referring vendor earns a commission. Shop names on screen are sample data.' },
       { title: 'Pick a brand, then book pickup', notes: 'After the customer picks a laundry brand, Washgo carries the TaskGo referral, applies 5% off, and can book door-to-door pickup. Brands on screen are samples.' },
-      { title: 'See it in action', notes: 'About two minutes. Ahao walks through TaskGo, Ale walks through Washgo, from the repair request to laundry pickup.', videoLabel: 'Play the TaskGo × Washgo walkthrough' },
+      { title: 'See it in action', notes: '1 minute 26 seconds. Ahao covers TaskGo repairs, referrals, and commission. Ale covers the Washgo back office and pickup. One repair request becomes a laundry order, and the customer gets 5% off.', videoLabel: 'Play the TaskGo × Washgo film' },
       { title: 'Press coverage', notes: 'Economic Daily News ran three pieces under 商情／熱門亮點: TaskGo (2025/10/20), Homigo (2026/07/01), and Washgo (2026/09/16). The reporter on all three is 鄭芝珊.\nThe TaskGo free trial is 14 days.' },
       { title: 'What the articles actually said', notes: 'These lines are from the Economic Daily News pieces. “3 million renters” is a market figure the articles cite. The alliance’s job is to land those directions on each repair order.' },
       { title: 'GO Marketing Center', notes: 'Social posts for all three brands come out of this center, and a person reviews them before they go live. The publish queue on 2026/10/02 was TaskGo 231, Homigo 218, Washgo 381.\nCrews can use “Go Posting”: two posts a week, NT$999 a month. Site photos and close-out reports are the material.' },
@@ -122,9 +122,9 @@ export const en: BriefingCopy = {
   films: [
     {
       title: 'TaskGo to Washgo',
-      summary: 'The customer adds laundry on a repair, opens Washgo pickup, and this order is 5% off. Ahao covers TaskGo. Ale covers Washgo.',
-      duration: '1 min 57 sec',
-      cue: 'From a repair request to laundry pickup',
+      summary: 'A repair request becomes a laundry order. Ahao covers TaskGo repairs and referrals. Ale covers the Washgo back office and pickup. The customer gets 5% off, and the commission is recorded by the system.',
+      duration: '1 min 26 sec',
+      cue: 'How a repair becomes a laundry order',
     },
     {
       title: 'Craft City close-out',

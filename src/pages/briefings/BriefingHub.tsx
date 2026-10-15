@@ -84,7 +84,7 @@ export function BriefingHub() {
         <p>{ui.filmsLead}</p>
         <div className="briefing-film-grid">
           {films.map((film) => (
-            <LocalLink key={film.slug} to={`/briefings/watch/${film.slug}`} className="briefing-film-card">
+            <LocalLink key={film.slug} to={`/briefings/watch/${film.slug}`} className={film.vertical ? 'briefing-film-card is-vertical' : 'briefing-film-card'}>
               <img src={film.poster} alt="" />
               <div>
                 <BrandChips brands={film.brands} />

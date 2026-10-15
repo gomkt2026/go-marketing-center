@@ -68,7 +68,14 @@ export function BriefingFilm() {
       </header>
       <div className="briefing-present-body">
         <div className="briefing-stage">
-          <video src={film.src} poster={film.poster} controls autoPlay playsInline />
+          <video
+            src={film.src}
+            poster={film.poster}
+            className={film.vertical ? 'is-vertical' : undefined}
+            controls
+            autoPlay
+            playsInline
+          />
         </div>
       </div>
     </div>

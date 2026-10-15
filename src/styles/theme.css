@@ -635,6 +635,7 @@ a {
   border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-card);
 }
 .briefing-film-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #071e3f; }
+.briefing-film-card.is-vertical img { object-fit: contain; }
 .briefing-film-card div { padding: 12px 14px 14px; }
 .briefing-film-card strong, .briefing-film-card span { display: block; }
 .briefing-film-card span, .briefing-film-card p { font-size: 13px; }

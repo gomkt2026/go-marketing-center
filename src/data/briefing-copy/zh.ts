@@ -48,7 +48,7 @@ export const zh: BriefingCopy = {
       { title: '三品牌怎麼串', notes: '已經在跑的是 Homigo 報修進 TaskGo，以及結案、洗滌追蹤用的匠城呈現。GoCoin 目前在 Washgo。\nWashgo 這條線是把修繕客人轉去洗衣，不是把修繕案派給聯盟廠商。報導裡提到的下一步，是逐步在做的方向。' },
       { title: '修繕單轉成洗滌訂單', notes: '客人在 TaskGo 報修時可以選洗滌服務，進到 Washgo「我要送洗」，這一單 95 折。介紹廠商有佣金，畫面裡的店名是示範資料。' },
       { title: '客人選品牌、我要送洗', notes: '客人選洗衣品牌之後，Washgo 會帶入 TaskGo 轉介紹，這一單享 95 折，並可約到府收送。畫面中的品牌是示範。' },
-      { title: '操作示範', notes: '約 1 分 30 秒。小咪說明報修單怎麼變成洗衣訂單：客人享九五折，轉介佣金由系統入帳。', videoLabel: '播放 TaskGo × Washgo 串接' },
+      { title: '操作示範', notes: '1 分 28 秒，橫式。小咪說明報修單怎麼變成洗衣訂單：客人享九五折，轉介佣金由系統入帳。直式版本在影片專區。', videoLabel: '播放 TaskGo × Washgo 串接' },
       { title: '媒體報導', notes: '經濟日報「商情／熱門亮點」有三篇：TaskGo（2025/10/20）、Homigo（2026/07/01）、Washgo（2026/09/16），記者都是鄭芝珊。\nTaskGo 現在的免費試用是 14 天。' },
       { title: '報導裡的原話', notes: '這些句子都出自經濟日報原文。「300 萬租屋人口」是報導引用的市場統計。聯盟要做的，是把這些方向落到每一張修繕單上。' },
       { title: 'Go 行銷中心', notes: '三個品牌的社群都由這個中心產出，人看過才發布。2026/10/02 的發布任務是 TaskGo 231、Homigo 218、Washgo 381。\n工班可以用「Go 幫你發文」，每週 2 則、999 元／月。施工照片和結案報告就是素材。' },
@@ -123,8 +123,14 @@ export const zh: BriefingCopy = {
     {
       title: 'TaskGo 轉 Washgo',
       summary: '修繕報修單變成洗衣訂單。小咪說明 TaskGo 報修、轉介，以及 Washgo 的後台和送洗。客人享九五折，佣金由系統入帳。',
-      duration: '1 分 30 秒',
-      cue: '看報修單怎麼變成洗衣訂單',
+      duration: '1 分 28 秒',
+      cue: '橫式看報修單怎麼變成洗衣訂單',
+    },
+    {
+      title: 'TaskGo 轉 Washgo｜直式',
+      summary: '同一支說明的直式版本，適合 Reels 和限動。小咪說明報修單怎麼變成洗衣訂單，客人享九五折。',
+      duration: '1 分 28 秒',
+      cue: '直式看報修單怎麼變成洗衣訂單',
     },
     {
       title: '匠城結案呈現',

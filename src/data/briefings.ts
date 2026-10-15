@@ -47,6 +47,8 @@ export interface BriefingFilm {
   brands: BriefingBrand[];
   /** 什麼時候播 */
   cue: string;
+  /** 直式畫面，播放時左右留空 */
+  vertical?: boolean;
 }
 
 export interface BriefingCatalog {
@@ -64,16 +66,23 @@ export const BRAND_LABEL: Record<BriefingBrand, string> = {
 const ALLIANCE_AT = [1, 4, 15, 19, 27];
 const FIXER_AT = [1, 3, 8, 18, 56];
 const ALLIANCE_VIDEO: Record<number, { src: string; vertical?: boolean }> = {
-  8: { src: '/briefings/alliance-1012/washgo.mp4?v=20261015b' },
+  8: { src: '/briefings/alliance-1012/washgo.mp4?v=20261015c' },
   21: { src: '/briefings/alliance-1012/jiangcheng.mp4', vertical: true },
 };
 
-const FILM_MEDIA: { slug: string; src: string; poster: string; brands: BriefingBrand[] }[] = [
+const FILM_MEDIA: { slug: string; src: string; poster: string; brands: BriefingBrand[]; vertical?: boolean }[] = [
   {
     slug: 'taskgo-washgo',
-    src: '/briefings/alliance-1012/washgo.mp4?v=20261015b',
-    poster: '/briefings/alliance-1012/washgo-poster.jpg?v=20261015',
+    src: '/briefings/alliance-1012/washgo.mp4?v=20261015c',
+    poster: '/briefings/alliance-1012/washgo-poster.jpg?v=20261015c',
     brands: ['taskgo', 'washgo'],
+  },
+  {
+    slug: 'taskgo-washgo-reels',
+    src: '/briefings/alliance-1012/washgo-reels.mp4?v=20261015c',
+    poster: '/briefings/alliance-1012/washgo-reels-poster.jpg?v=20261015c',
+    brands: ['taskgo', 'washgo'],
+    vertical: true,
   },
   {
     slug: 'jiangcheng-report',

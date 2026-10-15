@@ -64,14 +64,14 @@ export const BRAND_LABEL: Record<BriefingBrand, string> = {
 const ALLIANCE_AT = [1, 4, 15, 19, 27];
 const FIXER_AT = [1, 3, 8, 18, 56];
 const ALLIANCE_VIDEO: Record<number, { src: string; vertical?: boolean }> = {
-  8: { src: '/briefings/alliance-1012/washgo.mp4?v=20261015' },
+  8: { src: '/briefings/alliance-1012/washgo.mp4?v=20261015b' },
   21: { src: '/briefings/alliance-1012/jiangcheng.mp4', vertical: true },
 };
 
 const FILM_MEDIA: { slug: string; src: string; poster: string; brands: BriefingBrand[] }[] = [
   {
     slug: 'taskgo-washgo',
-    src: '/briefings/alliance-1012/washgo.mp4?v=20261015',
+    src: '/briefings/alliance-1012/washgo.mp4?v=20261015b',
     poster: '/briefings/alliance-1012/washgo-poster.jpg?v=20261015',
     brands: ['taskgo', 'washgo'],
   },

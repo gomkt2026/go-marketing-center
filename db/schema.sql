@@ -1241,6 +1241,27 @@ CREATE TABLE posting_inquiries (
 );
 CREATE INDEX idx_posting_inquiries_created ON posting_inquiries (created_at DESC);
 
+-- 公開頁「工班現場」留下的客戶與合作留言。電話只在登入後台後顯示。
+CREATE TABLE crew_leads (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  crew_slug     TEXT NOT NULL,
+  intent        TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  phone         TEXT NOT NULL,
+  line_id       TEXT,
+  need          TEXT NOT NULL,
+  place         TEXT,
+  message       TEXT,
+  status        TEXT NOT NULL DEFAULT 'new',
+  staff_note    TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  handed_at     TIMESTAMPTZ,
+  CONSTRAINT crew_leads_intent_check CHECK (intent IN ('customer', 'partner')),
+  CONSTRAINT crew_leads_status_check CHECK (status IN ('new', 'handed', 'closed'))
+);
+CREATE INDEX idx_crew_leads_created ON crew_leads (created_at DESC);
+CREATE INDEX idx_crew_leads_crew ON crew_leads (crew_slug, created_at DESC);
+
 -- ============================================================================
 -- 結尾:agent_roles 種子(角色本身不含品牌別,實際 Agent 於 seed.sql 建立)
 -- ============================================================================

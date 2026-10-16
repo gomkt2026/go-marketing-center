@@ -693,7 +693,41 @@ a {
 .briefing-missing { margin: auto; font-size: 16px; }
 .briefing-missing a { color: #fff; }
 .briefing-present-foot { color: rgba(255,255,255,.62); justify-content: center; }
+.crew-grid { margin-top: 22px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.crew-card {
+  display: flex; flex-direction: column; background: #fff; color: inherit; text-decoration: none;
+  border: 1px solid #E6E8E2; border-radius: 16px; overflow: hidden;
+}
+.crew-card img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; background: #071e3f; }
+.crew-card div { padding: 12px 14px 16px; display: grid; gap: 4px; }
+.crew-card strong, .crew-trade { font-weight: 800; }
+.crew-trade {
+  display: inline-flex; width: fit-content; max-width: 100%;
+  background: #0b2d5c; color: #fff; border-radius: 999px; padding: 3px 8px; font-size: 12px;
+}
+.crew-card em, .crew-card small, .crew-person { font-style: normal; color: #5c6560; font-size: 13px; line-height: 1.5; }
+.crew-back { display: inline-block; margin-bottom: 12px; color: #0b2d5c; font-weight: 800; }
+.crew-profile { display: grid; grid-template-columns: minmax(220px, 360px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.crew-profile h1 { font-size: 32px; margin: 8px 0 0; }
+.crew-profile h2 { font-size: 18px; margin: 22px 0 8px; }
+.crew-video { width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 16px; overflow: hidden; }
+.crew-video iframe { width: 100%; height: 100%; border: 0; }
+.crew-yt { display: inline-block; margin-top: 8px; color: #0b2d5c; font-weight: 800; font-size: 14px; }
+.crew-services { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
+.crew-profile .lp-form { margin-top: 28px; }
+.crew-intent { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.crew-intent legend { font-size: 14px; font-weight: 700; width: 100%; padding: 0; }
+.crew-intent label { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.crew-strip { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.crew-strip-card {
+  display: grid; gap: 4px; padding: 14px; text-decoration: none; color: inherit;
+  background: #fff; border: 1px solid var(--color-border); border-radius: 14px;
+}
+.crew-strip-card strong { font-size: 16px; }
+.crew-strip-card em, .crew-strip-card span:last-child { font-style: normal; color: var(--color-text-muted); font-size: 13px; line-height: 1.45; }
+.briefing-films .briefing-actions { margin-top: 14px; }
 @media (max-width: 800px) {
+  .crew-profile { grid-template-columns: 1fr; }
   .briefing-deck-card { grid-template-columns: 1fr; }
   .briefing-outline p { margin-left: 0; }
   .briefing-present-title em, .briefing-present-foot { display: none; }

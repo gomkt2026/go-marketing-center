@@ -9,6 +9,7 @@ export const CONTACT_EMAIL = 'service@inforcraft.com.tw';
 const NAV = [
   { to: '/welcome', key: 'home' },
   { to: '/briefings', key: 'alliance' },
+  { to: '/crews', key: 'crews' },
   { to: '/go-posting', key: 'posting' },
   { to: '/proof', key: 'proof' },
   { to: '/show', key: 'show' },
@@ -566,6 +567,7 @@ export function Landing() {
           <p className="lp-muted lp-sub">{home.allianceLead}</p>
           <div className="lp-hero-cta">
             <LocalLink className="lp-btn" to="/briefings">{home.allianceCta}</LocalLink>
+            <LocalLink className="lp-btn ghost" to="/crews">{home.crewsCta}</LocalLink>
           </div>
         </div>
       </section>
@@ -646,7 +648,7 @@ export const LANDING_CSS = `
 .lp-logo{text-decoration:none;font-weight:700;font-size:17px}
 .lp-logo b{color:var(--green);font-weight:900;margin-right:4px}
 .lp-nav nav{display:flex;gap:18px;margin-left:auto;font-size:14px}
-.lp-nav nav a{text-decoration:none;color:var(--muted)}
+.lp-nav nav a{text-decoration:none;color:var(--muted);white-space:nowrap}
 .lp-nav nav a:hover{color:var(--ink)}
 .lp-lang{display:flex;align-items:center;gap:2px;background:#F7F9F5;border:1px solid #E6E8E2;border-radius:999px;padding:3px;flex:none}
 .lp-lang button{border:0;background:transparent;border-radius:999px;padding:5px 9px;font:700 12px inherit;color:var(--muted);cursor:pointer;line-height:1.2;white-space:nowrap}
@@ -928,6 +930,8 @@ export const LANDING_CSS = `
 .lp-kind-picks{display:flex;gap:8px;flex-wrap:wrap}
 .lp-kind-picks button{border:1px solid #cfd6c7;background:#fff;border-radius:999px;padding:6px 12px;font:700 13px inherit;cursor:pointer}
 .lp-kind-picks button[aria-pressed=true]{background:var(--green);color:#fff;border-color:var(--green)}
+.lp-form .crew-intent label{display:flex;grid-template-columns:none;align-items:center;gap:8px;font-weight:600}
+.lp-form .crew-intent input{width:auto;padding:0}
 @media (max-width:900px){
   .lp-week-cards{grid-template-columns:1fr 1fr}
   .lp-scene-photos,.lp-task-grid{grid-template-columns:1fr}
@@ -961,7 +965,7 @@ export function PublicFrame({ title, children }: { title: string; children: Reac
           <LocalLink to="/welcome" className="lp-logo"><b>GO</b> {copy.brandName.replace(/^GO\s?/, '')}</LocalLink>
           <nav>
             {NAV.map((item) => (
-              <LocalLink key={item.to} to={item.to} aria-current={here === item.to ? 'page' : undefined}>{copy.nav[item.key]}</LocalLink>
+              <LocalLink key={item.to} to={item.to} aria-current={here === item.to || (item.to !== '/welcome' && here.startsWith(`${item.to}/`)) ? 'page' : undefined}>{copy.nav[item.key]}</LocalLink>
             ))}
           </nav>
           <LanguageSwitch />

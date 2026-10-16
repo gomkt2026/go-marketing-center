@@ -61,6 +61,9 @@ const Inquiries = lazyPage(() => import('@/pages/inquiries/Inquiries'), 'Inquiri
 const BriefingHub = lazyPage(() => import('@/pages/briefings/BriefingHub'), 'BriefingHub');
 const BriefingPlay = lazyPage(() => import('@/pages/briefings/BriefingPlay'), 'BriefingPlay');
 const BriefingFilm = lazyPage(() => import('@/pages/briefings/BriefingFilm'), 'BriefingFilm');
+const CrewDirectory = lazyPage(() => import('@/pages/public/crews/Crews'), 'CrewDirectory');
+const CrewProfile = lazyPage(() => import('@/pages/public/crews/Crews'), 'CrewProfile');
+const CrewLeads = lazyPage(() => import('@/pages/crews/CrewLeads'), 'CrewLeads');
 
 /** 未登入看公開首頁；已登入沿用原本的品牌工作台導向。 */
 function RootGate() {
@@ -123,6 +126,7 @@ function AppRoutes() {
         <Route path="/settings/meta-threads" element={<MetaThreadsPlaybook />} />
         <Route path="/settings/game" element={<GameSeasons />} />
         <Route path="/inquiries" element={<Inquiries />} />
+        <Route path="/crew-leads" element={<CrewLeads />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -172,6 +176,8 @@ export default function App() {
             <Route key={`${prefix}/briefings`} path={`${prefix}/briefings`} element={<Suspense fallback={<PublicFallback />}><BriefingHub /></Suspense>} />,
             <Route key={`${prefix}/briefings/watch`} path={`${prefix}/briefings/watch/:slug`} element={<Suspense fallback={<PublicFallback />}><BriefingFilm /></Suspense>} />,
             <Route key={`${prefix}/briefings/play`} path={`${prefix}/briefings/:slug/play`} element={<Suspense fallback={<PublicFallback />}><BriefingPlay /></Suspense>} />,
+            <Route key={`${prefix}/crews`} path={`${prefix}/crews`} element={<Suspense fallback={<PublicFallback />}><CrewDirectory /></Suspense>} />,
+            <Route key={`${prefix}/crews/profile`} path={`${prefix}/crews/:slug`} element={<Suspense fallback={<PublicFallback />}><CrewProfile /></Suspense>} />,
           ]))}
 
           <Route

@@ -1598,3 +1598,27 @@ export const inquiriesApi = {
   update: (id: string, body: { status?: 'new' | 'contacted'; staffNote?: string }) =>
     request<{ ok: boolean }>(`/api/inquiries/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
+
+export type CrewLeadStatus = 'new' | 'handed' | 'closed';
+
+export interface CrewLead {
+  id: string;
+  crewSlug: string;
+  intent: 'customer' | 'partner';
+  name: string;
+  phone: string;
+  lineId: string | null;
+  need: string;
+  place: string | null;
+  message: string | null;
+  status: CrewLeadStatus;
+  staffNote: string | null;
+  createdAt: string;
+  handedAt: string | null;
+}
+
+export const crewLeadsApi = {
+  list: () => request<{ leads: CrewLead[] }>('/api/crew-leads'),
+  update: (id: string, body: { status?: CrewLeadStatus; staffNote?: string }) =>
+    request<{ ok: boolean }>(`/api/crew-leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+};

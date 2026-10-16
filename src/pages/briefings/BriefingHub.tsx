@@ -1,5 +1,5 @@
 import { PublicFrame } from '@/pages/public/Landing';
-import { LocalLink, useLocale } from '@/pages/public/locale';
+import { LocalLink, useCopy, useLocale } from '@/pages/public/locale';
 import {
   BRAND_LABEL,
   briefingCatalog,
@@ -7,6 +7,7 @@ import {
   slideImage,
   type BriefingBrand,
 } from '@/data/briefings';
+import { ALLIANCE_CREWS } from '@/data/alliance-crews';
 
 function BrandChips({ brands }: { brands: BriefingBrand[] }) {
   return (
@@ -20,6 +21,7 @@ function BrandChips({ brands }: { brands: BriefingBrand[] }) {
 
 export function BriefingHub() {
   const { locale } = useLocale();
+  const crews = useCopy().crews;
   const { ui, decks, films } = briefingCatalog(locale);
 
   return (
@@ -30,6 +32,24 @@ export function BriefingHub() {
       <h1>{ui.pageTitle}</h1>
       <p className="lp-lead">{ui.lead}</p>
       {ui.artNote && <p className="lp-muted">{ui.artNote}</p>}
+
+      <section className="briefing-films">
+        <h2>{crews.title}</h2>
+        <p>{crews.lead}</p>
+        <div className="crew-strip">
+          {ALLIANCE_CREWS.map((crew) => (
+            <LocalLink key={crew.slug} to={`/crews/${crew.slug}`} className="crew-strip-card">
+              <span className="crew-trade">{crew.trade}</span>
+              <strong>{crew.name}</strong>
+              <em>{crew.person}</em>
+              <span>{crew.hook}</span>
+            </LocalLink>
+          ))}
+        </div>
+        <div className="briefing-actions">
+          <LocalLink className="briefing-start" to="/crews">{crews.directoryCta}</LocalLink>
+        </div>
+      </section>
 
       {decks.map((deck) => (
         <section key={deck.slug} className="briefing-deck-card">

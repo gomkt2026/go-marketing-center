@@ -64,6 +64,7 @@ const BriefingFilm = lazyPage(() => import('@/pages/briefings/BriefingFilm'), 'B
 const CrewDirectory = lazyPage(() => import('@/pages/public/crews/Crews'), 'CrewDirectory');
 const CrewProfile = lazyPage(() => import('@/pages/public/crews/Crews'), 'CrewProfile');
 const CrewLeads = lazyPage(() => import('@/pages/crews/CrewLeads'), 'CrewLeads');
+const CrewVideoRequests = lazyPage(() => import('@/pages/crews/CrewVideoRequests'), 'CrewVideoRequests');
 
 /** 未登入看公開首頁；已登入沿用原本的品牌工作台導向。 */
 function RootGate() {
@@ -127,6 +128,7 @@ function AppRoutes() {
         <Route path="/settings/game" element={<GameSeasons />} />
         <Route path="/inquiries" element={<Inquiries />} />
         <Route path="/crew-leads" element={<CrewLeads />} />
+        <Route path="/crew-video-requests" element={<CrewVideoRequests />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

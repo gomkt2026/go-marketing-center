@@ -84,6 +84,7 @@ const otherGroups: OtherGroup[] = [
     items: [
       { label: '發文需求', path: '/inquiries' },
       { label: '工班客源', path: '/crew-leads' },
+      { label: '工班拍片', path: '/crew-video-requests' },
       { label: '總覽 Dashboard', path: '/overview', end: true },
       { label: '持續學習', path: '/learning', brandScoped: true },
       { label: '時間軸', path: '/timeline' },

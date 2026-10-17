@@ -882,7 +882,7 @@ export const LANDING_CSS = `
 .lp-note{font-size:13px;color:var(--muted);line-height:1.7}
 .lp-form{display:grid;gap:14px;background:#fff;border:1px solid #E6E8E2;border-radius:20px;padding:24px;max-width:640px}
 .lp-form label{display:grid;gap:6px;font-size:14px;font-weight:700;color:var(--ink)}
-.lp-form input,.lp-form textarea{font:inherit;font-weight:400;padding:12px 14px;border-radius:10px;border:1px solid #D5D8D0;background:#fff}
+.lp-form input,.lp-form textarea,.lp-form select{font:inherit;font-weight:400;padding:12px 14px;border-radius:10px;border:1px solid #D5D8D0;background:#fff;width:100%;box-sizing:border-box}
 .lp-form textarea{min-height:96px;resize:vertical}
 .lp-form .lp-hp{position:absolute;left:-9999px;height:0;overflow:hidden}
 .lp-form-msg{margin:0;font-size:14px;line-height:1.6}
@@ -932,6 +932,12 @@ export const LANDING_CSS = `
 .lp-kind-picks button[aria-pressed=true]{background:var(--green);color:#fff;border-color:var(--green)}
 .lp-form .crew-intent label{display:flex;grid-template-columns:none;align-items:center;gap:8px;font-weight:600}
 .lp-form .crew-intent input{width:auto;padding:0}
+.crew-consent{border:1px solid #E6E8E2;border-radius:14px;margin:0;padding:14px 16px 12px}
+.crew-consent legend{font-size:14px;font-weight:800;padding:0 4px}
+.crew-consent ol{margin:8px 0 12px;padding-left:1.2em;display:grid;gap:6px;font-size:13px;font-weight:400;line-height:1.65;color:#3a3a3a}
+.lp-form .crew-consent label{display:flex;grid-template-columns:none;align-items:flex-start;gap:8px;font-weight:800}
+.lp-form .crew-consent input{width:auto;margin-top:3px;padding:0;flex:none}
+.crew-consent .lp-note{margin:8px 0 0}
 @media (max-width:900px){
   .lp-week-cards{grid-template-columns:1fr 1fr}
   .lp-scene-photos,.lp-task-grid{grid-template-columns:1fr}

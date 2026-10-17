@@ -1622,3 +1622,31 @@ export const crewLeadsApi = {
   update: (id: string, body: { status?: CrewLeadStatus; staffNote?: string }) =>
     request<{ ok: boolean }>(`/api/crew-leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
+
+export type CrewVideoFocus = 'intro' | 'before_after' | 'process' | 'unsure';
+export type CrewVideoStatus = 'new' | 'scheduled' | 'filmed' | 'closed';
+
+export interface CrewVideoRequest {
+  id: string;
+  crewName: string;
+  name: string;
+  phone: string;
+  lineId: string | null;
+  trade: string;
+  area: string | null;
+  focus: CrewVideoFocus;
+  message: string | null;
+  portraitConsent: boolean;
+  consentedAt: string | null;
+  status: CrewVideoStatus;
+  staffNote: string | null;
+  createdAt: string;
+  contactedAt: string | null;
+  filmedAt: string | null;
+}
+
+export const crewVideoRequestsApi = {
+  list: () => request<{ requests: CrewVideoRequest[] }>('/api/crew-video-requests'),
+  update: (id: string, body: { status?: CrewVideoStatus; staffNote?: string }) =>
+    request<{ ok: boolean }>(`/api/crew-video-requests/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+};

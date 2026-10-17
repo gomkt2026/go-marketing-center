@@ -935,8 +935,8 @@ export const LANDING_CSS = `
 .crew-consent{border:1px solid #E6E8E2;border-radius:14px;margin:0;padding:14px 16px 12px}
 .crew-consent legend{font-size:14px;font-weight:800;padding:0 4px}
 .crew-consent ol{margin:8px 0 12px;padding-left:1.2em;display:grid;gap:6px;font-size:13px;font-weight:400;line-height:1.65;color:#3a3a3a}
-.lp-form .crew-consent label{display:flex;grid-template-columns:none;align-items:flex-start;gap:8px;font-weight:800}
-.lp-form .crew-consent input{width:auto;margin-top:3px;padding:0;flex:none}
+.lp-form .crew-consent label,.lp-form label.crew-check{display:flex;grid-template-columns:none;align-items:flex-start;gap:8px;font-weight:800}
+.lp-form .crew-consent input,.lp-form label.crew-check input{width:auto;margin-top:3px;padding:0;flex:none}
 .crew-consent .lp-note{margin:8px 0 0}
 @media (max-width:900px){
   .lp-week-cards{grid-template-columns:1fr 1fr}

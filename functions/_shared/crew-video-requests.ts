@@ -15,6 +15,7 @@ export interface CrewVideoRequestInput {
   area: string;
   focus: CrewVideoFocus;
   message: string;
+  allianceIntent: true;
   portraitConsent: true;
 }
 
@@ -30,15 +31,17 @@ export function parseCrewVideoRequest(body: Record<string, unknown>): { ok: true
   const lineId = clip(body.lineId, LIMITS.line);
   const trade = clip(body.trade, LIMITS.trade);
   const area = clip(body.area, LIMITS.area);
-  const focus = CREW_VIDEO_FOCUSES.includes(body.focus as CrewVideoFocus) ? body.focus as CrewVideoFocus : null;
   const message = clip(body.message, LIMITS.message);
   if (!crewName) return { ok: false, error: '請填寫工班名稱' };
   if (!name) return { ok: false, error: '請填寫怎麼稱呼' };
   if (!isValidTaiwanMobile(phone)) return { ok: false, error: '請輸入有效的台灣手機號碼' };
   if (!trade) return { ok: false, error: '請填寫做哪一種' };
-  if (!focus) return { ok: false, error: '請選擇想拍哪一種' };
+  if (body.allianceIntent !== true) return { ok: false, error: '請勾選已有意願加入 FIXERCOWORK 修繕聯盟' };
   if (body.portraitConsent !== true) return { ok: false, error: '請勾選同意在修繕聯盟中露出' };
-  return { ok: true, value: { crewName, name, phone, lineId, trade, area, focus, message, portraitConsent: true } };
+  return {
+    ok: true,
+    value: { crewName, name, phone, lineId, trade, area, focus: 'intro', message, allianceIntent: true, portraitConsent: true },
+  };
 }
 
 function clip(value: unknown, max: number): string {
@@ -65,6 +68,7 @@ export async function ensureCrewVideoRequestTable(env: Env): Promise<void> {
       filmed_at     TIMESTAMPTZ,
       portrait_consent BOOLEAN NOT NULL DEFAULT false,
       consented_at  TIMESTAMPTZ,
+      alliance_intent BOOLEAN NOT NULL DEFAULT false,
       CONSTRAINT crew_video_requests_focus_check CHECK (focus IN ('intro', 'before_after', 'process', 'unsure')),
       CONSTRAINT crew_video_requests_status_check CHECK (status IN ('new', 'scheduled', 'filmed', 'closed'))
     )
@@ -75,6 +79,7 @@ export async function ensureCrewVideoRequestTable(env: Env): Promise<void> {
   `;
   await sql`ALTER TABLE crew_video_requests ADD COLUMN IF NOT EXISTS portrait_consent BOOLEAN NOT NULL DEFAULT false`;
   await sql`ALTER TABLE crew_video_requests ADD COLUMN IF NOT EXISTS consented_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE crew_video_requests ADD COLUMN IF NOT EXISTS alliance_intent BOOLEAN NOT NULL DEFAULT false`;
 }
 
 /** 同一支手機 24 小時內不重複建一筆拍攝需求。 */
@@ -93,7 +98,8 @@ export async function insertCrewVideoRequest(env: Env, input: CrewVideoRequestIn
   const sql = getSql(env);
   await sql`
     INSERT INTO crew_video_requests (
-      crew_name, name, phone, line_id, trade, area, focus, message, portrait_consent, consented_at
+      crew_name, name, phone, line_id, trade, area, focus, message,
+      portrait_consent, consented_at, alliance_intent
     )
     VALUES (
       ${input.crewName},
@@ -105,7 +111,8 @@ export async function insertCrewVideoRequest(env: Env, input: CrewVideoRequestIn
       ${input.focus},
       ${input.message || null},
       ${input.portraitConsent},
-      now()
+      now(),
+      ${input.allianceIntent}
     )
   `;
 }

@@ -15,7 +15,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const sql = getSql(context.env);
     const rows = await sql`
       SELECT id, crew_name, name, phone, line_id, trade, area, focus, message,
-             portrait_consent, consented_at,
+             portrait_consent, consented_at, alliance_intent,
              status, staff_note, created_at, contacted_at, filmed_at
       FROM crew_video_requests
       ORDER BY created_at DESC

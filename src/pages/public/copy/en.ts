@@ -498,7 +498,7 @@ export const en: PublicCopy = {
     shoot: {
       eyebrow: 'Not filmed yet',
       title: 'Want a short for your crew',
-      lead: 'If your crew wants a short video for marketing, fill in the form. We will confirm on your mobile, then set a time to film on site.',
+      lead: 'If your crew wants a short video for marketing, fill in the form. The short introduces the crew and the person. We will confirm on your mobile, then set a time to film on site.',
       note: 'Only the marketing team sees this form. The phone number is not published. Whether and when we film is decided after we talk.',
       cta: 'My crew wants a short',
       crew: 'Crew name',
@@ -512,15 +512,10 @@ export const en: PublicCopy = {
       tradePlaceholder: 'e.g. plumbing, paint, cleaning, air-conditioning',
       area: 'Where you work (optional)',
       areaPlaceholder: 'City or district is enough',
-      focus: 'What should the short show',
-      focuses: {
-        intro: 'Introduce the crew and the person',
-        before_after: 'Before and after the job',
-        process: 'How a job gets done',
-        unsure: 'Not sure yet. Let’s talk first',
-      },
       message: 'Anything else (optional)',
       messagePlaceholder: 'A good time to film, a usual job site, or a question',
+      alliance: 'I want to join the FIXERCOWORK repair alliance',
+      allianceNote: 'The form can be sent only after this box is checked. Checking it means you want to join. We will explain how.',
       consentTitle: 'Portrait and interview consent',
       consent: 'My crew may appear in the repair alliance, and I agree to the portrait and interview terms above',
       consentPoints: [

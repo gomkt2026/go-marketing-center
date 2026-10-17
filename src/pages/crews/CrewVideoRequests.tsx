@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/Button';
 import {
   ApiError,
   crewVideoRequestsApi,
-  type CrewVideoFocus,
   type CrewVideoRequest,
   type CrewVideoStatus,
 } from '@/lib/api';
@@ -24,13 +23,6 @@ const STATUS_LABEL: Record<CrewVideoStatus, string> = {
   closed: '不拍了',
 };
 
-const FOCUS_LABEL: Record<CrewVideoFocus, string> = {
-  intro: '介紹工班和師傅',
-  before_after: '完工前後',
-  process: '接到案子怎麼做',
-  unsure: '還沒想好，想先聊聊',
-};
-
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('zh-TW', { hour12: false });
 }
@@ -43,8 +35,9 @@ function handoffText(row: CrewVideoRequest): string {
     row.lineId ? `LINE：${row.lineId}` : '',
     `工種：${row.trade}`,
     row.area ? `範圍：${row.area}` : '',
-    `想拍：${FOCUS_LABEL[row.focus] ?? row.focus}`,
+    '拍攝：介紹工班和師傅',
     row.message ? `補充：${row.message}` : '',
+    row.allianceIntent ? 'FIXERCOWORK：已有意願加入' : 'FIXERCOWORK：尚未表示加入意願',
     row.portraitConsent ? '修繕聯盟露出：已同意肖像權及訪談授權' : '修繕聯盟露出：未同意',
     '來源：工班現場・拍攝需求',
   ].filter(Boolean).join('\n');
@@ -148,9 +141,12 @@ function RequestCard({ row, onChanged }: { row: CrewVideoRequest; onChanged: () 
             <a href={`tel:${row.phone}`}>{row.phone}</a>
             {row.lineId ? <span style={{ marginLeft: 12 }}>LINE {row.lineId}</span> : null}
           </div>
-          <div style={{ marginTop: 6 }}>想拍：{FOCUS_LABEL[row.focus] ?? row.focus}</div>
+          <div style={{ marginTop: 6 }}>拍攝：介紹工班和師傅</div>
           {row.area ? <div style={muted}>{row.area}</div> : null}
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Badge tone={row.allianceIntent ? 'success' : 'danger'}>
+              {row.allianceIntent ? '已有意願加入 FIXERCOWORK' : '尚未表示加入意願'}
+            </Badge>
             <Badge tone={row.portraitConsent ? 'success' : 'danger'}>
               {row.portraitConsent ? '已同意修繕聯盟露出' : '未同意露出'}
             </Badge>

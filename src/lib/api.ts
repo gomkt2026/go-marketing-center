@@ -1638,6 +1638,7 @@ export interface CrewVideoRequest {
   message: string | null;
   portraitConsent: boolean;
   consentedAt: string | null;
+  allianceIntent: boolean;
   status: CrewVideoStatus;
   staffNote: string | null;
   createdAt: string;

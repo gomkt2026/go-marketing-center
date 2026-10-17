@@ -500,7 +500,7 @@ export const zh = {
     shoot: {
       eyebrow: '還沒拍過也可以',
       title: '想拍工班短片',
-      lead: '你的工班想用短片做行銷宣傳，填下面這張表。我們看完會用手機跟你確認，再約時間到現場拍。',
+      lead: '你的工班想用短片做行銷宣傳，填下面這張表。短片會介紹工班和師傅。我們看完會用手機跟你確認，再約時間到現場拍。',
       note: '這張表只給行銷中心的人看。電話不會公開。拍不拍、什麼時候拍，聯絡後再一起決定。',
       cta: '我的工班想拍',
       crew: '工班名稱',
@@ -514,15 +514,10 @@ export const zh = {
       tradePlaceholder: '例如：水電、油漆、清潔、冷氣',
       area: '服務範圍（選填）',
       areaPlaceholder: '縣市或區域就好',
-      focus: '想拍哪一種',
-      focuses: {
-        intro: '介紹工班和師傅',
-        before_after: '完工前後',
-        process: '接到案子怎麼做',
-        unsure: '還沒想好，想先聊聊',
-      },
       message: '補充（選填）',
       messagePlaceholder: '方便拍攝的時段、常做的案場，或想先問的問題',
+      alliance: '已有意願加入 FIXERCOWORK 修繕聯盟',
+      allianceNote: '要勾選才送得出去。勾了表示想加入，我們會再跟你說明怎麼加入。',
       consentTitle: '肖像權及訪談授權',
       consent: '可以在修繕聯盟中露出，並同意上方的肖像權及訪談授權',
       consentPoints: [

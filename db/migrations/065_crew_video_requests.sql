@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS crew_video_requests (
   filmed_at     TIMESTAMPTZ,
   portrait_consent BOOLEAN NOT NULL DEFAULT false,
   consented_at  TIMESTAMPTZ,
+  alliance_intent BOOLEAN NOT NULL DEFAULT false,
   CONSTRAINT crew_video_requests_focus_check CHECK (focus IN ('intro', 'before_after', 'process', 'unsure')),
   CONSTRAINT crew_video_requests_status_check CHECK (status IN ('new', 'scheduled', 'filmed', 'closed'))
 );

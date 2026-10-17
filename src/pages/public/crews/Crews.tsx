@@ -114,8 +114,6 @@ function YtPoster({ id, alt }: { id: string; alt: string }) {
   );
 }
 
-const SHOOT_FOCUSES = ['intro', 'before_after', 'process', 'unsure'] as const;
-
 function CrewShootForm() {
   const form = useCopy().crews.shoot;
   const { locale } = useLocale();
@@ -125,8 +123,8 @@ function CrewShootForm() {
   const [lineId, setLineId] = useState('');
   const [trade, setTrade] = useState('');
   const [area, setArea] = useState('');
-  const [focus, setFocus] = useState<(typeof SHOOT_FOCUSES)[number]>('intro');
   const [message, setMessage] = useState('');
+  const [alliance, setAlliance] = useState(false);
   const [consent, setConsent] = useState(false);
   const [website, setWebsite] = useState('');
   const [sending, setSending] = useState(false);
@@ -149,8 +147,8 @@ function CrewShootForm() {
           lineId,
           trade,
           area,
-          focus,
           message,
+          allianceIntent: alliance,
           portraitConsent: consent,
           website,
         }),
@@ -164,8 +162,8 @@ function CrewShootForm() {
       setLineId('');
       setTrade('');
       setArea('');
-      setFocus('intro');
       setMessage('');
+      setAlliance(false);
       setConsent(false);
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : form.fail);
@@ -209,15 +207,14 @@ function CrewShootForm() {
           <input value={area} onChange={(e) => setArea(e.target.value)} maxLength={80} placeholder={form.areaPlaceholder} />
         </label>
         <label>
-          {form.focus}
-          <select value={focus} onChange={(e) => setFocus(e.target.value as (typeof SHOOT_FOCUSES)[number])}>
-            {SHOOT_FOCUSES.map((key) => <option key={key} value={key}>{form.focuses[key]}</option>)}
-          </select>
-        </label>
-        <label>
           {form.message}
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} maxLength={500} placeholder={form.messagePlaceholder} />
         </label>
+        <label className="crew-check">
+          <input type="checkbox" checked={alliance} onChange={(e) => setAlliance(e.target.checked)} required />
+          {form.alliance}
+        </label>
+        <p className="lp-note">{form.allianceNote}</p>
         <fieldset className="crew-consent">
           <legend>{form.consentTitle}</legend>
           <ol>

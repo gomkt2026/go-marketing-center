@@ -11,7 +11,7 @@ import {
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
   defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
   SEO_TOPIC_BANK, brandSeoFacts, type SeoTopicSeed,
-  buildSocialImagePrompt, defaultDesignImageStyle,
+  buildSocialImagePrompt, defaultDesignImageStyle, pickTaskgoPosterScene,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
   type GeneratedXPost, type EcosystemXAngle,
   type AudienceLane, type ImageStyleId,
@@ -26,6 +26,7 @@ import { burnPainBar, burnPosterHeadline } from './poster-text';
 import { loadBrandImagePromptPack } from './image-prompts';
 import {
   describeAssetForPrompt, pickBrandAsset, pickBrandScreenshot, markAssetUsed,
+  isJiangchengGameAsset,
   type BrandAssetPick, type PickBrandAssetQuery,
 } from './brand-assets';
 import {
@@ -86,6 +87,7 @@ export interface GenerationResult {
   imageSource?: 'asset' | 'generated' | null;
   imageStyle?: ImageStyleId | null;
   assetId?: string | null;
+  posterScene?: string | null;
   offtopicCategory?: string;
   loveAngle?: string;
 }
@@ -301,6 +303,36 @@ async function frameAssetForInstagram(env: Env, brandSlug: string, fileUrl: stri
   }
 }
 
+async function recentUsedAssetIds(env: Env, brandId: string): Promise<string[]> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT generation_prompt_meta->>'assetId' AS asset_id
+    FROM contents
+    WHERE brand_id = ${brandId}::uuid
+      AND target_platform IN ('facebook', 'instagram')
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  const id = (rows[0] as { asset_id: string | null } | undefined)?.asset_id;
+  return id ? [id] : [];
+}
+
+async function recentPosterScenes(env: Env, brandId: string): Promise<string[]> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT generation_prompt_meta->>'posterScene' AS scene
+    FROM contents
+    WHERE brand_id = ${brandId}::uuid
+      AND target_platform IN ('facebook', 'instagram')
+      AND coalesce(generation_prompt_meta->>'posterScene', '') <> ''
+    ORDER BY created_at DESC
+    LIMIT 6
+  `;
+  return (rows as { scene: string | null }[])
+    .map((row) => row.scene)
+    .filter((scene): scene is string => !!scene);
+}
+
 async function recentImageStyles(env: Env, brandId: string): Promise<ImageStyleId[]> {
   const sql = getSql(env);
   const rows = await sql`
@@ -376,17 +408,35 @@ export async function generatePlatformPost(
       : await pickAudience(env, brandCtx.brandId, brandCtx.slug, lane);
 
   let reusedAsset: BrandAssetPick | null = null;
+  const recentAssetIds = params.skipImage || params.skipAssetLookup
+    ? []
+    : await recentUsedAssetIds(env, brandCtx.brandId).catch(() => [] as string[]);
   // 三個平台都先用品牌上傳的圖。有素材就本地合成,不呼叫生圖。
+  // 匠城出任務的遊戲畫面不拿來當 FB／IG 圖文,否則九宮格會是同一張。
   if (!params.skipImage && !params.skipAssetLookup) {
     try {
       reusedAsset = await pickBrandAsset(env, brandCtx.brandId, {
         preferScreenshot: platform !== 'threads' && lane === 'b2b',
         query: params.topic,
+        excludeGameStills: true,
+        excludeIds: platform === 'threads' ? undefined : recentAssetIds,
       });
     } catch (e) {
       console.error('[generate] 素材庫查詢失敗,改走生圖', e);
     }
   }
+  if (
+    reusedAsset
+    && brandCtx.slug === 'taskgo'
+    && platform !== 'threads'
+    && recentAssetIds.includes(reusedAsset.id)
+  ) {
+    reusedAsset = null;
+  }
+
+  const posterScene = !reusedAsset && brandCtx.slug === 'taskgo' && platform !== 'threads' && !params.skipImage
+    ? pickTaskgoPosterScene(await recentPosterScenes(env, brandCtx.brandId).catch(() => [] as string[]))
+    : null;
 
   const screenshotPoster = !!(reusedAsset && isSystemScreenshot(reusedAsset));
   const convertPhotoPoster = !!(reusedAsset && !screenshotPoster);
@@ -403,6 +453,9 @@ export async function generatePlatformPost(
       params.extraInstruction ?? '',
       screenshotPoster || convertPhotoPoster
         ? `本篇會把品牌上傳的原圖鋪滿,底部只疊 4-10 字痛點,不重繪。${reusedAsset ? describeAssetForPrompt(reusedAsset, brandCtx.slug) : ''}文案要對得上這張真實畫面,不要幻想不存在的細節。`
+        : '',
+      posterScene
+        ? `這篇是 TaskGo 的 FB／IG 圖文,不要寫成匠城出任務,不要叫人來玩遊戲。配圖場面固定是「${posterScene.label}」。imagePrompt 必須描述這個場面:${posterScene.visual}`
         : '',
     ].filter(Boolean).join('\n'),
     brandSlug: brandCtx.slug,
@@ -564,6 +617,9 @@ export async function generatePlatformPost(
         emptyBanner: isFb || isIg,
         designStyle: imagePack.designStyle,
         photoStyle: imagePack.photoStyle,
+        sceneLock: posterScene
+          ? `THIS POSTER MUST SHOW: ${posterScene.visual} Scene id ${posterScene.id}. A different workplace moment from the last posts.`
+          : undefined,
       });
       const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
       const quality = platform === 'threads' ? 'medium' as const : 'high' as const;
@@ -599,6 +655,7 @@ export async function generatePlatformPost(
     post, prediction, imageUrl, imageError,
     audienceLane: lane, audienceName: audience.name,
     imageSource: imageUrl ? 'generated' : null, imageStyle, assetId: null,
+    posterScene: posterScene?.id ?? null,
   };
 }
 
@@ -776,6 +833,25 @@ export async function generatePostFromImage(
   },
 ): Promise<GenerationResult> {
   const { brandCtx, imageUrl, platform } = params;
+  if (
+    (platform === 'facebook' || platform === 'instagram')
+    && isJiangchengGameAsset({
+      name: params.assetName,
+      caption: params.caption,
+      fileUrl: imageUrl,
+    })
+  ) {
+    return generatePlatformPost(env, {
+      brandCtx,
+      platform,
+      topic: params.feature || params.caption || params.assetName || '工程派工現場',
+      extraInstruction: params.extraInstruction,
+      audienceLane: params.audienceLane,
+      audienceName: params.audienceName,
+      skipAssetLookup: true,
+      skipPrediction: params.skipPrediction,
+    });
+  }
   const lane = params.audienceLane ?? defaultAudienceLane(platform);
   const audienceName = params.audienceName ?? (await pickAudience(env, brandCtx.brandId, brandCtx.slug, lane)).name;
   const userPrompt = buildImageInspiredPostPrompt({
@@ -1003,6 +1079,7 @@ export async function saveGeneratedContent(
         posterAccent: result.post.posterAccent ?? undefined,
         posterAdvantage: result.post.posterAdvantage ?? undefined,
         posterKicker: result.post.posterKicker ?? undefined,
+        posterScene: params.promptMeta?.posterScene ?? result.posterScene ?? undefined,
       })},
       ${params.sourceMarketSignalId ?? null}
     ) RETURNING id

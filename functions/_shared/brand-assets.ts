@@ -222,6 +222,23 @@ export interface PickBrandAssetQuery {
   usageContext?: string;
   includeLegacy?: boolean;
   includeBrandIdentity?: boolean;
+  /** FB／IG 圖文不要拿匠城出任務的遊戲畫面當配圖 */
+  excludeGameStills?: boolean;
+  /** 最近用過的素材，有其他選擇時跳過，避免九宮格同一張 */
+  excludeIds?: string[];
+}
+
+const JIANGCHENG_GAME_ASSET = /匠城|jiangcheng|craft\s*city|\/game\/og-image|jiangcheng-language/i;
+
+/** 匠城出任務的遊戲畫面。只留給每天一篇 Threads，不拿來當 FB／IG 圖文。 */
+export function isJiangchengGameAsset(asset: {
+  name?: string | null;
+  caption?: string | null;
+  fileUrl?: string | null;
+  file_url?: string | null;
+}): boolean {
+  const hay = [asset.name, asset.caption, asset.fileUrl, asset.file_url].filter(Boolean).join(' ');
+  return JIANGCHENG_GAME_ASSET.test(hay);
 }
 
 type AssetRow = {
@@ -334,6 +351,8 @@ export async function searchBrandAssets(
   return rows
     .filter((row) => isUsableForAi(row, opts))
     .filter((row) => !opts.preferScreenshot || row.image_category === 'system_screenshot')
+    .filter((row) => !opts.excludeGameStills || !isJiangchengGameAsset(row))
+    .filter((row) => !opts.excludeIds?.includes(row.id))
     .map((row) => ({ row, score: matchScore(row, opts) }))
     .sort((a, b) => b.score - a.score || (a.row.used_in_threads_count ?? 0) - (b.row.used_in_threads_count ?? 0))
     .map(({ row }) => toAssetPick(env, row))
@@ -349,7 +368,10 @@ export async function pickBrandAsset(
     ? { preferScreenshot: preferScreenshotOrOpts }
     : preferScreenshotOrOpts;
 
-  const matched = await searchBrandAssets(env, brandId, opts);
+  let matched = await searchBrandAssets(env, brandId, opts);
+  if (!matched.length && opts.excludeIds?.length) {
+    matched = await searchBrandAssets(env, brandId, { ...opts, excludeIds: undefined });
+  }
   if (matched.length) {
     if (!opts.query && !opts.feature && !opts.usageContext && !opts.role) return matched[0];
     const best = matched[0];

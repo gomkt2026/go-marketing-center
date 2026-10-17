@@ -36,3 +36,5 @@ description: >-
 ## 自動發文
 
 程式規格在 `functions/_shared/prompts.ts` 的 `BRAND_DESIGN_IMAGE_STYLE.taskgo`。改風格時兩處一起改。
+
+FB／IG 不要用「匠城出任務」遊戲畫面。那個遊戲只留 Threads 每天 10:00 一篇。圖文要輪流換場面（派工、打卡、報價、回報、請款、收工），連續幾天不能是同一張圖。

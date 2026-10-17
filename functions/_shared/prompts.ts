@@ -697,6 +697,33 @@ export function defaultDesignImageStyle(slug: string): string {
   return BRAND_DESIGN_IMAGE_STYLE[slug] ?? BRAND_DESIGN_IMAGE_STYLE.homigo;
 }
 
+/** TaskGo FB／IG 生圖輪流換場面，避免九宮格都是同一張匠城或同一張工地海報。 */
+export interface TaskgoPosterScene {
+  id: string;
+  label: string;
+  visual: string;
+}
+
+export const TASKGO_POSTER_SCENES: TaskgoPosterScene[] = [
+  { id: 'dispatch', label: '白板派工', visual: 'A Taiwanese site foreman standing at a scheduling whiteboard, hard hat under one arm, diagonal navy and cyan blocks. The board is abstract marks only, no letters.' },
+  { id: 'checkin', label: '工地打卡', visual: 'A craftsman at a site gate holding a phone to check in, bust crop, looking aside. Cyan honeycomb behind him, navy diagonal cut in front.' },
+  { id: 'line', label: 'LINE對不上', visual: 'A crew lead turned away from a phone full of abstract message bubbles, reflective vest, irritated but not comic. Navy field, one yellow chip.' },
+  { id: 'quote', label: '報價對不上', visual: 'Two Taiwanese site people comparing a clipboard and a small tablet, three-quarter view. The tablet UI is grey bars only. Split navy and white diagonal.' },
+  { id: 'report', label: '現場回報', visual: 'A worker photographing a wall detail with a phone, another figure waiting with a measuring tape. Graphic crane silhouette, not a photoreal site.' },
+  { id: 'invoice', label: '月底請款', visual: 'An indoor site office at month end: papers, a tea thermos, a small tablet card. One person rubbing their neck. Navy blocks, paper grain, no scenery photo.' },
+  { id: 'typhoon', label: '颱風收工', visual: 'Crew packing tools under a blue tarp, wet alley as a graphic shape, hard hats, scooter silhouette. Storm light as flat cyan planes.' },
+  { id: 'survey', label: '場勘漏水', visual: 'An inspector looking up at a ceiling stain drawn as a flat graphic mark, flashlight, hard hat. Portrait crop, lots of navy negative space.' },
+  { id: 'kickoff', label: '開工進場', visual: 'A crew walking into a site, a red opening banner as a graphic shape with no readable text, tower-crane silhouette. Diagonal navy banner.' },
+  { id: 'night', label: '收工機車', visual: 'End of shift: a craftsman on a scooter leaving a scaffolded arcade, city lights as cyan dots. Profile, calm, not a sunset photo.' },
+];
+
+export function pickTaskgoPosterScene(excludeIds: string[] = [], seed = Date.now()): TaskgoPosterScene {
+  const pool = TASKGO_POSTER_SCENES.filter((scene) => !excludeIds.includes(scene.id));
+  const list = pool.length ? pool : TASKGO_POSTER_SCENES;
+  const day = Math.floor((seed + 8 * 60 * 60 * 1000) / 86_400_000);
+  return list[day % list.length];
+}
+
 export function defaultPhotoImageStyle(slug: string): string {
   return BRAND_PHOTO_IMAGE_STYLE[slug] ?? defaultDesignImageStyle(slug);
 }
@@ -711,6 +738,8 @@ export function buildSocialImagePrompt(params: {
   emptyBanner?: boolean;
   designStyle?: string;
   photoStyle?: string;
+  /** 這張必須畫的具體場面，避免連續海報長一樣 */
+  sceneLock?: string;
 }): string {
   const designSpec = params.designStyle?.trim() || defaultDesignImageStyle(params.brandSlug);
   const photoSpec = params.photoStyle?.trim() || defaultPhotoImageStyle(params.brandSlug);
@@ -730,6 +759,10 @@ export function buildSocialImagePrompt(params: {
         : 'PORTRAIT poster. Top 25% empty designed paper or brand color block.');
   return [
     params.scene,
+    params.sceneLock ?? '',
+    params.sceneLock
+      ? 'Do not draw a video-game title screen, a language menu, a start button, or the same Craft City Rush layout.'
+      : '',
     styleBlock,
     'CRITICAL: no letters, numbers, CJK, Latin, UI labels, captions, watermarks, or logos. Typography is composited later in Traditional Chinese.',
     frameRule,

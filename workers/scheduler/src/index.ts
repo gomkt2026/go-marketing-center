@@ -517,8 +517,8 @@ async function generateDailyThemePlatforms(
         topic: theme.theme,
         topicSummary: theme.summary,
           extraInstruction: platform === 'instagram'
-            ? `切入角度:${theme.angle}。這是今天的每日主題貼文。IG:第一句=顧客搜得到的痛點,整篇只打一個標籤主題。配圖做成痛點海報(現場煩惱+主標+系統重點卡),不要整頁截圖直發。文案結尾要有明確匠管 CTA。主受眾:${audience.name}。`
-            : `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。配圖做成痛點海報,系統畫面當解法卡。主受眾:${audience.name}。`,
+            ? `切入角度:${theme.angle}。這是今天的每日主題貼文。IG:第一句=顧客搜得到的痛點,整篇只打一個標籤主題。配圖做成痛點海報(現場煩惱+主標+系統重點卡),不要整頁截圖直發。${brand.slug === 'taskgo' ? '禁止使用匠城出任務遊戲畫面,每篇換成不同的工地場面。' : ''}文案結尾要有明確匠管 CTA。主受眾:${audience.name}。`
+            : `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。配圖做成痛點海報,系統畫面當解法卡。${brand.slug === 'taskgo' ? '禁止使用匠城出任務遊戲畫面,每篇換成不同的工地場面。' : ''}主受眾:${audience.name}。`,
         audienceLane: 'b2b',
         audienceName: audience.name,
         skipPrediction: true,
@@ -739,12 +739,19 @@ async function generateDailyThemeForBrand(
         WHERE brand_id = ${brand.id}::uuid AND discovered_at > now() - interval '48 hours'
         ORDER BY relevance_score DESC LIMIT 6
       `,
-      sql`
-        SELECT DISTINCT generation_prompt_meta->>'theme' AS theme FROM contents
-        WHERE brand_id = ${brand.id}::uuid
-          AND generation_prompt_meta->>'source' = 'daily_theme'
-          AND created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours'
-      `,
+      brand.slug === 'taskgo'
+        ? sql`
+          SELECT DISTINCT generation_prompt_meta->>'theme' AS theme FROM contents
+          WHERE brand_id = ${brand.id}::uuid
+            AND generation_prompt_meta->>'source' = 'daily_theme'
+            AND created_at > now() - interval '14 days'
+        `
+        : sql`
+          SELECT DISTINCT generation_prompt_meta->>'theme' AS theme FROM contents
+          WHERE brand_id = ${brand.id}::uuid
+            AND generation_prompt_meta->>'source' = 'daily_theme'
+            AND created_at > date_trunc('day', now() + interval '8 hours') - interval '8 hours'
+        `,
     ]);
 
     const voice = getBrandVoice(brand.slug);
@@ -765,8 +772,13 @@ async function generateDailyThemeForBrand(
             '這篇是寫給業者的:手寫單、派工、對帳、多門市、客源、系統操作。不要出換季、媽媽加班、羽絨被這類 C 端生活題。',
             `主受眾:${audience.name}。痛點:${JSON.stringify(audience.painPoints)}。訴求:${audience.appealAngle ?? ''}`,
             signalText || '(目前沒有新情報,請從業者日常痛點自選一個)',
-            usedThemes.length ? `今天已做過的主題(不要重複):${usedThemes.join('、')}` : '',
+            usedThemes.length
+              ? `${brand.slug === 'taskgo' ? '近兩週' : '今天'}已做過的主題(不要重複):${usedThemes.join('、')}`
+              : '',
             `業者每天在煩的事:${voice.operatorConcerns ?? voice.dailyConcerns}`,
+            brand.slug === 'taskgo'
+              ? 'TaskGo 的 FB／IG 不要做「匠城出任務」。遊戲只留在 Threads 每天 10:00。這裡寫工程行與工班：派工、打卡、現場回報、報價、請款、調度。每天換一個痛點。'
+              : '',
             '',
             '回傳 JSON:{"theme":"主題標題","angle":"切入角度一句話","summary":"主題背景說明(100字內)"}',
           ].filter(Boolean).join('\n'),
@@ -774,11 +786,26 @@ async function generateDailyThemeForBrand(
       ],
     });
 
+    const taskgoFallbackThemes = [
+      { theme: '白板派工對不上', angle: '今天誰去哪一案,白板和 LINE 各講一套', summary: '工程行早上對班,人到了案子還在群組裡找。' },
+      { theme: '工地打卡補不回', angle: '人在現場,出勤紀錄還是晚上才補', summary: '沒有當下的定位和照片,月底請款對不到人。' },
+      { theme: '報價和現場兩套帳', angle: '報價單寫一套,師傅做到另一套', summary: '變更沒留下,結案才發現這案在賠。' },
+      { theme: '現場回報停在群組', angle: '照片在 LINE,進度在頭裡', summary: '業主問做到哪,內勤要翻半天聊天紀錄。' },
+      { theme: '月底請款對不到班', angle: '做完的工,請款時少一截', summary: '打卡、回報、簽名沒放在同一處,帳就是對不攏。' },
+      { theme: '調度還在看誰有空', angle: '一通奪命 call,整組人要重排', summary: '臨時改案沒有班表,空班和趕工一起出現。' },
+    ];
+    const themeIsGame = brand.slug === 'taskgo'
+      && /匠城|出任務|jiangcheng/i.test(`${theme.theme} ${theme.angle} ${theme.summary}`);
+    const fresh = taskgoFallbackThemes.find((item) => !usedThemes.includes(item.theme));
+    const themeForToday = themeIsGame
+      ? (fresh ?? taskgoFallbackThemes[Math.floor(Date.now() / 86_400_000) % taskgoFallbackThemes.length])
+      : theme;
+
     const themeKey = `${new Date().toISOString().slice(0, 10)}-${brand.slug}-${brand.theme_count + 1}`;
     await generateDailyThemePlatforms(env, brand, slotAt, platforms, {
-      theme: theme.theme, angle: theme.angle, summary: theme.summary, themeKey,
+      theme: themeForToday.theme, angle: themeForToday.angle, summary: themeForToday.summary, themeKey,
     });
-    console.log(`[themes] ${brand.slug} 今日主題 #${brand.theme_count + 1}:${theme.theme}`);
+    console.log(`[themes] ${brand.slug} 今日主題 #${brand.theme_count + 1}:${themeForToday.theme}`);
     return true;
   } catch (e) {
     console.error(`[themes] 品牌 ${brand.slug} 主題生成失敗`, e);

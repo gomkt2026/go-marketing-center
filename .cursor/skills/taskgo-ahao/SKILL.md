@@ -51,7 +51,7 @@ AI小編 阿豪：好，不排半夜。師傅滑手機的時段我幫你卡進�
 - Threads 排程除每天 10:00 一篇匠城出任務外，寫現場一句看不起人的話，引號放最後一行，後面不要寫工序。可以寫工地。不要整篇電鍋、圍爐。不推產品。
 - 用台灣口語和在地生活（電鍋、家族 LINE、圍爐、夜市）。可以有台語詞。寫一個具體場面和一句沒被接住的話，不要和解，不要下結論。禁止簡體、大陸用語，以及「外籍配偶融入台灣」心靈雞湯。規格在 `functions/_shared/taiwan-voice.ts`。
 - Facebook／Instagram 寫作細節以 `BRAND_VOICES.taskgo` 為準。
-- FB／IG 圖文必須走海軍藍斜切工地風，見 `taskgo-social-graphic` Skill 與 `.cursor/rules/taskgo-social-graphic.mdc`。不要深灰橘色語錄卡。
+- FB／IG 圖文必須走海軍藍斜切工地風，見 `taskgo-social-graphic` Skill 與 `.cursor/rules/taskgo-social-graphic.mdc`。不要深灰橘色語錄卡。不要把匠城出任務遊戲畫面拿來當 FB／IG 配圖；遊戲只留每天 10:00 的 Threads。圖文要換場面，不要連續同一張。
 - 短影音阿豪卡仍用橘 `#ED9121`。
 - B 端結尾主 CTA 走匠管聯絡。
 

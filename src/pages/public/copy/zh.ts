@@ -183,7 +183,7 @@ export const zh = {
     followersTotal: (n: string) => `這八週三個平台合計新增粉絲 ${n}。`,
     followersPending: '新增粉絲還沒從平台回收，表上先顯示 —。',
     byBrand: '各品牌這八週的瀏覽',
-    pickedWeek: (label: string) => `${label} 這一週，三個品牌各自的瀏覽`,
+    pickedWeek: (label: string) => `${label} 為止，三個品牌各自的累計瀏覽`,
   },
   map: { s: '小地圖', m: '中地圖', l: '大地圖', t: '台灣地圖' },
   board: {

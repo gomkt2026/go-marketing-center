@@ -17,8 +17,9 @@ export interface TrendBrand {
 }
 
 const W = 360;
-const H = 132;
-const PAD = { l: 34, r: 22, t: 12, b: 22 };
+const H = 148;
+const PAD = { l: 36, r: 18, t: 22, b: 24 };
+const CHIP_H = 16;
 
 function weekLabel(iso: string): string {
   const [, m, d] = iso.split('-');
@@ -58,23 +59,36 @@ export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: Tren
   const hitW = shown.length <= 1 ? innerW : innerW / (shown.length - 1);
 
   const labels = active == null ? [] : series
-    .map((item) => ({
-      slug: item.brand.slug,
-      color: item.brand.color,
-      x: xAt(active),
-      y: yAt(item.values[active] ?? 0),
-      text: format.compact(shown[active].brands?.[item.brand.slug] ?? 0),
-    }))
-    .sort((a, b) => a.y - b.y)
-    .map((item, i, all) => {
-      const prev = all[i - 1];
-      const y = prev && item.y - prev.y < 11 ? prev.y + 11 : item.y;
-      const next = { ...item, y: Math.min(H - PAD.b - 2, Math.max(PAD.t + 8, y)) };
-      all[i] = next;
-      return next;
-    });
-  const labelAnchor = active != null && active >= shown.length - 2 ? 'end' : 'start';
-  const labelDx = labelAnchor === 'end' ? -8 : 8;
+    .map((item) => {
+      const total = item.values[active] ?? 0;
+      const text = format.compact(total);
+      return {
+        slug: item.brand.slug,
+        color: item.brand.color,
+        px: xAt(active),
+        py: yAt(total),
+        text,
+        width: Math.max(34, text.length * 9.2),
+        ly: 0,
+      };
+    })
+    .sort((a, b) => a.py - b.py);
+  const placeLeft = active != null && active >= Math.floor(shown.length / 2);
+  const stackWidth = labels.reduce((wide, item) => Math.max(wide, item.width), 36);
+  const anchorX = active == null ? 0 : xAt(active);
+  const rawLeft = placeLeft ? anchorX - stackWidth - 12 : anchorX + 12;
+  const stackLeft = Math.min(W - stackWidth - 4, Math.max(PAD.l + 4, rawLeft));
+  let nextTop = 2;
+  for (const item of labels) {
+    item.ly = Math.max(nextTop, item.py - CHIP_H / 2);
+    nextTop = item.ly + CHIP_H + 4;
+  }
+  const bottom = H - PAD.b - 1;
+  const last = labels[labels.length - 1];
+  if (last && last.ly + CHIP_H > bottom) {
+    const shift = last.ly + CHIP_H - bottom;
+    for (const item of labels) item.ly = Math.max(2, item.ly - shift);
+  }
 
   function toggle(index: number) {
     setPicked((current) => (current === index ? null : index));
@@ -115,24 +129,20 @@ export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: Tren
             </g>
           );
         })}
-        {labels.map((item) => {
-          const width = Math.max(28, item.text.length * 9);
-          const left = labelAnchor === 'end' ? item.x + labelDx - width : item.x + labelDx;
-          return (
-            <g key={item.slug} style={{ pointerEvents: 'none' }}>
-              <rect x={left - 3} y={item.y - 8} width={width + 6} height={13} rx={3} fill="#fff" />
-              <text
-                x={item.x + labelDx}
-                y={item.y + 2}
-                textAnchor={labelAnchor}
-                className="lp-trend-label"
-                fill={item.color}
-              >
-                {item.text}
-              </text>
-            </g>
-          );
-        })}
+        {labels.map((item) => (
+          <g key={item.slug} style={{ pointerEvents: 'none' }}>
+            <rect x={stackLeft} y={item.ly} width={stackWidth} height={CHIP_H} rx={4} fill="#fff" stroke={item.color} strokeWidth={1.4} />
+            <text
+              x={stackLeft + stackWidth / 2}
+              y={item.ly + 11.5}
+              textAnchor="middle"
+              className="lp-trend-label"
+              fill={item.color}
+            >
+              {item.text}
+            </text>
+          </g>
+        ))}
         {shown.map((week, i) => (
           <text
             key={week.week}
@@ -164,8 +174,8 @@ export function ProofTrend({ weeks, brands }: { weeks: TrendWeek[]; brands: Tren
           return (
             <li key={item.brand.slug}>
               <span><i style={{ background: item.brand.color }} />{item.brand.name}</span>
-              <b>{format.n(weekly == null ? item.total : weekly)}</b>
-              {weekly != null && <small>{copy.cumulative} {format.n(item.values[active ?? 0] ?? 0)}</small>}
+              <b>{format.n(weekly == null ? item.total : (item.values[active ?? 0] ?? 0))}</b>
+              {weekly != null && <small>{copy.views} {format.n(weekly)}</small>}
             </li>
           );
         })}

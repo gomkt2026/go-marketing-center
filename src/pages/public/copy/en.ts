@@ -187,7 +187,7 @@ export const en: PublicCopy = {
     followersTotal: (n: string) => `${n} new followers across the three networks in these eight weeks.`,
     followersPending: 'New followers are not back from the networks yet. That column shows — until then.',
     byBrand: 'Views by brand, these eight weeks',
-    pickedWeek: (label: string) => `Week of ${label}: views for each brand`,
+    pickedWeek: (label: string) => `Through ${label}: cumulative views for each brand`,
   },
   map: { s: 'Small map', m: 'Medium map', l: 'Large map', t: 'Taiwan map' },
   board: {

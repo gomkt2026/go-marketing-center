@@ -185,6 +185,7 @@ export const ja: PublicCopy = {
     followersTotal: (n: string) => `この 8 週で三つの SNS 合計 ${n} 人増えました。`,
     followersPending: '新規フォロワーはまだ SNS から戻っていません。戻るまでは — です。',
     byBrand: 'この 8 週のブランド別閲覧',
+    pickedWeek: (label: string) => `${label} の週、各ブランドの閲覧`,
   },
   map: { s: '小マップ', m: '中マップ', l: '大マップ', t: '台湾マップ' },
   board: {

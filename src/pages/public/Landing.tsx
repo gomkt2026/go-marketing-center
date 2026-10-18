@@ -785,7 +785,11 @@ export const LANDING_CSS = `
 .lp-week-table th:first-child,.lp-week-table td:first-child{text-align:left;font-weight:800;color:var(--ink)}
 .lp-week-table th{font-size:11px;color:var(--muted);font-weight:700}
 .lp-week-table td{color:var(--ink)}
+.lp-trend-label{font-size:10px;font-weight:800}
 .lp-trend-hit{fill:transparent;cursor:pointer}
+.lp-week-table tbody tr{cursor:pointer}
+.lp-week-table tr.on td{background:#F3F6EF}
+.lp-chart-values small{display:block;margin-top:1px;color:var(--muted);font-size:11px;font-weight:700}
 .lp-trend-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;font-size:13px;font-weight:700;color:var(--ink)}
 .lp-trend-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
 .lp-trend-detail{margin:12px 0 0;font-size:14px;line-height:1.6}

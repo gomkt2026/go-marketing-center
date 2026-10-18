@@ -390,7 +390,11 @@ export async function pickBrandAsset(
   }
 
   if (opts.preferScreenshot && (opts.query || opts.feature || opts.usageContext || opts.role)) {
-    const anyShot = await searchBrandAssets(env, brandId, { preferScreenshot: true });
+    const anyShot = await searchBrandAssets(env, brandId, {
+      preferScreenshot: true,
+      excludeGameStills: opts.excludeGameStills,
+      excludeIds: opts.excludeIds,
+    });
     return anyShot[0] ?? null;
   }
   return matched[0] ?? null;

@@ -5,7 +5,7 @@ import { seoChatJson, socialChatJson } from './social-llm';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
-  TRAFFIC_SYSTEM_PROMPT, WASHGO_TRAFFIC_SYSTEM_PROMPT, TASKGO_TRAFFIC_SYSTEM_PROMPT, composeTrafficPrompt, type TrafficFormulaId,
+  TRAFFIC_SYSTEM_PROMPT, WASHGO_TRAFFIC_SYSTEM_PROMPT, TASKGO_TRAFFIC_SYSTEM_PROMPT, composeTrafficPrompt, taskgoLectureIssue, type TrafficFormulaId,
   buildImageInspiredPostPrompt, buildGamePromoPrompt, GAME_PROMO_URL,
   type GamePromoAngle,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
@@ -427,6 +427,13 @@ export async function generatePlatformPost(
   }
   if (
     reusedAsset
+    && (platform === 'facebook' || platform === 'instagram')
+    && isJiangchengGameAsset(reusedAsset)
+  ) {
+    reusedAsset = null;
+  }
+  if (
+    reusedAsset
     && brandCtx.slug === 'taskgo'
     && platform !== 'threads'
     && recentAssetIds.includes(reusedAsset.id)
@@ -767,7 +774,8 @@ export async function generateTrafficPost(
   ).test(post.body);
   const missed = Boolean(focus) && !post.body.includes(focus);
   const trafficVoice = taiwanVoiceIssue(post.body);
-  if (post.body.length > limit || leaked || missed || post.body.length < 80 || trafficVoice) {
+  const lecture = taskgo ? taskgoLectureIssue(post.body) : null;
+  if (post.body.length > limit || leaked || missed || post.body.length < 80 || trafficVoice || lecture) {
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: systemPrompt },
@@ -775,12 +783,12 @@ export async function generateTrafficPost(
         { role: 'assistant', content: JSON.stringify(post) },
         {
           role: 'user',
-          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${focus}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}）。` +
-            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : washgo ? '，改成櫃檯一句問話' : taskgo ? '，改成工地一句看不起人的話，人沒有接' : '，改成一句讓人想回嘴的話，人沒有接'}。` +
+          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${focus}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}${lecture ? `，${lecture}` : ''}）。` +
+            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : washgo ? '，改成櫃檯一句問話' : taskgo ? '，改成工地一句輕的話，人沒有接' : '，改成一句讓人想回嘴的話，人沒有接'}。` +
             (washgo
               ? '一句問話之後停住。不要列功能，不要提別的店，不要寫電鍋。禁止簡體、大陸用語。回傳同格式 JSON。'
               : taskgo
-                ? '可以寫工地。不要寫電鍋、圍爐、盛飯。不要寫外勞都。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
+                ? '可以寫工地。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。不要寫電鍋、圍爐、盛飯。不要寫外勞都。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
                 : '不要出現電鍋、圍爐、盛飯。引號是最後一行，人沒有接。時事不要改成品牌比喻。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌、「男生都」「女生都」。回傳同格式 JSON。'),
         },
       ],

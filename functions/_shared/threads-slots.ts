@@ -167,7 +167,7 @@ async function writeTrafficDraft(
     usedTopics,
     theme,
     siblings,
-    hourTw,
+    hourTw: hourTW,
     now: slotMs,
     skipPrediction: true,
   });

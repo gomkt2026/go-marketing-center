@@ -34,43 +34,67 @@ const STOPWORDS = new Set([
   '影響', '持續', '宣布', '表示', '指出', '可能', '最新', '進行', '相關', '注意', '小心', '一次', '這些', '那些',
 ]);
 
+function headlineKey(title: string): string {
+  const cleaned = title
+    .replace(/\s*[-|｜]\s*(自由時報|自由電子報|聯合報|ETtoday|三立|TVBS|中央社|Yahoo).*$/i, '')
+    .replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '');
+  return cleaned.slice(0, 18);
+}
+
 /**
- * 輕量中文關鍵詞抽取:對標題做 2-8 字 n-gram 詞頻統計。
- * 去雜訊規則:
- * 1. 某個詞若是「頻率不低於它的更長詞」的一部分,表示它從未獨立出現過
- *    (只是滑動視窗切出的碎片,如「颱風白海」之於「颱風白海豚」),丟棄,只留最長的完整詞。
- * 2. 輸出前剔除含停用詞的片語(如「颱風白海豚影響」含「影響」),留下乾淨的關鍵詞。
+ * 熱門關鍵字：重複出現的完整標題只留一條，短詞必須跨到不同標題才算。
+ * 不再對長標題做 8 字滑動視窗，避免「台南車站百年鐵軌」被切成一串重疊碎片。
  */
-function extractKeywords(titles: string[], limit = 40): KeywordItem[] {
-  const freq = new Map<string, number>();
-  for (const title of titles) {
-    const seen = new Set<string>(); // 同一標題內同詞只計一次
+function extractKeywords(titles: string[], limit = 28): KeywordItem[] {
+  const headlineCount = new Map<string, number>();
+  const shortHeads = new Map<string, Set<string>>();
+
+  titles.forEach((title) => {
+    const head = headlineKey(title);
+    if (head.length >= 4) headlineCount.set(head, (headlineCount.get(head) ?? 0) + 1);
+    const seen = new Set<string>();
     for (const run of title.match(/[\u4e00-\u9fff]{2,}/g) ?? []) {
-      for (let n = 2; n <= 8; n++) {
+      for (let n = 2; n <= 4; n++) {
         for (let i = 0; i + n <= run.length; i++) {
           const gram = run.slice(i, i + n);
           if (seen.has(gram)) continue;
+          let blocked = false;
+          for (const sw of STOPWORDS) if (gram.includes(sw)) { blocked = true; break; }
+          if (blocked) continue;
           seen.add(gram);
-          freq.set(gram, (freq.get(gram) ?? 0) + 1);
+          if (!shortHeads.has(gram)) shortHeads.set(gram, new Set());
+          if (head) shortHeads.get(gram)!.add(head);
         }
       }
     }
-    for (const w of title.match(/[A-Za-z][A-Za-z0-9]{2,}/g) ?? []) {
-      if (!seen.has(w)) { seen.add(w); freq.set(w, (freq.get(w) ?? 0) + 1); }
+    for (const word of title.match(/[A-Za-z][A-Za-z0-9]{2,}/g) ?? []) {
+      const key = word.toUpperCase();
+      if (!shortHeads.has(key)) shortHeads.set(key, new Set());
+      if (head) shortHeads.get(key)!.add(head);
     }
-  }
+  });
 
-  const candidates = [...freq.entries()].filter(([, count]) => count >= 2);
-  const containsStopword = (text: string) => {
-    for (const sw of STOPWORDS) if (text.includes(sw)) return true;
-    return false;
-  };
-  const kept = candidates.filter(([text, weight]) =>
-    !containsStopword(text) &&
-    !candidates.some(([other, otherWeight]) =>
+  const headlines = [...headlineCount.entries()].filter(([, count]) => count >= 2);
+  const keptHeadlines = headlines.filter(([text, weight]) =>
+    !headlines.some(([other, otherWeight]) =>
       other.length > text.length && otherWeight >= weight && other.includes(text)));
 
-  return kept
+  const shorts = [...shortHeads.entries()]
+    .map(([text, heads]) => [text, heads.size] as [string, number])
+    .filter(([, count]) => count >= 2);
+  const keptShorts = shorts.filter(([text, weight]) =>
+    !shorts.some(([other, otherWeight]) =>
+      other.length > text.length && otherWeight >= weight && other.includes(text))
+    && !keptHeadlines.some(([head]) => head.includes(text)));
+
+  const merged = new Map<string, number>();
+  for (const [text, weight] of keptHeadlines) merged.set(text, Math.max(merged.get(text) ?? 0, weight));
+  for (const [text, weight] of keptShorts) {
+    if ([...merged.keys()].some((head) => head === text)) continue;
+    merged.set(text, Math.max(merged.get(text) ?? 0, weight));
+  }
+
+  return [...merged.entries()]
     .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
     .slice(0, limit)
     .map(([text, weight]) => ({ text, weight }));

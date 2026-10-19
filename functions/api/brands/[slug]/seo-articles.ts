@@ -10,6 +10,7 @@ import type { BrandContext } from '../../../_shared/prompts';
 import { generateSeoArticle, saveSeoArticle, findBrandAgent, pickSeoTopicFromList } from '../../../_shared/generate';
 import {
   annotateSeoTopics,
+  crawlSiteArticleTitles,
   discoverNewSeoTopics,
   listSeoTopicsForBrand,
   MAX_RECOMMENDED_SEO_ARTICLES,
@@ -28,7 +29,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (!brand) return error('Brand not found', 404);
 
   const bank = await listSeoTopicsForBrand(context.env, brand.id, slug);
-  const topics = await annotateSeoTopics(context.env, brand.id, bank);
+  const siteUrl = (brand.blogBaseUrl || brand.websiteUrl || '').replace(/\/$/, '');
+  const siteTitles = siteUrl ? await crawlSiteArticleTitles(siteUrl).catch(() => []) : [];
+  const topics = await annotateSeoTopics(context.env, brand.id, bank, siteTitles);
   return json({
     topics,
     recommended: recommendedSeoTopics(topics),

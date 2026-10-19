@@ -5,7 +5,7 @@ import { seoChatJson, socialChatJson } from './social-llm';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
-  TRAFFIC_SYSTEM_PROMPT, WASHGO_TRAFFIC_SYSTEM_PROMPT, TASKGO_TRAFFIC_SYSTEM_PROMPT, composeTrafficPrompt, taskgoLectureIssue, type TrafficFormulaId,
+  composeTrafficPrompt, taskgoLectureIssue, trafficStaleIssue, trafficSystemPrompt, type TrafficFormulaId,
   buildImageInspiredPostPrompt, buildGamePromoPrompt, GAME_PROMO_URL,
   type GamePromoAngle,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
@@ -739,20 +739,17 @@ export async function generateTrafficPost(
     theme?: string | null;
     siblings?: string[];
     focusKeyword?: string | null;
+    hourTw?: number;
+    now?: number;
     skipPrediction?: boolean;
   },
 ): Promise<GenerationResult> {
-  const focusKeyword = params.focusKeyword === '電鍋' || params.focusKeyword === '圍爐' ? null : params.focusKeyword;
-  const spec = composeTrafficPrompt({ ...params, focusKeyword });
+  const spec = composeTrafficPrompt(params);
   const limit = spec.maxChars + 40;
   const washgo = params.brandSlug === 'washgo';
   const taskgo = params.brandSlug === 'taskgo';
-  const focus = washgo || taskgo ? '' : (focusKeyword?.trim() || '');
-  const systemPrompt = washgo
-    ? WASHGO_TRAFFIC_SYSTEM_PROMPT
-    : taskgo
-      ? TASKGO_TRAFFIC_SYSTEM_PROMPT
-      : TRAFFIC_SYSTEM_PROMPT;
+  const anchor = spec.anchor.trim();
+  const systemPrompt = trafficSystemPrompt(params.brandSlug);
   const userPrompt = spec.prompt;
   let post = await socialChatJson<GeneratedPost>(env, {
     messages: [
@@ -769,13 +766,15 @@ export async function generateTrafficPost(
   const leaked = (washgo
     ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|洗楽|HappyWash|happy415|https?:\/\/|工地|業主|房東/
     : taskgo
-      ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|房東|電鍋/
-      : /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|只有一件|工地|業主|房東|電鍋/
+      ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|電鍋|房東/
+      : /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|工地|電鍋/
   ).test(post.body);
-  const missed = Boolean(focus) && !post.body.includes(focus);
+  const missed = Boolean(anchor) && !post.body.includes(anchor);
   const trafficVoice = taiwanVoiceIssue(post.body);
   const lecture = taskgo ? taskgoLectureIssue(post.body) : null;
-  if (post.body.length > limit || leaked || missed || post.body.length < 80 || trafficVoice || lecture) {
+  const stale = trafficStaleIssue(params.brandSlug, post.body);
+  const minChars = spec.category === 'joke' ? 50 : 80;
+  if (post.body.length > limit || leaked || missed || post.body.length < minChars || trafficVoice || lecture || stale) {
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: systemPrompt },
@@ -783,13 +782,13 @@ export async function generateTrafficPost(
         { role: 'assistant', content: JSON.stringify(post) },
         {
           role: 'user',
-          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${focus}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}${lecture ? `，${lecture}` : ''}）。` +
-            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${focus ? `，場面必須出現「${focus}」` : washgo ? '，改成櫃檯一句問話' : taskgo ? '，改成工地一句輕的話，人沒有接' : '，改成一句讓人想回嘴的話，人沒有接'}。` +
+          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${anchor}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}${lecture ? `，${lecture}` : ''}${stale ? `，${stale}` : ''}）。` +
+            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${anchor ? `，正文必須出現「${anchor}」` : spec.category === 'joke' ? '，改成一個讓人想按讚的品牌笑話，笑點放最後一行' : '，改成一個讓人想轉的小故事'}。` +
             (washgo
-              ? '一句問話之後停住。不要列功能，不要提別的店，不要寫電鍋。禁止簡體、大陸用語。回傳同格式 JSON。'
+              ? '可以寫洗衣店和衣服。不要寫洗好了沒，不要列功能，不要提別的店，不要寫婆媳。禁止簡體、大陸用語。回傳同格式 JSON。'
               : taskgo
-                ? '可以寫工地。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。不要寫電鍋、圍爐、盛飯。不要寫外勞都。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
-                : '不要出現電鍋、圍爐、盛飯。引號是最後一行，人沒有接。時事不要改成品牌比喻。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌、「男生都」「女生都」。回傳同格式 JSON。'),
+                ? '可以寫工地、裝修、颱風。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。不要寫婆媳、電鍋。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
+                : '可以寫離職、房租、搬家。不要寫婆媳、家庭對罵。不要站隊罵人。禁止簡體、大陸用語、「男生都」「女生都」。回傳同格式 JSON。'),
         },
       ],
       temperature: 0.7,

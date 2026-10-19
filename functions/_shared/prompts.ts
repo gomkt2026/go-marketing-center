@@ -1552,98 +1552,163 @@ export function buildOfftopicUserPrompt(usedTopics: string[], brandSlug?: string
 }
 
 // ============================================================================
-// Threads 流量文。非匠城檔不介紹品牌。
-// 10/9–10/10 三個帳號被綁在同一則時事（美債、金馬、英超、法甲），
-// 再硬套進工地、租屋、自助洗衣，帖文幾乎同一張臉，瀏覽大多停在幾百次。
-// 之後各寫各的：家庭、兩性、感情。時事只有能放進飯桌或感情裡才用。
+// Threads 流量文。非匠城檔不介紹產品。
+// 舊策略把 TaskGo 鎖在工序、Homigo 鎖在婆媳、Washgo 鎖在「洗好了沒」，
+// 同一批讀者看久了不會按讚。
+// 改成兩種交錯：時事小故事、品牌笑話。三個帳號各接各的熱門，不要寫成同一則新聞的三種比喻。
 // ============================================================================
 
-export type TrafficFormulaId = 'family' | 'gender' | 'feeling' | 'news';
-
-const TRAFFIC_LANES: Record<TrafficFormulaId, { label: string; maxChars: number; instruction: string }> = {
-  family: {
-    label: '家庭',
-    maxChars: 240,
-    instruction:
-      '寫家庭裡一句不公平的話。爸媽、手足、阿嬤、過年圍爐、誰該洗碗、家族群組。' +
-      '一個具體的人講一句讓另一邊想回嘴的話，敘事者沒有接。不要和解，不要問你家的溫柔。',
-  },
-  gender: {
-    label: '兩性',
-    maxChars: 240,
-    instruction:
-      '寫兩個人之間讓人想留言的瞬間：誰先傳訊息、帳單誰付、催婚、家事誰做。' +
-      '不色情，不寫男生都或女生都。一句引號之後停住，不要問有沒有人顧過你。',
-  },
-  feeling: {
-    label: '感情',
-    maxChars: 220,
-    instruction:
-      '寫感情裡一句沒有被接住的話。一個晚上、一個人、一個動作。不要散文，不要道理，不要寫成被懂。' +
-      '不要問讀者心裡還放著哪一句。',
-  },
-  news: {
-    label: '時事',
-    maxChars: 220,
-    instruction:
-      '時事要直接寫大家正在氣的那一件事和那一句話，不要改成工地、房租、洗衣的比喻。' +
-      '專有名詞可以出現。沒有那種讓人想回嘴的事，就改寫家裡或現場一句沒被接住的話。',
-  },
-};
+export type TrafficFormulaId = 'hook' | 'joke';
 
 const TRAFFIC_HOURS = [0, 6, 9, 12, 18, 21];
-const TRAFFIC_LANE_ORDER: TrafficFormulaId[] = ['family', 'gender', 'feeling', 'news'];
 
-const TREND_SKIP = /地震|颱風|豪雨|死亡|命案|戰爭|選舉|罷免|股票|股價|美債|殖利率|比特幣|比分|冠軍|英超|法甲|中職|金馬|自殺|色情|未成年|愛豆|韓星/;
-const LIFE_TREND = /結婚|離婚|生子|生育|小孩|孩子|爸|媽|家庭|薪水|房租|物價|性別|婚姻|婆家|單身|約會|分手|家暴|長照|過年|圍爐|紅包|回娘家|聘金|同居|家務/;
+/** 災難、政治、喪聞不拿來博流量。 */
+const TREND_BLOCK = /死亡|命案|戰爭|暴動|選舉|罷免|自殺|色情|未成年|殺害|兇殺|空難|喪禮|告別式|梗塞/;
+/** 純賽事、純債市放最後，有生活題材就不要三個帳號一起寫。 */
+const TREND_DEFER = /股價|美債|殖利率|比特幣|升息|英超|法甲|冠軍|比分|中職|金馬/;
+
+const BRAND_TREND_FIT: Record<string, RegExp> = {
+  taskgo: /颱風|豪雨|地震|漏水|淹水|裝修|營造|工地|施工|老屋|壁癌|停班|薔/,
+  homigo: /房租|房價|租屋|租金|離職|薪水|搬家|居住|失業/,
+  washgo: /車站|店面|鐵軌|地下化|回憶|下雨|洗衣|衣服|梅雨|換季/,
+};
+
+const JOKE_SEEDS: Record<string, string[]> = {
+  taskgo: [
+    '業主說只是一點小漏水，到場才發現天花板在跟你點頭',
+    '颱風天群組最安靜的是氣象，最吵的是「師傅你人到了沒」',
+    '估價單寫了順便，現場多出一面沒人承認的牆',
+    '收工前五分鐘，業主想起還有一個小地方',
+    '鷹架上的人在看天，樓下的人在看群組',
+  ],
+  homigo: [
+    '離職了，下個月房租還在，睡公園嗎',
+    '看房時窗景很好，搬進去才發現窗景是隔壁的冷氣室外機',
+    '薪水入帳的同一天，房租把它認領走',
+    '退租照片傳出去，對方回這也叫清潔',
+    '合約寫近捷運，近的是你願意走的那段',
+  ],
+  washgo: [
+    '羽絨被洗完，比客人先把門口佔滿',
+    '洗標像外星文，客人問能不能進水，標籤自己也不確定',
+    '下雨天，整條街的衣服都來店裡避難',
+    '老車站那排店面若有一間洗衣店，路翻掉之後它還在不在',
+    '客人說這件不能縮，結果它自己先縮成回憶',
+  ],
+};
 
 export function trafficFormulaFor(slug: string, hourTw: number, now = Date.now()): TrafficFormulaId {
   const brand = slug === 'taskgo' ? 0 : slug === 'washgo' ? 2 : 1;
   const hourIndex = Math.max(0, TRAFFIC_HOURS.indexOf(hourTw));
   const day = Math.floor((now + 8 * 60 * 60 * 1000) / 86400000);
-  return TRAFFIC_LANE_ORDER[(day + brand + hourIndex) % TRAFFIC_LANE_ORDER.length];
+  return (day + brand + hourIndex) % 2 === 0 ? 'hook' : 'joke';
 }
 
-/** 只留下能放進家庭或感情的時事。運動、債市、頒獎、人名不拿來硬套。 */
-export function pickLifeTrend(trends: string[]): string | null {
-  const hit = trends
-    .map((item) => item.replace(/\s+/g, ' ').trim())
-    .find((item) => item.length >= 2 && item.length <= 24 && LIFE_TREND.test(item) && !TREND_SKIP.test(item));
-  return hit ?? null;
+export function usableTrends(titles: string[]): string[] {
+  const seen = new Set<string>();
+  const fresh: string[] = [];
+  const deferred: string[] = [];
+  for (const raw of titles) {
+    let title = raw.replace(/\s+/g, ' ').trim();
+    title = title.replace(/\s*[-|｜]\s*(自由時報|自由電子報|聯合報|ETtoday|三立|TVBS|中央社|Yahoo).*$/i, '').trim();
+    if (title.length > 36) title = title.slice(0, 28);
+    const key = title.replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '');
+    if (key.length < 2 || seen.has(key) || TREND_BLOCK.test(title)) continue;
+    seen.add(key);
+    (TREND_DEFER.test(title) ? deferred : fresh).push(title);
+  }
+  return [...fresh, ...deferred];
+}
+
+/** 每個品牌先拿跟自己生活面最貼的熱門，再依日期錯開，避免三個帳號寫同一則。 */
+export function pickBrandTrend(titles: string[], slug: string, hourTw: number, now = Date.now()): string | null {
+  const usable = usableTrends(titles);
+  if (!usable.length) return null;
+  const fit = BRAND_TREND_FIT[slug] ?? /$^/;
+  const preferred = usable.filter((title) => fit.test(title));
+  const rest = usable.filter((title) => !fit.test(title));
+  const pool = [...preferred, ...rest];
+  const brand = slug === 'taskgo' ? 0 : slug === 'washgo' ? 2 : 1;
+  const hourIndex = Math.max(0, TRAFFIC_HOURS.indexOf(hourTw));
+  const day = Math.floor((now + 8 * 60 * 60 * 1000) / 86400000);
+  return pool[(day + hourIndex + brand) % pool.length] ?? null;
+}
+
+/** 正文裡必須看得到的短錨點，讓人一眼對上那則熱門。 */
+export function trendAnchor(title: string): string {
+  const named = title.match(/颱風[\u4e00-\u9fff]{1,3}|[\u4e00-\u9fff]{1,2}颱風/);
+  if (named) return named[0];
+  const token = title.match(/台南車站|百年鐵軌|房價|離職|發票|薔[\u4e00-\u9fff]/);
+  if (token) return token[0];
+  const core = title.replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '');
+  return core.slice(0, Math.min(4, core.length));
+}
+
+export function trafficStaleIssue(slug: string, body: string): string | null {
+  if (/婆媳|婆婆|媳婦/.test(body)) return '又寫回婆媳';
+  if (slug === 'washgo' && /洗好了沒/.test(body)) return '又寫回客人問洗好了沒';
+  if (slug === 'taskgo' && taskgoLectureIssue(body)) return taskgoLectureIssue(body);
+  return null;
 }
 
 export const WASHGO_TRAFFIC_SYSTEM_PROMPT =
-  '你是台灣洗衣店的年輕店員，在 Threads 講櫃檯上一句問話。' +
-  '問完就停。不要寫後面發生什麼，不要寫你怎麼回。' +
-  '不要寫成廣告、不要列功能、不要 hashtag、不要連結、不要叫人加 LINE、不要提別的洗衣店名字。' +
-  '不要寫婆媳、電鍋、圍爐。不要寫品牌名。' +
-  TAIWAN_LOCAL_VOICE;
+  '你是台灣洗衣店的年輕店員，在 Threads 講一個讓人想按讚、想轉出去的小故事或笑話。' +
+  '可以寫店面、衣服、街角回憶、下雨天。' +
+  '不要寫成廣告，不要列功能，不要 hashtag，不要連結，不要叫人加 LINE，不要提別的洗衣店名字。' +
+  '不要整篇只問洗好了沒。不要寫婆媳。不要寫品牌名。' +
+  TAIWAN_LOCAL_VOICE +
+  '這一則不要寫婆媳、婆婆、媳婦。';
 
 export const TASKGO_TRAFFIC_SYSTEM_PROMPT =
-  '你是台灣工地的帶班，在 Threads 講現場一句輕的話。' +
-  '不要教訓業主，不要證明自己比較懂，也不要列工序。' +
-  '可以寫工地、業主、叫料。不要寫電鍋、圍爐、盛飯、保溫。' +
-  '不要寫水泥比例、坍度、配比、砂漿比例、做了幾年。' +
-  '不要寫成一整群人的結論，不要寫外勞都、某國人都。不要寫品牌名、報價、連結、hashtag。' +
-  TAIWAN_LOCAL_VOICE;
+  '你是台灣工地的帶班，在 Threads 講一個讓人想按讚、想轉出去的小故事或笑話。' +
+  '可以寫颱風、漏水、室內裝修、收工、業主隨口一句。' +
+  '不要教訓業主，不要列工序，不要寫水泥比例、配比、坍度、做了幾年。' +
+  '不要寫婆媳、電鍋、圍爐。不要寫品牌名、報價、連結、hashtag。' +
+  TAIWAN_LOCAL_VOICE +
+  '這一則不要寫婆媳、婆婆、媳婦。';
 
 /** 工地文若在教工序或寫配比，同行會直接說這是假文。 */
 export function taskgoLectureIssue(body: string): string | null {
   if (/水泥比例|坍度|水灰比|配比|砂漿比例/.test(body)) return '寫了水泥比例或配比，像在教工序';
-  if (/做[了過]?\d+年/.test(body)) return '用做了幾年來證明自己懂';
-  const steps = body.match(/量了|檢查了|確認了|測了|算了/g);
+  if (/做[了過]?([一二三四五六七八九十兩]|\d)+多年?/.test(body)) return '用做了幾年來證明自己懂';
+  const steps = body.match(/量了|檢查了|確認了|測了|算了|先看|先量|先檢查|先測|先確認/g);
   if (steps && steps.length >= 3) return '連續列了三項以上工序';
+  if (/找了.*師傅過來/.test(body) && /業主在旁邊/.test(body)) return '又寫成師傅到場、業主在旁邊看的同一套';
   return null;
 }
 
 export const TRAFFIC_SYSTEM_PROMPT =
-  '你是會在 Threads 上引發共鳴的台灣人，不是任何品牌的小編。' +
-  '這篇不要出現品牌、產品、工地報價、業主、師傅在工地、租屋平台、房東收租、早餐店、自助洗衣、烘衣機、甩乾、只有一件。' +
-  '婆媳、家事、誰先傳訊息、誰付錢可以寫。寫成一句不公平的話，敘事者沒有接。不要寫成廣告、新聞，不要攻擊一整群人，不要寫外籍配偶融入台灣的心靈雞湯。' +
-  '寫家庭、兩性、感情裡讓人想留言的場面。不要和解，不要寫很小的溫柔。' +
-  '一個具體的人，一句引號，然後停住。不要下結論，不要新聞稿，不要問你站哪邊。' +
+  '你是會在 Threads 上講租屋生活的台灣人，不是任何品牌的小編。' +
+  '這篇可以寫離職、薪水、房租、搬家、一個人還在租。' +
+  '不要寫婆媳、婆婆、媳婦，不要寫家庭對罵，不要站隊罵房東或房客。' +
+  '不要寫成廣告、新聞稿。一個具體場面，一句讓人想轉的話。' +
   '禁止品牌名、產品、系統、App、連結、hashtag、促銷。' +
-  TAIWAN_LOCAL_VOICE;
+  TAIWAN_LOCAL_VOICE +
+  '這一則不要寫婆媳、婆婆、媳婦。';
+
+export function trafficSystemPrompt(slug: string): string {
+  if (slug === 'washgo') return WASHGO_TRAFFIC_SYSTEM_PROMPT;
+  if (slug === 'taskgo') return TASKGO_TRAFFIC_SYSTEM_PROMPT;
+  return TRAFFIC_SYSTEM_PROMPT;
+}
+
+function pickJokeSeed(slug: string, hourTw: number, now: number): string {
+  const seeds = JOKE_SEEDS[slug] ?? JOKE_SEEDS.homigo;
+  const brand = slug === 'taskgo' ? 0 : slug === 'washgo' ? 2 : 1;
+  const hourIndex = Math.max(0, TRAFFIC_HOURS.indexOf(hourTw));
+  const day = Math.floor((now + 8 * 60 * 60 * 1000) / 86400000);
+  return seeds[(day + hourIndex + brand) % seeds.length];
+}
+
+function brandHookCut(slug: string): string {
+  if (slug === 'taskgo') {
+    return '把這則時事接到營造、室內裝修或工地最怕的事。寫一個師傅或屋主會心一笑、想轉給同行的小故事。可以寫漏水、鷹架、颱風天還要收工。不要列工序，不要教訓業主。';
+  }
+  if (slug === 'washgo') {
+    return '把這則時事接到街角店面、衣服或在地回憶。可以問那排店裡有沒有洗衣店，或這種天氣衣服怎麼辦。不要寫客人問洗好了沒，不要教洗法。';
+  }
+  return '把這則時事接到「人還在租屋、生活突然轉彎」。離職、薪水、房租、搬家、一個人住都可以。不要寫婆媳，不要寫家庭對罵。';
+}
 
 export function composeTrafficPrompt(opts: {
   brandSlug: string;
@@ -1652,89 +1717,51 @@ export function composeTrafficPrompt(opts: {
   theme?: string | null;
   siblings?: string[];
   focusKeyword?: string | null;
-}): { prompt: string; category: TrafficFormulaId; label: string; maxChars: number; theme: string } {
-  const lane = TRAFFIC_LANES[opts.formula] ?? TRAFFIC_LANES.feeling;
-  const theme = opts.focusKeyword || (opts.formula === 'news' && opts.theme ? opts.theme : lane.label);
-  if (opts.brandSlug === 'taskgo') {
-    return {
-      category: opts.formula,
-      label: '現場一句話',
-      maxChars: 220,
-      theme: '現場一句話',
-      prompt: [
-        '寫一則工地 Threads。一個具體的人隨口講一句話，語氣放輕，不要看不起人，也不要教訓對方。',
-        '這句引號是最後一行。前面不要列工序，後面不要再解釋。',
-        '不要寫水泥比例、坍度、配比、砂漿、垂直度、做了幾年、隨便找人就行。',
-        '敘事者沒有接話，沒有金句，沒有教別人該怎麼做。',
-        '不要寫電鍋、圍爐、盛飯、保溫、家族群。不要寫外勞都、某國人都。',
-        '不要出現品牌名、報價、連結、hashtag。',
-        opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
-        opts.usedTopics.length ? `這些標題和開頭最近用過，換一句現場的話：\n${opts.usedTopics.join('\n')}` : '',
-        '正文 80 到 220 字，一句一行。',
-        '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","hashtags":[],"cta":""}',
-      ].filter(Boolean).join('\n'),
-    };
-  }
-  if (opts.brandSlug === 'washgo') {
-    const washgoScenes = [
-      '只寫客人問「洗好了沒」。進度已經看得到。這句問話是最後一行，不要解釋系統。',
-      '只寫一件洗壞的衣服。客人的一句話放在最後一行。不要教洗法，不要寫你怎麼回。',
-      '只寫袋子裡一件不方便當面打開的東西。單獨裝箱，備註不寫在外面。可以點到按摩棒一次，不描述、不笑客人。問完就停。',
-    ];
-    const washgoSceneKeys = [
-      ['洗好了沒'],
-      ['洗壞', '縮水', '起毛', '穿不了'],
-      ['單獨裝', '按摩棒', '不寫在外面', '袋子裡'],
-    ];
-    const recentWashgo = opts.usedTopics.slice(0, 6).join('\n');
-    const taipeiHour = (new Date().getUTCHours() + 8) % 24;
-    const hourSlot = [0, 6, 9, 12, 18, 21].indexOf(taipeiHour);
-    let washgoScene = washgoScenes[Math.max(0, hourSlot) % 3];
-    for (let step = 0; step < 3; step += 1) {
-      const index = (Math.max(0, hourSlot) + step) % 3;
-      if (!washgoSceneKeys[index].some((key) => recentWashgo.includes(key))) {
-        washgoScene = washgoScenes[index];
-        break;
-      }
-    }
-    return {
-      category: opts.formula,
-      label: '櫃檯一句話',
-      maxChars: 150,
-      theme: '櫃檯一句話',
-      prompt: [
-        '寫一則洗衣店店員的 Threads。像櫃檯隨手發的，不是品牌稿。',
-        washgoScene,
-        '一句問話用引號。問完就停，不要列功能。',
-        '不要寫婆媳、電鍋、圍爐。不要出現品牌名、別的店名、連結、hashtag、電話。',
-        opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
-        opts.usedTopics.length ? `這些標題和開頭最近用過，換一句客人的問話：\n${opts.usedTopics.join('\n')}` : '',
-        '正文 80 到 150 字，一句一行。',
-        '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","hashtags":[],"cta":""}',
-      ].filter(Boolean).join('\n'),
-    };
-  }
+  now?: number;
+  hourTw?: number;
+}): { prompt: string; category: TrafficFormulaId; label: string; maxChars: number; theme: string; anchor: string } {
+  const now = opts.now ?? Date.now();
+  const hourTw = opts.hourTw ?? (new Date(now).getUTCHours() + 8) % 24;
+  const isJoke = opts.formula === 'joke';
+  const theme = (opts.theme ?? '').trim();
+  const anchor = !isJoke && theme ? trendAnchor(theme) : '';
+  const maxChars = isJoke ? 140 : opts.brandSlug === 'washgo' ? 170 : 220;
+  const minChars = isJoke ? 50 : 80;
+  const label = isJoke ? '品牌笑話' : '時事小故事';
+  const shared = [
+    '三個帳號各寫各的，不要寫成同一則新聞的三種版本。',
+    '不要寫婆媳、婆婆、媳婦。不要品牌名、報價、連結、hashtag、電話。',
+    '用台灣口語。一句一行。問句最多一句，放在最後一行。',
+    '禁止簡體、大陸用語、外籍配偶廚房考試，以及「男生都」「女生都」。',
+    opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
+    opts.usedTopics.length ? `這些標題和開頭最近用過，換一個場面：\n${opts.usedTopics.join('\n')}` : '',
+    `正文 ${minChars} 到 ${maxChars} 字。`,
+    '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","hashtags":[],"cta":""}',
+  ];
+  const lead = isJoke
+    ? [
+        '寫一則跟這個品牌生活有關的笑話。要有畫面，最後一行是笑點，讓人想按讚。',
+        `場面從這裡長出來：${pickJokeSeed(opts.brandSlug, hourTw, now)}。`,
+        theme ? `若「${theme}」能變成笑點就用，接不上就不要提。` : '',
+        opts.brandSlug === 'taskgo' ? '可以寫工地、裝修、颱風天出工。不要列工序，不要教訓業主。' : '',
+        opts.brandSlug === 'washgo' ? '可以寫洗衣店、衣服、店門口。不要寫洗好了沒，不要教洗法。' : '',
+        opts.brandSlug === 'homigo' ? '可以寫離職、房租、搬家、一個人住。不要寫家庭對罵。' : '',
+      ]
+    : [
+        theme
+          ? `這一則只接這一則時事：「${theme}」。正文要出現「${anchor}」，讓人一眼對上熱門。`
+          : '現在沒有可用的時事。改寫一個這週大家會轉的生活場面，仍然用下面的品牌切角。',
+        brandHookCut(opts.brandSlug),
+        '結構：第一行點到時事，中間一個具體小故事，最後一行是讓人想轉的那一句。',
+        '不要寫成新聞稿，不要列重點，不要硬塞產品。',
+      ];
   return {
     category: opts.formula,
-    label: lane.label,
-    maxChars: lane.maxChars,
-    theme,
-    prompt: [
-      '寫一則 Threads。讓陌生人覺得這是自己的家或自己的感情，看完想留言，不是一則品牌貼文。',
-      opts.focusKeyword
-        ? `這一則的場面就是「${opts.focusKeyword}」。這個詞近 28 天的貼文瀏覽明顯比較高。寫成這一個家裡的具體場面和一句話，讓人想回自己的故事。不要寫成議題整理，不要寫成一整群人的結論。`
-        : `這一則只寫「${lane.label}」。`,
-      lane.instruction,
-      opts.focusKeyword ? '' : (opts.formula === 'news' && opts.theme ? `可以借用的時事只有這一則：${opts.theme}。接不上就不要提。` : '不要提新聞、運動、明星、債市、頒獎。'),
-      '三個帳號今天各寫各的，不要寫成同一件事的三種版本。',
-      opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
-      '開頭不要用「自助洗衣」「工地」「房東」「電鍋」「圍爐」「盛飯」。正文不要出現電鍋。直接從人說的那一句不公平的話開始。',
-      '用台灣口語。引號那一句是最後一行，後面不要再寫敘事者怎麼回、全桌安靜、然後去做別的事。時事不要改成品牌比喻。禁止簡體、大陸用語、外籍配偶廚房考試、三天飯桌都被嫌，以及「男生都」「女生都」。',
-      `正文 ${Math.max(80, lane.maxChars - 80)} 到 ${lane.maxChars} 字，一句一行。`,
-      '不要 hashtag，不要連結，不要第二則回覆。',
-      opts.usedTopics.length ? `這些標題和開頭最近用過，換一個家裡的人或一句話：\n${opts.usedTopics.join('\n')}` : '',
-      '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","hashtags":[],"cta":""}',
-    ].filter(Boolean).join('\n'),
+    label,
+    maxChars,
+    theme: theme || label,
+    anchor,
+    prompt: [...lead, ...shared].filter(Boolean).join('\n'),
   };
 }
 

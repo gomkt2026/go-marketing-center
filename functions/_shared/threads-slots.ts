@@ -2,7 +2,7 @@ import type { Env } from './env';
 import { getSql } from './db';
 import {
   buildBrandContext,
-  trafficFormulaFor, pickLifeTrend,
+  trafficFormulaFor, pickBrandTrend, trendAnchor,
   GAME_PUBLIC_STILLS,
 } from './prompts';
 import { loadGamePromoBrief } from './game-daily';
@@ -11,14 +11,13 @@ import {
   saveGeneratedContent, findBrandAgent,
 } from './generate';
 import { logActivity } from './activity';
-import { fetchGoogleTrendsTW } from './sources';
+import { fetchGoogleTrendsTW, fetchTaiwanNews } from './sources';
 import {
   countSlotsByBrand, listBrandThreadHours, sourceForBrandHour, listBrandPostingSlots,
   isHourlyFamily, isOfftopicFamily, slotKindLabel,
   type PostingSlotKind,
 } from './posting-slots';
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from './auto-post-brands';
-import { focusKeywordFor, loadResonantKeywords } from './resonance';
 
 /** 品牌相關跟風文時段(台灣時間) */
 export const THREADS_POST_HOURS_TW: readonly number[] = [0, 6, 12, 18];
@@ -111,6 +110,7 @@ async function writeTrafficDraft(
   const sql = getSql(env);
   const hourTW = (slotAt.getUTCHours() + 8) % 24;
   const formula = trafficFormulaFor(brand.slug, hourTW, slotAt.getTime());
+  const slotMs = slotAt.getTime();
   const usedRows = await sql`
     SELECT c.title,
            left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 42) AS opening
@@ -130,8 +130,16 @@ async function writeTrafficDraft(
   const usedTopics = (usedRows as { title: string | null; opening: string | null }[])
     .map((r) => [r.title, r.opening].filter(Boolean).join('｜'))
     .filter((t) => t.length > 0);
-  const trends = formula === 'news' ? await fetchGoogleTrendsTW(8).catch(() => []) : [];
-  const theme = pickLifeTrend(trends.map((item) => item.title));
+  const [googleTrends, headlines] = await Promise.all([
+    fetchGoogleTrendsTW(12).catch(() => []),
+    fetchTaiwanNews(8).catch(() => []),
+  ]);
+  const theme = pickBrandTrend(
+    [...googleTrends, ...headlines].map((item) => item.title),
+    brand.slug,
+    hourTW,
+    slotMs,
+  );
   const siblingRows = await sql`
     SELECT b.slug,
            left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 36) AS opening
@@ -151,19 +159,16 @@ async function writeTrafficDraft(
   `;
   const siblings = (siblingRows as { slug: string; opening: string | null }[])
     .map((r) => [r.slug, r.opening].filter(Boolean).join('｜'));
-  const keywords = await loadResonantKeywords(env).catch((e) => {
-    console.error('[threads] 高瀏覽題材讀取失敗', e);
-    return [];
-  });
-  const focusKeyword = focusKeywordFor(keywords, brand.slug, hourTW);
   const agentId = await findBrandAgent(env, brand.id);
+  const anchor = formula === 'hook' && theme ? trendAnchor(theme) : '';
   const post = await generateTrafficPost(env, {
     brandSlug: brand.slug,
     formula,
     usedTopics,
     theme,
     siblings,
-    focusKeyword,
+    hourTw,
+    now: slotMs,
     skipPrediction: true,
   });
   const { contentId } = await saveGeneratedContent(env, {
@@ -176,8 +181,8 @@ async function writeTrafficDraft(
       source: slotKind,
       category: formula,
       trafficFormula: formula,
-      trafficTheme: focusKeyword ?? theme ?? formula,
-      focusKeyword,
+      trafficTheme: theme ?? formula,
+      trendAnchor: anchor,
       slotAt: slotAt.toISOString(),
       audienceLane: 'b2c',
     },
@@ -189,7 +194,7 @@ async function writeTrafficDraft(
     action: 'content.generated',
     entityType: 'content',
     entityId: contentId,
-    afterState: { platform: 'threads', source: slotKind, category: formula, trafficTheme: focusKeyword ?? theme, scheduled: false, slotAt: slotAt.toISOString() },
+    afterState: { platform: 'threads', source: slotKind, category: formula, trafficTheme: theme, trendAnchor: anchor, scheduled: false, slotAt: slotAt.toISOString() },
   });
   return { contentId, category: formula };
 }

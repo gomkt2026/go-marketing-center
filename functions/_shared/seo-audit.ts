@@ -259,7 +259,7 @@ function parsePage(url: string, status: number | null, finalUrl: string | null, 
   };
 }
 
-function parseSitemapLocs(xml: string, limit = 12): string[] {
+function parseSitemapLocs(xml: string, limit = 80): string[] {
   const locs = [...xml.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)].map((m) => m[1].trim());
   const seen = new Set<string>();
   const out: string[] = [];
@@ -471,7 +471,7 @@ export async function runBrandSeoAudit(
   const moreUrls = sitemapLocs
     .filter((loc) => !seedUrls.includes(loc.replace(/\/$/, '')) && loc.startsWith(originOf(siteUrl)))
     .filter((loc) => /blog|article|knowledge|guide|pricing|brands|about/i.test(loc))
-    .slice(0, 8);
+    .slice(0, 24);
   const moreFetched = await Promise.all(moreUrls.map((url) => fetchUrl(url)));
 
   const htmlPages: SeoPageSnapshot[] = [];
@@ -510,7 +510,8 @@ export async function runBrandSeoAudit(
   }
 
   const host = new URL(siteUrl).hostname;
-  if (host.startsWith('dev.') || host.endsWith('.pages.dev') || host.endsWith('.workers.dev')) {
+  const officialHost = brand.slug === 'taskgo' && host === 'dev.taskgo.com.tw';
+  if (!officialHost && (host.startsWith('dev.') || host.endsWith('.pages.dev') || host.endsWith('.workers.dev'))) {
     addFinding(findings, counters, {
       category: 'indexability',
       priority: 'P0',

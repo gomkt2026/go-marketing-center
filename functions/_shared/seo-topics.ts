@@ -163,9 +163,10 @@ export async function annotateSeoTopics(
   env: Env,
   brandId: string,
   topics: SeoTopicSeed[],
+  extraTitles: string[] = [],
 ): Promise<SeoTopicWithCoverage[]> {
   const coverage = await loadSeoContentTitles(env, brandId);
-  return classifySeoTopics(topics, coverage);
+  return classifySeoTopics(topics, { ...coverage, extraTitles });
 }
 
 export function recommendedSeoTopics(topics: SeoTopicWithCoverage[]): SeoTopicWithCoverage[] {
@@ -189,7 +190,7 @@ async function fetchText(url: string): Promise<string> {
   }
 }
 
-function sitemapLocs(xml: string, limit = 12): string[] {
+function sitemapLocs(xml: string, limit = 80): string[] {
   const locs = [...xml.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)].map((m) => m[1].trim());
   const seen = new Set<string>();
   const out: string[] = [];
@@ -202,6 +203,11 @@ function sitemapLocs(xml: string, limit = 12): string[] {
   return out;
 }
 
+/** 只留 /blog/某一篇，不要把 /blog、/guide 這種目錄頁算成一篇長文。 */
+function blogArticleUrls(xml: string): string[] {
+  return sitemapLocs(xml, 80).filter((loc) => /\/blog\/[^/?#]+\/?$/i.test(loc));
+}
+
 function htmlTitle(html: string, fallback: string): string {
   const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = match?.[1]?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -210,14 +216,19 @@ function htmlTitle(html: string, fallback: string): string {
 
 export async function crawlSiteArticleTitles(siteUrl: string): Promise<string[]> {
   const origin = siteUrl.replace(/\/$/, '');
-  const titles: string[] = [];
   const sitemap = await fetchText(`${origin}/sitemap.xml`);
-  const blogUrls = sitemapLocs(sitemap, 12).filter((loc) => /blog|article|knowledge|guide/i.test(loc)).slice(0, 4);
-  const blogIndex = await fetchText(`${origin}/blog`);
-  if (blogIndex) titles.push(htmlTitle(blogIndex, 'blog'));
-  const pages = await Promise.all(blogUrls.map((url) => fetchText(url).then((html) => htmlTitle(html, url))));
-  titles.push(...pages.filter(Boolean));
-  return [...new Set(titles)];
+  let articleUrls = blogArticleUrls(sitemap);
+  if (/<sitemapindex/i.test(sitemap)) {
+    const nested = await Promise.all(sitemapLocs(sitemap, 8).map((url) => fetchText(url)));
+    articleUrls = nested.flatMap((xml) => blogArticleUrls(xml));
+  }
+  const unique = [...new Set(articleUrls)].slice(0, 40);
+  const pages = await Promise.all(unique.map(async (url) => {
+    const html = await fetchText(url);
+    const title = htmlTitle(html, '');
+    return title && title !== url ? title : '';
+  }));
+  return [...new Set(pages.filter(Boolean))];
 }
 
 function topicKey(topic: SeoTopicSeed): string {

@@ -109,7 +109,7 @@ async function writeTrafficDraft(
 ): Promise<{ contentId: string; category: string }> {
   const sql = getSql(env);
   const hourTW = (slotAt.getUTCHours() + 8) % 24;
-  const formula = trafficFormulaFor(brand.slug, hourTW, slotAt.getTime());
+  let formula = trafficFormulaFor(brand.slug, hourTW, slotAt.getTime());
   const slotMs = slotAt.getTime();
   const usedRows = await sql`
     SELECT c.title,
@@ -139,7 +139,9 @@ async function writeTrafficDraft(
     brand.slug,
     hourTW,
     slotMs,
+    usedTopics,
   );
+  if (formula === 'hook' && !theme) formula = 'joke';
   const siblingRows = await sql`
     SELECT b.slug,
            left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 36) AS opening

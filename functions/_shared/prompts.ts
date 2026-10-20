@@ -1555,15 +1555,19 @@ export function buildOfftopicUserPrompt(usedTopics: string[], brandSlug?: string
 // Threads 流量文。非匠城檔不介紹產品。
 // 舊策略把 TaskGo 鎖在工序、Homigo 鎖在婆媳、Washgo 鎖在「洗好了沒」，
 // 同一批讀者看久了不會按讚。
-// 改成兩種交錯：時事小故事、品牌笑話。三個帳號各接各的熱門，不要寫成同一則新聞的三種比喻。
+// 兩種交錯：時事小故事、品牌笑話。
+// 10/20 第一天的數字：硬接無關新聞的瀏覽掉下去（黃蜂、銅箔、緯創、威力彩），
+// 留在自己生活裡的笑話還在（近捷運、不能縮、估價單多一面牆）。
+// 所以時事只接跟這個品牌對得上的；對不上就改寫笑話，不要三個帳號一起蹭同一則。
+// 舊的高瀏覽是工序清單、婆媳、洗好了沒，會被說是假文，不走回去。
 // ============================================================================
 
 export type TrafficFormulaId = 'hook' | 'joke';
 
 const TRAFFIC_HOURS = [0, 6, 9, 12, 18, 21];
 
-/** 災難、政治、喪聞不拿來博流量。 */
-const TREND_BLOCK = /死亡|命案|戰爭|暴動|選舉|罷免|自殺|色情|未成年|殺害|兇殺|空難|喪禮|告別式|梗塞/;
+/** 災難、政治、喪聞、性騷擾不拿來博流量。 */
+const TREND_BLOCK = /死亡|命案|戰爭|暴動|選舉|罷免|自殺|色情|未成年|殺害|兇殺|空難|喪禮|告別式|梗塞|騷擾|狼爪|性侵|還債/;
 /** 純賽事、純債市放最後，有生活題材就不要三個帳號一起寫。 */
 const TREND_DEFER = /股價|美債|殖利率|比特幣|升息|英超|法甲|冠軍|比分|中職|金馬/;
 
@@ -1620,27 +1624,39 @@ export function usableTrends(titles: string[]): string[] {
   return [...fresh, ...deferred];
 }
 
-/** 每個品牌先拿跟自己生活面最貼的熱門，再依日期錯開，避免三個帳號寫同一則。 */
-export function pickBrandTrend(titles: string[], slug: string, hourTw: number, now = Date.now()): string | null {
+/** 只回傳跟這個品牌生活面貼得上的熱門。對不上就回 null，交給笑話，不要硬接球類、股市或社會新聞。 */
+export function pickBrandTrend(
+  titles: string[],
+  slug: string,
+  hourTw: number,
+  now = Date.now(),
+  used: string[] = [],
+): string | null {
   const usable = usableTrends(titles);
   if (!usable.length) return null;
   const fit = BRAND_TREND_FIT[slug] ?? /$^/;
   const preferred = usable.filter((title) => fit.test(title));
-  const rest = usable.filter((title) => !fit.test(title));
-  const pool = [...preferred, ...rest];
+  if (!preferred.length) return null;
+  const usedBlob = used.join('\n');
+  const fresh = preferred.filter((title) => {
+    const anchor = trendAnchor(title);
+    return anchor.length < 2 || !usedBlob.includes(anchor);
+  });
+  if (!fresh.length) return null;
   const brand = slug === 'taskgo' ? 0 : slug === 'washgo' ? 2 : 1;
   const hourIndex = Math.max(0, TRAFFIC_HOURS.indexOf(hourTw));
   const day = Math.floor((now + 8 * 60 * 60 * 1000) / 86400000);
-  return pool[(day + hourIndex + brand) % pool.length] ?? null;
+  return fresh[(day + hourIndex + brand) % fresh.length] ?? null;
 }
 
-/** 正文裡必須看得到的短錨點，讓人一眼對上那則熱門。 */
+/** 正文裡必須看得到的短錨點。只留中文，避免報紙英文名被切成 TAIP 這種碎片。 */
 export function trendAnchor(title: string): string {
   const named = title.match(/颱風[\u4e00-\u9fff]{1,3}|[\u4e00-\u9fff]{1,2}颱風/);
   if (named) return named[0];
-  const token = title.match(/台南車站|百年鐵軌|房價|離職|發票|薔[\u4e00-\u9fff]/);
+  const token = title.match(/台南車站|百年鐵軌|房價|房租|離職|搬家|發票|漏水|淹水|裝修|老屋|梅雨|換季|薔[\u4e00-\u9fff]/);
   if (token) return token[0];
-  const core = title.replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '');
+  const core = title.replace(/[^\u4e00-\u9fff]/g, '');
+  if (core.length < 2) return '';
   return core.slice(0, Math.min(4, core.length));
 }
 
@@ -1692,12 +1708,18 @@ export function trafficSystemPrompt(slug: string): string {
   return TRAFFIC_SYSTEM_PROMPT;
 }
 
-function pickJokeSeed(slug: string, hourTw: number, now: number): string {
+function pickJokeSeed(slug: string, hourTw: number, now: number, used: string[] = []): string {
   const seeds = JOKE_SEEDS[slug] ?? JOKE_SEEDS.homigo;
+  const blob = used.join('\n');
+  const open = seeds.filter((seed) => {
+    const key = seed.replace(/[，。]/g, '').slice(0, 6);
+    return key.length < 2 || !blob.includes(key);
+  });
+  const pool = open.length ? open : seeds;
   const brand = slug === 'taskgo' ? 0 : slug === 'washgo' ? 2 : 1;
   const hourIndex = Math.max(0, TRAFFIC_HOURS.indexOf(hourTw));
   const day = Math.floor((now + 8 * 60 * 60 * 1000) / 86400000);
-  return seeds[(day + hourIndex + brand) % seeds.length];
+  return pool[(day + hourIndex + brand) % pool.length];
 }
 
 function brandHookCut(slug: string): string {
@@ -1741,7 +1763,7 @@ export function composeTrafficPrompt(opts: {
   const lead = isJoke
     ? [
         '寫一則跟這個品牌生活有關的笑話。要有畫面，最後一行是笑點，讓人想按讚。',
-        `場面從這裡長出來：${pickJokeSeed(opts.brandSlug, hourTw, now)}。`,
+        `場面從這裡長出來：${pickJokeSeed(opts.brandSlug, hourTw, now, opts.usedTopics)}。`,
         theme ? `若「${theme}」能變成笑點就用，接不上就不要提。` : '',
         opts.brandSlug === 'taskgo' ? '可以寫工地、裝修、颱風天出工。不要列工序，不要教訓業主。' : '',
         opts.brandSlug === 'washgo' ? '可以寫洗衣店、衣服、店門口。不要寫洗好了沒，不要教洗法。' : '',

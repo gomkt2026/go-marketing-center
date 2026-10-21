@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import {
   assetStatusLabel, assetStatusTone, fallbackTaxonomy, imageCategoryLabel, libraryCopy, roleLabel,
 } from '@/lib/brand-asset-library';
+import { TASKGO_PRODUCT_FILMS } from '@/data/taskgo-product-films';
 import type {
   BrandAsset, BrandAssetImageCategory, BrandAssetRole, BrandAssetStatus, BrandAssetTaxonomy,
 } from '@/types';
@@ -140,6 +141,7 @@ export function BrandAssetLibrary({
   const [error, setError] = useState<string | null>(null);
   const [generatingAssetId, setGeneratingAssetId] = useState<string | null>(null);
   const [generatedContentId, setGeneratedContentId] = useState<string | null>(null);
+  const [generatedKind, setGeneratedKind] = useState<'post' | 'seo'>('post');
   const [openMenu, setOpenMenu] = useState<{ id: string; kind: 'use' | 'more' } | null>(null);
   const [q, setQ] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -264,10 +266,27 @@ export function BrandAssetLibrary({
     setGeneratedContentId(null);
     try {
       const { contentId } = await api.generatePostFromAsset(slug, id, platform);
+      setGeneratedKind('post');
       setGeneratedContentId(contentId);
       onAssetsChange((prev) => prev.map((a) => (a.id === id
         ? { ...a, usedInThreadsCount: (a.usedInThreadsCount ?? 0) + 1, lastUsedAt: new Date().toISOString() }
         : a)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '生成失敗');
+    } finally {
+      setGeneratingAssetId(null);
+    }
+  }
+
+  async function generateSeo(id: string) {
+    setOpenMenu(null);
+    setGeneratingAssetId(`${id}:website`);
+    setError(null);
+    setGeneratedContentId(null);
+    try {
+      const { contentId } = await api.generateSeoFromAsset(slug, id);
+      setGeneratedKind('seo');
+      setGeneratedContentId(contentId);
     } catch (e) {
       setError(e instanceof Error ? e.message : '生成失敗');
     } finally {
@@ -301,10 +320,36 @@ export function BrandAssetLibrary({
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 700 }}>圖片素材庫</div>
         <HelpTip
-          text="這裡放真實品牌素材。系統畫面請標角色與功能，AI 產圖會優先用「現行」素材，不會自己畫假的產品 UI 或 Logo。"
+          text="這裡放真實品牌素材。系統畫面請標角色與功能，AI 產圖會優先用「現行」素材，不會自己畫假的產品 UI 或 Logo。TaskGo 產品短片的截圖標成系統畫面，可用來產生 Facebook、Instagram、Threads 與官網長文。畫面裡的數字是示範。"
           label="素材庫說明"
         />
       </div>
+
+      {slug === 'taskgo' && (
+        <div style={{ ...cardBoxStyle, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>產品短片</div>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
+            四支產品介紹。截圖標成系統畫面，出現在下方素材格；用「使用素材」可產生貼文或官網長文。畫面裡的案名與數字是示範。
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            {TASKGO_PRODUCT_FILMS.map((film) => (
+              <article key={film.id} style={{ border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+                <video
+                  src={film.video}
+                  poster={film.poster}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  style={{ width: '100%', aspectRatio: '9 / 16', maxHeight: 280, objectFit: 'cover', background: '#0c1c33', display: 'block' }}
+                />
+                <div style={{ padding: 10, fontSize: 12, lineHeight: 1.5 }}>
+                  {film.stills.join('、')}
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
 
       {canEdit && (
         <div style={{ ...cardBoxStyle, marginBottom: 12 }}>
@@ -430,7 +475,7 @@ export function BrandAssetLibrary({
       {error && <p style={{ fontSize: 12, color: 'var(--color-danger)', marginBottom: 8 }}>{error}</p>}
       {generatedContentId && (
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-          已生成貼文草稿，請至內容審閱頁查看（content id: {generatedContentId}）。
+          已生成{generatedKind === 'seo' ? '官網長文' : '貼文'}草稿，請至內容審閱頁查看（content id: {generatedContentId}）。
         </p>
       )}
 
@@ -483,12 +528,16 @@ export function BrandAssetLibrary({
                         ['facebook', '生成 Facebook'],
                         ['instagram', '生成 Instagram'],
                         ['threads', '生成 Threads'],
+                        ['website', '生成官網長文'],
                       ] as const).map(([platform, label]) => (
                         <button
                           key={platform}
                           type="button"
                           disabled={!!generatingAssetId}
-                          onClick={() => void generateFromAsset(a.id, platform)}
+                          onClick={() => {
+                            if (platform === 'website') void generateSeo(a.id);
+                            else void generateFromAsset(a.id, platform);
+                          }}
                           style={menuItemStyle}
                         >
                           {generatingAssetId === `${a.id}:${platform}` ? '生成中…' : label}

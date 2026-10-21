@@ -1,5 +1,6 @@
 import { LocalLink, useCopy } from '@/pages/public/locale';
 import { BrandPosts, BrandResults, PublicFrame, brandOf, useBrands, usePress } from '@/pages/public/Landing';
+import { TASKGO_PRODUCT_FILMS } from '@/data/taskgo-product-films';
 
 export function Proof() {
   const copy = useCopy();
@@ -49,6 +50,39 @@ export function Proof() {
                   <p>{item.note}</p>
                   <span className="lp-link">{page.read}</span>
                 </a>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="lp-section">
+        <div className="lp-wrap">
+          <div className="lp-eyebrow">{page.filmsEyebrow}</div>
+          <h2>{page.filmsTitle}</h2>
+          <p className="lp-muted lp-sub">{page.filmsSub}</p>
+          <div className="lp-films">
+            {page.films.map((item) => {
+              const media = TASKGO_PRODUCT_FILMS.find((film) => film.id === item.id);
+              if (!media) return null;
+              return (
+                <article key={item.id} className="lp-film">
+                  <video
+                    src={media.video}
+                    poster={media.poster}
+                    controls
+                    playsInline
+                    preload="metadata"
+                  />
+                  <div className="lp-film-body">
+                    <div className="lp-post-meta">{item.duration}</div>
+                    <h3>{item.title}</h3>
+                    <p>{item.summary}</p>
+                    <ul>
+                      {item.points.map((point) => <li key={point}>{point}</li>)}
+                    </ul>
+                  </div>
+                </article>
               );
             })}
           </div>

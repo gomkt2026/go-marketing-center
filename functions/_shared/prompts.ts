@@ -5,6 +5,7 @@ import { loadBrandCollaterals, collateralPrompt } from './documents';
 import { officialWebsitePrompt, loadBrandWebsite } from './brand-profile';
 import { isMissingLaneColumn } from './audience-lane';
 import { TAIWAN_LOCAL_VOICE } from './taiwan-voice';
+import { taskgoProductFilmFacts } from './taskgo-product-films';
 
 // ============================================================================
 // 品牌第一線角色視角:讓 AI 用「行業最前端人員」的思維寫貼文,而不是 AI 腔
@@ -2031,7 +2032,10 @@ export function brandSeoFacts(slug: string): string {
     return '定位:把租屋關係、紀錄、信任、流程整理回同一個地方。可寫收租對帳、報修指揮、合約續約。不可發明物件數或成交保證。';
   }
   if (slug === 'taskgo') {
-    return '定位:工班派工與現場回報工具。可寫排程、現場回報、成本看得見。不可保證接案量或數位轉型成功。';
+    return [
+      '定位:工班派工與現場回報工具。可寫排程、現場回報、成本看得見。不可保證接案量或數位轉型成功。',
+      taskgoProductFilmFacts(),
+    ].join('\n');
   }
   return '只寫可核實的產品能力與流程。不可發明客戶數、市佔、營收、滿意度或保證成效。';
 }

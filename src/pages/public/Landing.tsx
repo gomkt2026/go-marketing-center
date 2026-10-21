@@ -677,6 +677,13 @@ export const LANDING_CSS = `
 .lp-section{padding:72px 0}
 .lp-section.soft{background:#F7F9F5}
 .lp-brands{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.lp-films{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px}
+.lp-film{background:#fff;border:1px solid #E6E8E2;border-radius:16px;overflow:hidden}
+.lp-film video{width:100%;height:min(68vh,560px);object-fit:contain;background:#0c1c33;display:block}
+.lp-film-body{padding:16px 18px 18px}
+.lp-film h3{margin:0 0 6px;font-size:18px}
+.lp-film p{margin:0;line-height:1.6}
+.lp-film ul{margin:10px 0 0;padding-left:1.15em;display:grid;gap:4px;font-size:14px;line-height:1.5}
 .lp-brand{border:1px solid #E6E8E2;border-top:4px solid var(--c);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:10px}
 .lp-brand p{margin:0;font-size:14px;line-height:1.75}
 .lp-brand-logo{height:40px;width:auto;align-self:flex-start;object-fit:contain}
@@ -849,7 +856,7 @@ export const LANDING_CSS = `
   .lp-hero{padding:48px 0}
   .lp-hero-inner,.lp-game-grid,.lp-podcast,.lp-integ{grid-template-columns:1fr}
   .lp-podcast-cover{max-width:320px}
-  .lp-brands,.lp-modules,.lp-plat-grid,.lp-trend-split{grid-template-columns:1fr}
+  .lp-brands,.lp-modules,.lp-plat-grid,.lp-trend-split,.lp-films{grid-template-columns:1fr}
   .lp-trend-head{flex-direction:column;align-items:flex-start}
   .lp-reach-row{grid-template-columns:72px 1fr auto}
   .lp-results,.lp-trend-stats{grid-template-columns:1fr 1fr}

@@ -13,6 +13,7 @@ import {
   isAssetStatus,
   isImageCategory,
 } from '../../../../_shared/brand-assets';
+import { ensureTaskgoProductFilmAssets } from '../../../../_shared/taskgo-product-films';
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 const EXT_BY_MIME: Record<string, string> = {
@@ -37,6 +38,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (!brand) return error('Brand not found', 404);
 
   await ensureBrandAssetLibrary(context.env).catch(() => undefined);
+  if (slug === 'taskgo') {
+    await ensureTaskgoProductFilmAssets(context.env).catch((e) => {
+      console.error('[taskgo-films] 素材庫寫入失敗', e);
+    });
+  }
   const url = new URL(context.request.url);
   const q = url.searchParams.get('q')?.trim().toLowerCase() ?? '';
   const imageCategory = url.searchParams.get('imageCategory')?.trim() ?? '';

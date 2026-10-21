@@ -267,6 +267,13 @@ export const api = {
       body: JSON.stringify({ platform: platform ?? 'threads' }),
     }),
 
+  generateSeoFromAsset: (slug: string, assetId: string) =>
+    request<{ contentId: string; title: string; topic: string }>(`/api/brands/${slug}/assets/${assetId}/generate-seo`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+      timeoutMs: SEO_ARTICLE_TIMEOUT_MS,
+    }),
+
   helpDocuments: (slug: string) =>
     request<{ documents: import('@/types').CsKnowledgeDocument[] }>(`/api/brands/${slug}/help/documents`),
 

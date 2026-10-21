@@ -11,6 +11,7 @@ import { applyDocumentCollateralMigration, isMissingDocumentCollateral } from '.
 import { listBrandImagePrompts } from '../../../_shared/image-prompts';
 import { listBrandVersions } from '../../../_shared/brand-knowledge';
 import { ensureBrandAssetLibrary } from '../../../_shared/brand-assets';
+import { ensureTaskgoProductFilmAssets } from '../../../_shared/taskgo-product-films';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -23,6 +24,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const sql = getSql(context.env);
   const brandId = brand.id;
   await ensureBrandAssetLibrary(context.env).catch(() => undefined);
+  if (slug === 'taskgo') {
+    await ensureTaskgoProductFilmAssets(context.env).catch((e) => {
+      console.error('[taskgo-films] 素材庫寫入失敗', e);
+    });
+  }
 
   let documentRows: Record<string, unknown>[] = [];
   try {

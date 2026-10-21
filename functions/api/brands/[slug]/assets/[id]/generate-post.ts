@@ -11,6 +11,7 @@ import {
   generatePostFromImage, saveGeneratedContent, findBrandAgent, SUPPORTED_PLATFORMS, type SocialPlatform,
 } from '../../../../../_shared/generate';
 import { logActivity } from '../../../../../_shared/activity';
+import { TASKGO_FILM_DEMO_LIMIT, filmKeyFromMetadata } from '../../../../../_shared/taskgo-product-films';
 
 // POST /api/brands/:slug/assets/:id/generate-post
 // 手動觸發:用素材庫這張圖生成 FB / IG / Threads 貼文,存成待審閱內容
@@ -50,6 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   );
   const publicImageUrl = toPublicMediaUrl(context.env, asset.fileUrl);
   if (!publicImageUrl) return error('這個素材沒有可用的圖片網址', 400);
+  const fromFilm = filmKeyFromMetadata((rows[0] as { metadata?: unknown }).metadata);
 
   try {
     const brandCtx = await buildBrandContext(context.env, brand.id);
@@ -68,6 +70,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       usageContext: asset.usageContext ?? undefined,
       audienceLane,
       assetId: asset.id,
+      extraInstruction: fromFilm ? TASKGO_FILM_DEMO_LIMIT : undefined,
     });
 
     const { contentId } = await saveGeneratedContent(context.env, {
@@ -77,7 +80,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       generatedByAgentId: agentId,
       status: 'pending_review',
       promptMeta: {
-        source: platform === 'threads' ? 'threads_hourly' : 'daily_theme',
+        source: fromFilm ? 'product_film' : (platform === 'threads' ? 'threads_hourly' : 'daily_theme'),
         category: 'image_inspired',
         assetId: asset.id,
         manual: true,

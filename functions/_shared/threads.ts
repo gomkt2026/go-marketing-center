@@ -225,7 +225,7 @@ async function publishContainer(ctx: ThreadsCallContext | null, accessToken: str
 async function createAndPublish(
   ctx: ThreadsCallContext | null,
   accessToken: string,
-  params: { text: string; imageUrl?: string | null; videoUrl?: string | null; replyToId?: string },
+  params: { text: string; imageUrl?: string | null; videoUrl?: string | null; replyToId?: string; topicTag?: string | null },
 ): Promise<{ id: string }> {
   const container = await createThreadsContainer(ctx, accessToken, params);
   const waitMs = params.videoUrl ? 40000 : params.imageUrl ? 30000 : 20000;
@@ -244,34 +244,50 @@ async function createAndPublish(
 async function createThreadsContainer(
   ctx: ThreadsCallContext | null,
   accessToken: string,
-  params: { text: string; imageUrl?: string | null; videoUrl?: string | null; replyToId?: string },
+  params: { text: string; imageUrl?: string | null; videoUrl?: string | null; replyToId?: string; topicTag?: string | null },
 ): Promise<{ id: string }> {
-  const containerParams = new URLSearchParams({
-    access_token: accessToken,
-    text: normalizeMultilineText(params.text).slice(0, 500),
-  });
-  if (params.replyToId) containerParams.set('reply_to_id', params.replyToId);
-  if (params.videoUrl) {
-    containerParams.set('media_type', 'VIDEO');
-    containerParams.set('video_url', params.videoUrl);
-  } else if (params.imageUrl) {
-    containerParams.set('media_type', 'IMAGE');
-    containerParams.set('image_url', params.imageUrl);
-  } else {
-    containerParams.set('media_type', 'TEXT');
-  }
+  const topicTag = (params.topicTag ?? '').replace(/[#＃\s]/g, '').slice(0, 50);
+  const build = (withTopic: boolean) => {
+    const containerParams = new URLSearchParams({
+      access_token: accessToken,
+      text: normalizeMultilineText(params.text).slice(0, 500),
+    });
+    if (params.replyToId) containerParams.set('reply_to_id', params.replyToId);
+    if (withTopic && topicTag && !params.replyToId) containerParams.set('topic_tag', topicTag);
+    if (params.videoUrl) {
+      containerParams.set('media_type', 'VIDEO');
+      containerParams.set('video_url', params.videoUrl);
+    } else if (params.imageUrl) {
+      containerParams.set('media_type', 'IMAGE');
+      containerParams.set('image_url', params.imageUrl);
+    } else {
+      containerParams.set('media_type', 'TEXT');
+    }
+    return containerParams;
+  };
 
-  // 走 /me,不要用可能填錯的 Threads user id
-  const createRes = await threadsFetch(ctx, `${THREADS_API}/me/threads`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: containerParams.toString(),
-  });
-  if (!createRes.ok) {
-    const text = await createRes.text().catch(() => '');
-    throw new Error(`Threads container 建立失敗 (${formatThreadsApiError(createRes.status, text)})`);
+  const postContainer = async (body: URLSearchParams) => {
+    const createRes = await threadsFetch(ctx, `${THREADS_API}/me/threads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+    if (!createRes.ok) {
+      const text = await createRes.text().catch(() => '');
+      return { ok: false as const, error: `Threads container 建立失敗 (${formatThreadsApiError(createRes.status, text)})` };
+    }
+    return { ok: true as const, data: await createRes.json() as { id: string } };
+  };
+
+  const first = await postContainer(build(true));
+  if (first.ok) return first.data;
+  if (topicTag && /topic_tag|topic tag/i.test(first.error)) {
+    console.warn(`[threads] 主題標籤被拒,改發不帶標籤: ${first.error.slice(0, 160)}`);
+    const second = await postContainer(build(false));
+    if (second.ok) return second.data;
+    throw new Error(second.error);
   }
-  return await createRes.json() as { id: string };
+  throw new Error(first.error);
 }
 
 export function isThreadsAccessBlocked(message: string): boolean {
@@ -558,7 +574,7 @@ export async function replyToThreadsPost(
 /** 發布一則 Threads 貼文(純文字、單張圖或單支影片);被安全閘門擋下會丟 ThreadsSafetyBlockedError */
 export async function publishThreadsPost(
   account: ThreadsAccount,
-  params: { text: string; imageUrl?: string | null; videoUrl?: string | null; replyText?: string | null },
+  params: { text: string; imageUrl?: string | null; videoUrl?: string | null; replyText?: string | null; topicTag?: string | null },
 ): Promise<ThreadsPublishResult> {
   const textHash = await assertThreadsSafety(account.env, {
     accountId: account.accountId, brandId: account.brandId, action: 'publish', text: params.text,
@@ -568,14 +584,14 @@ export async function publishThreadsPost(
   let published: { id: string };
   try {
     published = await createAndPublish(ctx, account.accessToken, {
-      text: params.text, imageUrl: params.imageUrl, videoUrl: params.videoUrl,
+      text: params.text, imageUrl: params.imageUrl, videoUrl: params.videoUrl, topicTag: params.topicTag,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const hadMedia = !!(params.imageUrl || params.videoUrl);
     if (hadMedia && (/container 建立失敗|container ERROR|發布失敗|media with id/i.test(msg))) {
       console.warn(`[threads] 帶媒體發布失敗,改發純文字: ${msg.slice(0, 200)}`);
-      published = await createAndPublish(ctx, account.accessToken, { text: params.text });
+      published = await createAndPublish(ctx, account.accessToken, { text: params.text, topicTag: params.topicTag });
     } else {
       throw e;
     }

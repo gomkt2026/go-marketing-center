@@ -101,8 +101,6 @@ export const DEFAULT_SLOT_DEFS: Array<{
 }> = [
   { platform: 'facebook', hourTw: 19, slotKind: 'daily_theme' },
   { platform: 'instagram', hourTw: 19, slotKind: 'daily_theme' },
-  { platform: 'threads', hourTw: 0, slotKind: 'threads_hourly' },
-  { platform: 'threads', hourTw: 6, slotKind: 'threads_hourly' },
   { platform: 'threads', hourTw: 12, slotKind: 'threads_hourly' },
   { platform: 'threads', hourTw: 18, slotKind: 'threads_hourly' },
   { platform: 'threads', hourTw: 9, slotKind: 'threads_offtopic' },
@@ -322,13 +320,13 @@ let gameSlotsRetired = false;
 let trafficMixEnsured = false;
 
 const TRAFFIC_BRANDS = ['homigo', 'taskgo', 'washgo'];
-const TRAFFIC_HOURS = [0, 6, 9, 10, 12, 18, 21];
+const TRAFFIC_HOURS = [9, 10, 12, 18, 21];
 const TRAFFIC_KINDS = [
-  'threads_hourly', 'threads_hourly', 'threads_offtopic', 'threads_game',
+  'threads_offtopic', 'threads_game',
   'threads_hourly', 'threads_hourly', 'threads_offtopic',
 ];
 
-/** 三品牌 Threads：只留 10:00 匠城，其餘時段改成流量文。 */
+/** 三品牌 Threads：只留有人醒著的檔。0 點、6 點前兩小時沒人，不拿來衝觸及。 */
 export async function ensureThreadsTrafficMix(env: Env): Promise<void> {
   if (trafficMixEnsured) return;
   trafficMixEnsured = true;
@@ -353,13 +351,44 @@ export async function ensureThreadsTrafficMix(env: Env): Promise<void> {
         AND s.platform = 'threads'
         AND s.enabled = true
         AND NOT (
-          (s.hour_tw = 0 AND s.slot_kind = 'threads_hourly')
-          OR (s.hour_tw = 6 AND s.slot_kind = 'threads_hourly')
-          OR (s.hour_tw = 9 AND s.slot_kind = 'threads_offtopic')
+          (s.hour_tw = 9 AND s.slot_kind = 'threads_offtopic')
           OR (s.hour_tw = 10 AND s.slot_kind = 'threads_game')
           OR (s.hour_tw = 12 AND s.slot_kind = 'threads_hourly')
           OR (s.hour_tw = 18 AND s.slot_kind = 'threads_hourly')
           OR (s.hour_tw = 21 AND s.slot_kind = 'threads_offtopic')
+        )
+    `;
+    await sql`
+      UPDATE publishing_jobs AS pj
+      SET status = 'cancelled', updated_at = now()
+      FROM contents c
+      JOIN brands b ON b.id = c.brand_id
+      WHERE pj.content_id = c.id
+        AND pj.platform = 'threads'
+        AND pj.status = 'scheduled'
+        AND pj.published_at IS NULL
+        AND b.slug = ANY(${TRAFFIC_BRANDS}::text[])
+        AND c.generation_prompt_meta->>'slotAt' IS NOT NULL
+        AND extract(hour FROM ((c.generation_prompt_meta->>'slotAt')::timestamptz AT TIME ZONE 'Asia/Taipei'))::int IN (0, 6)
+        AND (c.generation_prompt_meta->>'slotAt')::timestamptz > now() - interval '36 hours'
+    `;
+    await sql`
+      UPDATE contents AS c
+      SET status = 'pending_review',
+          generation_prompt_meta = c.generation_prompt_meta || '{"skipped":"true","skipReason":"凌晨沒有人，這一檔不發"}'::jsonb,
+          updated_at = now()
+      FROM brands b
+      WHERE c.brand_id = b.id
+        AND b.slug = ANY(${TRAFFIC_BRANDS}::text[])
+        AND c.target_platform = 'threads'
+        AND c.status IN ('pending_review', 'scheduled')
+        AND coalesce(c.generation_prompt_meta->>'skipped', 'false') <> 'true'
+        AND c.generation_prompt_meta->>'slotAt' IS NOT NULL
+        AND extract(hour FROM ((c.generation_prompt_meta->>'slotAt')::timestamptz AT TIME ZONE 'Asia/Taipei'))::int IN (0, 6)
+        AND (c.generation_prompt_meta->>'slotAt')::timestamptz > now() - interval '36 hours'
+        AND NOT EXISTS (
+          SELECT 1 FROM publishing_jobs pj
+          WHERE pj.content_id = c.id AND pj.status = 'published'
         )
     `;
     const ids = await sql`SELECT id FROM brands WHERE slug = ANY(${TRAFFIC_BRANDS}::text[])`;
@@ -481,7 +510,7 @@ export async function listEnabledSlotsAtHour(
 export function threadHoursFromSlots(slots: PostingSlot[]): number[] {
   const hours = [...new Set(slots.filter((s) => s.platform === 'threads' && s.enabled).map((s) => s.hourTw))]
     .sort((a, b) => a - b);
-  return hours.length ? hours : [0, 6, 9, 10, 12, 15, 18, 20, 21];
+  return hours.length ? hours : [9, 10, 12, 18, 21];
 }
 
 export function sourceFromSlots(slots: PostingSlot[], hourTw: number): PostingSlotKind {

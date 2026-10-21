@@ -82,6 +82,9 @@ async function findBrandAgent(env: Env, brandId: string): Promise<string | null>
 function replyHeatRank(a: ThreadsSearchPost, b: ThreadsSearchPost): number {
   const now = Date.now();
   const age = (p: ThreadsSearchPost) => p.timestamp ? now - new Date(p.timestamp).getTime() : Number.MAX_SAFE_INTEGER;
+  const burst = (p: ThreadsSearchPost) => age(p) < 2 * 60 * 60 * 1000 ? 1 : 0;
+  const inBurst = burst(b) - burst(a);
+  if (inBurst !== 0) return inBurst;
   const recency = (p: ThreadsSearchPost) => {
     const ms = age(p);
     if (ms < 24 * 60 * 60 * 1000) return 2;

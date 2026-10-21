@@ -1330,6 +1330,12 @@ function threadsReplyBody(meta: unknown): string | undefined {
   return typeof reply === 'string' && reply.trim() ? reply.trim() : undefined;
 }
 
+function threadsTopicTag(meta: unknown): string | undefined {
+  if (!meta || typeof meta !== 'object') return undefined;
+  const tag = (meta as { topicTag?: unknown }).topicTag;
+  return typeof tag === 'string' && tag.trim() ? tag.trim() : undefined;
+}
+
 /** 把素材庫與待發貼文裡的 data URI 轉成 R2 公開路徑，避免 Graph API 9004 / 324。 */
 async function rehostBrokenMedia(env: Env): Promise<void> {
   try {
@@ -1404,6 +1410,7 @@ async function publishDueJobs(env: Env): Promise<void> {
           imageUrl: await imageForPublish(env, row.content_version_id, row.image_url, row.brand_slug),
           videoUrl: toPublicMediaUrl(env, row.video_url),
           replyText: threadsReplyBody(row.generation_prompt_meta),
+          topicTag: threadsTopicTag(row.generation_prompt_meta),
         });
       } else if (row.platform === 'facebook' && row.brand_id) {
         const account = await getMetaAccount(env, row.brand_id, 'facebook');

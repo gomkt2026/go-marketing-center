@@ -5,7 +5,7 @@ import { seoChatJson, socialChatJson } from './social-llm';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
-  composeTrafficPrompt, taskgoLectureIssue, trafficStaleIssue, trafficSystemPrompt, type TrafficFormulaId,
+  composeTrafficPrompt, pickTrafficTopicTag, taskgoLectureIssue, trafficEndingIssue, trafficReplyFallback, trafficStaleIssue, trafficSystemPrompt, type TrafficFormulaId,
   buildImageInspiredPostPrompt, buildGamePromoPrompt, GAME_PROMO_URL,
   type GamePromoAngle,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
@@ -727,6 +727,24 @@ export async function generateOfftopicPost(
   return { post, prediction, imageUrl: null, imageError: null, offtopicCategory: spec.category, loveAngle: spec.loveAngle };
 }
 
+function trafficReplyIssue(text: string | undefined): string | null {
+  const reply = (text ?? '').trim();
+  if (!reply) return '缺少 2/2';
+  if (/https?:\/\/|#|你們覺得|大家覺得/.test(reply)) return '2/2 有連結、標籤或空泛問句';
+  if (/匠城|匠管|Homigo|TaskGo|Washgo/i.test(reply)) return '2/2 出現品牌名';
+  return null;
+}
+
+function finishTrafficPost(post: GeneratedPost, slug: string): GeneratedPost {
+  post.body = normalizeMultilineText(post.body);
+  post.hashtags = [];
+  post.cta = '';
+  post.imagePrompt = undefined;
+  post.replyBody = normalizeMultilineText(post.replyBody ?? '').slice(0, 80);
+  post.topicTag = pickTrafficTopicTag(slug, post.body, post.topicTag);
+  return post;
+}
+
 /**
  * Threads 非匠城檔。不帶品牌知識庫，只套用已驗證的高瀏覽結構。
  */
@@ -758,11 +776,7 @@ export async function generateTrafficPost(
     ],
     temperature: 0.9,
   });
-  post.body = normalizeMultilineText(post.body);
-  post.hashtags = [];
-  post.cta = '';
-  post.replyBody = '';
-  post.imagePrompt = undefined;
+  post = finishTrafficPost(post, params.brandSlug);
   const leaked = (washgo
     ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|洗楽|HappyWash|happy415|https?:\/\/|工地|業主|房東/
     : taskgo
@@ -773,8 +787,10 @@ export async function generateTrafficPost(
   const trafficVoice = taiwanVoiceIssue(post.body);
   const lecture = taskgo ? taskgoLectureIssue(post.body) : null;
   const stale = trafficStaleIssue(params.brandSlug, post.body);
+  const ending = trafficEndingIssue(post.body);
+  const replyIssue = trafficReplyIssue(post.replyBody);
   const minChars = spec.category === 'joke' ? 50 : 80;
-  if (post.body.length > limit || leaked || missed || post.body.length < minChars || trafficVoice || lecture || stale) {
+  if (post.body.length > limit || leaked || missed || post.body.length < minChars || trafficVoice || lecture || stale || ending || replyIssue) {
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: systemPrompt },
@@ -782,8 +798,9 @@ export async function generateTrafficPost(
         { role: 'assistant', content: JSON.stringify(post) },
         {
           role: 'user',
-          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${anchor}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}${lecture ? `，${lecture}` : ''}${stale ? `，${stale}` : ''}）。` +
-            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${anchor ? `，正文必須出現「${anchor}」` : spec.category === 'joke' ? '，改成一個讓人想按讚的品牌笑話，笑點放最後一行' : '，改成一個讓人想轉的小故事'}。` +
+          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${anchor}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}${lecture ? `，${lecture}` : ''}${stale ? `，${stale}` : ''}${ending ? `，${ending}` : ''}${replyIssue ? `，${replyIssue}` : ''}）。` +
+            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${anchor ? `，正文必須出現「${anchor}」` : spec.category === 'joke' ? '，改成一個品牌笑話，笑點放倒數第二行' : '，改成一個讓人想轉的小故事'}。` +
+            '至少三行。最後一行是做過的人才答得上來的問句。replyBody 一句邀請，80 字以內。' +
             (washgo
               ? '可以寫洗衣店和衣服。不要寫洗好了沒，不要列功能，不要提別的店，不要寫婆媳。禁止簡體、大陸用語。回傳同格式 JSON。'
               : taskgo
@@ -793,12 +810,9 @@ export async function generateTrafficPost(
       ],
       temperature: 0.7,
     });
-    post.body = normalizeMultilineText(post.body);
-    post.hashtags = [];
-    post.cta = '';
-    post.replyBody = '';
-    post.imagePrompt = undefined;
+    post = finishTrafficPost(post, params.brandSlug);
   }
+  if (trafficReplyIssue(post.replyBody)) post.replyBody = trafficReplyFallback(params.brandSlug);
 
   const prediction = params.skipPrediction
     ? { score: 0, analysis: '', suggestions: [] }
@@ -981,7 +995,7 @@ export async function generateGamePromoPost(
         { role: 'system', content: brandCtx.systemPrompt },
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${limit} 字。縮短到 ${limit} 字以內,網址保留,回傳同格式 JSON。` },
+        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${limit} 字。縮短到 ${limit} 字以內,網址不要留在正文,回傳同格式 JSON。` },
       ],
       temperature: 0.5,
     });
@@ -990,9 +1004,10 @@ export async function generateGamePromoPost(
     post.hashtags = clampHashtags(post.hashtags, 'threads');
     if (!post.posterHeadline) post.posterHeadline = angle.hook;
   }
-  if (!post.body.includes('go-marketing-center.pages.dev/game')) {
-    post.body = `${post.body.trim()}\n\n${GAME_PROMO_URL}`;
-  }
+  post.body = post.body.replaceAll(GAME_PROMO_URL, '').replace(/\n{3,}/g, '\n\n').trim();
+  post.hashtags = [];
+  post.replyBody = GAME_PROMO_URL;
+  post.topicTag = '匠城出任務';
   let imageUrl: string | null = null;
   let imageError: string | null = null;
   if (params.stillUrl) {
@@ -1082,6 +1097,7 @@ export async function saveGeneratedContent(
         imageStyle: params.promptMeta?.imageStyle ?? result.imageStyle,
         assetId: params.promptMeta?.assetId ?? result.assetId,
         replyBody: params.promptMeta?.replyBody ?? result.post.replyBody ?? undefined,
+        topicTag: params.promptMeta?.topicTag ?? result.post.topicTag ?? undefined,
         posterHeadline: result.post.posterHeadline ?? undefined,
         posterAccent: result.post.posterAccent ?? undefined,
         posterAdvantage: result.post.posterAdvantage ?? undefined,

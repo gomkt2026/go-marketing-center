@@ -31,7 +31,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     brand_id: string; target_platform: string | null; status: string; title: string;
     content_type: string;
     source_market_signal_id: string | null;
-    generation_prompt_meta: { replyBody?: string } | null;
+    generation_prompt_meta: { replyBody?: string; topicTag?: string } | null;
   };
 
   const isWebsite = isWebsiteSeoContent(content);
@@ -168,6 +168,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         imageUrl,
         videoUrl,
         replyText: content.generation_prompt_meta?.replyBody,
+        topicTag: content.generation_prompt_meta?.topicTag,
       });
     } else {
       const account = await getMetaAccount(context.env, content.brand_id, platform);

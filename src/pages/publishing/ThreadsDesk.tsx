@@ -326,6 +326,11 @@ function SlotCard({
         </>
       )}
 
+      {!empty && !editing && slot.topicTag && (
+        <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+          主題 {slot.topicTag}
+        </p>
+      )}
       {!empty && !editing && slot.body && (
         <p style={{ fontSize: 13.5, whiteSpace: 'pre-wrap', lineHeight: 1.7, marginBottom: slot.replyBody ? 8 : 10 }}>
           {slot.body}

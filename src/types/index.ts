@@ -707,6 +707,7 @@ export interface ThreadsDeskSlot {
   skipped?: boolean;
   body?: string | null;
   replyBody?: string | null;
+  topicTag?: string | null;
   hashtags?: string[] | null;
   imageUrl?: string | null;
   predictedEngagementScore?: number | null;

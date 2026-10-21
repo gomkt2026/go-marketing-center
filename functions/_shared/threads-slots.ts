@@ -13,20 +13,20 @@ import {
 import { logActivity } from './activity';
 import { fetchGoogleTrendsTW, fetchTaiwanNews } from './sources';
 import {
-  countSlotsByBrand, listBrandThreadHours, sourceForBrandHour, listBrandPostingSlots,
+  countSlotsByBrand, listBrandThreadHours, sourceForBrandHour, listBrandPostingSlots, listAllPostingSlots,
   isHourlyFamily, isOfftopicFamily, slotKindLabel,
   type PostingSlotKind,
 } from './posting-slots';
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from './auto-post-brands';
 
-/** 品牌相關跟風文時段(台灣時間) */
-export const THREADS_POST_HOURS_TW: readonly number[] = [0, 6, 12, 18];
+/** 品牌相關跟風文時段(台灣時間)。凌晨沒人，不放 0 點、6 點。 */
+export const THREADS_POST_HOURS_TW: readonly number[] = [12, 18];
 /** 生活哏文 / 愛情散文時段(台灣時間) */
 export const THREADS_OFFTOPIC_HOURS_TW: readonly number[] = [9, 21];
 /** 匠城出任務推廣(台灣時間)。一天一篇，用昨天的局數、排行榜或今日路況。 */
 export const THREADS_GAME_HOURS_TW: readonly number[] = [10];
-/** 小編工作台一天 9 檔 */
-export const THREADS_DESK_HOURS_TW: readonly number[] = [0, 6, 9, 10, 12, 15, 18, 20, 21];
+/** 小編工作台一天 5 檔：9 生活、10 匠城、12／18 流量、21 生活 */
+export const THREADS_DESK_HOURS_TW: readonly number[] = [9, 10, 12, 18, 21];
 
 export const THREADS_SLOT_BRANDS = ['homigo', 'taskgo', 'washgo'] as const;
 const THREADS_DAILY_CAP = 4;
@@ -221,6 +221,7 @@ export async function generateThreadsSlot(
            (SELECT count(*)::int FROM contents c
             WHERE c.brand_id = b.id AND c.target_platform = 'threads'
               AND c.generation_prompt_meta->>'source' LIKE 'threads_%'
+              AND coalesce(c.generation_prompt_meta->>'skipped', 'false') <> 'true'
               AND (c.generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
               AND (c.generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
            ) AS today_count,
@@ -328,6 +329,7 @@ export async function generateThreadsOfftopicSlot(
         SELECT count(*)::int AS n FROM contents
         WHERE brand_id = ${brand.id}::uuid
           AND generation_prompt_meta->>'source' LIKE 'threads_%'
+          AND coalesce(generation_prompt_meta->>'skipped', 'false') <> 'true'
           AND (generation_prompt_meta->>'slotAt')::timestamptz >= date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') - interval '8 hours'
           AND (generation_prompt_meta->>'slotAt')::timestamptz < date_trunc('day', ${slotAt.toISOString()}::timestamptz + interval '8 hours') + interval '16 hours'
       `;
@@ -538,7 +540,22 @@ export async function promoteDueThreadsSafetyNet(env: Env): Promise<number> {
   `;
 
   let created = 0;
+  const enabled = await listAllPostingSlots(env, { enabledOnly: true });
+  const openHours = new Set(
+    enabled.filter((slot) => slot.platform === 'threads').map((slot) => `${slot.brandSlug}|${slot.hourTw}`),
+  );
   for (const row of rows as { id: string; slot_at: string | null; version_id: string; slug: string }[]) {
+    const hour = row.slot_at ? hourTWFromIso(row.slot_at) : null;
+    if (hour == null || !openHours.has(`${row.slug}|${hour}`)) {
+      await sql`
+        UPDATE contents
+        SET generation_prompt_meta = generation_prompt_meta || '{"skipped":"true","skipReason":"這一檔的時段已關閉"}'::jsonb,
+            updated_at = now()
+        WHERE id = ${row.id}::uuid
+      `;
+      console.log(`[threads-safety] ${row.slug} ${hour ?? '?'}:00 時段已關閉,不自動發布`);
+      continue;
+    }
     await sql`
       INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
       VALUES (${row.id}::uuid, ${row.version_id}::uuid, 'threads', 'scheduled', now())

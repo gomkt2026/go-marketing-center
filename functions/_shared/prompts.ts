@@ -530,6 +530,8 @@ export interface GeneratedPost {
   posterKicker?: string;
   /** Threads 串文 2/2:發布後自動回覆在主帖下面,用來邀請大家分享故事 */
   replyBody?: string;
+  /** Threads 藍字主題標籤,一篇一個,不含 # */
+  topicTag?: string;
 }
 
 export interface EngagementPrediction {
@@ -1205,8 +1207,7 @@ export function buildGamePromoPrompt(params: {
     '這篇是「匠城出任務」今天的實況。只講下面這一個事實，數字不要改，不要加沒寫到的功能、分數、獎品、下載量或活動。',
     `角度:${params.angle.hook}`,
     `可講的事實:${params.angle.fact}`,
-    '需要收尾時只能再帶一句：手機瀏覽器就能玩。網址必須原樣出現一次：',
-    GAME_PROMO_URL,
+    '需要收尾時只能再帶一句：手機瀏覽器就能玩。網址不要寫進正文。',
     cut,
     `字數不超過 ${limit} 字。2-4 個短段落、一句一行。`,
     params.usedHooks.length ? `這些鉤子最近用過，不要重寫同一個開頭：${params.usedHooks.join('、')}` : '',
@@ -1561,11 +1562,13 @@ export function buildOfftopicUserPrompt(usedTopics: string[], brandSlug?: string
 // 留在自己生活裡的笑話還在（近捷運、不能縮、估價單多一面牆）。
 // 所以時事只接跟這個品牌對得上的；對不上就改寫笑話，不要三個帳號一起蹭同一則。
 // 舊的高瀏覽是工序清單、婆媳、洗好了沒，會被說是假文，不走回去。
+// 10/22 起：留言比按讚重。前兩行要有畫面，最後一行問做過的人遇過哪一種。
+// 發文當下補一則 2/2。正文不放 hashtag、不放連結。主題標籤一篇一個。
 // ============================================================================
 
 export type TrafficFormulaId = 'hook' | 'joke';
 
-const TRAFFIC_HOURS = [0, 6, 9, 12, 18, 21];
+const TRAFFIC_HOURS = [9, 12, 18, 21];
 
 /** 災難、政治、喪聞、性騷擾不拿來博流量。 */
 const TREND_BLOCK = /死亡|命案|戰爭|暴動|選舉|罷免|自殺|色情|未成年|殺害|兇殺|空難|喪禮|告別式|梗塞|騷擾|狼爪|性侵|還債/;
@@ -1668,6 +1671,46 @@ export function trafficStaleIssue(slug: string, body: string): string | null {
   return null;
 }
 
+const BRAND_TOPIC_WORDS: Record<string, string[]> = {
+  taskgo: ['颱風', '漏水', '淹水', '裝修', '工地', '老屋'],
+  homigo: ['房租', '租屋', '搬家', '離職'],
+  washgo: ['洗衣', '換季', '梅雨'],
+};
+
+const BRAND_TOPIC_DEFAULT: Record<string, string> = {
+  taskgo: '裝修',
+  homigo: '租屋',
+  washgo: '洗衣',
+};
+
+/** 一篇一個、跟正文同一件事的主題標籤。對不上就用這個品牌的生活面。 */
+export function pickTrafficTopicTag(slug: string, body: string, requested?: string | null): string {
+  const clean = (requested ?? '').replace(/[#＃\s]/g, '').replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '').slice(0, 12);
+  const words = BRAND_TOPIC_WORDS[slug] ?? BRAND_TOPIC_WORDS.homigo;
+  const allowed = clean.length >= 2
+    && body.includes(clean)
+    && !TREND_BLOCK.test(clean)
+    && words.some((word) => clean.includes(word) || word.includes(clean));
+  if (allowed) return clean;
+  return words.find((word) => body.includes(word)) ?? BRAND_TOPIC_DEFAULT[slug] ?? '租屋';
+}
+
+/** 最後一行要是做過的人才答得上來的問句。 */
+export function trafficEndingIssue(body: string): string | null {
+  const lines = body.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 3) return '少於三行，前兩行要有畫面，最後一行要是問句';
+  const last = lines[lines.length - 1];
+  if (!/[？?]/.test(last)) return '最後一行不是問句';
+  if (/你們覺得|大家覺得|有共鳴|同意嗎|你們呢|各位/.test(last)) return '問句太寬，要問做過的人遇過哪一種';
+  return null;
+}
+
+export function trafficReplyFallback(slug: string): string {
+  if (slug === 'taskgo') return '你收工前也被業主補過一句嗎';
+  if (slug === 'washgo') return '你送洗遇過衣服自己先出事的嗎';
+  return '你看房或退租遇過哪一種';
+}
+
 export const WASHGO_TRAFFIC_SYSTEM_PROMPT =
   '你是台灣洗衣店的年輕店員，在 Threads 講一個讓人想按讚、想轉出去的小故事或笑話。' +
   '可以寫店面、衣服、街角回憶、下雨天。' +
@@ -1704,9 +1747,12 @@ export const TRAFFIC_SYSTEM_PROMPT =
   '這一則不要寫婆媳、婆婆、媳婦。';
 
 export function trafficSystemPrompt(slug: string): string {
-  if (slug === 'washgo') return WASHGO_TRAFFIC_SYSTEM_PROMPT;
-  if (slug === 'taskgo') return TASKGO_TRAFFIC_SYSTEM_PROMPT;
-  return TRAFFIC_SYSTEM_PROMPT;
+  const base = slug === 'washgo'
+    ? WASHGO_TRAFFIC_SYSTEM_PROMPT
+    : slug === 'taskgo'
+      ? TASKGO_TRAFFIC_SYSTEM_PROMPT
+      : TRAFFIC_SYSTEM_PROMPT;
+  return `${base}前兩行就要有畫面。最後一行問做過的人遇過哪一種，讓人想留言講自己的那一次。不要寫你們覺得呢。`;
 }
 
 function pickJokeSeed(slug: string, hourTw: number, now: number, used: string[] = []): string {
@@ -1748,22 +1794,27 @@ export function composeTrafficPrompt(opts: {
   const isJoke = opts.formula === 'joke';
   const theme = (opts.theme ?? '').trim();
   const anchor = !isJoke && theme ? trendAnchor(theme) : '';
-  const maxChars = isJoke ? 140 : opts.brandSlug === 'washgo' ? 170 : 220;
+  const maxChars = isJoke ? 170 : opts.brandSlug === 'washgo' ? 210 : 250;
   const minChars = isJoke ? 50 : 80;
   const label = isJoke ? '品牌笑話' : '時事小故事';
+  const defaultTag = BRAND_TOPIC_DEFAULT[opts.brandSlug] ?? '租屋';
   const shared = [
     '三個帳號各寫各的，不要寫成同一則新聞的三種版本。',
     '不要寫婆媳、婆婆、媳婦。不要品牌名、報價、連結、hashtag、電話。',
-    '用台灣口語。一句一行。問句最多一句，放在最後一行。',
+    '用台灣口語。一句一行。至少三行。',
+    '前兩行就要有畫面，沒點開也看得懂。',
+    '笑點或想被轉出去的那一句放倒數第二行。最後一行只能有一個問句，問做過的人遇過哪一種。不要寫「你們覺得呢」「有共鳴嗎」。',
+    'replyBody 是發文後立刻貼上的 2/2：一句話邀請對方講自己的那一次，80 字以內。不要連結、不要 hashtag、不要品牌名。',
+    `topicTag 只放一個跟這篇同一件事的詞，2 到 8 個字，不要井號。對不上就用「${defaultTag}」。`,
     '禁止簡體、大陸用語、外籍配偶廚房考試，以及「男生都」「女生都」。',
     opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
     opts.usedTopics.length ? `這些標題和開頭最近用過，換一個場面：\n${opts.usedTopics.join('\n')}` : '',
     `正文 ${minChars} 到 ${maxChars} 字。`,
-    '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","hashtags":[],"cta":""}',
+    '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","replyBody":"2/2一句邀請","topicTag":"一個主題","hashtags":[],"cta":""}',
   ];
   const lead = isJoke
     ? [
-        '寫一則跟這個品牌生活有關的笑話。要有畫面，最後一行是笑點，讓人想按讚。',
+        '寫一則跟這個品牌生活有關的笑話。要有畫面，倒數第二行是笑點，最後一行讓做過的人想留言。',
         `場面從這裡長出來：${pickJokeSeed(opts.brandSlug, hourTw, now, opts.usedTopics)}。`,
         theme ? `若「${theme}」能變成笑點就用，接不上就不要提。` : '',
         opts.brandSlug === 'taskgo' ? '可以寫工地、裝修、颱風天出工。不要列工序，不要教訓業主。' : '',
@@ -1775,7 +1826,7 @@ export function composeTrafficPrompt(opts: {
           ? `這一則只接這一則時事：「${theme}」。正文要出現「${anchor}」，讓人一眼對上熱門。`
           : '現在沒有可用的時事。改寫一個這週大家會轉的生活場面，仍然用下面的品牌切角。',
         brandHookCut(opts.brandSlug),
-        '結構：第一行點到時事，中間一個具體小故事，最後一行是讓人想轉的那一句。',
+        '結構：第一行點到時事，中間一個具體小故事，倒數第二行是讓人想轉的那一句，最後一行是問句。',
         '不要寫成新聞稿，不要列重點，不要硬塞產品。',
       ];
   return {

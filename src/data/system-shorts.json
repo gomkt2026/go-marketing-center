@@ -1,0 +1,751 @@
+[
+  {
+    "id": "clock-in",
+    "brand": "taskgo",
+    "episode": "02",
+    "feature": "打卡出勤",
+    "title": "TaskGo 打卡出勤",
+    "tagline": "工地狀況 一手掌握",
+    "duration": 73.4,
+    "durationLabel": "1 分 13 秒",
+    "video": "/shorts/taskgo/clock-in.mp4",
+    "poster": "/shorts/taskgo/clock-in.jpg",
+    "role": "staff",
+    "pain": [
+      "工班到底去案場了沒？老闆永遠不知道。",
+      "到了月底算薪水更頭痛，這天到底有沒有來上工？",
+      "客戶問今天做到哪，內部也在問，老闆只有一個腦袋，誰會知道？"
+    ],
+    "chips": [
+      "專案燈號",
+      "每日報告",
+      "出勤報表",
+      "一鍵匯出"
+    ],
+    "summary": "工班去哪不知道、月底算薪水靠猜？ TaskGo 專案燈號自動判斷進度落後與逾期，每日報告彙整任務、照片與打卡，出勤報表支援日／週／月與十天、十五天制，打卡距離案場過遠自動警示，報表一鍵匯出 Excel、PDF。",
+    "ytTitle": "師傅到底去案場了沒？老闆永遠不知道😩｜TaskGo 工地出勤",
+    "ig": "工班老闆，你是不是也常常不知道師傅到底去案場了沒 😩\n📞 打給工班沒人回，傳給外包已讀不回\n📒 月底算薪水，這天到底有沒有來上工？\n🤯 客戶問做到哪，內部也在問，老闆只有一個腦袋\n\n用了 TaskGo，工地狀況一手掌握 👇\n🚦 專案燈號：進度落後、逾期自動判斷，有問題的一眼抓出來\n⏸ 卡關案件：卡在哪一步、停了幾天，最久的排最前面\n📅 每日報告：完成任務、照片、打卡次數，逾期事件自動列出\n🗓 出勤報表：日報、週報、月報，十天制、十五天制都能切\n📍 打卡離案場超過五公里自動警示，忘了打離場也會自動補\n📤 一鍵匯出 Excel、PDF，算薪水不用再猜\n\n👉 想要工地狀況一手掌握？私訊我們了解 TaskGo\n\n#TaskGo #工班管理 #出勤管理 #GPS打卡 #工程管理 #每日報表 #工班老闆 #修繕 #裝修 #案場管理",
+    "threads": "以前最怕客戶打來問：「今天師傅有來嗎？」\n我也不知道，只能說我問一下。\n\n現在打開 TaskGo，專案燈號紅黃綠一眼分清楚，\n每日報告看今天誰打卡、拍了什麼，\n月底出勤報表一鍵匯出，算薪水不用再對群組。",
+    "stills": [
+      {
+        "id": "clock-in-1",
+        "file": "/brands/taskgo/shorts/clock-in-1.jpg",
+        "tag": "專案燈號",
+        "label": "專案燈號自動判斷 有問題、要注意，一眼分清楚",
+        "caption": "專案燈號自動判斷進度落後、逾期，有問題、要注意、正常，一眼分清楚。"
+      },
+      {
+        "id": "clock-in-2",
+        "file": "/brands/taskgo/shorts/clock-in-2.jpg",
+        "tag": "卡關案件",
+        "label": "卡在哪一步、停了幾天 最久的排最前面",
+        "caption": "修繕案件卡在哪一步、停了幾天，停最久的排最前面。"
+      },
+      {
+        "id": "clock-in-3",
+        "file": "/brands/taskgo/shorts/clock-in-3.jpg",
+        "tag": "每日報告",
+        "label": "今天完成幾件、拍幾張、打幾次卡 逾期事件自動列出來",
+        "caption": "每日報告，今天完成幾個任務、上傳幾張照片、打了幾次卡，逾期事件自動列出來。"
+      },
+      {
+        "id": "clock-in-4",
+        "file": "/brands/taskgo/shorts/clock-in-4.jpg",
+        "tag": "出勤報表",
+        "label": "日報・週報・月報 十天制、十五天制都能切換",
+        "caption": "出勤報表日報、週報、月報，十天制、十五天制都能切換，出勤人數、工時自動統計。"
+      },
+      {
+        "id": "clock-in-5",
+        "file": "/brands/taskgo/shorts/clock-in-5.jpg",
+        "tag": "GPS 距離警示",
+        "label": "離案場超過五公里自動警示 忘了打離場，系統自動補",
+        "caption": "打卡位置離案場超過五公里，系統自動警示；超過八小時沒打離場，也會自動產生紀錄。"
+      }
+    ]
+  },
+  {
+    "id": "finance-cost",
+    "brand": "taskgo",
+    "episode": "03",
+    "feature": "財務成本",
+    "title": "TaskGo 財務成本",
+    "tagline": "收款・成本・毛利 即時掌握",
+    "duration": 70.9,
+    "durationLabel": "1 分 11 秒",
+    "video": "/shorts/taskgo/finance-cost.mp4",
+    "poster": "/shorts/taskgo/finance-cost.jpg",
+    "role": "shop",
+    "pain": [
+      "工班老闆永遠都在猜：哪個案場今天要收錢？還是早就收了，自己也不知道？",
+      "專案成本多少？到底是賺還是賠？什麼都不知道。",
+      "還沒到月底，現金流就完全抓不住，每天都在調頭寸、跑銀行。"
+    ],
+    "chips": [
+      "收款提醒",
+      "超支警示",
+      "成本明細",
+      "成本歸戶"
+    ],
+    "summary": "收款靠記憶、成本算不清、月底前每天調頭寸跑銀行？ TaskGo 專案財務總覽即時掌握合約總額、已收／待收款與總成本；收款提醒自動列出過期款項，成本分析總覽抓出超支專案，廠商派工費用自動記入成本。",
+    "ytTitle": "哪個案場收錢了？賺還是賠？老闆每天都在猜🤔｜TaskGo 專案財務",
+    "ig": "做工程的老闆，是不是每天都在猜 🤔\n💰 哪個案場今天要收錢？還是早就收了，自己也不知道？\n📒 這個案子成本多少？到底是賺還是賠？\n🏦 還沒到月底，現金流就抓不住，每天都在調頭寸、跑銀行…\n\n用了 TaskGo，錢的事情一看就知道 👇\n📊 專案財務總覽：合約總額、已收款、待收款、總成本，即時更新\n🔔 收款提醒：哪一期過期幾天、金額多少，自動跳出來\n🚨 成本分析總覽：控制良好幾個、超支幾個，馬上抓出來\n📈 每個專案預算、實際、差異、執行率，超支直接標紅\n📦 廠商派工費用自動記進成本，一筆一筆都在\n\n阿不就什麼都知道了！\n老闆不用再跑銀行，每天泡茶，想想下一個案子接哪個更好 🍵\n\n👉 想讓每個案場都賺得明明白白？私訊我們了解 TaskGo\n\n#TaskGo #工程財務 #專案管理 #成本管理 #收款管理 #毛利率 #現金流 #工班老闆 #修繕 #裝修 #工程管理",
+    "threads": "工程老闆最常說的一句話：\n「那筆錢…收了沒？我再問問看。」\n\n案場一多，收款、成本全靠記憶，\n做完一整年，才發現有幾個案子根本是賠的。\n\nTaskGo 把已收、待收、成本攤開給你看，\n哪一期過期幾天、哪個專案超支，系統自己會標出來。\n\n不用跑銀行調頭寸，泡茶想下一個案子接哪個就好 🍵",
+    "stills": [
+      {
+        "id": "finance-cost-1",
+        "file": "/brands/taskgo/shorts/finance-cost-1.jpg",
+        "tag": "專案財務總覽",
+        "label": "專案財務總覽：合約・已收・待收・成本 即時更新",
+        "caption": "專案財務總覽，合約總額、已收款、待收款、總成本，即時更新。"
+      },
+      {
+        "id": "finance-cost-2",
+        "file": "/brands/taskgo/shorts/finance-cost-2.jpg",
+        "tag": "收款提醒",
+        "label": "收款提醒自動跳出來 過期幾天、金額多少，一看就知道",
+        "caption": "收款提醒自動跳出來，哪一期過期幾天、金額多少，一看就知道。"
+      },
+      {
+        "id": "finance-cost-3",
+        "file": "/brands/taskgo/shorts/finance-cost-3.jpg",
+        "tag": "超支專案",
+        "label": "控制良好幾個、超支幾個 馬上抓出來",
+        "caption": "成本分析總覽，哪些專案成本控制良好、哪些已經超支，馬上抓出來。"
+      },
+      {
+        "id": "finance-cost-4",
+        "file": "/brands/taskgo/shorts/finance-cost-4.jpg",
+        "tag": "專案成本明細",
+        "label": "預算・實際・差異・執行率 超支的直接標紅",
+        "caption": "每個專案的預算、實際成本、差異、執行率，超支的直接標紅。"
+      },
+      {
+        "id": "finance-cost-5",
+        "file": "/brands/taskgo/shorts/finance-cost-5.jpg",
+        "tag": "成本記錄",
+        "label": "廠商派工自動記成本 哪個案子花多少，一筆一筆都在",
+        "caption": "廠商派工的費用自動記進成本，哪個案子花了多少，一筆一筆都在。"
+      }
+    ]
+  },
+  {
+    "id": "dispatch-calendar",
+    "brand": "taskgo",
+    "episode": "04",
+    "feature": "派工行事曆",
+    "title": "TaskGo 派工行事曆",
+    "tagline": "派工・通知・進度 一次搞定",
+    "duration": 62.9,
+    "durationLabel": "1 分 3 秒",
+    "video": "/shorts/taskgo/dispatch-calendar.mp4",
+    "poster": "/shorts/taskgo/dispatch-calendar.jpg",
+    "role": "staff",
+    "pain": [
+      "每天晚上在群組一個一個排工，師傅還是問：明天到底去哪裡？",
+      "結果兩組人跑到同一個案場，另一邊的客戶等不到人，電話一直打來。"
+    ],
+    "chips": [
+      "派工行事曆",
+      "狀態顏色",
+      "LINE 通知",
+      "當日任務"
+    ],
+    "summary": "群組排工、地址傳了又傳、兩組人撞同一個案場？ TaskGo 派工行事曆月週日一鍵切換，新增派工事件指定專案與時間，狀態用顏色分好，列表檢視每日任務；師傅 LINE 直接收到通知。",
+    "ytTitle": "每天排工到半夜，師傅還是跑錯案場？😫｜TaskGo 派工行事曆",
+    "ig": "工班老闆，你是不是每天晚上都在群組排工到半夜 😩\n📱 一個一個打字排工，師傅還是問「明天去哪？」\n📍 地址傳了又傳，還是有人跑錯案場\n😫 兩組人撞同一間，另一邊客戶等不到人\n\n用了 TaskGo，派工一次搞定 👇\n📅 派工行事曆：月、週、日一鍵切換，誰哪天去哪一眼看到\n➕ 新增派工事件：填標題、時間、指定專案，馬上排進去\n🎨 待派工、進行中、已完成，用顏色分好\n📋 切到列表，每天任務排好好，狀態一眼看到\n📲 師傅 LINE 直接收到通知，地址、時間都在上面\n\n派工不用再喊，工地自己會動！\n\n👉 想讓排工不再熬夜？私訊我們了解 TaskGo\n\n#TaskGo #派工 #工班管理 #工程管理 #LINE派工 #排程 #修繕 #裝修 #工班老闆 #案場管理",
+    "threads": "以前每天晚上 11 點還在群組打字排工，\n隔天早上還是有師傅問我「今天去哪？」\n最慘的是兩組人撞同一個案場，另一邊客戶在家等一早上。\n\n現在派工都排在 TaskGo 行事曆，\n師傅 LINE 自己收到今天去哪、幾點、地址，\n我晚上終於可以好好睡覺了。",
+    "stills": [
+      {
+        "id": "dispatch-calendar-1",
+        "file": "/brands/taskgo/shorts/dispatch-calendar-1.jpg",
+        "tag": "派工行事曆",
+        "label": "月・週・日一鍵切換 誰哪天去哪，一眼看到",
+        "caption": "派工行事曆月、週、日一鍵切換，誰哪天去哪裡，一眼就看到。"
+      },
+      {
+        "id": "dispatch-calendar-2",
+        "file": "/brands/taskgo/shorts/dispatch-calendar-2.jpg",
+        "tag": "新增任務",
+        "label": "按新增派工事件 填標題時間，馬上排進去",
+        "caption": "按新增派工事件，填標題、時間、指定專案，馬上排進行事曆。"
+      },
+      {
+        "id": "dispatch-calendar-3",
+        "file": "/brands/taskgo/shorts/dispatch-calendar-3.jpg",
+        "tag": "狀態顏色",
+        "label": "待派工、進行中、已完成 顏色分好，進度不用問",
+        "caption": "待派工、進行中、待確認、已完成，用顏色分好，進度不用再一個一個問。"
+      },
+      {
+        "id": "dispatch-calendar-4",
+        "file": "/brands/taskgo/shorts/dispatch-calendar-4.jpg",
+        "tag": "列表・任務清單",
+        "label": "切到列表，每天任務排好好 右邊清單，狀態一眼看到",
+        "caption": "切到列表，每一天的任務排得整整齊齊，右邊任務清單，狀態一眼就看到。"
+      }
+    ]
+  },
+  {
+    "id": "field-report-review",
+    "brand": "taskgo",
+    "episode": "05",
+    "feature": "施工回報",
+    "title": "TaskGo 施工回報",
+    "tagline": "施工照片・分段審核 全都有紀錄",
+    "duration": 58.1,
+    "durationLabel": "58 秒",
+    "video": "/shorts/taskgo/field-report-review.mp4",
+    "poster": "/shorts/taskgo/field-report-review.jpg",
+    "role": "crew",
+    "pain": [
+      "師傅說做好了，問他照片，施工前的沒拍，施工中也沒有。",
+      "客戶說上次修的又壞了，到底是誰做的、哪天做的，翻遍群組也找不到。"
+    ],
+    "chips": [
+      "審核資料包",
+      "分段審核",
+      "三段把關",
+      "AI 比對"
+    ],
+    "summary": "施工照片缺東缺西、出問題找不到是誰做的？ TaskGo 審核資料包自動整理每筆任務照片，依待 WM 審核、待 PM 審核分頁，工班提交、WM 審核、PM 確認三段把關，並可觸發 AI 比對交叉檢查。",
+    "ytTitle": "師傅說做好了，照片呢？😤｜TaskGo 施工審核資料包",
+    "ig": "師傅說做好了，問他照片：施工前沒拍、施工中也沒有 😤\n🔁 客戶說上次修的又壞了，到底誰做的、哪天做的？\n📱 翻遍群組也找不到那張照片\n\n用了 TaskGo，每一次施工都有憑有據 👇\n📦 審核資料包：每筆場勘、報價任務的照片自動整理好\n🗂 待 WM 審核、待 PM 審核分頁列好，誰該看哪筆不會漏\n📸 工班提交 → WM 審核 → PM 確認，三段把關\n🤖 一鍵觸發 AI 比對，照片和任務交叉檢查\n\n每一單都有照片、有審核，客戶放心，老闆也不怕被說沒做！\n\n👉 想讓施工品質有憑有據？私訊我們了解 TaskGo\n\n#TaskGo #施工管理 #工程品質 #施工照片 #工班管理 #修繕 #裝修 #工程管理 #AI審核",
+    "threads": "修繕最怕的一句話：「上次修的又壞了。」\n然後全公司開始翻群組找照片。\n\n現在每一筆任務的照片都進 TaskGo 審核資料包，\n工班提交、WM 審核、PM 確認三段把關，\n還能叫 AI 幫忙比對，誰做的、哪天做的，一查就有。",
+    "stills": [
+      {
+        "id": "field-report-review-1",
+        "file": "/brands/taskgo/shorts/field-report-review-1.jpg",
+        "tag": "審核資料包",
+        "label": "照片自動整理成審核資料包 幾張照片、完成沒，清清楚楚",
+        "caption": "每一筆場勘、報價任務，照片都自動整理成審核資料包，幾張照片、有沒有完成，清清楚楚。"
+      },
+      {
+        "id": "field-report-review-2",
+        "file": "/brands/taskgo/shorts/field-report-review-2.jpg",
+        "tag": "分段審核",
+        "label": "待 WM・待 PM・已完成 誰該看哪一筆，不會漏",
+        "caption": "待 WM 審核、待 PM 審核、已完成，分頁列好，誰該看哪一筆，不會漏。"
+      },
+      {
+        "id": "field-report-review-3",
+        "file": "/brands/taskgo/shorts/field-report-review-3.jpg",
+        "tag": "三段把關",
+        "label": "工班提交 → WM 審核 → PM 確認 三段把關，一段都不能少",
+        "caption": "點開就看到工班提交的照片、WM 審核、PM 確認，三段把關，一段都不能少。"
+      },
+      {
+        "id": "field-report-review-4",
+        "file": "/brands/taskgo/shorts/field-report-review-4.jpg",
+        "tag": "AI 比對",
+        "label": "一鍵觸發 AI 比對 照片和任務交叉檢查",
+        "caption": "還能一鍵觸發 AI 比對，照片和任務交叉檢查，有問題先抓出來。"
+      }
+    ]
+  },
+  {
+    "id": "repair-management",
+    "brand": "taskgo",
+    "episode": "08",
+    "feature": "修繕管理",
+    "title": "TaskGo 修繕管理",
+    "tagline": "報修進來 自動成案",
+    "duration": 62.2,
+    "durationLabel": "1 分 2 秒",
+    "video": "/shorts/taskgo/repair-management.mp4",
+    "poster": "/shorts/taskgo/repair-management.jpg",
+    "role": "shop",
+    "pain": [
+      "報修電話一通接一通，地址、聯絡人寫在便條紙上，轉頭就找不到。",
+      "客戶一直追：上禮拜報修的，到底什麼時候來？"
+    ],
+    "chips": [
+      "公開報修",
+      "手動新增",
+      "群組 AI",
+      "報修單據"
+    ],
+    "summary": "報修靠電話和便條紙，客戶追進度卻找不到紀錄？ TaskGo 修繕管理提供公開報修連結、LINE 群組 AI 機器人自動建單、電話手動新增；報修單據一眼看案件階段與帳務待辦，案件詳情追蹤派工到請款。",
+    "ytTitle": "報修電話接不完，漏接一件客戶就爆炸😵｜TaskGo 修繕管理",
+    "ig": "做修繕的，最怕客戶問「到底什麼時候來？」😓\n📞 報修電話一通接一通，接都接不完\n📝 地址電話寫在便條紙，轉頭就不見\n⏰ 漏接一件，客戶就洗了一週冷水\n\n用了 TaskGo，報修自動成案 👇\n🔗 公開報修連結：客戶自己填，案件直接進系統\n☎️ 電話進來也能手動新增，馬上有案號\n🤖 AI 機器人加進 LINE 群組，報修訊息自動解析成案件\n📋 報修單據：案件階段、帳務待辦一眼看完\n🔎 點進案件：派工、施工、完工、驗收、請款一條線追到底\n\n每一件報修，都有人接、有人追！\n\n👉 想讓報修不再漏接？私訊我們了解 TaskGo\n\n#TaskGo #修繕管理 #報修 #物業管理 #水電 #工班管理 #工程管理 #包租代管 #房東 #修繕",
+    "threads": "修繕最常出事的，不是師傅技術，是漏接。\n電話一多，便條紙一貼，轉頭就找不到。\n一週後客戶打來：「我洗冷水洗一週了。」\n\n現在報修都走 TaskGo，\n客戶填連結、LINE 群組 AI 自動建單、電話也能手動新增，\n每一件都有案號，進度一條線追到底。",
+    "stills": [
+      {
+        "id": "repair-management-1",
+        "file": "/brands/taskgo/shorts/repair-management-1.jpg",
+        "tag": "公開報修連結",
+        "label": "給一條公開報修連結 客戶自己填，直接成案",
+        "caption": "給委託方一條公開報修連結，客戶自己填，案件直接進系統。"
+      },
+      {
+        "id": "repair-management-2",
+        "file": "/brands/taskgo/shorts/repair-management-2.jpg",
+        "tag": "電話手動新增",
+        "label": "電話進來手動新增 填好資料，馬上有案號",
+        "caption": "電話進來也能手動新增，聯絡人、地址、修繕內容填好，馬上有案號。"
+      },
+      {
+        "id": "repair-management-3",
+        "file": "/brands/taskgo/shorts/repair-management-3.jpg",
+        "tag": "LINE 群組 AI 機器人",
+        "label": "AI 機器人加進 LINE 群組 報修自動解析存進案件",
+        "caption": "把修Go AI 機器人加進 LINE 群組，群組裡的報修，AI 自動解析，存進對應案件。"
+      },
+      {
+        "id": "repair-management-4",
+        "file": "/brands/taskgo/shorts/repair-management-4.jpg",
+        "tag": "報修單據",
+        "label": "案件階段、帳務待辦一眼看完 快漏掉的，系統會提醒",
+        "caption": "所有報修都在報修單據，案件階段、帳務待辦一眼看完，快漏掉的還會提醒你。"
+      },
+      {
+        "id": "repair-management-5",
+        "file": "/brands/taskgo/shorts/repair-management-5.jpg",
+        "tag": "案件詳情",
+        "label": "點進案件，流程・下一步・照片 全部在同一頁",
+        "caption": "點進案件，流程進度、下一步行動、現場照片，全部在同一頁。"
+      }
+    ]
+  },
+  {
+    "id": "owner-cockpit",
+    "brand": "taskgo",
+    "episode": "11",
+    "feature": "老闆駕駛艙",
+    "title": "TaskGo 老闆駕駛艙",
+    "tagline": "公司全局 一頁看完",
+    "duration": 68.4,
+    "durationLabel": "1 分 8 秒",
+    "video": "/shorts/taskgo/owner-cockpit.mp4",
+    "poster": "/shorts/taskgo/owner-cockpit.jpg",
+    "role": "shop",
+    "pain": [
+      "老闆想知道公司現在怎樣，要問工務、問會計、問師傅，問完一輪天都黑了。",
+      "等報表整理好，問題早就爆了：案子逾期、錢沒收、師傅忙不過來。"
+    ],
+    "chips": [
+      "營運四燈",
+      "財務四格",
+      "健康矩陣",
+      "異常事件"
+    ],
+    "summary": "案子落後、錢沒收、人力排不過來，總是最後才知道？ TaskGo OWNER 駕駛艙一頁呈現專案健康度、任務交付、人力負荷、品質風險，以及合約總額、應收現金、實際成本與預期毛利；專案健康矩陣、現金流時間軸、人力熱力圖、異常事件串流一鍵切換。",
+    "ytTitle": "想知道公司現況要問三個人？🤯｜TaskGo OWNER 駕駛艙",
+    "ig": "老闆想知道公司現在怎樣，是不是要問工務、問會計、問師傅 🤯\n📞 問完一輪天都黑了\n📄 等報表整理好，問題早就爆了\n😵 案子逾期、錢沒收、師傅排不過來\n\n用了 TaskGo，公司全局一頁看完 👇\n🚦 OWNER 駕駛艙：專案健康度、任務交付、人力負荷、品質風險四個燈號\n💰 合約總額、應收現金、實際成本、預期毛利，逾期未收直接標紅\n🩺 專案健康矩陣：依健康分數排序，最該關注的在最上面\n📈 現金流時間軸、人力配置熱力圖、異常事件串流，一鍵切換\n\n早上喝杯咖啡，就知道今天先處理哪一件 ☕\n\n👉 想要一頁看完公司全局？私訊我們了解 TaskGo\n\n#TaskGo #老闆儀表板 #工程管理 #專案管理 #財務管理 #工班老闆 #修繕 #裝修 #經營管理",
+    "threads": "當老闆最累的不是做事，是「問狀況」。\n問工務案子落後幾個、問會計錢收多少，\n等答案回來，問題早就爆了。\n\n現在打開 TaskGo OWNER 駕駛艙，\n營運四燈、財務四格、專案健康排行，一頁看完，\n早上喝杯咖啡就知道今天先處理哪一件。",
+    "stills": [
+      {
+        "id": "owner-cockpit-1",
+        "file": "/brands/taskgo/shorts/owner-cockpit-1.jpg",
+        "tag": "營運四燈",
+        "label": "專案・任務・人力・品質 四個燈號一眼看完",
+        "caption": "OWNER 駕駛艙，專案健康度、任務交付、人力負荷、品質風險，四個燈號一眼看完。"
+      },
+      {
+        "id": "owner-cockpit-2",
+        "file": "/brands/taskgo/shorts/owner-cockpit-2.jpg",
+        "tag": "財務四格",
+        "label": "合約・應收・成本・毛利 逾期沒收的直接標紅",
+        "caption": "合約總額、應收現金、實際成本、預期毛利，逾期沒收的錢直接標紅。"
+      },
+      {
+        "id": "owner-cockpit-3",
+        "file": "/brands/taskgo/shorts/owner-cockpit-3.jpg",
+        "tag": "專案健康矩陣",
+        "label": "依健康分數排序 最該關注的排最上面",
+        "caption": "專案依健康分數排序，進度、逾期任務、合約達成率，最該關注的排最上面。"
+      },
+      {
+        "id": "owner-cockpit-4",
+        "file": "/brands/taskgo/shorts/owner-cockpit-4.jpg",
+        "tag": "現金流・人力",
+        "label": "現金流時間軸、人力熱力圖 錢和人，提早知道",
+        "caption": "再切到現金流時間軸、人力配置熱力圖，錢什麼時候進來、人力夠不夠，提早知道。"
+      },
+      {
+        "id": "owner-cockpit-5",
+        "file": "/brands/taskgo/shorts/owner-cockpit-5.jpg",
+        "tag": "異常事件串流",
+        "label": "異常事件自動串成一條 出狀況第一時間跳出來",
+        "caption": "異常事件自動串成一條，任務逾期、哪個專案出狀況，第一時間跳出來。"
+      }
+    ]
+  },
+  {
+    "id": "intake-quote-sign",
+    "brand": "washgo",
+    "episode": "01",
+    "feature": "收件報價",
+    "title": "Washgo 收件報價",
+    "tagline": "收件・覆核・報價・簽名 一條龍",
+    "duration": 64.3,
+    "durationLabel": "1 分 4 秒",
+    "video": "/shorts/washgo/intake-quote-sign.mp4",
+    "poster": "/shorts/washgo/intake-quote-sign.jpg",
+    "role": "staff",
+    "pain": [
+      "收件時口頭報價，洗好了客人才說：怎麼跟講好的不一樣？",
+      "收件單手寫，幾件、什麼材質、有沒有污漬，事後誰也說不清楚。"
+    ],
+    "chips": [
+      "門市收件",
+      "收貨覆核",
+      "逐件報價",
+      "簽名確認"
+    ],
+    "summary": "口頭報價、手寫收件單，洗好才吵價錢？ Washgo 門市收件五步驟引導櫃檯作業，收貨覆核拆袋定價與確認洗滌風險，逐件報價列出品項與加價，客人簽名確認後才開始洗。",
+    "ytTitle": "洗好才說「跟講好的不一樣」？🤨｜Washgo 收件報價簽名",
+    "ig": "收件時口頭報價，洗好了客人才說「怎麼跟講好的不一樣」😤\n📝 收件單手寫，幾件、什麼材質、有沒有污漬，事後誰也說不清\n💬 價錢沒講清楚，一吵就是半小時\n\n用了 Washgo，收件到報價一條龍 👇\n🧺 門市收件五步驟：查會員、確認姓名、收貨覆核、簽名、印單\n📞 電話或姓名都能找會員\n🔍 收貨覆核：拆袋定價、確認洗滌風險，幾件多少錢列清楚\n💬 逐件報價：品項、價格、污漬加價，合計一行一行列給客人看\n✍️ 客人簽名確認才開洗，不怕事後爭議\n\n每一張單，都清清楚楚！\n\n👉 想讓收件不再吵架？私訊我們了解 Washgo\n\n#Washgo #洗衣店 #收件 #報價 #電子簽名 #門市管理 #洗衣管理 #乾洗",
+    "threads": "洗衣店最怕的對話：\n「怎麼跟講好的不一樣？」\n\n以前收件靠手寫、報價靠嘴巴，\n現在用 Washgo，收貨覆核逐件定價，\n報價一行一行列清楚，客人簽名確認了才開洗。\n吵架少了，熟客也多了。",
+    "stills": [
+      {
+        "id": "intake-quote-sign-1",
+        "file": "/brands/washgo/shorts/intake-quote-sign-1.jpg",
+        "tag": "門市收件",
+        "label": "查會員 → 確認 → 收貨覆核 → 簽名 → 印單，照著走",
+        "caption": "客人來送洗，櫃檯照著五個步驟走：查會員、確認姓名、收貨覆核、簽名、印單。"
+      },
+      {
+        "id": "intake-quote-sign-2",
+        "file": "/brands/washgo/shorts/intake-quote-sign-2.jpg",
+        "tag": "電話找會員",
+        "label": "電話或姓名找會員 忘記電話也查得到",
+        "caption": "用電話或姓名就能找到會員，忘記電話也查得到。"
+      },
+      {
+        "id": "intake-quote-sign-3",
+        "file": "/brands/washgo/shorts/intake-quote-sign-3.jpg",
+        "tag": "收貨覆核",
+        "label": "拆袋定價、確認洗滌風險 幾件、多少錢，列清楚",
+        "caption": "收貨覆核拆袋定價、確認洗滌風險，每一筆覆核了幾件、金額多少，列得清清楚楚。"
+      },
+      {
+        "id": "intake-quote-sign-4",
+        "file": "/brands/washgo/shorts/intake-quote-sign-4.jpg",
+        "tag": "逐件報價",
+        "label": "每一件、每個加價 合計多少，一行一行列清楚",
+        "caption": "覆核完送出報價，每一件品項、價格、污漬加價，合計多少，一行一行列給客人看。"
+      },
+      {
+        "id": "intake-quote-sign-5",
+        "file": "/brands/washgo/shorts/intake-quote-sign-5.jpg",
+        "tag": "等客人確認",
+        "label": "待客戶確認分區列好 客人簽名確認才開洗",
+        "caption": "待客戶確認、已覆核待回覆，分好兩區，客人簽名確認了才開始洗。"
+      }
+    ]
+  },
+  {
+    "id": "driver-tasks",
+    "brand": "washgo",
+    "episode": "02",
+    "feature": "司機任務",
+    "title": "Washgo 司機任務",
+    "tagline": "取件・送回 派車不漏單",
+    "duration": 65.5,
+    "durationLabel": "1 分 6 秒",
+    "video": "/shorts/washgo/driver-tasks.mp4",
+    "poster": "/shorts/washgo/driver-tasks.jpg",
+    "role": "driver",
+    "pain": [
+      "每天早上司機都要問：今天先去哪？地址再傳一次。",
+      "客人說等了一下午沒人來收，送到的衣服又說沒收到，司機有理說不清。"
+    ],
+    "chips": [
+      "派遣流程",
+      "派遣清單",
+      "回貨覆核",
+      "待送回"
+    ],
+    "summary": "派車靠群組、地址傳了又傳、送回漏單？ Washgo 派遣流程從下單、排運費到 LINE 通知司機一條龍；門市派遣清單、回貨覆核、待送回分開管理，運送行程表日週月檢視並可訂閱 Google 日曆。",
+    "ytTitle": "司機每天問今天去哪？😩｜Washgo 收送派車",
+    "ig": "每天早上司機都要問：今天先去哪？地址再傳一次 😩\n⏰ 客人等了一下午沒人來收\n📦 送到的衣服又說沒收到，司機有理說不清\n\n用了 Washgo，取件送回派車不漏單 👇\n🗺 派遣流程五步驟：下單、排運費、LINE 通知司機、確認、到府打卡收件\n📋 門市派遣清單：到府取件全部列好，排好行程自動推播 LINE\n📦 回貨覆核：包好的衣服確認完成就派司機送回\n🚚 待自取、待送回分開管，地址、件數、污點說明都看得到\n📅 運送行程表日週月檢視，還能訂閱 Google 日曆\n\n收送路線，照著走就對了！\n\n👉 想讓收送不再漏單？私訊我們了解 Washgo\n\n#Washgo #洗衣店 #到府收送 #司機派遣 #物流管理 #洗衣管理 #LINE",
+    "threads": "到府收送最常出事的，不是司機，是派車。\n誰去哪、哪件要送回，全靠群組喊。\n\n現在用 Washgo，到府取件進派遣清單，\n排好行程自動 LINE 通知司機，\n包好的衣服進回貨覆核、待送回一張一張列好，\n不會再漏單。",
+    "stills": [
+      {
+        "id": "driver-tasks-1",
+        "file": "/brands/washgo/shorts/driver-tasks-1.jpg",
+        "tag": "派遣流程",
+        "label": "下單 → 排運費 → LINE 通知司機 → 確認 → 到府打卡收件",
+        "caption": "派車照五個步驟：會員下單、店長排運費、LINE 通知司機、司機確認、到府一鍵打卡收件。"
+      },
+      {
+        "id": "driver-tasks-2",
+        "file": "/brands/washgo/shorts/driver-tasks-2.jpg",
+        "tag": "門市派遣清單",
+        "label": "到府取件全部列好 排好行程，自動推播 LINE",
+        "caption": "已受理的到府取件，全部列在派遣清單，排好行程系統就直接建立司機任務、推播 LINE。"
+      },
+      {
+        "id": "driver-tasks-3",
+        "file": "/brands/washgo/shorts/driver-tasks-3.jpg",
+        "tag": "回貨覆核",
+        "label": "包好的衣服進回貨覆核 確認完成就派司機送回",
+        "caption": "洗好包好的衣服進回貨覆核，確認包裝完成，就能派司機送回。"
+      },
+      {
+        "id": "driver-tasks-4",
+        "file": "/brands/washgo/shorts/driver-tasks-4.jpg",
+        "tag": "待送回",
+        "label": "待自取・待送回分開管 地址、件數、污點說明都看得到",
+        "caption": "待自取、待送回分開管理，送回地址、件數、污點說明，司機出發前全部看得到。"
+      },
+      {
+        "id": "driver-tasks-5",
+        "file": "/brands/washgo/shorts/driver-tasks-5.jpg",
+        "tag": "運送行程表",
+        "label": "日・週・月運送行程表 還能訂閱 Google 日曆",
+        "caption": "運送行程表用日、週、月檢視取件送回，還能訂閱 Google 日曆。"
+      }
+    ]
+  },
+  {
+    "id": "order-tracking",
+    "brand": "washgo",
+    "episode": "03",
+    "feature": "訂單進度",
+    "title": "Washgo 訂單進度",
+    "tagline": "進度 一查就有",
+    "duration": 67.7,
+    "durationLabel": "1 分 8 秒",
+    "video": "/shorts/washgo/order-tracking.mp4",
+    "poster": "/shorts/washgo/order-tracking.jpg",
+    "role": "staff",
+    "pain": [
+      "客人一直問：我的衣服洗好了沒？門市翻了半天也找不到。",
+      "一到下班時間，問進度的電話和訊息一直來，店員根本沒辦法專心工作。"
+    ],
+    "chips": [
+      "快速查詢",
+      "訂單流程",
+      "追蹤連結",
+      "取件管理"
+    ],
+    "summary": "問進度的電話接不完、翻單據找半天？ Washgo 訂單查詢支援姓名、電話、訂單編號、衣物名稱搜尋；訂單流程進度條、客戶追蹤連結一鍵推送，品項金額與覆核照片同頁查看，待取件管理記錄存放區與交件照片。",
+    "ytTitle": "客人一直問衣服洗好了沒？😵｜Washgo 訂單進度",
+    "ig": "客人一直問：我的衣服洗好了沒？門市翻了半天也找不到 😵\n📞 一到下班時間，問進度的電話和訊息一直來\n🧺 店員根本沒辦法專心工作\n\n用了 Washgo，進度一查就有 👇\n🔎 姓名、電話、訂單編號、衣物名稱，打一個字就查到\n📲 訂單流程進度條：收件、覆核、報價、洗滌、交付，到哪一步一看就懂\n🔗 每張單都有客戶追蹤連結，一鍵推送狀態給客人\n📷 品項、金額、覆核照片都在同一頁\n🔔 待自取、待送回分開列，存放區、交件照片、簽名都記下來\n\n每一件衣服的進度，都清清楚楚！\n\n👉 想讓門市不再被電話追著跑？私訊我們了解 Washgo\n\n#Washgo #洗衣店 #訂單管理 #進度查詢 #門市管理 #洗衣管理 #LINE",
+    "threads": "洗衣店下班前最常聽到：「我的衣服好了沒？」\n以前要翻單據、問後場，\n現在 Washgo 打一個字就查到訂單，\n進度條一看就知道到哪一步，\n還能把追蹤連結推給客人，讓他自己看。",
+    "stills": [
+      {
+        "id": "order-tracking-1",
+        "file": "/brands/washgo/shorts/order-tracking-1.jpg",
+        "tag": "一秒查訂單",
+        "label": "姓名、電話、訂單號、衣物名 打一個字就查到",
+        "caption": "客人問洗好了沒？姓名、電話、訂單編號、衣物名稱，打一個字就查得到。"
+      },
+      {
+        "id": "order-tracking-2",
+        "file": "/brands/washgo/shorts/order-tracking-2.jpg",
+        "tag": "訂單流程",
+        "label": "收件 → 覆核 → 報價 → 洗滌 → 交付 現在到哪一步一看就懂",
+        "caption": "點進訂單，收件、覆核、報價、洗滌、交付，現在到哪一步，進度條一看就懂。"
+      },
+      {
+        "id": "order-tracking-3",
+        "file": "/brands/washgo/shorts/order-tracking-3.jpg",
+        "tag": "客戶追蹤連結",
+        "label": "每張單都有追蹤連結 一鍵推送，客人自己看",
+        "caption": "每張單都有客戶追蹤連結，一鍵推送狀態給客人，客人自己看進度。"
+      },
+      {
+        "id": "order-tracking-4",
+        "file": "/brands/washgo/shorts/order-tracking-4.jpg",
+        "tag": "照片與金額",
+        "label": "品項、金額、覆核照片 客人問哪件，馬上翻給他看",
+        "caption": "洗滌品項、金額、覆核照片都在同一頁，客人問哪一件，馬上翻給他看。"
+      },
+      {
+        "id": "order-tracking-5",
+        "file": "/brands/washgo/shorts/order-tracking-5.jpg",
+        "tag": "可以取件了",
+        "label": "待自取・待送回分開列 存放區、交件照片、簽名都記下來",
+        "caption": "洗好了就進待取件，待自取、待送回分開列，存放區域、交件照片、簽名都記下來。"
+      }
+    ]
+  },
+  {
+    "id": "qc-rewash",
+    "brand": "washgo",
+    "episode": "04",
+    "feature": "品管重洗",
+    "title": "Washgo 品管重洗",
+    "tagline": "每一件 過關才出門",
+    "duration": 54.5,
+    "durationLabel": "55 秒",
+    "video": "/shorts/washgo/qc-rewash.mp4",
+    "poster": "/shorts/washgo/qc-rewash.jpg",
+    "role": "staff",
+    "pain": [
+      "衣服洗好就直接包，回家客人才發現污漬還在，口碑一下就壞了。",
+      "要重洗的衣服混在一般單裡，洗完放哪、要送哪裡，又找不到了。"
+    ],
+    "chips": [
+      "逐件品檢",
+      "照片對照",
+      "需重洗",
+      "貼紙碼定位"
+    ],
+    "summary": "洗好直接包沒檢查、重洗的衣服混在一般單裡？ Washgo 品管作業對照送洗照片逐件品檢，一鍵通過或需重洗、污點說明告知顧客；輸入貼紙碼即可快速定位品項。",
+    "ytTitle": "客人回家才發現污漬還在😣｜Washgo 品管與重洗",
+    "ig": "洗衣店最傷的，是客人回家才發現「污漬還在」😣\n🧺 洗好就直接包，沒人檢查\n😤 客人一氣之下給一星\n🔁 要重洗的混在一般單，洗完又找不到\n\n用了 Washgo，每一件過關才出門 👇\n🔎 洗好的全部進品管：待品檢幾單、幾件、通過幾件，清清楚楚\n📷 展開品檢，對照收件時拍的送洗照片逐件檢查\n✅ 乾淨按通過，不乾淨按需重洗，污點說明也一起告知顧客\n🏷 輸入貼紙碼馬上定位那一件，重洗的衣服不會找不到\n\n每一件衣服，都過關才出門！\n\n👉 想讓洗衣品質穩定？私訊我們了解 Washgo\n\n#Washgo #洗衣店 #品質管理 #品管 #洗衣管理 #乾洗 #洗衣工廠 #五星好評 #門市管理 #LINE",
+    "threads": "一件沒洗乾淨的白襯衫，可以毀掉一家洗衣店的評價。\n以前洗好就包，客人回家才打開，\n然後就是一則一星評論。\n\n現在每一件都要過品管，\n對照收件照片逐件看，不乾淨就按需重洗，\n貼紙碼一輸入就找得到那一件。",
+    "stills": [
+      {
+        "id": "qc-rewash-1",
+        "file": "/brands/washgo/shorts/qc-rewash-1.jpg",
+        "tag": "品管檢查",
+        "label": "洗好全部進品管 待檢、通過幾件，清清楚楚",
+        "caption": "洗好的衣服全部進品管，待品檢幾單、幾件、通過幾件，數字清清楚楚。"
+      },
+      {
+        "id": "qc-rewash-2",
+        "file": "/brands/washgo/shorts/qc-rewash-2.jpg",
+        "tag": "對照送洗照片",
+        "label": "對照收件時的照片 每一件逐件檢查",
+        "caption": "展開品檢，對照收件時拍的送洗照片，每一件都逐件檢查。"
+      },
+      {
+        "id": "qc-rewash-3",
+        "file": "/brands/washgo/shorts/qc-rewash-3.jpg",
+        "tag": "通過・↩ 需重洗",
+        "label": "乾淨按通過，不乾淨需重洗 污點也要告知顧客",
+        "caption": "洗乾淨就按通過，沒洗乾淨按需重洗，有污點也要說明、告知顧客。"
+      },
+      {
+        "id": "qc-rewash-4",
+        "file": "/brands/washgo/shorts/qc-rewash-4.jpg",
+        "tag": "貼紙碼快速定位",
+        "label": "輸入貼紙碼馬上定位 重洗的衣服不會找不到",
+        "caption": "貼紙碼一輸入，馬上定位到那一件，要重洗的衣服再也不會找不到。"
+      }
+    ]
+  },
+  {
+    "id": "points-topup",
+    "brand": "washgo",
+    "episode": "05",
+    "feature": "點數儲值",
+    "title": "Washgo 點數儲值",
+    "tagline": "儲值・扣點・餘額 一目了然",
+    "duration": 63.7,
+    "durationLabel": "1 分 4 秒",
+    "video": "/shorts/washgo/points-topup.mp4",
+    "poster": "/shorts/washgo/points-topup.jpg",
+    "role": "shop_owner",
+    "pain": [
+      "熟客問：我上次儲的錢還剩多少？門市只好翻記帳本慢慢找。",
+      "儲值寫在本子上，扣了幾次、剩多少，跟客人一對就吵起來。"
+    ],
+    "chips": [
+      "儲值方案",
+      "LINE 儲值",
+      "櫃檯加點",
+      "加值報表"
+    ],
+    "summary": "儲值寫本子、餘額對不起來？ Washgo 儲值方案自動計算贈點，客人 LINE 儲值付款成功自動入點；櫃檯可用電話、會員 QR 或姓名查詢加點；客戶管理顯示點數餘額，加值報表彙整現金、轉帳、LINE Pay 與人工補點。",
+    "ytTitle": "「我的儲值還剩多少？」翻本子查半天📒｜Washgo 點數儲值",
+    "ig": "熟客問：我上次儲的錢還剩多少？門市只好翻記帳本慢慢找 😓\n📒 儲值寫在本子上，扣了幾次、剩多少，一對就吵起來\n\n用了 Washgo，儲值扣點一目了然 👇\n🎯 儲值方案先設好，儲越多送越多，贈點自動算\n💳 客人在 LINE 儲值，付款成功點數自動入帳\n🏪 付現金也行，櫃檯用電話、會員 QR 或姓名找會員加點\n👤 客戶管理：總會員數、本月新增、每個人點數餘額都在\n📊 加值報表：現金、轉帳、LINE Pay、人工補點，一張表對清楚\n\n儲值有帳，熟客回頭！\n\n👉 想讓儲值不再對帳對到吵架？私訊我們了解 Washgo\n\n#Washgo #洗衣店 #儲值 #會員點數 #LINEPay #熟客經營 #門市管理 #洗衣管理",
+    "threads": "洗衣店的儲值本，是最容易吵架的那本。\n剩多少、扣幾次，客人記得跟你不一樣。\n\n現在用 Washgo，方案先設好、贈點自動算，\n客人 LINE 儲值自動入點，櫃檯也能幫忙加點，\n加值報表一張對清楚，熟客自己也安心。",
+    "stills": [
+      {
+        "id": "points-topup-1",
+        "file": "/brands/washgo/shorts/points-topup-1.jpg",
+        "tag": "儲值方案",
+        "label": "儲值方案先設好 儲越多送越多，贈點自動算",
+        "caption": "儲值方案先設好，一千、兩千、一萬，儲越多送越多，贈點自動算。"
+      },
+      {
+        "id": "points-topup-2",
+        "file": "/brands/washgo/shorts/points-topup-2.jpg",
+        "tag": "LINE 儲值預覽",
+        "label": "客人 LINE 儲值畫面 付款成功自動入點",
+        "caption": "客人在 LINE 看到的儲值按鈕長這樣，付款成功點數自動入帳，還能先試算。"
+      },
+      {
+        "id": "points-topup-3",
+        "file": "/brands/washgo/shorts/points-topup-3.jpg",
+        "tag": "櫃檯儲值",
+        "label": "櫃檯用電話・QR・姓名 找會員幫忙加點",
+        "caption": "付現金也可以，櫃檯用電話、掃會員 QR、或姓名找到會員，幫客人加點。"
+      },
+      {
+        "id": "points-topup-4",
+        "file": "/brands/washgo/shorts/points-topup-4.jpg",
+        "tag": "客戶與點數",
+        "label": "總會員、本月新增 每個人的點數餘額都在",
+        "caption": "客戶管理一打開，總會員數、本月新增、每個人的點數餘額，全部都在。"
+      },
+      {
+        "id": "points-topup-5",
+        "file": "/brands/washgo/shorts/points-topup-5.jpg",
+        "tag": "加值報表",
+        "label": "現金・轉帳・LINE Pay・補點 一張報表對清楚",
+        "caption": "加值報表依日期、門市查詢，現金、轉帳、LINE Pay、人工補點，一張表對清楚。"
+      }
+    ]
+  },
+  {
+    "id": "ops-center-shift",
+    "brand": "washgo",
+    "episode": "06",
+    "feature": "營運中心",
+    "title": "Washgo 營運中心",
+    "tagline": "開班第一眼 就知道怎麼做",
+    "duration": 62.5,
+    "durationLabel": "1 分 3 秒",
+    "video": "/shorts/washgo/ops-center-shift.mp4",
+    "poster": "/shorts/washgo/ops-center-shift.jpg",
+    "role": "shop_owner",
+    "pain": [
+      "一開門，收件、派車、報價、品管全部一起來，到底要先做哪一件？",
+      "待辦寫在白板上，做到一半被打斷，哪一張單漏了，下班才發現。"
+    ],
+    "chips": [
+      "系統總覽",
+      "待處理數",
+      "卡單提醒",
+      "狀態篩選"
+    ],
+    "summary": "收件、派車、報價、品管同時來，待辦寫白板常漏單？ Washgo 系統總覽一眼看完各狀態訂單，首頁顯示待處理件數，營運中心主動提醒卡單，訂單查詢可依狀態一鍵篩選。",
+    "ytTitle": "洗衣店一開門就手忙腳亂？🤯｜Washgo 營運中心",
+    "ig": "洗衣店一開門，是不是所有事情一起砸過來 🤯\n📥 新訂單、司機問路線、客人催報價、品管問重洗\n📋 待辦寫白板，做一半被打斷\n😵 漏了哪張單，下班才發現\n\n用了 Washgo，開班第一眼就知道怎麼做 👇\n📊 系統總覽：全部訂單、洗滌中、配送中，一眼看完\n🔴 首頁直接顯示還有幾件待處理，紅字標出卡在哪\n⚠️ 營運中心主動提醒：哪幾筆單卡在點數不足\n🔎 訂單狀態一鍵切換，待接單、洗滌中、配送中分開做\n\n開店第一眼，就知道今天怎麼做！\n\n👉 想讓門市不再手忙腳亂？私訊我們了解 Washgo\n\n#Washgo #洗衣店 #門市管理 #營運管理 #洗衣管理 #待辦 #收送洗 #洗衣工廠 #店長 #LINE",
+    "threads": "早上九點一開門，LINE 就開始響：\n新訂單、司機問路線、客人催報價、品管問要不要重洗。\n白板寫一寫，做到一半被打斷，晚上才發現漏一張。\n\n現在開班先看營運中心，\n紅字告訴你哪裡還有幾筆，照順序清掉就好，\n終於可以準時關店。",
+    "stills": [
+      {
+        "id": "ops-center-shift-1",
+        "file": "/brands/washgo/shorts/ops-center-shift-1.jpg",
+        "tag": "系統總覽",
+        "label": "開班先看系統總覽 洗滌中、配送中，一眼看完",
+        "caption": "開班先看系統總覽，全部訂單、洗滌中、配送中、待確認報價，一眼看完。"
+      },
+      {
+        "id": "ops-center-shift-2",
+        "file": "/brands/washgo/shorts/ops-center-shift-2.jpg",
+        "tag": "待處理一目了然",
+        "label": "還有幾件待處理 哪裡卡住，紅字標清楚",
+        "caption": "首頁直接告訴你還有幾件事要處理，哪個模組卡住，紅字標得清清楚楚。"
+      },
+      {
+        "id": "ops-center-shift-3",
+        "file": "/brands/washgo/shorts/ops-center-shift-3.jpg",
+        "tag": "卡單主動提醒",
+        "label": "系統主動提醒 哪幾筆單卡在點數不足",
+        "caption": "營運中心還會主動提醒：哪幾筆單卡在點數不足，還沒進洗滌。"
+      },
+      {
+        "id": "ops-center-shift-4",
+        "file": "/brands/washgo/shorts/ops-center-shift-4.jpg",
+        "tag": "訂單狀態篩選",
+        "label": "狀態一鍵切換 專心做眼前那一段",
+        "caption": "訂單查詢用狀態一鍵切換，待接單、洗滌中、配送中，專心做眼前那一段。"
+      },
+      {
+        "id": "ops-center-shift-5",
+        "file": "/brands/washgo/shorts/ops-center-shift-5.jpg",
+        "tag": "待接單",
+        "label": "LINE 下的單進待接單 今天全部清空！",
+        "caption": "顧客從 LINE 下的單，都會進待接單，一筆一筆受理，今天全部清空！"
+      }
+    ]
+  }
+]

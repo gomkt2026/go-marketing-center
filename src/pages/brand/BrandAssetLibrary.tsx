@@ -9,6 +9,7 @@ import {
   assetStatusLabel, assetStatusTone, fallbackTaxonomy, imageCategoryLabel, libraryCopy, roleLabel,
 } from '@/lib/brand-asset-library';
 import { TASKGO_PRODUCT_FILMS } from '@/data/taskgo-product-films';
+import { SYSTEM_SHORTS } from '@/data/system-shorts';
 import type {
   BrandAsset, BrandAssetImageCategory, BrandAssetRole, BrandAssetStatus, BrandAssetTaxonomy,
 } from '@/types';
@@ -130,6 +131,7 @@ export function BrandAssetLibrary({
 }) {
   const taxonomy: BrandAssetTaxonomy = fallbackTaxonomy(slug);
   const copy = libraryCopy(slug);
+  const shorts = SYSTEM_SHORTS.filter((item) => item.brand === slug);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [draft, setDraft] = useState<AssetDraft>(emptyDraft());
@@ -347,6 +349,65 @@ export function BrandAssetLibrary({
                 </div>
               </article>
             ))}
+          </div>
+        </div>
+      )}
+
+      {shorts.length > 0 && (
+        <div style={{ ...cardBoxStyle, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>系統短影片（發文主力）</div>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
+            {shorts.length} 支一分鐘系統短片，每個系統畫面都已放進下方素材格，自動發文會優先用。
+            從這裡產生的 Instagram 會用 Reels 發這支短片，Threads 直接附影片，Facebook 附截圖。
+            畫面是客戶真實帳號，個資已遮掉；件數與金額不會寫進文案。
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+            {shorts.map((short) => {
+              const lead = assets.find((a) => a.fileUrl === short.stills[0]?.file);
+              return (
+                <article key={short.id} style={{ border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  <video
+                    src={short.video}
+                    poster={short.poster}
+                    controls
+                    playsInline
+                    preload="none"
+                    style={{ width: '100%', aspectRatio: '9 / 16', maxHeight: 300, objectFit: 'cover', background: '#0c1c33', display: 'block' }}
+                  />
+                  <div style={{ padding: 10, fontSize: 12, lineHeight: 1.5, display: 'grid', gap: 6, flex: 1 }}>
+                    <strong style={{ fontSize: 13 }}>{short.feature}</strong>
+                    <span style={{ color: 'var(--color-text-muted)' }}>{short.durationLabel} · {short.tagline}</span>
+                    <span>{short.stills.map((s) => s.tag).join('、')}</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 'auto' }}>
+                      {([
+                        ['instagram', 'IG Reels'],
+                        ['threads', 'Threads'],
+                        ['facebook', 'Facebook'],
+                        ['website', '官網長文'],
+                      ] as const).map(([platform, label]) => (
+                        <button
+                          key={platform}
+                          type="button"
+                          disabled={!lead || !!generatingAssetId}
+                          title={lead ? undefined : '素材格還沒寫入這支短片，重新整理後再試'}
+                          onClick={() => {
+                            if (!lead) return;
+                            if (platform === 'website') void generateSeo(lead.id);
+                            else void generateFromAsset(lead.id, platform);
+                          }}
+                          style={{
+                            fontSize: 12, padding: '4px 8px', borderRadius: 6, cursor: lead ? 'pointer' : 'not-allowed',
+                            border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'inherit',
+                          }}
+                        >
+                          {lead && generatingAssetId === `${lead.id}:${platform}` ? '生成中…' : label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </div>
       )}

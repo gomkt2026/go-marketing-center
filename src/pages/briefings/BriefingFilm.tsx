@@ -7,8 +7,8 @@ export function BriefingFilm() {
   const { slug } = useParams();
   const { locale } = useLocale();
   const copy = useCopy();
-  const { ui, films } = briefingCatalog(locale);
-  const film = films.find((item) => item.slug === slug);
+  const { ui, films, shorts } = briefingCatalog(locale);
+  const film = films.find((item) => item.slug === slug) ?? shorts.find((item) => item.slug === slug);
 
   useEffect(() => {
     const previous = document.title;

@@ -8,6 +8,7 @@ import {
   type BriefingBrand,
 } from '@/data/briefings';
 import { ALLIANCE_CREWS } from '@/data/alliance-crews';
+import { SYSTEM_SHORT_BRANDS } from '@/data/system-shorts';
 
 function BrandChips({ brands }: { brands: BriefingBrand[] }) {
   return (
@@ -22,7 +23,10 @@ function BrandChips({ brands }: { brands: BriefingBrand[] }) {
 export function BriefingHub() {
   const { locale } = useLocale();
   const crews = useCopy().crews;
-  const { ui, decks, films } = briefingCatalog(locale);
+  const { ui, decks, films, shorts } = briefingCatalog(locale);
+  const shortGroups = SYSTEM_SHORT_BRANDS
+    .map((brand) => ({ brand, items: shorts.filter((item) => item.brands.includes(brand)) }))
+    .filter((group) => group.items.length);
 
   return (
     <PublicFrame title={ui.pageTitle}>
@@ -32,6 +36,31 @@ export function BriefingHub() {
       <h1>{ui.pageTitle}</h1>
       <p className="lp-lead">{ui.lead}</p>
       {ui.artNote && <p className="lp-muted">{ui.artNote}</p>}
+
+      {shortGroups.length > 0 && (
+        <section className="briefing-films" id="shorts">
+          <h2>{ui.shortsTitle}</h2>
+          <p>{ui.shortsLead}</p>
+          {shortGroups.map((group) => (
+            <div key={group.brand} className="briefing-short-group" id={`shorts-${group.brand}`}>
+              <h3><span className={`briefing-chip is-${group.brand}`}>{BRAND_LABEL[group.brand]}</span></h3>
+              <p>{ui.shortsBrandLead[group.brand]}</p>
+              <div className="briefing-short-grid">
+                {group.items.map((film) => (
+                  <LocalLink key={film.slug} to={`/briefings/watch/${film.slug}`} className="briefing-short-card">
+                    <img src={film.poster} alt="" loading="lazy" />
+                    <div>
+                      <strong>{film.title}</strong>
+                      <span>{film.duration} · {film.cue}</span>
+                      <p>{film.summary}</p>
+                    </div>
+                  </LocalLink>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="briefing-films">
         <h2>{crews.title}</h2>

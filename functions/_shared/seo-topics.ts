@@ -3,6 +3,7 @@ import { getSql } from './db';
 import { chatCompleteJson } from './openai';
 import { SEO_TOPIC_BANK, type SeoTopicSeed } from './prompts';
 import { TASKGO_FILM_SEO_TOPICS } from './taskgo-product-films';
+import { SYSTEM_SHORT_SEO_TOPICS } from './system-shorts';
 import { defaultWebsiteDestination } from './website-articles';
 
 /** 一次只推這幾篇新長文，避免主題庫全部變成「產生這篇長文」 */
@@ -81,9 +82,13 @@ export async function listSeoTopicsForBrand(
 ): Promise<SeoTopicSeed[]> {
   const stored = await listStoredSeoTopics(env, brandId);
   const base = stored.length ? stored : (SEO_TOPIC_BANK[slug] ?? []);
-  if (slug !== 'taskgo') return base;
+  const candidates = [
+    ...(slug === 'taskgo' ? TASKGO_FILM_SEO_TOPICS : []),
+    ...(SYSTEM_SHORT_SEO_TOPICS[slug] ?? []),
+  ];
+  if (!candidates.length) return base;
   const have = new Set(base.map((item) => item.topic.replace(/\s+/g, '')));
-  const extra = TASKGO_FILM_SEO_TOPICS.filter((item) => !have.has(item.topic.replace(/\s+/g, '')));
+  const extra = candidates.filter((item) => !have.has(item.topic.replace(/\s+/g, '')));
   return [...base, ...extra];
 }
 

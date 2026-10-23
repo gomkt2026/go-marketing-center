@@ -6,6 +6,7 @@ import { officialWebsitePrompt, loadBrandWebsite } from './brand-profile';
 import { isMissingLaneColumn } from './audience-lane';
 import { TAIWAN_LOCAL_VOICE } from './taiwan-voice';
 import { taskgoProductFilmFacts } from './taskgo-product-films';
+import { systemShortFacts } from './system-shorts';
 
 // ============================================================================
 // 品牌第一線角色視角:讓 AI 用「行業最前端人員」的思維寫貼文,而不是 AI 腔
@@ -2077,7 +2078,8 @@ export function brandSeoFacts(slug: string): string {
       '四個角色:客戶用品牌 LINE 下單/追蹤/線上報價簽名;門市用 LINE 收件 + Web 後台做 AI 進件、批次品管、一鍵報價;司機用 LINE 任務選單、導航、電子簽收、運費結算;品牌主用 Web 控制中心看多門市、定價、行銷與會員。',
       '業者能力可寫:手寫單改雲端訂單、多門市調撥、品管掃碼、運費規劃與智慧派車、品牌分析報表、平台導流、LINE 會員經營。',
       '不可發明客戶數、營收、門市數、滿意度;簡報上的示範數字不得當真實業績。',
-    ].join('\n');
+      systemShortFacts('washgo'),
+    ].filter(Boolean).join('\n');
   }
   if (slug === 'homigo') {
     return '定位:把租屋關係、紀錄、信任、流程整理回同一個地方。可寫收租對帳、報修指揮、合約續約。不可發明物件數或成交保證。';
@@ -2086,7 +2088,8 @@ export function brandSeoFacts(slug: string): string {
     return [
       '定位:工班派工與現場回報工具。可寫排程、現場回報、成本看得見。不可保證接案量或數位轉型成功。',
       taskgoProductFilmFacts(),
-    ].join('\n');
+      systemShortFacts('taskgo'),
+    ].filter(Boolean).join('\n');
   }
   return '只寫可核實的產品能力與流程。不可發明客戶數、市佔、營收、滿意度或保證成效。';
 }

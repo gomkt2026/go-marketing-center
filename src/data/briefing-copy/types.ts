@@ -33,6 +33,10 @@ export interface BriefingUi {
   hasVideo: string;
   filmsTitle: string;
   filmsLead: string;
+  shortsTitle: string;
+  shortsLead: string;
+  /** 短影片依品牌分組時，組名下面的一句話 */
+  shortsBrandLead: { taskgo: string; washgo: string };
   missingDeck: string;
   missingFilm: string;
   back: string;

@@ -639,6 +639,21 @@ a {
 .briefing-film-card div { padding: 12px 14px 14px; }
 .briefing-film-card strong, .briefing-film-card span { display: block; }
 .briefing-film-card span, .briefing-film-card p { font-size: 13px; }
+.briefing-short-group { margin-top: 18px; }
+.briefing-short-group h3 { margin: 0; }
+.briefing-short-group h3 .briefing-chip { font-size: 14px; padding: 4px 12px; }
+.briefing-short-group > p { font-size: 13px; color: var(--color-text-muted); margin: 6px 0 0; }
+.briefing-short-grid { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.briefing-short-card {
+  display: flex; flex-direction: column; background: var(--color-bg); text-decoration: none; color: inherit;
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-card);
+}
+.briefing-short-card img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; background: #071e3f; display: block; }
+.briefing-short-card div { padding: 10px 12px 12px; }
+.briefing-short-card strong, .briefing-short-card span { display: block; }
+.briefing-short-card strong { font-size: 14px; }
+.briefing-short-card span { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+.briefing-short-card p { font-size: 12px; line-height: 1.5; margin: 6px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .briefing-present {
   position: fixed; inset: 0; z-index: 200; background: #071e3f; color: #fff;
   display: flex; flex-direction: column;

@@ -18,6 +18,12 @@ export const zh: BriefingCopy = {
     hasVideo: '含影片',
     filmsTitle: '看系統實際怎麼跑',
     filmsLead: '這幾支影片讓你直接看到報修、場勘、報價，以及修繕怎麼轉成洗衣。',
+    shortsTitle: '一分鐘看懂系統',
+    shortsLead: '每支一分鐘左右：先看現場常見的麻煩，再看系統畫面怎麼解決。畫面是實際帳號操作，個資已經遮掉。',
+    shortsBrandLead: {
+      taskgo: '工程行與工班：出勤、派工、施工回報、修繕與財務。',
+      washgo: '洗衣店：收件報價、收送派車、訂單進度、品管與儲值。',
+    },
     missingDeck: '找不到這份簡報。',
     missingFilm: '找不到這支影片。',
     back: '回簡報專區',

@@ -18,6 +18,12 @@ export const en: BriefingCopy = {
     hasVideo: 'Includes video',
     filmsTitle: 'See the system actually run',
     filmsLead: 'These films show a repair request, a site survey, a quote, and how a repair can turn into laundry.',
+    shortsTitle: 'The system in about a minute',
+    shortsLead: 'Each short starts with a common headache, then shows the screens that fix it. They were recorded in real accounts with personal details blurred. Narration and captions are in Mandarin.',
+    shortsBrandLead: {
+      taskgo: 'For contractors and crews: attendance, dispatch, work reports, repairs and finance.',
+      washgo: 'For laundry shops: intake and quotes, pickup and delivery, order status, quality checks and prepaid points.',
+    },
     missingDeck: 'This briefing is not here.',
     missingFilm: 'This film is not here.',
     back: 'Back to briefings',

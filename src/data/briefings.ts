@@ -2,6 +2,7 @@
 
 import { BRIEFING_COPY } from '@/data/briefing-copy';
 import type { DeckCopy } from '@/data/briefing-copy/types';
+import { SYSTEM_SHORTS, systemShortSlug, systemShortText } from '@/data/system-shorts';
 import type { Locale } from '@/pages/public/copy';
 
 export type BriefingBrand = 'taskgo' | 'homigo' | 'washgo';
@@ -55,6 +56,8 @@ export interface BriefingCatalog {
   ui: (typeof BRIEFING_COPY)['zh']['ui'];
   decks: BriefingDeck[];
   films: BriefingFilm[];
+  /** TaskGo、Washgo 系統短影片，直式 */
+  shorts: (BriefingFilm & { features: string[] })[];
 }
 
 export const BRAND_LABEL: Record<BriefingBrand, string> = {
@@ -161,6 +164,15 @@ export function briefingCatalog(locale: Locale): BriefingCatalog {
       buildDeck('fixercowork', [], '2026/10/14', FIXER_AT, {}, copy.fixer, 61),
     ],
     films: FILM_MEDIA.map((media, index) => ({ ...media, ...copy.films[index] })),
+    shorts: SYSTEM_SHORTS.map((short) => ({
+      slug: systemShortSlug(short),
+      src: short.video,
+      poster: short.poster,
+      brands: [short.brand],
+      vertical: true,
+      features: short.chips,
+      ...systemShortText(short, locale),
+    })),
   };
 }
 

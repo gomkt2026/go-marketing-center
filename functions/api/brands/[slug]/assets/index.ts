@@ -14,6 +14,7 @@ import {
   isImageCategory,
 } from '../../../../_shared/brand-assets';
 import { ensureTaskgoProductFilmAssets } from '../../../../_shared/taskgo-product-films';
+import { ensureSystemShortAssets } from '../../../../_shared/system-shorts';
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 const EXT_BY_MIME: Record<string, string> = {
@@ -43,6 +44,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       console.error('[taskgo-films] 素材庫寫入失敗', e);
     });
   }
+  await ensureSystemShortAssets(context.env, slug).catch((e) => {
+    console.error('[system-shorts] 素材庫寫入失敗', e);
+  });
   const url = new URL(context.request.url);
   const q = url.searchParams.get('q')?.trim().toLowerCase() ?? '';
   const imageCategory = url.searchParams.get('imageCategory')?.trim() ?? '';

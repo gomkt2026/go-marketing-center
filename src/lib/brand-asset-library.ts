@@ -1,6 +1,7 @@
 import type {
   BrandAssetImageCategory, BrandAssetRole, BrandAssetStatus, BrandAssetTaxonomy,
 } from '@/types';
+import { SYSTEM_SHORTS } from '@/data/system-shorts';
 
 export const IMAGE_CATEGORY_OPTIONS: { value: BrandAssetImageCategory; label: string }[] = [
   { value: 'system_screenshot', label: '系統畫面截圖' },
@@ -74,7 +75,10 @@ const GENERIC_ROLES: { value: BrandAssetRole; label: string }[] = [
 ];
 
 export function featuresForBrand(slug: string): string[] {
-  return FEATURES_BY_SLUG[slug] ?? ['產品功能', '操作畫面', '現場', ...SHARED_FEATURES];
+  const base = FEATURES_BY_SLUG[slug] ?? ['產品功能', '操作畫面', '現場', ...SHARED_FEATURES];
+  const extra = [...new Set(SYSTEM_SHORTS.filter((s) => s.brand === slug).map((s) => s.feature))]
+    .filter((item) => !base.includes(item));
+  return extra.length ? [...base.slice(0, -SHARED_FEATURES.length), ...extra, ...SHARED_FEATURES] : base;
 }
 
 export function rolesForBrand(slug: string): { value: BrandAssetRole; label: string }[] {

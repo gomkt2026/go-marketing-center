@@ -24,6 +24,7 @@ import { taiwanVoiceIssue } from './taiwan-voice';
 import { X_TWEET_MAX_CHARS } from './x';
 import { burnPainBar, burnPosterHeadline } from './poster-text';
 import { loadBrandImagePromptPack } from './image-prompts';
+import { attachSystemShortVideo, systemShortFromAssetName, systemShortPrompt } from './system-shorts';
 import {
   describeAssetForPrompt, pickBrandAsset, pickBrandScreenshot, markAssetUsed,
   isJiangchengGameAsset,
@@ -447,6 +448,7 @@ export async function generatePlatformPost(
 
   const screenshotPoster = !!(reusedAsset && isSystemScreenshot(reusedAsset));
   const convertPhotoPoster = !!(reusedAsset && !screenshotPoster);
+  const fromShort = reusedAsset ? systemShortFromAssetName(brandCtx.slug, reusedAsset.name) : undefined;
   const recentStyles = params.skipImage || convertPhotoPoster || screenshotPoster
     ? []
     : await recentImageStyles(env, brandCtx.brandId).catch(() => [] as ImageStyleId[]);
@@ -458,6 +460,7 @@ export async function generatePlatformPost(
     platform, topic: params.topic, topicSummary: params.topicSummary,
     extraInstruction: [
       params.extraInstruction ?? '',
+      fromShort ? systemShortPrompt(fromShort) : '',
       screenshotPoster || convertPhotoPoster
         ? `本篇會把品牌上傳的原圖鋪滿,底部只疊 4-10 字痛點,不重繪。${reusedAsset ? describeAssetForPrompt(reusedAsset, brandCtx.slug) : ''}文案要對得上這張真實畫面,不要幻想不存在的細節。`
         : '',
@@ -1137,6 +1140,9 @@ export async function saveGeneratedContent(
   const usedAssetId = (params.promptMeta?.assetId as string | undefined) ?? result.assetId;
   if (usedAssetId) {
     await markAssetUsed(env, usedAssetId);
+    await attachSystemShortVideo(env, { versionId, platform, assetId: usedAssetId }).catch((e) => {
+      console.error('[system-shorts] 附上短影片失敗', e);
+    });
   }
 
   return { contentId, versionId };

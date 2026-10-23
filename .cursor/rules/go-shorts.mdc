@@ -1,0 +1,10 @@
+---
+description: 製作 TaskGo／Washgo 系統功能「痛點行銷短片」（go-shorts；教學片用 go-ops-sop-video、Podcast 切片用 go-short-video-editor）。使用者提到「剪短影片」「功能短片」「痛點影片」「配音」「打馬賽克」「社群文案」時套用。
+globs: ["tools/go-shorts/**", "**/go-shorts/**"]
+alwaysApply: false
+---
+先完整讀 `.cursor/skills/go-pain-shorts/SKILL.md` 再動手（系列進度用 `python gs.py series` 看，還沒錄影可加 `--draft` 先出草稿），照裡面的 5 個步驟做：
+probe/frame 看錄影 → 寫腳本 → 寫 projects/<品牌>/<編號>-<功能>.json → tts / ocr / still 檢查 → render / sheet 驗收。
+所有指令都在 tools/go-shorts 資料夾（cd tools/go-shorts）、啟用 .venv 後執行：`source .venv/bin/activate && python gs.py <指令> <專案.json>`。
+配音一定是台灣腔（zh-TW-HsiaoYuNeural），台詞用台灣用語；個資（人名、電話、地址、公司、案名）一定要遮；不要捏造系統沒有的功能。
+每一步產生的圖（probe、frame、still、sheet）都要打開來看過再往下做。

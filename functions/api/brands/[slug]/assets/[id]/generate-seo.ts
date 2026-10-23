@@ -10,6 +10,7 @@ import { findBrandAgent, generateSeoArticle, saveSeoArticle } from '../../../../
 import type { BrandContext } from '../../../../../_shared/prompts';
 import { logActivity } from '../../../../../_shared/activity';
 import { TASKGO_FILM_DEMO_LIMIT, seoTopicForFilmFeature } from '../../../../../_shared/taskgo-product-films';
+import { seoTopicForShortFeature, systemShortFromMetadata, systemShortPrompt } from '../../../../../_shared/system-shorts';
 
 // POST /api/brands/:slug/assets/:id/generate-seo
 // 用素材庫這張產品截圖的說明，寫一篇待審官網長文。
@@ -40,7 +41,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return error('這個素材還沒有說明，請先補上再產生長文', 400);
   }
 
-  const topic = seoTopicForFilmFeature(asset.feature);
+  const fromShort = systemShortFromMetadata((rows[0] as { metadata?: unknown }).metadata);
+  const topic = (fromShort ? seoTopicForShortFeature(slug, asset.feature) : undefined) ?? seoTopicForFilmFeature(asset.feature);
   const sourceTitle = topic?.topic || asset.feature || asset.name || '產品畫面';
   const sourceSummary = [
     asset.caption,
@@ -63,7 +65,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       topicSeed: topic,
       extraInstruction: [
         '這篇依據品牌素材庫的產品短片截圖來寫，只寫說明裡真的有的功能。',
-        TASKGO_FILM_DEMO_LIMIT,
+        fromShort ? systemShortPrompt(fromShort) : TASKGO_FILM_DEMO_LIMIT,
         asset.name ? `截圖名稱:${asset.name}` : '',
       ].filter(Boolean).join('\n'),
     });
@@ -72,7 +74,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       article,
       generatedByAgentId: agentId,
       promptMeta: {
-        source: 'product_film',
+        source: fromShort ? 'system_short' : 'product_film',
+        shortId: fromShort?.id,
         topic: sourceTitle,
         angle: topic?.angle ?? asset.caption,
         assetId: asset.id,

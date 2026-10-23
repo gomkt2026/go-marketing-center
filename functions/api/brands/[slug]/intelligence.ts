@@ -12,6 +12,7 @@ import { listBrandImagePrompts } from '../../../_shared/image-prompts';
 import { listBrandVersions } from '../../../_shared/brand-knowledge';
 import { ensureBrandAssetLibrary } from '../../../_shared/brand-assets';
 import { ensureTaskgoProductFilmAssets } from '../../../_shared/taskgo-product-films';
+import { ensureSystemShortAssets } from '../../../_shared/system-shorts';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
@@ -29,6 +30,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       console.error('[taskgo-films] 素材庫寫入失敗', e);
     });
   }
+  await ensureSystemShortAssets(context.env, slug).catch((e) => {
+    console.error('[system-shorts] 素材庫寫入失敗', e);
+  });
 
   let documentRows: Record<string, unknown>[] = [];
   try {

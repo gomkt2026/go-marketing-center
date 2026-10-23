@@ -842,8 +842,6 @@ Service@inforcraft.com.tw
       {"key":"chambers","label":"現行加入的商會","type":"checkbox","required":true,"options":["扶輪社","獅子會","BNI","21克拉工程聯盟","其他","尚未加入"]},
       {"key":"chambers_other","label":"其他商會名稱","type":"text","required":false},
       {"key":"introducer","label":"本次活動介紹人","type":"text","required":false},
-      {"key":"amway_heard","label":"是否聽過安麗課程或內容（含淨水器、空氣清淨機）","type":"select","required":true,"options":["是","略有聽過","否"]},
-      {"key":"amway_branch","label":"安麗分會","type":"text","required":false},
       {"key":"accept_repair_jobs","label":"是否願意承接修繕中心派案","type":"select","required":true,"options":["是","再考慮","否"]},
       {"key":"uses_site_system","label":"是否用系統做案場管理","type":"select","required":true,"options":["是","否"]},
       {"key":"site_system_name","label":"使用的系統名稱","type":"text","required":false}

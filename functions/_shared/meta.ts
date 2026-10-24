@@ -358,7 +358,8 @@ export async function publishInstagramReel(
   const containerId = String(container.id ?? '');
   if (!containerId) throw new Error('IG Reels container 建立失敗:回應缺少 ID');
 
-  for (let i = 0; i < 12; i++) {
+  // 一分鐘的短片 IG 常要一到兩分鐘才處理完
+  for (let i = 0; i < 30; i++) {
     await new Promise((r) => setTimeout(r, 5000));
     try {
       const res = await fetch(`${GRAPH_API}/${containerId}?fields=status_code&access_token=${encodeURIComponent(account.accessToken)}`);
@@ -371,10 +372,18 @@ export async function publishInstagramReel(
     }
   }
 
-  const published = await graphPost(`${GRAPH_API}/${account.externalId}/media_publish`, {
+  const publish = () => graphPost(`${GRAPH_API}/${account.externalId}/media_publish`, {
     access_token: account.accessToken,
     creation_id: containerId,
   });
+  let published: Record<string, unknown>;
+  try {
+    published = await publish();
+  } catch (e) {
+    if (!(e instanceof Error && e.message.includes('9007'))) throw e;
+    await new Promise((r) => setTimeout(r, 30000));
+    published = await publish();
+  }
   const mediaId = String(published.id ?? '');
   if (!mediaId) throw new Error('IG Reels 發布回應缺少 media ID');
 

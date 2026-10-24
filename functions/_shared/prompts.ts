@@ -1585,11 +1585,12 @@ const BRAND_TREND_FIT: Record<string, RegExp> = {
 
 const JOKE_SEEDS: Record<string, string[]> = {
   taskgo: [
-    '業主說只是一點小漏水，到場才發現天花板在跟你點頭',
-    '颱風天群組最安靜的是氣象，最吵的是「師傅你人到了沒」',
-    '估價單寫了順便，現場多出一面沒人承認的牆',
-    '收工前五分鐘，業主想起還有一個小地方',
-    '鷹架上的人在看天，樓下的人在看群組',
+    '業主說這面牆很小，量完那面牆不在圖上',
+    '收工前五分鐘，群組又多一個順便',
+    '材料寫明天到，明天到的是新的明天',
+    '圖上寫保留，現場那面牆自己先沒了',
+    '報價寫含清潔，清潔的範圍每個人不一樣',
+    '說好只改一個開關，開關旁邊的牆也跟著改',
   ],
   homigo: [
     '離職了，下個月房租還在，睡公園嗎',
@@ -1733,12 +1734,21 @@ export const WASHGO_TRAFFIC_SYSTEM_PROMPT =
   '這一則不要寫婆媳、婆婆、媳婦。';
 
 export const TASKGO_TRAFFIC_SYSTEM_PROMPT =
-  '你是台灣工地的帶班，在 Threads 講一個讓人想按讚、想轉出去的小故事或笑話。' +
-  '可以寫颱風、漏水、室內裝修、收工、業主隨口一句。' +
-  '不要教訓業主，不要列工序，不要寫水泥比例、配比、坍度、做了幾年。' +
+  '你是台灣工地的帶班，在 Threads 跟做過工程的人說話。' +
+  '一篇只寫兩種之一：一個現場才知道的判斷，或一則工地群組認得出來的笑話。' +
+  '不要寫成短篇創作，不要給人取名字，不要寫假的傳訊、假的照片、假的新聞。' +
+  '不要寫送醫、急診、受傷、死亡、工安意外。' +
+  '不要教訓業主，不要列工序，不要寫水泥比例、配比、坍度、坪數、單價、做了幾年。' +
   '不要寫婆媳、電鍋、圍爐。不要寫品牌名、報價、連結、hashtag。' +
   TAIWAN_LOCAL_VOICE +
   '這一則不要寫婆媳、婆婆、媳婦。';
+
+/** 把工安編成故事，同行會直接要求停更。 */
+export function taskgoFictionIssue(body: string): string | null {
+  if (/急診|送醫|住院|身亡|死了|過世|受傷|工安|救護/.test(body)) return '把送醫或工安編成故事';
+  if (/傳訊|傳來說|群組說|配一句|傳一張/.test(body) && /阿[\u4e00-\u9fff]/.test(body)) return '編成有名字、有假對話的創作';
+  return null;
+}
 
 /** 工地文若在教工序或寫配比，同行會直接說這是假文。 */
 export function taskgoLectureIssue(body: string): string | null {
@@ -1786,7 +1796,7 @@ function pickJokeSeed(slug: string, hourTw: number, now: number, used: string[] 
 
 function brandHookCut(slug: string): string {
   if (slug === 'taskgo') {
-    return '把這則時事接到營造、室內裝修或工地最怕的事。寫一個師傅或屋主會心一笑、想轉給同行的小故事。可以寫漏水、鷹架、颱風天還要收工。不要列工序，不要教訓業主。';
+    return '把這則時事接到工班現場會先做的一個判斷。寫判斷和因果，不要編成今天發生的故事。不要取名字，不要寫假對話，不要寫送醫或工安。不要列工序，不要教訓業主。';
   }
   if (slug === 'washgo') {
     return '把這則時事接到街角店面、衣服或在地回憶。可以問那排店裡有沒有洗衣店，或這種天氣衣服怎麼辦。不要寫客人問洗好了沒，不要教洗法。';
@@ -1807,11 +1817,12 @@ export function composeTrafficPrompt(opts: {
   const now = opts.now ?? Date.now();
   const hourTw = opts.hourTw ?? (new Date(now).getUTCHours() + 8) % 24;
   const isJoke = opts.formula === 'joke';
+  const taskgo = opts.brandSlug === 'taskgo';
   const theme = (opts.theme ?? '').trim();
   const anchor = !isJoke && theme ? trendAnchor(theme) : '';
   const maxChars = isJoke ? 170 : opts.brandSlug === 'washgo' ? 210 : 250;
   const minChars = isJoke ? 50 : 80;
-  const label = isJoke ? '品牌笑話' : '時事小故事';
+  const label = isJoke ? (taskgo ? '工地笑話' : '品牌笑話') : (taskgo ? '工地判斷' : '時事小故事');
   const defaultTag = BRAND_TOPIC_DEFAULT[opts.brandSlug] ?? '租屋';
   const worn = wornScenesIn(opts.brandSlug, opts.usedTopics);
   const seed = isJoke ? pickJokeSeed(opts.brandSlug, hourTw, now, opts.usedTopics) : null;
@@ -1835,18 +1846,26 @@ export function composeTrafficPrompt(opts: {
         '寫一則跟這個品牌生活有關的笑話。要有畫面，倒數第二行是笑點，最後一行讓做過的人想留言。',
         seed ? `場面從這裡長出來：${seed}。` : '近期的固定場面都寫過了。換一個這個品牌生活裡還沒寫過的小事。',
         theme ? `若「${theme}」能變成笑點就用，接不上就不要提。` : '',
-        opts.brandSlug === 'taskgo' ? '可以寫工地、裝修、颱風天出工。不要列工序，不要教訓業主。' : '',
+        opts.brandSlug === 'taskgo' ? '笑點是工地習慣：改圖、順便、材料改期、範圍對不攏。不要寫成新聞，不要寫送醫、急診、受傷。不要列工序，不要教訓業主。' : '',
         opts.brandSlug === 'washgo' ? '可以寫洗衣店、衣服、店門口。不要寫洗好了沒，不要教洗法。' : '',
         opts.brandSlug === 'homigo' ? '可以寫離職、房租、搬家、一個人住。不要寫家庭對罵。' : '',
       ]
-    : [
-        theme
-          ? `這一則只接這一則時事：「${theme}」。正文要出現「${anchor}」，讓人一眼對上熱門。`
-          : '現在沒有可用的時事。改寫一個這週大家會轉的生活場面，仍然用下面的品牌切角。',
-        brandHookCut(opts.brandSlug),
-        '結構：第一行點到時事，中間一個具體小故事，倒數第二行是讓人想轉的那一句，最後一行是問句。',
-        '不要寫成新聞稿，不要列重點，不要硬塞產品。',
-      ];
+    : taskgo
+      ? [
+          theme
+            ? `這一則只接這一則時事：「${theme}」。正文要出現「${anchor}」。寫這種情況下工班先判斷什麼，不要編成故事。`
+            : '現在沒有可用的時事。寫一個工班在現場會做的判斷，例如颱風前先收哪一項、漏水先看哪裡、圖和現場對不上時誰先停。',
+          '第一行就是那個判斷。中間一個現場畫面，不要給人取名字。倒數第二行寫前面做錯、後面要付的代價。最後一行問做過的人場上先處理哪一項。',
+          '不要寫成短篇、新聞稿、步驟清單。不要發明坪數、單價、比例。',
+        ]
+      : [
+          theme
+            ? `這一則只接這一則時事：「${theme}」。正文要出現「${anchor}」，讓人一眼對上熱門。`
+            : '現在沒有可用的時事。改寫一個這週大家會轉的生活場面，仍然用下面的品牌切角。',
+          brandHookCut(opts.brandSlug),
+          '結構：第一行點到時事，中間一個具體小場面，倒數第二行是讓人想轉的那一句，最後一行是問句。',
+          '不要寫成新聞稿，不要列重點，不要硬塞產品。',
+        ];
   return {
     category: opts.formula,
     label,

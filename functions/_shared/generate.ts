@@ -5,7 +5,7 @@ import { seoChatJson, socialChatJson } from './social-llm';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
-  composeTrafficPrompt, pickTrafficTopicTag, taskgoLectureIssue, trafficEndingIssue, trafficSceneIssue, trafficStaleIssue, trafficSystemPrompt, type TrafficFormulaId,
+  composeTrafficPrompt, pickTrafficTopicTag, taskgoFictionIssue, taskgoLectureIssue, trafficEndingIssue, trafficSceneIssue, trafficStaleIssue, trafficSystemPrompt, type TrafficFormulaId,
   buildImageInspiredPostPrompt, buildGamePromoPrompt, GAME_PROMO_URL,
   type GamePromoAngle,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
@@ -781,11 +781,12 @@ export async function generateTrafficPost(
   const missed = Boolean(anchor) && !post.body.includes(anchor);
   const trafficVoice = taiwanVoiceIssue(post.body);
   const lecture = taskgo ? taskgoLectureIssue(post.body) : null;
+  const fiction = taskgo ? taskgoFictionIssue(post.body) : null;
   const stale = trafficStaleIssue(params.brandSlug, post.body);
   const ending = trafficEndingIssue(post.body);
   const scene = trafficSceneIssue(params.brandSlug, post.body, params.usedTopics);
   const minChars = spec.category === 'joke' ? 50 : 80;
-  if (post.body.length > limit || leaked || missed || post.body.length < minChars || trafficVoice || lecture || stale || ending || scene) {
+  if (post.body.length > limit || leaked || missed || post.body.length < minChars || trafficVoice || lecture || fiction || stale || ending || scene) {
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: systemPrompt },
@@ -793,14 +794,14 @@ export async function generateTrafficPost(
         { role: 'assistant', content: JSON.stringify(post) },
         {
           role: 'user',
-          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${anchor}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}${lecture ? `，${lecture}` : ''}${stale ? `，${stale}` : ''}${ending ? `，${ending}` : ''}${scene ? `，${scene}` : ''}）。` +
-            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${anchor ? `，正文必須出現「${anchor}」` : spec.category === 'joke' ? '，改成一個品牌笑話，笑點放倒數第二行' : '，改成一個讓人想轉的小故事'}。` +
+          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${anchor}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}${lecture ? `，${lecture}` : ''}${fiction ? `，${fiction}` : ''}${stale ? `，${stale}` : ''}${ending ? `，${ending}` : ''}${scene ? `，${scene}` : ''}）。` +
+            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${anchor ? `，正文必須出現「${anchor}」` : taskgo ? (spec.category === 'joke' ? '，改成一則工地習慣的笑話' : '，改成一個現場判斷，不要編成故事') : spec.category === 'joke' ? '，改成一個品牌笑話，笑點放倒數第二行' : '，改成一個讓人想轉的小場面'}。` +
             '至少三行。最後一行是做過的人才答得上來的問句。replyBody 留空字串。' +
             (scene ? `${scene}，換一個沒寫過的場面。` : '') +
             (washgo
               ? '可以寫洗衣店和衣服。不要寫洗好了沒，不要列功能，不要提別的店，不要寫婆媳。禁止簡體、大陸用語。回傳同格式 JSON。'
               : taskgo
-                ? '可以寫工地、裝修、颱風。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。不要寫婆媳、電鍋。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
+                ? '寫一個現場判斷，或一則工地習慣的笑話。不要取名字，不要寫假對話，不要寫送醫、急診、受傷。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
                 : '可以寫離職、房租、搬家。不要寫婆媳、家庭對罵。不要站隊罵人。禁止簡體、大陸用語、「男生都」「女生都」。回傳同格式 JSON。'),
         },
       ],

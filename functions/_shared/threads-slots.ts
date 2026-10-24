@@ -164,7 +164,7 @@ async function writeTrafficDraft(
     slotMs,
     usedTopics,
   );
-  if (formula === 'hook' && !theme) formula = 'joke';
+  if (formula === 'hook' && !theme && brand.slug !== 'taskgo') formula = 'joke';
   const siblingRows = await sql`
     SELECT b.slug,
            left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 36) AS opening

@@ -1,7 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { isEmbeddedImageUrl, storeEmbeddedImage, toPublicMediaUrl } from './media';
-import { SYSTEM_SHORT_ASSET_PREFIX, systemShortFeatures } from './system-shorts';
+import { systemShortFeatures } from './system-shorts';
 
 export const IMAGE_CATEGORIES = [
   'system_screenshot',
@@ -315,11 +315,8 @@ function matchScore(row: AssetRow, opts: PickBrandAssetQuery): number {
       if (hay.includes(token)) score += 2;
     }
   }
-  if (opts.preferScreenshot && row.image_category === 'system_screenshot') {
-    score += 3;
-    // 系統短影片的畫面是發文主力，IG／Threads 還會附上短影片
-    if (row.name?.startsWith(SYSTEM_SHORT_ASSET_PREFIX)) score += 4;
-  } else if (!opts.preferScreenshot) {
+  if (opts.preferScreenshot && row.image_category === 'system_screenshot') score += 3;
+  else if (!opts.preferScreenshot) {
     if (row.image_category === 'real_photo') score += 2;
     if (row.image_category === 'scene' || row.image_category === 'people') score += 1;
   }

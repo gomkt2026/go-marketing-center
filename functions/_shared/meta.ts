@@ -316,6 +316,33 @@ export async function publishFacebookPost(
   return { postId, permalink };
 }
 
+/** 發布 FB 粉專影片;videoUrl 必須是 Meta 抓得到的公開 mp4 */
+export async function publishFacebookVideo(
+  account: MetaAccount,
+  params: { message: string; videoUrl: string },
+): Promise<MetaPublishResult> {
+  const pageToken = await resolvePageToken(account);
+  const data = await graphPost(`${GRAPH_API}/${account.externalId}/videos`, {
+    access_token: pageToken,
+    file_url: params.videoUrl,
+    description: params.message,
+  });
+  const postId = String(data.id ?? '');
+  if (!postId) throw new Error('FB 影片發布回應缺少 ID');
+
+  let permalink: string | null = null;
+  try {
+    const res = await fetch(`${GRAPH_API}/${encodeURIComponent(postId)}?fields=permalink_url&access_token=${encodeURIComponent(pageToken)}`);
+    if (res.ok) {
+      const data = await res.json() as { permalink_url?: string };
+      if (data.permalink_url) {
+        permalink = data.permalink_url.startsWith('http') ? data.permalink_url : `https://www.facebook.com${data.permalink_url}`;
+      }
+    }
+  } catch { /* 忽略 */ }
+  return { postId, permalink };
+}
+
 /** 發布 IG Reels;videoUrl 必須是 Meta 抓得到的公開 mp4 */
 export async function publishInstagramReel(
   account: MetaAccount,

@@ -3,7 +3,7 @@ import type { Env } from '../../../_shared/env';
 import { requireAuth } from '../../../_shared/auth';
 import { getSql } from '../../../_shared/db';
 import { getThreadsAccount, publishThreadsPost } from '../../../_shared/threads';
-import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage } from '../../../_shared/meta';
+import { getMetaAccount, publishFacebookPost, publishFacebookVideo, publishInstagramPost, publishInstagramReel, composePostMessage } from '../../../_shared/meta';
 import { resolvePublishableMedia, toPublicMediaUrl } from '../../../_shared/media';
 import { isThreadsSafetyBlocked } from '../../../_shared/social-safety';
 import { logActivity } from '../../../_shared/activity';
@@ -183,7 +183,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
           return error('IG API 發布必須有配圖或短影音', 400);
         }
       } else {
-        published = await publishFacebookPost(account, { message, imageUrl });
+        published = videoUrl
+          ? await publishFacebookVideo(account, { message, videoUrl })
+          : await publishFacebookPost(account, { message, imageUrl });
       }
     }
   } catch (e) {

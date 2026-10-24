@@ -23,7 +23,7 @@ import { listAllPostingSlots, isHourlyFamily, isOfftopicFamily, isThreadsSlotKin
 import { getThreadsAccount, publishThreadsPost, isThreadsAccessBlocked, THREADS_ACCESS_BLOCKED_NOTE, THREADS_API, refreshThreadsAccountScopes } from '../../../functions/_shared/threads';
 import { isThreadsSafetyBlocked } from '../../../functions/_shared/social-safety';
 import { threadsFetch } from '../../../functions/_shared/threads-api-log';
-import { getMetaAccount, publishFacebookPost, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, metaTokenInvalidNoteFromMessage } from '../../../functions/_shared/meta';
+import { getMetaAccount, publishFacebookPost, publishFacebookVideo, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, metaTokenInvalidNoteFromMessage } from '../../../functions/_shared/meta';
 import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '../../../functions/_shared/x';
 import { resolvePublishableMedia, toPublicMediaUrl } from '../../../functions/_shared/media';
 import { processBrandReplyRound } from '../../../functions/_shared/threads-reply-round';
@@ -38,6 +38,9 @@ import { analyzeAllBrandPerformance } from '../../../functions/_shared/performan
 import { notifyPendingReviewDigest, notifyPublishFailed } from '../../../functions/_shared/line-ops';
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from '../../../functions/_shared/auto-post-brands';
 import { runSeoAutoPublish } from '../../../functions/_shared/seo-autopublish';
+import {
+  SYSTEM_SHORT_SLOTS, catchupSystemShortSlot, generateSystemShortSlot, hasSystemShorts,
+} from '../../../functions/_shared/system-short-slots';
 
 const AUTO_DRAFT_THRESHOLD = 0.75;
 
@@ -1124,9 +1127,17 @@ async function handleBrandJob(env: Env, job: BrandJobMessage): Promise<void> {
       }, new Date(job.slotAt), job.platforms);
       return;
     }
+    case 'generate_short':
+      await generateSystemShortSlot(env, { slug: job.slug, platform: job.platform, slotAt: new Date(job.slotAt) });
+      return;
     case 'catchup_brand': {
       const threadsFilled = await catchupMissingThreadsSlots(env, [job.slug], 1);
-      if (!threadsFilled) {
+      const shortFilled = !threadsFilled
+        && await catchupSystemShortSlot(env, job.slug, GENERATION_LEAD_HOURS).catch((e) => {
+          console.error(`[shorts] ${job.slug} 補短影片檔失敗`, e);
+          return false;
+        });
+      if (!threadsFilled && !shortFilled) {
         await fillMissingDailyThemePlatforms(env, [job.slug], {
           maxPlatforms: 1, onlyAutoPublish: true,
         });
@@ -1220,6 +1231,15 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
             kind: 'generate_theme', brandId: row.brandId, slug: row.slug, name: row.slug,
             slotAt: slotAt.toISOString(), platforms: row.platforms,
           });
+        }
+      }
+    }
+    const shortDue = SYSTEM_SHORT_SLOTS.filter((s) => s.hourTw === genHour);
+    if (shortDue.length) {
+      const shortSlugs = (await listAutoPostSlugs(env)).filter(hasSystemShorts);
+      for (const slug of shortSlugs) {
+        for (const slot of shortDue) {
+          jobs.push({ kind: 'generate_short', slug, platform: slot.platform, slotAt: slotAt.toISOString() });
         }
       }
     }
@@ -1416,10 +1436,13 @@ async function publishDueJobs(env: Env): Promise<void> {
         const account = await getMetaAccount(env, row.brand_id, 'facebook');
         if (!account) throw new Error('Facebook 帳號未連線或憑證失效');
         const message = composePostMessage(row.body, row.hashtags);
-        published = await publishFacebookPost(account, {
-          message,
-          imageUrl: await imageForPublish(env, row.content_version_id, row.image_url, row.brand_slug),
-        });
+        const publicVideo = toPublicMediaUrl(env, row.video_url);
+        published = publicVideo
+          ? await publishFacebookVideo(account, { message, videoUrl: publicVideo })
+          : await publishFacebookPost(account, {
+            message,
+            imageUrl: await imageForPublish(env, row.content_version_id, row.image_url, row.brand_slug),
+          });
       } else if (row.platform === 'instagram' && row.brand_id) {
         const account = await getMetaAccount(env, row.brand_id, 'instagram');
         const publicImage = await imageForPublish(env, row.content_version_id, row.image_url, row.brand_slug);
@@ -1677,14 +1700,21 @@ export default {
       if (task === 'learn') return analyzeAllBrandPerformance(env);
       if (task === 'podcast') return createPodcastEpisode(env);
       if (task === 'seo') return runSeoAutoPublish(env);
+      if (task === 'shorts') {
+        const slugs = (await listAutoPostSlugs(env)).filter(hasSystemShorts);
+        for (const slug of slugs) {
+          while (await catchupSystemShortSlot(env, slug, GENERATION_LEAD_HOURS)) { /* 補到今天該有的都有 */ }
+        }
+        return publishDueJobs(env);
+      }
       return null;
     };
-    const known = ['collect', 'press', 'drafts', 'threads', 'offtopic', 'replies', 'themes', 'catchup', 'ecosystem', 'ecosystem-x', 'publish', 'cleanup', 'podcast', 'refresh-tokens', 'refresh-x-tokens', 'insights', 'learn', 'seo'];
+    const known = ['collect', 'press', 'drafts', 'threads', 'offtopic', 'replies', 'themes', 'catchup', 'ecosystem', 'ecosystem-x', 'publish', 'cleanup', 'podcast', 'refresh-tokens', 'refresh-x-tokens', 'insights', 'learn', 'seo', 'shorts'];
     if (!task || !known.includes(task)) {
       return new Response(`task 必須為 ${known.join(' / ')}`, { status: 400 });
     }
     // catchup / 生成必須等做完:waitUntil 在 HTTP 回應後約 30 秒就會被取消,補檔會做到一半被砍
-    const awaitTasks = ['catchup', 'threads', 'offtopic', 'themes', 'publish', 'seo'];
+    const awaitTasks = ['catchup', 'threads', 'offtopic', 'themes', 'publish', 'seo', 'shorts'];
     if (awaitTasks.includes(task)) {
       try {
         await run();

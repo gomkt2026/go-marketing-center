@@ -1133,9 +1133,11 @@ export async function saveGeneratedContent(
   const usedAssetId = (params.promptMeta?.assetId as string | undefined) ?? result.assetId;
   if (usedAssetId) {
     await markAssetUsed(env, usedAssetId);
-    await attachSystemShortVideo(env, { versionId, platform, assetId: usedAssetId }).catch((e) => {
-      console.error('[system-shorts] 附上短影片失敗', e);
-    });
+    if (params.promptMeta?.source === 'system_short') {
+      await attachSystemShortVideo(env, { versionId, platform, assetId: usedAssetId }).catch((e) => {
+        console.error('[system-shorts] 附上短影片失敗', e);
+      });
+    }
   }
 
   return { contentId, versionId };

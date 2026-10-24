@@ -4,8 +4,8 @@ import shortsJson from '../../src/data/system-shorts.json';
 
 /**
  * TaskGo、Washgo 系統短影片（tools/go-shorts/publish.py 產生清單）。
- * 打開品牌素材庫時把影片與每個系統畫面寫進 brand_assets；截圖標成系統畫面並優先拿去發 FB／IG。
- * 用這些截圖產的 IG 與 Threads 貼文會直接附上短影片（IG Reels、Threads 影片），FB 用截圖。
+ * 影片與每個系統畫面寫進 brand_assets（打開素材庫或排程產稿時）。
+ * 每天的短影片檔（system-short-slots.ts）與素材庫的手動按鈕產的貼文會附上影片。
  * 畫面是客戶真實帳號，個資已馬賽克，件數與金額不可寫成業績。
  */
 
@@ -83,7 +83,7 @@ export function systemShortPrompt(short: SystemShort): string {
     '影片裡的系統畫面依序是：',
     ...short.stills.map((still, index) => `${index + 1}. ${still.tag}：${still.caption}`),
     short.chips.length ? `片尾重點：${short.chips.join('、')}` : '',
-    'IG 與 Threads 會直接附上這支短影片，文案要讓人想點開看完；FB 附截圖。可以參考成片附的文案，但要重寫，不要照抄：',
+    '這篇會直接附上這支短影片（IG Reels、Threads 影片、FB 影片），文案要讓人想點開看完，不要寫「看圖」。可以參考成片附的文案，但要重寫，不要照抄：',
     short.threads,
     SYSTEM_SHORT_LIMIT,
   ].filter(Boolean).join('\n');
@@ -204,15 +204,12 @@ export function seoTopicForShortFeature(slug: string, feature: string | null | u
   return SYSTEM_SHORT_SEO_TOPICS[slug]?.find((item) => item.feature === feature);
 }
 
-/**
- * IG、Threads 貼文的配圖來自系統短影片時，附上那支短影片，發布時 IG 走 Reels、Threads 走影片。
- * FB 目前只發圖，不附。
- */
+/** 短影片貼文附上影片：IG 走 Reels、Threads 走影片、FB 發粉專影片。 */
 export async function attachSystemShortVideo(
   env: Env,
   params: { versionId: string; platform: string; assetId?: string | null },
 ): Promise<SystemShort | undefined> {
-  if (!params.assetId || (params.platform !== 'instagram' && params.platform !== 'threads')) return undefined;
+  if (!params.assetId || !['facebook', 'instagram', 'threads'].includes(params.platform)) return undefined;
   const sql = getSql(env);
   const rows = await sql`SELECT metadata FROM brand_assets WHERE id = ${params.assetId}::uuid LIMIT 1`.catch(() => []);
   const short = systemShortFromMetadata((rows[0] as { metadata?: unknown } | undefined)?.metadata);

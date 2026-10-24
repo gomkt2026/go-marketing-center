@@ -1563,8 +1563,9 @@ export function buildOfftopicUserPrompt(usedTopics: string[], brandSlug?: string
 // 留在自己生活裡的笑話還在（近捷運、不能縮、估價單多一面牆）。
 // 所以時事只接跟這個品牌對得上的；對不上就改寫笑話，不要三個帳號一起蹭同一則。
 // 舊的高瀏覽是工序清單、婆媳、洗好了沒，會被說是假文，不走回去。
-// 10/22 起：留言比按讚重。前兩行要有畫面，最後一行問做過的人遇過哪一種。
-// 發文當下補一則 2/2。正文不放 hashtag、不放連結。主題標籤一篇一個。
+// 10/22 起：前兩行要有畫面，最後一行問做過的人遇過哪一種。
+// 10/24 起觀察三天：不再自己貼 2/2。七天內寫過的場面不要再寫。
+// 正文不放 hashtag、不放連結。主題標籤一篇一個。
 // ============================================================================
 
 export type TrafficFormulaId = 'hook' | 'joke';
@@ -1696,6 +1697,23 @@ export function pickTrafficTopicTag(slug: string, body: string, requested?: stri
   return words.find((word) => body.includes(word)) ?? BRAND_TOPIC_DEFAULT[slug] ?? '租屋';
 }
 
+const WORN_SCENES: Record<string, string[]> = {
+  taskgo: ['風向變了', '人到了沒', '鷹架上', '颱風假', '估價單'],
+  homigo: ['冷氣室外機', '薪水入帳', '近捷運', '這也叫清潔'],
+  washgo: ['洗標', '能不能進水', '梅雨', '廚師服', '補習班', '便當店', '羽絨被'],
+};
+
+/** 近文已經出現過的場面。這篇再寫到同一個詞，就是在重發。 */
+export function wornScenesIn(slug: string, used: string[]): string[] {
+  const blob = used.join('\n');
+  return (WORN_SCENES[slug] ?? []).filter((scene) => blob.includes(scene));
+}
+
+export function trafficSceneIssue(slug: string, body: string, used: string[]): string | null {
+  const hit = wornScenesIn(slug, used).find((scene) => body.includes(scene));
+  return hit ? `近七天已經寫過「${hit}」` : null;
+}
+
 /** 最後一行要是做過的人才答得上來的問句。 */
 export function trafficEndingIssue(body: string): string | null {
   const lines = body.split('\n').map((line) => line.trim()).filter(Boolean);
@@ -1704,12 +1722,6 @@ export function trafficEndingIssue(body: string): string | null {
   if (!/[？?]/.test(last)) return '最後一行不是問句';
   if (/你們覺得|大家覺得|有共鳴|同意嗎|你們呢|各位/.test(last)) return '問句太寬，要問做過的人遇過哪一種';
   return null;
-}
-
-export function trafficReplyFallback(slug: string): string {
-  if (slug === 'taskgo') return '你收工前也被業主補過一句嗎';
-  if (slug === 'washgo') return '你送洗遇過衣服自己先出事的嗎';
-  return '你看房或退租遇過哪一種';
 }
 
 export const WASHGO_TRAFFIC_SYSTEM_PROMPT =
@@ -1756,18 +1768,20 @@ export function trafficSystemPrompt(slug: string): string {
   return `${base}前兩行就要有畫面。最後一行問做過的人遇過哪一種，讓人想留言講自己的那一次。不要寫你們覺得呢。`;
 }
 
-function pickJokeSeed(slug: string, hourTw: number, now: number, used: string[] = []): string {
+function pickJokeSeed(slug: string, hourTw: number, now: number, used: string[] = []): string | null {
   const seeds = JOKE_SEEDS[slug] ?? JOKE_SEEDS.homigo;
   const blob = used.join('\n');
+  const worn = wornScenesIn(slug, used);
   const open = seeds.filter((seed) => {
+    if (worn.some((scene) => seed.includes(scene))) return false;
     const key = seed.replace(/[，。]/g, '').slice(0, 6);
     return key.length < 2 || !blob.includes(key);
   });
-  const pool = open.length ? open : seeds;
+  if (!open.length) return null;
   const brand = slug === 'taskgo' ? 0 : slug === 'washgo' ? 2 : 1;
   const hourIndex = Math.max(0, TRAFFIC_HOURS.indexOf(hourTw));
   const day = Math.floor((now + 8 * 60 * 60 * 1000) / 86400000);
-  return pool[(day + hourIndex + brand) % pool.length];
+  return open[(day + hourIndex + brand) % open.length];
 }
 
 function brandHookCut(slug: string): string {
@@ -1799,24 +1813,27 @@ export function composeTrafficPrompt(opts: {
   const minChars = isJoke ? 50 : 80;
   const label = isJoke ? '品牌笑話' : '時事小故事';
   const defaultTag = BRAND_TOPIC_DEFAULT[opts.brandSlug] ?? '租屋';
+  const worn = wornScenesIn(opts.brandSlug, opts.usedTopics);
+  const seed = isJoke ? pickJokeSeed(opts.brandSlug, hourTw, now, opts.usedTopics) : null;
   const shared = [
     '三個帳號各寫各的，不要寫成同一則新聞的三種版本。',
     '不要寫婆媳、婆婆、媳婦。不要品牌名、報價、連結、hashtag、電話。',
     '用台灣口語。一句一行。至少三行。',
     '前兩行就要有畫面，沒點開也看得懂。',
     '笑點或想被轉出去的那一句放倒數第二行。最後一行只能有一個問句，問做過的人遇過哪一種。不要寫「你們覺得呢」「有共鳴嗎」。',
-    'replyBody 是發文後立刻貼上的 2/2：一句話邀請對方講自己的那一次，80 字以內。不要連結、不要 hashtag、不要品牌名。',
+    '不要自己回文。replyBody 回傳空字串。',
     `topicTag 只放一個跟這篇同一件事的詞，2 到 8 個字，不要井號。對不上就用「${defaultTag}」。`,
+    worn.length ? `這七天已經寫過這些場面，正文禁止再出現：${worn.join('、')}。` : '',
     '禁止簡體、大陸用語、外籍配偶廚房考試，以及「男生都」「女生都」。',
     opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
     opts.usedTopics.length ? `這些標題和開頭最近用過，換一個場面：\n${opts.usedTopics.join('\n')}` : '',
     `正文 ${minChars} 到 ${maxChars} 字。`,
-    '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","replyBody":"2/2一句邀請","topicTag":"一個主題","hashtags":[],"cta":""}',
+    '回傳 JSON：{"title":"15字內內部標題","body":"貼文全文","replyBody":"","topicTag":"一個主題","hashtags":[],"cta":""}',
   ];
   const lead = isJoke
     ? [
         '寫一則跟這個品牌生活有關的笑話。要有畫面，倒數第二行是笑點，最後一行讓做過的人想留言。',
-        `場面從這裡長出來：${pickJokeSeed(opts.brandSlug, hourTw, now, opts.usedTopics)}。`,
+        seed ? `場面從這裡長出來：${seed}。` : '近期的固定場面都寫過了。換一個這個品牌生活裡還沒寫過的小事。',
         theme ? `若「${theme}」能變成笑點就用，接不上就不要提。` : '',
         opts.brandSlug === 'taskgo' ? '可以寫工地、裝修、颱風天出工。不要列工序，不要教訓業主。' : '',
         opts.brandSlug === 'washgo' ? '可以寫洗衣店、衣服、店門口。不要寫洗好了沒，不要教洗法。' : '',

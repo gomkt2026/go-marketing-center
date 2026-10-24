@@ -19,14 +19,14 @@ import {
 } from './posting-slots';
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from './auto-post-brands';
 
-/** 品牌相關跟風文時段(台灣時間)。凌晨沒人，不放 0 點、6 點。 */
-export const THREADS_POST_HOURS_TW: readonly number[] = [12, 18];
+/** 品牌相關跟風文時段(台灣時間)。0 點、6 點先留著，這三天一起觀察。 */
+export const THREADS_POST_HOURS_TW: readonly number[] = [0, 6, 12, 18];
 /** 生活哏文 / 愛情散文時段(台灣時間) */
 export const THREADS_OFFTOPIC_HOURS_TW: readonly number[] = [9, 21];
 /** 匠城出任務推廣(台灣時間)。一天一篇，用昨天的局數、排行榜或今日路況。 */
 export const THREADS_GAME_HOURS_TW: readonly number[] = [10];
-/** 小編工作台一天 5 檔：9 生活、10 匠城、12／18 流量、21 生活 */
-export const THREADS_DESK_HOURS_TW: readonly number[] = [9, 10, 12, 18, 21];
+/** 小編工作台一天的 Threads 檔，含凌晨。 */
+export const THREADS_DESK_HOURS_TW: readonly number[] = [0, 6, 9, 10, 12, 18, 21];
 
 export const THREADS_SLOT_BRANDS = ['homigo', 'taskgo', 'washgo'] as const;
 const THREADS_DAILY_CAP = 4;
@@ -100,20 +100,43 @@ export async function brandHasSlotContent(
   return rows.length > 0;
 }
 
+/** 同一個品牌、同一個台灣整點，今天已經有稿就不再產第二篇。 */
+export async function brandHasHourContent(
+  env: Env,
+  brandId: string,
+  slotAt: Date,
+): Promise<boolean> {
+  const sql = getSql(env);
+  const hourTW = (slotAt.getUTCHours() + 8) % 24;
+  const dayStart = taiwanDayStartUtc(slotAt);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const rows = await sql`
+    SELECT c.id FROM contents c
+    WHERE c.brand_id = ${brandId}::uuid
+      AND c.target_platform = 'threads'
+      AND coalesce(c.generation_prompt_meta->>'skipped', 'false') <> 'true'
+      AND (c.generation_prompt_meta->>'slotAt')::timestamptz >= ${dayStart.toISOString()}::timestamptz
+      AND (c.generation_prompt_meta->>'slotAt')::timestamptz < ${dayEnd.toISOString()}::timestamptz
+      AND extract(hour FROM ((c.generation_prompt_meta->>'slotAt')::timestamptz AT TIME ZONE 'Asia/Taipei'))::int = ${hourTW}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
 /** 非匠城檔一律寫成已驗證的流量結構，待審後由安全網到期發布。 */
 async function writeTrafficDraft(
   env: Env,
   brand: { id: string; slug: string; name: string },
   slotAt: Date,
   slotKind: PostingSlotKind,
-): Promise<{ contentId: string; category: string }> {
+): Promise<{ contentId: string; category: string } | null> {
   const sql = getSql(env);
   const hourTW = (slotAt.getUTCHours() + 8) % 24;
   let formula = trafficFormulaFor(brand.slug, hourTW, slotAt.getTime());
   const slotMs = slotAt.getTime();
   const usedRows = await sql`
     SELECT c.title,
-           left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 42) AS opening
+           left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 80) AS opening
     FROM contents c
     LEFT JOIN LATERAL (
       SELECT body FROM content_versions
@@ -125,7 +148,7 @@ async function writeTrafficDraft(
       AND c.target_platform = 'threads'
       AND c.created_at > now() - interval '14 days'
     ORDER BY c.created_at DESC
-    LIMIT 12
+    LIMIT 18
   `;
   const usedTopics = (usedRows as { title: string | null; opening: string | null }[])
     .map((r) => [r.title, r.opening].filter(Boolean).join('｜'))
@@ -163,6 +186,7 @@ async function writeTrafficDraft(
     .map((r) => [r.slug, r.opening].filter(Boolean).join('｜'));
   const agentId = await findBrandAgent(env, brand.id);
   const anchor = formula === 'hook' && theme ? trendAnchor(theme) : '';
+  if (await brandHasHourContent(env, brand.id, slotAt)) return null;
   const post = await generateTrafficPost(env, {
     brandSlug: brand.slug,
     formula,
@@ -173,6 +197,7 @@ async function writeTrafficDraft(
     now: slotMs,
     skipPrediction: true,
   });
+  if (await brandHasHourContent(env, brand.id, slotAt)) return null;
   const { contentId } = await saveGeneratedContent(env, {
     brandCtx: { brandId: brand.id, slug: brand.slug, name: brand.name, systemPrompt: '' },
     platform: 'threads',
@@ -263,7 +288,8 @@ export async function generateThreadsSlot(
       result.skipped.push({ slug: brand.slug, reason: '這一檔不是跟風文' });
       continue;
     }
-    if (await brandHasSlotContent(env, brand.id, 'threads', slotKind, slotAt)) {
+    if (await brandHasSlotContent(env, brand.id, 'threads', slotKind, slotAt)
+      || await brandHasHourContent(env, brand.id, slotAt)) {
       const reason = '這一檔已經有稿';
       if (opts?.onlyMissing) {
         console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} Threads 跟風檔已存在,跳過`);
@@ -278,6 +304,10 @@ export async function generateThreadsSlot(
     }
     try {
       const written = await writeTrafficDraft(env, brand, slotAt, slotKind);
+      if (!written) {
+        result.skipped.push({ slug: brand.slug, reason: '這一檔已經有稿' });
+        continue;
+      }
       result.generated.push({ slug: brand.slug, contentId: written.contentId, category: written.category });
       console.log(`[threads] ${brand.slug} 已產 ${slotAt.toISOString()} 流量稿(${written.category},待工作台審核)`);
     } catch (e) {
@@ -317,7 +347,8 @@ export async function generateThreadsOfftopicSlot(
         result.skipped.push({ slug: brand.slug, reason: '這一檔不是生活／感情主題，改走另一條產稿' });
         continue;
       }
-      if (await brandHasSlotContent(env, brand.id, 'threads', slotKind, slotAt)) {
+      if (await brandHasSlotContent(env, brand.id, 'threads', slotKind, slotAt)
+        || await brandHasHourContent(env, brand.id, slotAt)) {
         if (opts?.onlyMissing) {
           console.log(`[catchup] ${brand.slug} ${slotAt.toISOString()} Threads 生活哏文已存在,跳過`);
         }
@@ -340,6 +371,10 @@ export async function generateThreadsOfftopicSlot(
       }
 
       const written = await writeTrafficDraft(env, brand, slotAt, slotKind);
+      if (!written) {
+        result.skipped.push({ slug: brand.slug, reason: '這一檔已經有稿' });
+        continue;
+      }
       result.generated.push({ slug: brand.slug, contentId: written.contentId, category: written.category });
       console.log(`[offtopic] ${brand.slug} 已產流量稿 ${written.category},${slotAt.toISOString()}(待工作台審核)`);
     } catch (e) {
@@ -516,6 +551,16 @@ export async function generateThreadsDeskSlot(
  */
 export async function promoteDueThreadsSafetyNet(env: Env): Promise<number> {
   const sql = getSql(env);
+  await sql`
+    UPDATE contents
+    SET generation_prompt_meta = generation_prompt_meta - 'replyBody',
+        updated_at = now()
+    WHERE target_platform = 'threads'
+      AND status IN ('pending_review', 'scheduled')
+      AND coalesce(generation_prompt_meta->>'source', '') <> 'threads_game'
+      AND coalesce(generation_prompt_meta->>'replyBody', '') <> ''
+      AND created_at > now() - interval '3 days'
+  `;
   const rows = await sql`
     SELECT c.id, c.generation_prompt_meta->>'slotAt' AS slot_at, v.id AS version_id, b.slug
     FROM contents c

@@ -1699,10 +1699,15 @@ export function pickTrafficTopicTag(slug: string, body: string, requested?: stri
 }
 
 const WORN_SCENES: Record<string, string[]> = {
-  taskgo: ['風向變了', '人到了沒', '鷹架上', '颱風假', '估價單'],
-  homigo: ['冷氣室外機', '薪水入帳', '近捷運', '這也叫清潔'],
-  washgo: ['洗標', '能不能進水', '梅雨', '廚師服', '補習班', '便當店', '羽絨被'],
+  taskgo: ['風向變了', '人到了沒', '鷹架上', '颱風假', '估價單', '排水孔', '開關換', '這面牆', '含清潔', '材料明天'],
+  homigo: ['冷氣室外機', '薪水入帳', '近捷運', '這也叫清潔', '離職那天', '月底才發'],
+  washgo: ['洗標', '能不能進水', '梅雨', '廚師服', '補習班', '便當店', '羽絨被', '店門口', '不能縮', '老車站'],
 };
+
+function chinesePrefix(text: string, size: number): string {
+  const body = text.includes('｜') ? text.split('｜').slice(1).join('｜') : text;
+  return body.replace(/[^\u4e00-\u9fff]/g, '').slice(0, size);
+}
 
 /** 近文已經出現過的場面。這篇再寫到同一個詞，就是在重發。 */
 export function wornScenesIn(slug: string, used: string[]): string[] {
@@ -1710,9 +1715,23 @@ export function wornScenesIn(slug: string, used: string[]): string[] {
   return (WORN_SCENES[slug] ?? []).filter((scene) => blob.includes(scene));
 }
 
+/** 最近稿的開頭八個字。新稿再以同樣的字開頭，就是同一則。 */
+export function recentOpeningKeys(used: string[]): string[] {
+  const keys: string[] = [];
+  for (const row of used) {
+    const key = chinesePrefix(row, 8);
+    if (key.length >= 8 && !keys.includes(key)) keys.push(key);
+    if (keys.length >= 12) break;
+  }
+  return keys;
+}
+
 export function trafficSceneIssue(slug: string, body: string, used: string[]): string | null {
   const hit = wornScenesIn(slug, used).find((scene) => body.includes(scene));
-  return hit ? `近七天已經寫過「${hit}」` : null;
+  if (hit) return `近七天已經寫過「${hit}」`;
+  const key = chinesePrefix(body, 8);
+  const same = key.length >= 8 && recentOpeningKeys(used).find((prev) => prev === key || prev.slice(0, 6) === key.slice(0, 6));
+  return same ? `開頭和最近的稿一樣：「${key}」` : null;
 }
 
 /** 最後一行要是做過的人才答得上來的問句。 */
@@ -1727,7 +1746,7 @@ export function trafficEndingIssue(body: string): string | null {
 
 export const WASHGO_TRAFFIC_SYSTEM_PROMPT =
   '你是台灣洗衣店的年輕店員，在 Threads 講一個讓人想按讚、想轉出去的小故事或笑話。' +
-  '可以寫店面、衣服、街角回憶、下雨天。' +
+  '可以寫店面、衣服、街角回憶。近稿寫過的下雨天、店門口、不能縮不要再寫。' +
   '不要寫成廣告，不要列功能，不要 hashtag，不要連結，不要叫人加 LINE，不要提別的洗衣店名字。' +
   '不要整篇只問洗好了沒。不要寫婆媳。不要寫品牌名。' +
   TAIWAN_LOCAL_VOICE +
@@ -1762,7 +1781,7 @@ export function taskgoLectureIssue(body: string): string | null {
 
 export const TRAFFIC_SYSTEM_PROMPT =
   '你是會在 Threads 上講租屋生活的台灣人，不是任何品牌的小編。' +
-  '這篇可以寫離職、薪水、房租、搬家、一個人還在租。' +
+  '這篇可以寫房租、搬家、退租、看房、押金、一個人還在租。近稿寫過的開頭不要再寫。' +
   '不要寫婆媳、婆婆、媳婦，不要寫家庭對罵，不要站隊罵房東或房客。' +
   '不要寫成廣告、新聞稿。一個具體場面，一句讓人想轉的話。' +
   '禁止品牌名、產品、系統、App、連結、hashtag、促銷。' +
@@ -1825,6 +1844,7 @@ export function composeTrafficPrompt(opts: {
   const label = isJoke ? (taskgo ? '工地笑話' : '品牌笑話') : (taskgo ? '工地判斷' : '時事小故事');
   const defaultTag = BRAND_TOPIC_DEFAULT[opts.brandSlug] ?? '租屋';
   const worn = wornScenesIn(opts.brandSlug, opts.usedTopics);
+  const openings = recentOpeningKeys(opts.usedTopics);
   const seed = isJoke ? pickJokeSeed(opts.brandSlug, hourTw, now, opts.usedTopics) : null;
   const shared = [
     '三個帳號各寫各的，不要寫成同一則新聞的三種版本。',
@@ -1835,6 +1855,7 @@ export function composeTrafficPrompt(opts: {
     '不要自己回文。replyBody 回傳空字串。',
     `topicTag 只放一個跟這篇同一件事的詞，2 到 8 個字，不要井號。對不上就用「${defaultTag}」。`,
     worn.length ? `這七天已經寫過這些場面，正文禁止再出現：${worn.join('、')}。` : '',
+    openings.length ? `這些開頭最近用過，禁止再以同樣的八個字起頭：${openings.join('、')}。` : '',
     '禁止簡體、大陸用語、外籍配偶廚房考試，以及「男生都」「女生都」。',
     opts.siblings?.length ? `這些開頭已經用過，禁止再用同樣的場景或句型：\n${opts.siblings.join('\n')}` : '',
     opts.usedTopics.length ? `這些標題和開頭最近用過，換一個場面：\n${opts.usedTopics.join('\n')}` : '',

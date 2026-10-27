@@ -357,7 +357,7 @@ export function BrandAssetLibrary({
         <div style={{ ...cardBoxStyle, marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>系統短影片（發文主力）</div>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
-            {shorts.length} 支一分鐘系統短片每天輪播一支自動發：Threads 15:00 附影片，FB 20:00 發粉專影片，IG 20:00 發 Reels。
+            {shorts.length} 支一分鐘系統短片每天輪播一支自動發：FB 20:00 發粉專影片，IG 20:00 發 Reels。Threads 維持文字。
             這裡的按鈕也能手動多產一篇，一樣附上影片。
             畫面是客戶真實帳號，個資已遮掉；件數與金額不會寫進文案。
           </p>

@@ -12,13 +12,13 @@ import {
 } from './system-shorts';
 
 /**
- * 每天的系統短影片檔：TaskGo、Washgo 各輪播一支短片，FB 發粉專影片、IG 發 Reels、Threads 附影片。
- * 同一天三個平台用同一支，隔天換下一支（最久沒發的先發）。
+ * 每天的系統短影片檔：TaskGo、Washgo 各輪播一支短片，只發 FB 粉專影片和 IG Reels。
+ * Threads 文字中位數約 200，同一支影片在 Threads 只有幾十次觀看，不再排進 Threads。
+ * 同一天兩個平台用同一支，隔天換下一支（最久沒發的先發）。
  */
 export const SYSTEM_SHORT_SOURCE = 'system_short';
 
 export const SYSTEM_SHORT_SLOTS: { platform: Extract<SocialPlatform, 'facebook' | 'instagram' | 'threads'>; hourTw: number }[] = [
-  { platform: 'threads', hourTw: 15 },
   { platform: 'facebook', hourTw: 20 },
   { platform: 'instagram', hourTw: 20 },
 ];

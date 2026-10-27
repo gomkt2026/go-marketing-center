@@ -191,7 +191,7 @@ python gs.py sheet  projects/taskgo/04-xxx.json      # 每秒一張縮圖，逐�
 
 - 新的一集要先加進 `publish.py` 的 `EPISODES`（英文 id、功能名），英日文標題補在 `src/data/system-shorts.ts`。
 - 產生 `public/shorts/<品牌>/<id>.mp4`（720×1280 網頁版）與封面、`public/brands/<品牌>/shorts/` 每個系統畫面一張截圖（不含字幕），清單在 `src/data/system-shorts.json`。
-- `/briefings` 依品牌分組顯示；打開品牌素材庫時截圖自動寫進素材格（名稱開頭「系統短影片｜」），B 端 FB／IG 配圖優先用。用這些截圖產的 IG 貼文會以 Reels 發這支短片、Threads 附影片、Facebook 附截圖。
+- `/briefings` 依品牌分組顯示；打開品牌素材庫時截圖自動寫進素材格（名稱開頭「系統短影片｜」），B 端 FB／IG 配圖優先用。用這些截圖產的 IG 貼文會以 Reels 發這支短片、Facebook 發粉專影片。Threads 不排這支影片。
 - 截圖畫面靠近邊緣、被切一半的電話 OCR 抓不到，`--check` 時特別看畫面底部，漏的用 `pii.manual` 補框後重新 render。
 
 ## 5. 常見問題

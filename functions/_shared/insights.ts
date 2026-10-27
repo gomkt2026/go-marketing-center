@@ -168,6 +168,22 @@ async function fetchThreadsInsights(account: ThreadsAccount, postId: string): Pr
   };
 }
 
+/** 粉專影片和 Reels 的播放次數在 video_insights，貼文 insights 讀不到。 */
+async function fetchFacebookVideoInsights(pageToken: string, videoId: string): Promise<Record<string, number>> {
+  const metricSets = [
+    'total_video_views,total_video_views_unique,total_video_impressions',
+    'fb_reels_total_plays,blue_reels_play_count,post_impressions_unique',
+  ];
+  const merged: Record<string, number> = {};
+  for (const metric of metricSets) {
+    const params = new URLSearchParams({ metric, access_token: pageToken });
+    const insights = await fetchJson(`${GRAPH_API}/${encodeURIComponent(videoId)}/video_insights?${params}`);
+    if (!insights.ok) continue;
+    Object.assign(merged, mapInsights((insights.data.data as InsightMetric[]) ?? []));
+  }
+  return merged;
+}
+
 async function fetchFacebookInsights(account: MetaAccount, postId: string): Promise<NormalizedMetrics> {
   const pageToken = await resolvePageToken(account);
   const attempts = [
@@ -199,12 +215,23 @@ async function fetchFacebookInsights(account: MetaAccount, postId: string): Prom
     access_token: pageToken,
   });
   const post = await fetchJson(`${GRAPH_API}/${encodeURIComponent(postId)}?${fields}`);
-  const hasInsightNumbers = firstPositive(
+  let hasInsightNumbers = firstPositive(
     mapped.post_media_view,
     mapped.post_total_media_view_unique,
     mapped.post_impressions,
     mapped.post_impressions_unique,
   ) > 0;
+  if (!hasInsightNumbers) {
+    const video = await fetchFacebookVideoInsights(pageToken, postId);
+    mapped = { ...mapped, ...video };
+    hasInsightNumbers = firstPositive(
+      mapped.total_video_views,
+      mapped.fb_reels_total_plays,
+      mapped.blue_reels_play_count,
+      mapped.total_video_impressions,
+      mapped.post_impressions_unique,
+    ) > 0;
+  }
   if (!hasInsightNumbers && !post.ok) {
     const blob = lastError || JSON.stringify(post.data);
     if (blob.includes('2069032') || blob.includes('不支援用戶存取權杖')) {
@@ -222,9 +249,13 @@ async function fetchFacebookInsights(account: MetaAccount, postId: string): Prom
   const metrics = {
     impressions: firstPositive(
       mapped.post_media_view,
+      mapped.total_video_views,
+      mapped.fb_reels_total_plays,
+      mapped.blue_reels_play_count,
+      mapped.total_video_impressions,
+      mapped.post_impressions_unique,
       mapped.post_total_media_view_unique,
       mapped.post_impressions,
-      mapped.post_impressions_unique,
     ),
     clicks: mapped.post_clicks ?? 0,
     comments,
@@ -236,8 +267,8 @@ async function fetchFacebookInsights(account: MetaAccount, postId: string): Prom
     ...metrics,
     engagementRate: computeEngagementRate(metrics),
     raw: {
-      source: 'facebook_insights',
-      uniqueViewers: mapped.post_total_media_view_unique ?? 0,
+      source: mapped.total_video_views || mapped.fb_reels_total_plays ? 'facebook_video_insights' : 'facebook_insights',
+      uniqueViewers: mapped.post_total_media_view_unique || mapped.total_video_views_unique || mapped.post_impressions_unique || 0,
       ...mapped,
     },
   };

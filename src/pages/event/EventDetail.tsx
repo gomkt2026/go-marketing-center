@@ -13,6 +13,7 @@ import type {
   EventEdmImage, EventFormField, EventReferrerCommissionType, EventRegistration, EventRecord, EventSession, EventStats, EventStatus,
 } from '@/types';
 import { DuplicateEventDialog } from './DuplicateEventDialog';
+import { EventStandQr } from './EventStandQr';
 
 const statusTone: Record<EventStatus, BadgeTone> = {
   draft: 'default', open: 'primary', closed: 'accent', completed: 'secondary',
@@ -55,7 +56,7 @@ export function EventDetail() {
 
   const { event, sessions, referrers } = detailQuery.data;
   const registerUrl = `${window.location.origin}/e/${event.slug}`;
-  const checkinUrl = `${window.location.origin}/checkin?token=${event.staffToken}`;
+  const checkinUrl = `${window.location.origin}/checkin/${event.id}?token=${encodeURIComponent(event.staffToken)}`;
 
   function reloadAll() {
     detailQuery.reload();
@@ -101,6 +102,27 @@ export function EventDetail() {
           </div>
         }
       />
+
+      <a
+        href={`/checkin/${event.id}?token=${encodeURIComponent(event.staffToken)}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 56,
+          marginBottom: 14,
+          borderRadius: 14,
+          background: '#1B2B47',
+          color: '#fff',
+          textDecoration: 'none',
+          fontSize: 18,
+          fontWeight: 800,
+        }}
+      >
+        用這支手機掃碼報到
+      </a>
+
+      <EventStandQr event={event} />
 
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>

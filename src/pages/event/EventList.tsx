@@ -406,6 +406,24 @@ function EventGraphicCard({
         </div>
       </Link>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, padding: '8px 12px 12px', background: tone.soft }}>
+        {event.staffToken && (
+          <a
+            href={`/checkin/${event.id}?token=${encodeURIComponent(event.staffToken)}`}
+            style={{
+              marginRight: 'auto',
+              alignSelf: 'center',
+              background: '#1B2B47',
+              color: '#fff',
+              textDecoration: 'none',
+              borderRadius: 8,
+              padding: '6px 10px',
+              fontSize: 12,
+              fontWeight: 800,
+            }}
+          >
+            掃碼報到
+          </a>
+        )}
         <Button variant="ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={onCopy}>複製</Button>
         <Button variant="danger" style={{ padding: '4px 10px', fontSize: 12 }} disabled={deleting} onClick={onDelete}>
           {deleting ? '刪除中…' : '刪除'}

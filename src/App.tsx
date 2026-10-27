@@ -41,6 +41,7 @@ const EventList = lazyPage(() => import('@/pages/event/EventList'), 'EventList')
 const EventDetail = lazyPage(() => import('@/pages/event/EventDetail'), 'EventDetail');
 const EventRegister = lazyPage(() => import('@/pages/public/EventRegister'), 'EventRegister');
 const EventTicket = lazyPage(() => import('@/pages/public/EventTicket'), 'EventTicket');
+const EventDesk = lazyPage(() => import('@/pages/public/EventDesk'), 'EventDesk');
 const CheckinEntry = lazyPage(() => import('@/pages/public/CheckinEntry'), 'CheckinEntry');
 const CheckinScan = lazyPage(() => import('@/pages/public/CheckinScan'), 'CheckinScan');
 const PrivacyPolicy = lazyPage(() => import('@/pages/public/PrivacyPolicy'), 'PrivacyPolicy');
@@ -187,6 +188,14 @@ export default function App() {
             element={(
               <Suspense fallback={<PublicFallback />}>
                 <EventRegister />
+              </Suspense>
+            )}
+          />
+          <Route
+            path="/e/:slug/desk"
+            element={(
+              <Suspense fallback={<PublicFallback />}>
+                <EventDesk />
               </Suspense>
             )}
           />

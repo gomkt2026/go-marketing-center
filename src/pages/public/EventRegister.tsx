@@ -293,8 +293,8 @@ export function EventRegister() {
       </form>
 
       <div style={{ textAlign: 'center', marginTop: 16 }}>
-        <Link to={`/e/${slug}/ticket`} style={{ fontSize: 12, color: isFixer ? FIXER_NAVY : 'var(--color-text-muted)' }}>
-          已經報名過?查詢我的票券
+        <Link to={`/e/${slug}/ticket`} style={{ fontSize: 16, fontWeight: 800, color: isFixer ? FIXER_NAVY : 'var(--color-text)' }}>
+          我已報名，叫出報到 QR
         </Link>
       </div>
     </PublicShell>

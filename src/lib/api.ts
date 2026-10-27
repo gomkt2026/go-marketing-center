@@ -1483,6 +1483,12 @@ export const publicApi = {
       body: JSON.stringify(body),
     }),
 
+  arrive: (slug: string, body: { phone: string; registrationId: string }) =>
+    request<{ alreadyCheckedIn: boolean; registration: import('@/types').EventRegistration }>(
+      `/api/public/events/${encodeURIComponent(slug)}/arrive`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   lookupByPhone: (slug: string, phone: string) =>
     request<{ registrations: import('@/types').EventRegistration[] }>(`/api/public/events/${encodeURIComponent(slug)}/lookup`, {
       method: 'POST',
@@ -1499,7 +1505,10 @@ export const publicApi = {
 // -- 工作人員報到(無需登入,以 staffToken 授權) --------------------------------
 export const checkinApi = {
   verify: (staffToken: string) =>
-    request<{ eventId: string; eventSlug: string; title: string; location?: string; eventDate?: string; status: string }>(
+    request<{
+      eventId: string; eventSlug: string; title: string; location?: string; eventDate?: string; status: string;
+      registeredCount: number; checkedInCount: number;
+    }>(
       '/api/checkin/verify',
       { method: 'POST', body: JSON.stringify({ staffToken }) },
     ),
@@ -1508,6 +1517,18 @@ export const checkinApi = {
     request<{ ok: boolean; alreadyCheckedIn: boolean; registration: import('@/types').EventRegistration }>(
       '/api/checkin/scan',
       { method: 'POST', body: JSON.stringify({ staffToken, qrToken }) },
+    ),
+
+  confirm: (staffToken: string, registrationId: string) =>
+    request<{ ok: boolean; alreadyCheckedIn: boolean; registration: import('@/types').EventRegistration }>(
+      '/api/checkin/scan',
+      { method: 'POST', body: JSON.stringify({ staffToken, registrationId }) },
+    ),
+
+  lookup: (staffToken: string, query: string) =>
+    request<{ matches: Array<Pick<import('@/types').EventRegistration, 'id' | 'name' | 'phone' | 'checkedInAt' | 'status' | 'sessionLabel'>> }>(
+      '/api/checkin/lookup',
+      { method: 'POST', body: JSON.stringify({ staffToken, query }) },
     ),
 };
 

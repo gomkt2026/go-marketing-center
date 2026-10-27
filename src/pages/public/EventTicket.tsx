@@ -3,7 +3,6 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { PublicShell, PublicMessage, publicInputStyle, publicLabelStyle } from '@/components/public/PublicShell';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { publicApi, ApiError } from '@/lib/api';
 import type { EventRegistration } from '@/types';
 
@@ -17,7 +16,8 @@ function TicketView({ ticket, onRefresh }: { ticket: Ticket; onRefresh: () => vo
 
   useEffect(() => {
     if (canvasRef.current) {
-      void QRCode.toCanvas(canvasRef.current, ticket.qrToken, { width: 220, margin: 1 });
+      const width = Math.min(300, Math.max(220, window.innerWidth - 96));
+      void QRCode.toCanvas(canvasRef.current, ticket.qrToken, { width, margin: 1 });
     }
   }, [ticket.qrToken]);
 
@@ -29,12 +29,16 @@ function TicketView({ ticket, onRefresh }: { ticket: Ticket; onRefresh: () => vo
   return (
     <div style={{ textAlign: 'center' }}>
       <h1 style={{ fontSize: 18, marginBottom: 4 }}>{ticket.eventTitle}</h1>
-      <div style={{ marginBottom: 14 }}>
-        {ticket.checkedInAt ? (
-          <Badge tone="primary">✓ 已報到</Badge>
-        ) : (
-          <Badge tone="accent">尚未報到</Badge>
-        )}
+      <div style={{
+        marginBottom: 14,
+        padding: '12px 10px',
+        borderRadius: 14,
+        background: ticket.checkedInAt ? '#E8F6EE' : '#FFF6E8',
+        color: ticket.checkedInAt ? '#145C38' : '#6A4510',
+        fontSize: 20,
+        fontWeight: 800,
+      }}>
+        {ticket.checkedInAt ? '已報到' : '把這頁給工作人員掃'}
       </div>
 
       <div
@@ -54,7 +58,9 @@ function TicketView({ ticket, onRefresh }: { ticket: Ticket; onRefresh: () => vo
         {ticket.eventDate && <div><strong>時間</strong>&nbsp;&nbsp;{new Date(ticket.eventDate).toLocaleString('zh-TW')}</div>}
       </div>
 
-      <p style={{ fontSize: 12, marginBottom: 12 }}>請於活動現場出示此 QR Code 供工作人員掃描報到</p>
+      <p style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, lineHeight: 1.5 }}>
+        把螢幕亮度調高，對準工作人員的相機。
+      </p>
 
       {ticket.lineAddFriendUrl && (
         <a href={ticket.lineAddFriendUrl} target="_blank" rel="noreferrer">
@@ -143,13 +149,14 @@ export function EventTicket() {
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 14 }}>
-          <p style={{ fontSize: 14, fontWeight: 700 }}>查詢我的票券</p>
+          <p style={{ fontSize: 22, fontWeight: 800, textAlign: 'center', margin: 0 }}>我已報名</p>
+          <p style={{ fontSize: 14, textAlign: 'center', margin: 0, lineHeight: 1.6 }}>輸入手機，叫出報到 QR，給工作人員掃。</p>
           <label style={publicLabelStyle}>
-            <span>報名時填寫的手機號碼</span>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} style={publicInputStyle} placeholder="09xxxxxxxx" inputMode="numeric" />
+            <span>報名時的手機號碼</span>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...publicInputStyle, fontSize: 18, padding: '14px 12px' }} placeholder="09xxxxxxxx" inputMode="tel" autoComplete="tel" />
           </label>
           {lookupError && <PublicMessage title={lookupError} tone="danger" />}
-          <Button variant="primary" disabled={lookingUp} onClick={() => void handleLookup()} style={{ width: '100%', justifyContent: 'center' }}>
+          <Button variant="primary" disabled={lookingUp} onClick={() => void handleLookup()} style={{ width: '100%', justifyContent: 'center', minHeight: 48, fontSize: 16 }}>
             {lookingUp ? '查詢中…' : '查詢票券'}
           </Button>
         </div>

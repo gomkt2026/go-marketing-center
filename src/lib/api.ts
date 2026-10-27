@@ -93,7 +93,7 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }),
 
-  me: () => request<{ user: User }>('/api/auth/me'),
+  me: () => request<{ user: User | null }>('/api/auth/me'),
 
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 

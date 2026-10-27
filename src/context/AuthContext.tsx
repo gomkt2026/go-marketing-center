@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import type { User } from '@/types';
 
 interface AuthContextValue {
@@ -20,9 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { user: u } = await api.me();
       setUser(u);
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) setUser(null);
-      else setUser(null);
+    } catch {
+      setUser(null);
     } finally {
       setLoading(false);
     }

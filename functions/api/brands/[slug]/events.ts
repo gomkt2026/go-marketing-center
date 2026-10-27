@@ -19,14 +19,14 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const sql = getSql(context.env);
   const rows = await sql`
-    SELECT e.id, e.slug, e.title, e.status, e.event_date, e.location, e.created_at,
+    SELECT e.id, e.slug, e.title, e.status, e.event_date, e.location, e.created_at, e.edm_images,
       COUNT(*) FILTER (WHERE r.status = 'registered')::int AS registration_count,
       COUNT(*) FILTER (WHERE r.checked_in_at IS NOT NULL)::int AS checked_in_count
     FROM events e
     LEFT JOIN event_registrations r ON r.event_id = e.id
     WHERE e.brand_id = ${brand.id}::uuid
     GROUP BY e.id
-    ORDER BY e.created_at DESC
+    ORDER BY e.event_date ASC NULLS LAST, e.created_at DESC
   `;
 
   const events = rowsToCamel(rows as Record<string, unknown>[]);

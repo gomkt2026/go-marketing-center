@@ -12,6 +12,10 @@ export interface Env {
   BRAND_JOBS?: Queue<BrandJobMessage>;
   ADMIN_USERNAME: string;
   ADMIN_PASSWORD: string;
+  /** 服務展示書管理頁密碼。未設定時，管理頁改用 ADMIN_PASSWORD。 */
+  ADMIN_TOKEN?: string;
+  /** 選填：把訪客 IP 雜湊成防洗版代碼，資料庫不存原始 IP。 */
+  IP_SALT?: string;
   /** FIXERCOWORK 品牌限定登入(明文比對,僅存伺服器端) */
   FIXERCOWORK_USERNAME?: string;
   FIXERCOWORK_PASSWORD?: string;

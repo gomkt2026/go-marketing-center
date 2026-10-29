@@ -8,6 +8,7 @@ export const ja: PublicCopy = {
   langGroup: '言語',
   nav: {
     home: 'ホーム',
+    showcase: 'サービス紹介',
     posting: '投稿代行',
     proof: '成果',
     show: 'Podcast',
@@ -100,6 +101,7 @@ export const ja: PublicCopy = {
     { title: 'Washgo 配送追跡：匠シティ再生', body: 'お客が洗濯の進み具合を見ると、受け取り、洗濯、検品、返送が匠シティのアニメで流れます。衣類を待っている間にも見るものがあります。' },
   ],
   homePages: [
+    { title: 'サービス紹介', body: 'TaskGo、Homigo、Washgo。それぞれ何を解決し、お客が何をできるかを、画面と短い動画で見ます。', cta: '開く' },
     { title: 'Go 投稿代行', body: '工事班が自分で SNS を見守らなくてよい。週 2 本、月額 NT$999。', cta: '料金を見る' },
     { title: '三ブランドの投稿と報道', body: '三ブランドの累計投稿、表示、反応に、最新投稿と経済日報を加えます。', cta: '成果を見る' },
     { title: '三人編集の雑談', body: '同じセンターが作った Podcast。SoundOn、YouTube、Spotify で聴けます。', cta: '聴く' },

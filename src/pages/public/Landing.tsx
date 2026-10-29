@@ -8,6 +8,7 @@ export const CONTACT_EMAIL = 'service@inforcraft.com.tw';
 
 const NAV = [
   { to: '/welcome', key: 'home' },
+  { to: '/showcase/', key: 'showcase', hard: true },
   { to: '/briefings', key: 'alliance' },
   { to: '/crews', key: 'crews' },
   { to: '/go-posting', key: 'posting' },
@@ -525,7 +526,7 @@ export function GameFrame() {
   );
 }
 
-const HOME_PATHS = ['/go-posting', '/proof', '/show', '/jiangcheng', '/center'] as const;
+const HOME_PATHS = ['/showcase/', '/go-posting', '/proof', '/show', '/jiangcheng', '/center'] as const;
 
 export function Landing() {
   const copy = useCopy();
@@ -624,13 +625,12 @@ export function Landing() {
           <div className="lp-eyebrow">{home.pagesEyebrow}</div>
           <h2>{home.pagesTitle}</h2>
           <div className="lp-pages" style={{ marginTop: 28 }}>
-            {pages.map((p) => (
-              <LocalLink key={p.to} className="lp-page-card" to={p.to}>
-                <b>{p.title}</b>
-                <p>{p.body}</p>
-                <span>{p.cta}</span>
-              </LocalLink>
-            ))}
+            {pages.map((p) => {
+              const card = (<><b>{p.title}</b><p>{p.body}</p><span>{p.cta}</span></>);
+              return p.to.startsWith('/showcase')
+                ? <a key={p.to} className="lp-page-card" href={p.to}>{card}</a>
+                : <LocalLink key={p.to} className="lp-page-card" to={p.to}>{card}</LocalLink>;
+            })}
           </div>
         </div>
       </section>
@@ -982,7 +982,9 @@ export function PublicFrame({ title, children }: { title: string; children: Reac
           <LocalLink to="/welcome" className="lp-logo"><b>GO</b> {copy.brandName.replace(/^GO\s?/, '')}</LocalLink>
           <nav>
             {NAV.map((item) => (
-              <LocalLink key={item.to} to={item.to} aria-current={here === item.to || (item.to !== '/welcome' && here.startsWith(`${item.to}/`)) ? 'page' : undefined}>{copy.nav[item.key]}</LocalLink>
+              'hard' in item && item.hard
+                ? <a key={item.to} href={item.to}>{copy.nav[item.key]}</a>
+                : <LocalLink key={item.to} to={item.to} aria-current={here === item.to || (item.to !== '/welcome' && here.startsWith(`${item.to}/`)) ? 'page' : undefined}>{copy.nav[item.key]}</LocalLink>
             ))}
           </nav>
           <LanguageSwitch />
@@ -996,6 +998,7 @@ export function PublicFrame({ title, children }: { title: string; children: Reac
         <div className="lp-wrap lp-footer-inner">
           <span>© {new Date().getFullYear()} {copy.brandName}</span>
           <nav>
+            <a href="/showcase/">{copy.nav.showcase}</a>
             <LocalLink to="/go-posting">{copy.footer.posting}</LocalLink>
             <a href="/privacy">{copy.footer.privacy}</a>
             <a href="/legal/game-rules/">{copy.footer.rules}</a>

@@ -10,6 +10,7 @@ export const en: PublicCopy = {
   langGroup: 'Language',
   nav: {
     home: 'Home',
+    showcase: 'Service book',
     posting: 'Posting',
     proof: 'Results',
     show: 'Podcast',
@@ -102,6 +103,7 @@ export const en: PublicCopy = {
     { title: 'Washgo order tracking: Craft City playback', body: 'When a customer checks a laundry order, pickup, wash, quality check, and return play through as a Craft City animation. There is something to watch while the clothes are out.' },
   ],
   homePages: [
+    { title: 'Service book', body: 'TaskGo, Homigo, and Washgo: the problem each one solves, what a customer can do, plus the product screen and short films.', cta: 'Open the book' },
     { title: 'Go Posting', body: 'Crews do not have to run their own social accounts. Two posts a week, NT$999 a month.', cta: 'See the price' },
     { title: 'Posts and press', body: 'Cumulative posts, views, and interactions for three brands, plus the latest post and Economic Daily News.', cta: 'See the results' },
     { title: 'GO Trio Talk', body: 'A podcast made by the same center. Listen on SoundOn, YouTube, or Spotify.', cta: 'Listen' },

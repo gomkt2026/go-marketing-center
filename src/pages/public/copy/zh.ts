@@ -6,6 +6,7 @@ export const zh = {
   langGroup: '語言',
   nav: {
     home: '首頁',
+    showcase: '服務展示書',
     posting: 'Go幫你發文',
     proof: '品牌成果',
     show: 'Podcast',
@@ -98,6 +99,7 @@ export const zh = {
     { title: 'Washgo 洗滌追蹤：匠城呈現', body: '客人查送洗進度時，收件、洗護、品管、送回會以匠城動畫一路播完，等衣服的時間也有東西看。' },
   ],
   homePages: [
+    { title: '服務展示書', body: '匠管做 TaskGo、Homigo、Washgo。每一套先講解決什麼問題，再講客戶可以做哪些事，並看系統畫面與操作短片。', cta: '翻頁看' },
     { title: 'Go 幫你發文', body: '工班不用自己顧粉專。每週兩則，一個月 999。', cta: '看價格表' },
     { title: '三品牌發文與報導', body: '三個品牌的累計發文、曝光與互動，加上最新貼文和經濟日報。', cta: '看成果' },
     { title: '三小編熱聊', body: '同一套中心做出的 Podcast，SoundOn、YouTube、Spotify 都能聽。', cta: '去收聽' },

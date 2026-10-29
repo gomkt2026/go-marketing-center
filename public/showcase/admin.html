@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>展示書留言管理</title>
+<style>
+:root{--bg:#F3F5F8;--paper:#fff;--ink:#17213A;--muted:#5A6478;--line:#DCE1E8;--taskgo:#B4500A;--homigo:#8A6000;--washgo:#2257B8}
+@media (prefers-color-scheme:dark){:root{--bg:#0C1017;--paper:#161D29;--ink:#E7ECF4;--muted:#9AA5B8;--line:#2A3446;--taskgo:#F7A266;--homigo:#F5C24A;--washgo:#86AAF2;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;padding:24px max(16px,env(safe-area-inset-left))}
+.wrap{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-size:22px;margin:0}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input,select,button{font:inherit;color:inherit;border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--paper)}
+button{cursor:pointer;font-weight:700}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stats div{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-variant-numeric:tabular-nums}
+.stats b{display:block;font-size:22px}
+.tw{overflow-x:auto;background:var(--paper);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:14px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:500}
+td.t{white-space:pre-wrap;max-width:360px}
+tr.hid td{opacity:.45}
+.p{font-weight:700}
+.msg{color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>展示書留言管理</h1>
+  <p class="msg">輸入部署時設定的 ADMIN_TOKEN。密碼只存在這個瀏覽器分頁，關掉就清除。</p>
+  <form class="bar" id="f">
+    <input id="tok" type="password" placeholder="ADMIN_TOKEN" autocomplete="current-password" required>
+    <select id="flt"><option value="">全部系統</option><option value="taskgo">TaskGo</option><option value="homigo">Homigo</option><option value="washgo">Washgo</option></select>
+    <button type="submit">載入留言</button>
+    <button type="button" id="csv">匯出 CSV</button>
+    <span class="msg" id="msg"></span>
+  </form>
+  <div class="stats" id="stats"></div>
+  <div class="tw"><table><thead><tr><th>時間</th><th>系統</th><th>稱呼</th><th>聯絡方式</th><th>留言</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+</div>
+<script>
+const API="/api/showcase", N={taskgo:"TaskGo",homigo:"Homigo",washgo:"Washgo"};
+let data=[];
+const $=s=>document.querySelector(s);
+try{$("#tok").value=sessionStorage.getItem("sc_tok")||"";}catch(e){}
+const hdr=()=>({authorization:"Bearer "+$("#tok").value,"content-type":"application/json"});
+async function load(){
+  $("#msg").textContent="載入中…";
+  try{sessionStorage.setItem("sc_tok",$("#tok").value);}catch(e){}
+  const r=await fetch(API+"/admin/comments",{headers:hdr()}); const d=await r.json().catch(()=>({}));
+  if(!r.ok){$("#msg").textContent=d.error||"載入失敗";return;}
+  data=d.comments; $("#stats").innerHTML="";
+  for(const k in N){const n=data.filter(c=>c.product===k&&!c.hidden).length;
+    const box=document.createElement("div"); box.innerHTML=`<span style="color:var(--${k})">${N[k]}</span><b>${d.likes[k]||0} 讚</b><span class="msg">${n} 則留言</span>`; $("#stats").append(box);}
+  draw(); $("#msg").textContent="共 "+data.length+" 則";
+}
+function draw(){
+  const f=$("#flt").value, tb=$("#rows"); tb.innerHTML="";
+  data.filter(c=>!f||c.product===f).forEach(c=>{
+    const tr=document.createElement("tr"); if(c.hidden)tr.className="hid";
+    const cells=[new Date(c.created_at.replace(" ","T")+"Z").toLocaleString("zh-TW"),N[c.product]||c.product,c.name||"訪客",c.contact||"—",c.text];
+    cells.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i===4)td.className="t";if(i===1){td.className="p";td.style.color="var(--"+c.product+")";}tr.append(td);});
+    const td=document.createElement("td"),b=document.createElement("button");
+    b.textContent=c.hidden?"恢復":"隱藏";
+    b.onclick=async()=>{const r=c.hidden?await fetch(API+"/admin/restore",{method:"POST",headers:hdr(),body:JSON.stringify({id:c.id})}):await fetch(API+"/comment/"+c.id,{method:"DELETE",headers:hdr()});
+      if(r.ok){c.hidden=c.hidden?0:1;draw();}};
+    td.append(b);tr.append(td);tb.append(tr);});
+}
+$("#f").addEventListener("submit",e=>{e.preventDefault();load();});
+$("#flt").addEventListener("change",draw);
+$("#csv").addEventListener("click",()=>{
+  const esc=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
+  const rows=[["時間","系統","稱呼","聯絡方式","留言","已隱藏"],...data.map(c=>[c.created_at,N[c.product],c.name,c.contact,c.text,c.hidden?"是":""])];
+  const blob=new Blob(["﻿"+rows.map(r=>r.map(esc).join(",")).join("\n")],{type:"text/csv"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="showcase-comments.csv";a.click();
+});
+</script>
+</body>
+</html>

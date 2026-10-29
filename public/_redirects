@@ -3,4 +3,7 @@
 /game /game/ 301
 /legal/game-rules /legal/game-rules/ 301
 /legal/game-threads /legal/game-threads/ 301
+/showcase/admin /showcase/admin.html 200
+/showcase/ /showcase/index.html 200
+/showcase /showcase/index.html 200
 /*    /index.html   200

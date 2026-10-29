@@ -72,3 +72,14 @@ h2{margin:0;font-size:16.5pt;line-height:1.35;font-weight:700}
 .url{font-size:8.5pt;color:#C9D3E6;word-break:break-all}
 .family{font-size:8pt;letter-spacing:.06em;color:#9AA5B8}
 ul{margin:0;padding:0}
+.sheet{break-after:page}
+.sheet:last-child{break-after:auto}
+.pains{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+.pains figure{margin:0;display:flex;flex-direction:column;gap:1.6mm}
+.pains img{width:100%;height:92mm;object-fit:cover;object-position:center 42%;border-radius:3mm}
+.pains figcaption{font-size:8.5pt;line-height:1.4;color:#3E485C}
+.shots{display:flex;flex-direction:column;gap:3.2mm}
+.shots figure{margin:0;display:flex;flex-direction:column;gap:1.2mm}
+.shots img{width:100%;height:48mm;object-fit:contain;object-position:center;background:#F4F6F9;border-radius:2.4mm;border:1px solid #E4E8EF}
+.shots figcaption{font-size:9pt;line-height:1.35}
+.shots figcaption b{color:var(--c)}

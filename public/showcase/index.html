@@ -161,6 +161,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .wide{display:flex;flex-direction:column;gap:8px}
 .wide video{width:100%;aspect-ratio:1920/984;border-radius:14px;background:#000;display:block}
 .note{font-size:13px;color:var(--muted)}
+.catalog{display:flex;flex-direction:column;gap:16px}
+.catalog .reel{flex:none;width:100%;display:grid;grid-template-columns:132px 1fr;gap:14px;align-items:center;scroll-snap-align:none}
+.catalog .reel video{width:132px;height:235px;aspect-ratio:auto;object-fit:contain;background:#111}
+.catalog .vt{align-items:baseline}
+.catalog .reel p{margin:0}
+@media (max-width:520px){.catalog .reel{grid-template-columns:108px 1fr;gap:10px}.catalog .reel video{width:108px;height:192px}}
 
 /* feature index */
 .idx{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:18px 16px}
@@ -384,9 +390,9 @@ html,body{margin:0}
     </ul>
   </section>
   <section class="sec jump-target" id="tg-see">
-    <div class="label">操作短片 · 點一下播放</div>
-    <div class="reels" data-reels="taskgo"></div>
-    <p class="note">直式短片，可左右滑動。畫面中的案名與數字為示範資料。</p>
+    <div class="label">相關短片 · 全部列在這裡</div>
+    <div class="catalog" data-reels="taskgo"></div>
+    <p class="note">每一支都完整顯示，點一下播放。畫面中的案名與數字為示範資料。</p>
   </section>
   <section class="sec">
     <div class="label">從早上排班到月底算錢</div>
@@ -643,11 +649,17 @@ const PAGES=[
 ];
 const VIDEOS={
   taskgo:[
-    {f:"checkin",t:"打卡出勤",d:"1:07",p:"LINE 打卡帶 GPS，儀表板看出哪個案場落後。"},
-    {f:"closing",t:"結案報告",d:"1:02",p:"施工照片收成一頁，完工當下傳到客戶的 LINE。"},
+    {f:"checkin",t:"打卡出勤",d:"1:07",p:"工班到底去案場了沒，老闆不用再猜。LINE 打卡帶 GPS，落後的案場自己跳出來。"},
+    {f:"clock-in",t:"出勤與每日報告",d:"1:13",p:"專案燈號、每日報告、出勤報表。十天制、十五天制都能切，報表可匯出。",src:"/shorts/taskgo/clock-in.mp4",poster:"/shorts/taskgo/clock-in.jpg"},
+    {f:"dispatch-calendar",t:"派工行事曆",d:"1:03",p:"月週日切換，誰哪天去哪一眼看到。排好就推到師傅的 LINE。",src:"/shorts/taskgo/dispatch-calendar.mp4",poster:"/shorts/taskgo/dispatch-calendar.jpg"},
     {f:"field",t:"現場管理",d:"0:44",p:"人在工地用手機，調出照片、進度、簽名、請款。"},
+    {f:"field-report-review",t:"施工回報",d:"0:58",p:"施工前中後照片收成審核資料包。工班提交、審核、確認，三段都留著。",src:"/shorts/taskgo/field-report-review.mp4",poster:"/shorts/taskgo/field-report-review.jpg"},
+    {f:"closing",t:"結案報告",d:"1:02",p:"施工照片收成一頁，完工當下傳到客戶的 LINE。"},
     {f:"map",t:"專案地圖",d:"0:38",p:"案場釘在地圖上，點開看照片與維修車動態。"},
-    {f:"money",t:"收款與毛利",d:"1:15",p:"收款提醒、發票明細、修繕單毛利，一看就知道。"}
+    {f:"money",t:"收款與毛利",d:"1:15",p:"哪筆該收、成本多少、這單賺還是賠，打開就看得到。"},
+    {f:"finance-cost",t:"財務成本",d:"1:11",p:"合約、已收、待收、總成本在同一頁。過期款和超支專案自己標出來。",src:"/shorts/taskgo/finance-cost.mp4",poster:"/shorts/taskgo/finance-cost.jpg"},
+    {f:"repair-management",t:"修繕管理",d:"1:02",p:"報修不用再寫便條紙。連結、電話、LINE 群組進來的單，都有案號可追。",src:"/shorts/taskgo/repair-management.mp4",poster:"/shorts/taskgo/repair-management.jpg"},
+    {f:"owner-cockpit",t:"老闆駕駛艙",d:"1:08",p:"專案、任務、人力、錢，一頁看完。不用問完工務再問會計。",src:"/shorts/taskgo/owner-cockpit.mp4",poster:"/shorts/taskgo/owner-cockpit.jpg"}
   ],
   washgo:[
     {f:"ops-center-shift",t:"開班待辦",d:"1:03",p:"一開門先看總覽：待處理幾件、卡在哪，待接單、洗滌中、配送中分開做。",src:"/shorts/washgo/ops-center-shift.mp4",poster:"/shorts/washgo/ops-center-shift.jpg"},
@@ -722,7 +734,7 @@ function go(i,dir){
 $("#prev").onclick=()=>go(S.i-1); $("#next").onclick=()=>go(S.i+1);
 document.addEventListener("keydown",e=>{ if(e.target.closest("textarea,input,video"))return; if(e.key==="ArrowRight")go(S.i+1); if(e.key==="ArrowLeft")go(S.i-1); });
 (()=>{let x0=null,y0=null;const b=$("#book");
-  b.addEventListener("touchstart",e=>{ if(e.target.closest(".reels,.flow,video,textarea")){x0=null;return;} x0=e.touches[0].clientX;y0=e.touches[0].clientY;},{passive:true});
+  b.addEventListener("touchstart",e=>{ if(e.target.closest(".reels,.catalog,.flow,video,textarea")){x0=null;return;} x0=e.touches[0].clientX;y0=e.touches[0].clientY;},{passive:true});
   b.addEventListener("touchend",e=>{ if(x0==null)return; const dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0; x0=null;
     if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.6) go(S.i+(dx<0?1:-1)); },{passive:true});})();
 window.addEventListener("hashchange",()=>{const i=PAGES.findIndex(p=>"#"+p.id===location.hash); if(i>=0)go(i);});

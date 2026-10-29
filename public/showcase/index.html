@@ -184,6 +184,17 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .photo{margin:0;display:flex;flex-direction:column;gap:6px}
 .photo img{border-radius:12px;width:100%;border:1px solid var(--line)}
 .photo figcaption{font-size:12px;color:var(--muted)}
+.stills{display:grid;grid-template-columns:1fr;gap:12px;margin:4px 0 2px}
+@media (min-width:720px){.stills.two{grid-template-columns:1fr 1fr;align-items:start}}
+.stills figure{margin:0;display:flex;flex-direction:column;gap:6px}
+.stills img{width:100%;border-radius:12px;border:1px solid var(--line);background:#111;display:block}
+.stills.tall img{max-height:480px;object-fit:contain}
+.stills figcaption{font-size:12px;color:var(--muted);line-height:1.45}
+.phones{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:720px){.phones{grid-template-columns:1fr 1fr 1fr;align-items:start}}
+.phones figure{margin:0;display:flex;flex-direction:column;gap:6px}
+.phones img{width:100%;height:360px;object-fit:cover;object-position:top center;border-radius:12px;border:1px solid var(--line);background:#F4F6F9}
+.phones figcaption{font-size:12px;color:var(--muted);line-height:1.45}
 .press{display:grid;grid-template-columns:1fr;gap:14px;padding:16px;border-radius:14px;border:1.5px solid var(--line)}
 @media (min-width:600px){.press{grid-template-columns:240px 1fr;align-items:start}}
 .press img{border-radius:10px;width:100%}
@@ -428,18 +439,52 @@ html,body{margin:0}
     <li><span class="k">你可以</span><b>一棟房子走完</b><span>從招租、簽約、收租，到報修交給工班、再退租。</span></li>
   </ol>
   <nav class="jumps" aria-label="這一章">
-    <button type="button" data-jump="hm-life">房子怎麼走</button>
+    <button type="button" data-jump="hm-pain">四個斷點</button>
+    <button type="button" data-jump="hm-see">系統畫面</button>
     <button type="button" data-jump="hm-do">客戶可以做</button>
-    <button type="button" data-jump="hm-link">報修怎麼變工單</button>
+    <button type="button" data-jump="hm-link">報修四種決定</button>
     <button type="button" data-jump="hm-edm">下載 EDM</button>
   </nav>
   <div class="share jump-target" id="hm-edm">
-    <div><b>一頁 EDM</b><span>PDF 可下載，連結可轉傳給需要的人。</span></div>
+    <div><b>服務簡介</b><span>PDF 可下載，連結可轉傳給需要的人。</span></div>
     <div class="share-actions">
       <a class="btn" href="edm/homigo.pdf" download="Homigo-服務簡介.pdf">下載 PDF</a>
       <button type="button" class="btn ghost" data-share="https://go-marketing-center.pages.dev/showcase/edm/homigo.pdf">複製連結</button>
     </div>
   </div>
+  <section class="sec jump-target" id="hm-pain">
+    <div class="label">管房最常卡住的四件事</div>
+    <ol class="steps">
+      <li><span class="k">01</span><b>全靠自己記</b><p>收租、續約、報修、退租日期散在腦袋和 LINE。每天都在翻對話。</p></li>
+      <li><span class="k">02</span><b>對帳靠手抄</b><p>轉帳憑證一張張核。電費另外算，月底才發現對不起來。</p></li>
+      <li><span class="k">03</span><b>報修沒下文</b><p>自己找師傅，照片和地址傳來傳去。三方看到的進度不一樣。</p></li>
+      <li><span class="k">04</span><b>退租常爭議</b><p>押金扣款口說無憑。點交沒留下照片，事後才吵。</p></li>
+    </ol>
+  </section>
+  <section class="sec">
+    <div class="label">同一件事，以前和現在</div>
+    <div class="cols">
+      <div><h3 style="font-size:19px;margin-bottom:6px">以前</h3><ul class="kv">
+        <li><b>紀錄</b><span>Excel 加 LINE 群組，事情散在聊天室</span></li>
+        <li><b>報修</b><span>自己找工班，來回傳照片和地址</span></li>
+        <li><b>對帳</b><span>手抄存摺，電費另外算</span></li>
+        <li><b>退租</b><span>押金怎麼扣，事後說不清</span></li></ul></div>
+      <div><h3 style="font-size:19px;margin-bottom:6px">用了 Homigo</h3><ul class="kv">
+        <li><b>紀錄</b><span>招租到退租留在同一條，打開 LINE 就看得到</span></li>
+        <li><b>報修</b><span>找師傅就進 TaskGo，進度與照片同步</span></li>
+        <li><b>對帳</b><span>憑證上傳、房東核可，逾期可催繳</span></li>
+        <li><b>退租</b><span>點交、逐項扣款、房客確認後才結案</span></li></ul></div>
+    </div>
+  </section>
+  <section class="sec jump-target" id="hm-see">
+    <div class="label">系統實際畫面 · 在 LINE 裡</div>
+    <div class="phones">
+      <figure><img src="i/homigo-home.jpg" alt="房東首頁：本月收租、收租率，以及租金、報修、租約待辦" loading="lazy"><figcaption>房東首頁。本月應收、已收、未收，租金、報修、租約待辦在同一頁。自管、代管、包租可切換。</figcaption></figure>
+      <figure><img src="i/homigo-rent.jpg" alt="房客繳租頁：月份燈號、待繳帳單與繳費回報" loading="lazy"><figcaption>房客繳租。月份用燈號分已繳、待繳、逾期。上傳憑證前可先抄電表。</figcaption></figure>
+      <figure><img src="i/homigo-repair.jpg" alt="房客新增報修：選設備、填問題、上傳照片" loading="lazy"><figcaption>房客報修。選設備、寫問題、上傳照片。房東收到後再決定怎麼處理。</figcaption></figure>
+    </div>
+    <p class="note">畫面取自 Homigo 的 LINE 頁面。姓名已遮，金額為畫面中的示例。</p>
+  </section>
   <section class="sec jump-target" id="hm-life">
     <div class="label">一棟房子的一生</div>
     <div class="life"><span>招租</span><i>→</i><span>簽約</span><i>→</i><span>入住點交</span><i>→</i><span>收租</span><i>→</i><span>報修</span><i>→</i><span>退租</span><i>→</i><span>再招租</span></div>
@@ -465,8 +510,15 @@ html,body{margin:0}
     </ul>
   </section>
   <section class="sec jump-target" id="hm-link">
-    <div class="label">Homigo × TaskGo · 報修變工單</div>
-    <h3>房東、房客、廠商、後勤，看同一個案號</h3>
+    <div class="label">房東收到報修，一頁四種決定</div>
+    <h3>找師傅才進 TaskGo，其他三種也留痕</h3>
+    <ul class="roles four">
+      <li><span class="k">01</span><b>幫我找師傅</b><p>串接 TaskGo。直接指定廠商，或公開詢價比價。案號、報價、施工照片回到這一張單。</p></li>
+      <li><span class="k">02</span><b>自己安排</b><p>有認識的師傅，走 Homigo 手動路徑。進度一樣寫在這張報修上。</p></li>
+      <li><span class="k">03</span><b>房客自修</b><p>授權房客處理。完工上傳發票，請款或折抵。</p></li>
+      <li><span class="k">04</span><b>暫時不修</b><p>先觀察或結案。決定本身有紀錄，不是沒回。</p></li>
+    </ul>
+    <h3 style="margin-top:16px">找了師傅之後，六步走完</h3>
     <ol class="flow">
       <li><span class="dot">1</span><b>報修</b><span>房客拍照、描述問題</span></li>
       <li><span class="dot">2</span><b>建案</b><span>TaskGo 產生案號</span></li>
@@ -482,6 +534,19 @@ html,body{margin:0}
     </ul>
   </section>
   <section class="sec">
+    <div class="label">收租與退租</div>
+    <div class="cols">
+      <div><h3 style="font-size:19px;margin-bottom:6px">繳租有閉環</h3><ul class="kv">
+        <li><b>上傳</b><span>房客繳費回報，可先拍電表再附憑證</span></li>
+        <li><b>審核</b><span>房東核可，或退回並寫原因</span></li>
+        <li><b>催繳</b><span>逾期帳單可從收租總覽發出催繳</span></li></ul></div>
+      <div><h3 style="font-size:19px;margin-bottom:6px">退租不是一個按鈕</h3><ul class="kv">
+        <li><b>點交</b><span>設備與照片留存，入住時拍的也能對</span></li>
+        <li><b>扣款</b><span>押金逐項列，房客確認或提出異議</span></li>
+        <li><b>再招租</b><span>結案後這間房回到招租</span></li></ul></div>
+    </div>
+  </section>
+  <section class="sec">
     <div class="label">媒體報導</div>
     <div class="press">
       <img src="i/news-homigo.jpg" alt="Homigo 租屋管理系統研討會現場" loading="lazy">
@@ -491,7 +556,7 @@ html,body{margin:0}
     </div>
   </section>
   <div class="mascot"><img src="i/xiaomi.jpg" alt="Homigo 小編小咪" loading="lazy"><div><b>小咪 · Homigo 包租管家</b><p>先同理租屋的混亂，再把事情收回同一個地方。</p></div></div>
-  <div class="offer"><div><b>房東、包租代管，免費開始</b><br><span>招租到退租、收租、報修，一個 LINE 帳號管完。</span></div></div>
+  <div class="offer"><div><b>房東、包租代管，免費開始</b><br><span>不綁信用卡。招租到退租、收租、報修，一個 LINE 帳號管完。</span></div></div>
   <div data-react="homigo"></div>
 </template>
 
@@ -592,17 +657,61 @@ html,body{margin:0}
 </template>
 
 <template id="pg-link">
-  <div class="opener"><div><span class="eyebrow">第四章 · 串接</span><h2>現在接得起來的，<mark>和下一步才做的</mark>，分開講</h2></div></div>
-  <section class="sec">
-    <div class="label">現在就在跑</div>
-    <ul class="adv">
-      <li style="--c-ink:var(--homigo-ink)"><b>報修進工單</b><p>Homigo 報修建立 TaskGo 案號，進度與結案回到房東端。</p></li>
-      <li style="--c-ink:var(--washgo-ink)"><b>修繕轉送洗</b><p>TaskGo 報修可進 Washgo 送洗。這一單九五折，轉介由系統入帳。</p></li>
-      <li style="--c-ink:var(--taskgo-ink)"><b>匠城呈現</b><p>TaskGo 結案、Washgo 洗滌進度，都用匠城動畫把流程演給客人看。</p></li>
+  <div class="opener"><div><span class="eyebrow">第四章 · 串接</span><h2>三條已經接上的路，<mark>各自看得到畫面</mark></h2><p class="who">報修怎麼變成工單、報修怎麼轉去送洗、結案怎麼用匠城演給客人看。下面是系統裡的樣子，不是概念圖。</p></div></div>
+  <nav class="jumps" aria-label="這一章">
+    <button type="button" data-jump="lk-repair">報修進工單</button>
+    <button type="button" data-jump="lk-wash">修繕轉送洗</button>
+    <button type="button" data-jump="lk-play">匠城呈現</button>
+    <button type="button" data-jump="lk-next">下一步</button>
+  </nav>
+  <section class="sec jump-target" id="lk-repair">
+    <div class="label">報修進工單 · Homigo × TaskGo</div>
+    <h3>房客拍一張，修繕端就有案號</h3>
+    <p class="lead">房客在 Homigo 拍照報修。房東決定找師傅之後，TaskGo 依範本建案、配上案號。進度、報價、結案再回到房東端。下面是這張單在修繕端的樣子。</p>
+    <ol class="flow">
+      <li><span class="dot">1</span><b>報修</b><span>房客拍照、描述問題</span></li>
+      <li><span class="dot">2</span><b>建案</b><span>TaskGo 產生案號</span></li>
+      <li><span class="dot">3</span><b>場勘</b><span>師傅用連結回報現況</span></li>
+      <li><span class="dot">4</span><b>報價</b><span>業主線上簽名</span></li>
+      <li><span class="dot">5</span><b>施工</b><span>前中後照片留存</span></li>
+      <li><span class="dot">6</span><b>回流</b><span>進度與結案回到 Homigo</span></li>
+    </ol>
+    <div class="stills two">
+      <figure><img src="i/link-repair-intake.jpg" alt="TaskGo 公開報修表單設定，含表單連結與 QR" loading="lazy"><figcaption>公開報修表單。送出後依範本建案並分配案件編號，進度查詢與工班查詢各有一條連結。</figcaption></figure>
+      <figure><img src="i/link-repair-board.png" alt="報修單據列表，可依案件階段、結案狀態、帳務待辦篩選" loading="lazy"><figcaption>報修單據。進行中、已建案、詢價中分開。案件階段、結案狀態、帳務待辦各自篩。</figcaption></figure>
+    </div>
+    <figure class="photo"><img src="i/link-repair-case.png" alt="單一報修工單的案件流程：派工完成、施工進行，以及場勘照片" loading="lazy"><figcaption>打開一張工單：下一步行動、派工完成、施工進行，場勘照片掛在同一張單上。</figcaption></figure>
+    <div class="catalog" data-reels="linkRepair"></div>
+    <ul class="kv">
+      <li><b>房東／代管</b><span>看案號、階段、報價與收付款。完工收到結案報告。</span></li>
+      <li><b>房客</b><span>報修時上傳照片。租屋修繕走房東，自費生活修繕獨立成單。</span></li>
+      <li><b>修繕廠商</b><span>收到地址、問題與參考照片，場勘到請款沿同一張單。</span></li>
     </ul>
+    <p class="note">上面是修繕端的工單。房客在 Homigo 拍照報修、房東決定找師傅之後，進的就是這張單。姓名與電話已遮。</p>
   </section>
-  <figure class="photo"><img src="i/jiangcheng.jpg" alt="匠城出任務遊戲宣傳圖" loading="lazy"><figcaption>匠城出任務：騎車接 TaskGo 報修、Homigo 送鑰匙、Washgo 收衣服。90 秒一局，五國語言。</figcaption></figure>
-  <section class="sec">
+  <section class="sec jump-target" id="lk-wash">
+    <div class="label">修繕轉送洗 · TaskGo × Washgo</div>
+    <h3>報修單上點「洗滌服務」，衣服就進洗衣店</h3>
+    <p class="lead">品牌在 Washgo 開放 TaskGo 轉介，客人這一單九五折。報修單選洗滌服務、選門市自取或司機送回，轉介由系統入帳。</p>
+    <div data-wide="washlink"></div>
+    <div class="stills two">
+      <figure><img src="i/link-wash-open.jpg" alt="Washgo 系統設定勾選開放 TaskGo 洗滌服務轉介紹，客人折扣 95" loading="lazy"><figcaption>洗衣店先開放轉介。客人折扣 95，也就是這一單九五折。</figcaption></figure>
+      <figure><img src="i/link-wash-pick.jpg" alt="報修單點選洗滌服務，跳出洗衣品牌並標示 95 折" loading="lazy"><figcaption>在報修單點「洗滌服務」，選合作洗衣品牌。到府收送或門市自取在下一頁確認。</figcaption></figure>
+    </div>
+    <p class="note">影片把六步走完：開放轉介、報修單、選品牌、門市自取或司機送回、確認送洗、轉介入帳。店名與金額為示範。</p>
+  </section>
+  <section class="sec jump-target" id="lk-play">
+    <div class="label">匠城呈現 · 結案怎麼給客人看</div>
+    <h3>一頁書面報告，一段把工序演完的動畫</h3>
+    <p class="lead">TaskGo 結案後，客人在 LINE 收到結案。打開是工程資訊、施工日期；同一份還能進匠城，從派工、GPS 打卡、施工一路看到收工，工序旁附現場照片。Washgo 查送洗進度時，收件、洗護、品管、送回也用同一套呈現。</p>
+    <div class="stills two tall">
+      <figure><img src="i/link-play.jpg" alt="匠城呈現動畫：街道、機車，以及派工、打卡、施工三個步驟" loading="lazy"><figcaption>匠城呈現。派工、到場打卡、施工做成一段可看的動畫，不是另一份簡報。</figcaption></figure>
+      <figure><img src="i/link-report.jpg" alt="手機上的正式結案報告：工程名稱、專案、地址、負責人員與施工日期" loading="lazy"><figcaption>同一筆結案的書面報告：專案、地址、負責人、開始與結束日期。地址已遮。</figcaption></figure>
+    </div>
+    <div class="catalog" data-reels="linkPlay"></div>
+    <figure class="photo"><img src="i/jiangcheng.jpg" alt="匠城出任務遊戲宣傳圖" loading="lazy"><figcaption>匠城出任務是另外一款小遊戲：騎車接報修、送鑰匙、收衣服，90 秒一局。上面的匠城呈現用的是同一座城，給的是這一筆案子的結案，不是叫人來玩。</figcaption></figure>
+  </section>
+  <section class="sec jump-target" id="lk-next">
     <div class="label">公開說過、逐步在做</div>
     <ul class="adv">
       <li><b>住宅服務</b><p>串聯裝修、維修、清潔，以及保險與金融夥伴。</p></li>
@@ -642,9 +751,9 @@ const PAGES=[
   {id:"cover",tpl:"pg-cover",short:"封面",title:"工作、居住、生活",sub:"一家公司，三個產業入口",c:"brand"},
   {id:"method",tpl:"pg-method",short:"方法",title:"三個產業，同一套進入方式",sub:"人願意用 → 事情留得住 → AI 才有依據",c:"brand"},
   {id:"taskgo",tpl:"pg-taskgo",short:"TaskGo",title:"TaskGo 修繕與工程",sub:"解決群組洗掉紀錄。後勤、師傅、業主各自能做的事",c:"taskgo"},
-  {id:"homigo",tpl:"pg-homigo",short:"Homigo",title:"Homigo 租屋與居住",sub:"解決租屋靠翻聊天室。房東、房客、代管能做的事",c:"homigo"},
+  {id:"homigo",tpl:"pg-homigo",short:"Homigo",title:"Homigo 租屋與居住",sub:"解決記帳、對帳、報修沒下文、退租爭議",c:"homigo"},
   {id:"washgo",tpl:"pg-washgo",short:"Washgo",title:"Washgo 洗衣與收送",sub:"解決打電話、紙本、派車。客人、門市、司機、品牌能做的事",c:"washgo"},
-  {id:"link",tpl:"pg-link",short:"串接",title:"三個系統怎麼接起來",sub:"現在在跑的，和下一步",c:"brand"},
+  {id:"link",tpl:"pg-link",short:"串接",title:"三個系統怎麼接起來",sub:"報修工單、轉送洗、匠城呈現，各有畫面",c:"brand"},
   {id:"contact",tpl:"pg-contact",short:"找誰",title:"找誰、怎麼聯絡",sub:"對上你的現場",c:"brand"}
 ];
 const VIDEOS={
@@ -669,7 +778,13 @@ const VIDEOS={
     {f:"driver-tasks",t:"司機任務",d:"1:06",p:"派遣清單排行程並通知司機。回貨覆核、待送回分開，行程可訂閱日曆。",src:"/shorts/washgo/driver-tasks.mp4",poster:"/shorts/washgo/driver-tasks.jpg"},
     {f:"points-topup",t:"點數儲值",d:"1:04",p:"方案先設好、贈點自動算。LINE 儲值或櫃檯加點，加值報表一張對清楚。",src:"/shorts/washgo/points-topup.mp4",poster:"/shorts/washgo/points-topup.jpg"}
   ],
-  washlink:{f:"washlink",t:"修繕轉送洗",d:"1:57",p:"TaskGo 報修單一步步轉進 Washgo：選門市自取或司機送回，這一單九五折，轉介由系統入帳。"}
+  washlink:{f:"washlink",t:"修繕轉送洗",d:"1:57",p:"TaskGo 報修單一步步轉進 Washgo：選門市自取或司機送回，這一單九五折，轉介由系統入帳。"},
+  linkRepair:[
+    {f:"repair-management",t:"報修單據",d:"1:02",p:"報修不用再寫便條紙。連結、電話、LINE 群組進來的單，都有案號，打開看得到階段與照片。",src:"/shorts/taskgo/repair-management.mp4",poster:"/shorts/taskgo/repair-management.jpg"}
+  ],
+  linkPlay:[
+    {f:"closing",t:"結案與匠城呈現",d:"1:02",p:"書面結案進客戶 LINE。匠城從派工、打卡演到施工，工序旁是這一案的現場照片。"}
+  ]
 };
 const NAMES={taskgo:"TaskGo",homigo:"Homigo",washgo:"Washgo"};
 

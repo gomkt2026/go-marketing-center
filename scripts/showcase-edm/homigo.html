@@ -4,7 +4,26 @@
 <meta charset="utf-8">
 <title>Homigo 服務簡介</title>
 <link rel="stylesheet" href="edm.css">
-<style>:root{--c:#C4890A;--tint:#FDF4DC;--c-on-dark:#F5C24A}</style>
+<style>
+:root{--c:#C4890A;--tint:#FDF4DC;--c-on-dark:#F5C24A}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:2.4mm}
+.quad li{list-style:none;border:1px solid #E4E8EF;border-radius:3mm;padding:2.6mm 3mm 2.8mm}
+.quad .k{display:block;font-size:8pt;letter-spacing:.1em;color:var(--c);font-weight:700}
+.quad b{display:block;margin-top:.4mm;font-size:11pt}
+.quad span{display:block;margin-top:.6mm;font-size:8.5pt;line-height:1.4;color:#3E485C}
+.phones{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3mm}
+.phones figure{margin:0;display:flex;flex-direction:column;gap:1.4mm}
+.phones img{width:100%;height:78mm;object-fit:cover;object-position:top center;border-radius:3mm;border:1px solid #E4E8EF;background:#F4F6F9}
+.phones figcaption{font-size:8pt;line-height:1.35;color:#3E485C}
+.phones figcaption b{color:var(--c)}
+.sheet{gap:3.6mm}
+.then{display:grid;grid-template-columns:1fr 1fr;gap:3mm}
+.then div{border-radius:3mm;padding:3mm 3.4mm 3.2mm}
+.then div:first-child{background:#F4F6F9}
+.then div:last-child{background:var(--tint)}
+.then b{display:block;font-size:10pt;margin-bottom:1mm}
+.then li{list-style:none;font-size:8.5pt;line-height:1.45;color:#3E485C;padding:0.5mm 0}
+</style>
 </head>
 <body>
 <main class="sheet">
@@ -19,36 +38,76 @@
   <div class="rule"></div>
   <div>
     <h2>不是管理房子，<br>而是讓房子自己運作。</h2>
-    <p class="who">與達觀共同推動。房東、包租代管、房客，用 LINE 把租屋日常收回同一個地方。不必下載 App。</p>
+    <p class="who">與達觀共同推動。房東、包租代管、房客，用 LINE 把招租、收租、報修、退租收回同一個地方。不必下載 App。</p>
   </div>
-  <ul class="beats">
-    <li><span class="k">解決</span><b>租屋靠翻紀錄</b><span>招租、收租、報修、退租如果散在聊天室，每天都在找證據。</span></li>
-    <li><span class="k">誰在用</span><b>房東、房客、代管</b><span>三種身分切換。打開 LINE 就能做。</span></li>
-    <li><span class="k">你可以</span><b>一棟房子走完</b><span>從招租、簽約、收租，到報修交給工班、再退租。</span></li>
+  <ul class="quad">
+    <li><span class="k">01　全靠自己記</span><b>日期散在聊天室</b><span>收租、續約、報修、退租，靠腦袋和 LINE。每天都在翻對話。</span></li>
+    <li><span class="k">02　對帳靠手抄</span><b>憑證一張張核</b><span>轉帳憑證手對，電費另外算。月底才發現對不起來。</span></li>
+    <li><span class="k">03　報修沒下文</span><b>三方進度不一樣</b><span>自己找師傅，照片和地址傳來傳去。房東、房客、工班各看各的。</span></li>
+    <li><span class="k">04　退租常爭議</span><b>押金口說無憑</b><span>扣款沒有逐項，點交沒留下照片。事後才吵。</span></li>
   </ul>
-  <section class="roles">
-    <article><div class="k">房東</div><h3>房子的日常收回來</h3><p>新增物件、邀請房客、租約電子簽名、審核繳租、處理報修、入住點交與退租。</p></article>
-    <article><div class="k">房客</div><h3>繳租和報修不用打電話</h3><p>上傳繳租憑證、拍照報修並看進度、抄電表、確認入住與退租結算。</p></article>
-    <article><div class="k">包租代管</div><h3>指揮中心一天看完</h3><p>審核收租與催收、派報修、招租帶看、在退租中心結案，也能加團隊成員。</p></article>
-  </section>
+  <ul class="beats">
+    <li><span class="k">解決</span><b>每一步都留痕</b><span>不是多一套系統，是每件事有流程、有紀錄。</span></li>
+    <li><span class="k">誰在用</span><b>自管、代管、包租</b><span>一個帳號切換。房客端看到的是正確的房東名義。</span></li>
+    <li><span class="k">你可以</span><b>每天只看一眼</b><span>收租、續約、報修做成待辦，推到 LINE。</span></li>
+  </ul>
   <ol class="flow">
-    <li><b>招租</b><span>物件與帶看</span></li>
-    <li><b>簽約</b><span>電子簽名</span></li>
-    <li><b>收租</b><span>憑證與催繳</span></li>
-    <li><b>報修</b><span>進 TaskGo 工單</span></li>
-    <li><b>退租</b><span>結算再招租</span></li>
+    <li><b>招租</b><span>空房、刊登、帶看</span></li>
+    <li><b>簽約</b><span>租約與電子簽名</span></li>
+    <li><b>收租</b><span>憑證、審核、催繳</span></li>
+    <li><b>報修</b><span>四種決定，找師傅進 TaskGo</span></li>
+    <li><b>退租</b><span>點交、扣款、再招租</span></li>
   </ol>
+  <div class="then">
+    <div><b>以前</b><ul>
+      <li>Excel 加 LINE 群組，事情散在聊天室</li>
+      <li>自己找工班，來回傳照片和地址</li>
+      <li>手抄存摺，電費另外算</li>
+      <li>押金怎麼扣，事後說不清</li>
+    </ul></div>
+    <div><b>用了 Homigo</b><ul>
+      <li>招租到退租留在同一條，打開 LINE 就看得到</li>
+      <li>找師傅就進 TaskGo，進度與照片同步</li>
+      <li>憑證上傳、房東核可，逾期可催繳</li>
+      <li>點交、逐項扣款、房客確認後才結案</li>
+    </ul></div>
+  </div>
+  <p class="who" style="margin-top:auto">下一頁是 LINE 裡的實際畫面，以及報修的四種決定。</p>
+</main>
+<main class="sheet">
+  <div class="kicker">HOMIGO · 系統長這樣</div>
+  <h2>打開 LINE 就看得到，不用再翻聊天室。</h2>
+  <div class="phones">
+    <figure>
+      <img src="img/homigo-home.jpg" alt="房東首頁的本月收租與待辦">
+      <figcaption><b>房東首頁</b>　本月應收、已收、未收。租金、報修、租約待辦在同一頁。自管、代管、包租可切換。</figcaption>
+    </figure>
+    <figure>
+      <img src="img/homigo-rent.jpg" alt="房客繳租與月份燈號">
+      <figcaption><b>房客繳租</b>　月份燈號分已繳、待繳、逾期。上傳憑證前可先抄電表。</figcaption>
+    </figure>
+    <figure>
+      <img src="img/homigo-repair.jpg" alt="房客新增報修">
+      <figcaption><b>房客報修</b>　選設備、寫問題、上傳照片。房東收到後再決定怎麼處理。</figcaption>
+    </figure>
+  </div>
+  <section class="roles four">
+    <article><div class="k">幫我找師傅</div><h3>進 TaskGo</h3><p>指定廠商，或公開詢價。案號、報價、施工照片回到這一張單。</p></article>
+    <article><div class="k">自己安排</div><h3>手動路徑</h3><p>有認識的師傅也寫在這張報修上，進度一樣留著。</p></article>
+    <article><div class="k">房客自修</div><h3>上傳發票</h3><p>授權房客處理。完工請款或折抵，雙方看得到。</p></article>
+    <article><div class="k">暫時不修</div><h3>決定也留痕</h3><p>先觀察或結案。不是沒回。</p></article>
+  </section>
   <ul class="points">
-    <li>收租、續約、報修做成每日待辦，自管、代管、包租可切換。</li>
-    <li>房客拍照報修。找師傅、自己處理、房客自修或暫緩，進度雙方看得到。</li>
-    <li>繳租審核、逾期催繳、水電表。銀行交易可與租金、電費匹配。</li>
-    <li>報修建立 TaskGo 案號，結案報告回到房東端。</li>
+    <li>繳租：房客上傳憑證，房東核可或退回。逾期可從收租總覽催繳。</li>
+    <li>退租：點交與照片、押金逐項、房客確認或提出異議，結案再招租。</li>
+    <li>指揮中心用 LINE 登入，收租審核、維修、招租帶看、退租中心、團隊成員。</li>
+    <li>姓名已遮。金額為畫面示例，實際以登入後的物件為準。</li>
   </ul>
   <footer class="foot">
-    <div class="offer">房東、包租代管，免費開始</div>
+    <div class="offer">房東、包租代管，免費開始，不綁信用卡</div>
     <div class="meta"><span><b>來信</b>　Service@inforcraft.com.tw</span><span><b>來電</b>　0972-395-117</span></div>
     <div class="url">完整展示　https://go-marketing-center.pages.dev/showcase/#homigo</div>
-    <div class="family">匠管　TaskGo 工作　·　Homigo 居住　·　Washgo 生活</div>
+    <div class="family">匠管　TaskGo 工作　·　Homigo 居住　·　Washgo 生活　·　本檔可直接轉傳</div>
   </footer>
 </main>
 </body>

@@ -1,7 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
-import type { Env } from '../../../_shared/env';
-import { getSql } from '../../../_shared/db';
-import { error, json } from '../../../_shared/response';
+import type { Env } from '../../_shared/env';
+import { getSql } from '../../_shared/db';
+import { error, json } from '../../_shared/response';
 
 const PRODUCTS = ['taskgo', 'homigo', 'washgo'] as const;
 type Product = (typeof PRODUCTS)[number];

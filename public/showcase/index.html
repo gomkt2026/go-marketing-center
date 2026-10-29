@@ -196,6 +196,11 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .offer{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;padding:16px 18px;border-radius:14px;background:var(--c);color:var(--paper)}
 .offer b{font-family:var(--f-display);font-weight:400;font-size:20px}
 .offer span{font-size:14px;opacity:.92}
+.share{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:14px;border:1.5px dashed var(--c);background:var(--tint)}
+.share b{font-family:var(--f-display);font-weight:400;font-size:18px;display:block}
+.share span{font-size:13px;color:var(--muted)}
+.share-actions{display:flex;gap:8px;flex-wrap:wrap}
+a.btn{text-decoration:none;display:inline-block}
 .homigo-pg .offer{color:#1B2440}
 
 /* how to read this book */
@@ -210,6 +215,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .jumps button:hover,.jumps button:focus-visible{border-color:var(--c);color:var(--c-ink)}
 .roles{display:grid;grid-template-columns:1fr;gap:10px}
 @media (min-width:640px){.roles{grid-template-columns:repeat(3,1fr)}}
+@media (min-width:640px){.roles.four{grid-template-columns:1fr 1fr}}
 .roles li{padding:14px;border-radius:12px;border:1.5px solid var(--line);display:flex;flex-direction:column;gap:6px;min-width:0}
 .roles .k{font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;color:var(--c-ink)}
 .roles b{font-family:var(--f-display);font-weight:400;font-size:18px}
@@ -296,7 +302,7 @@ html,body{margin:0}
     <div class="trio">
       <button type="button" data-go="taskgo" style="--c:var(--taskgo);--c-ink:var(--taskgo-ink)"><span class="pl"><img src="i/logo-taskgo.webp" alt="TaskGo 標誌"></span><b>TaskGo</b><small>解決紀錄被群組洗掉。你可以派工、回報、請款。</small></button>
       <button type="button" data-go="homigo" style="--c:var(--homigo);--c-ink:var(--homigo-ink)"><span class="pl"><img src="i/logo-homigo.webp" alt="Homigo 標誌"></span><b>Homigo</b><small>解決租屋靠翻聊天室。你可以收租、報修、退租。</small></button>
-      <button type="button" data-go="washgo" style="--c:var(--washgo);--c-ink:var(--washgo-ink)"><span class="pl"><img src="i/mark-washgo.webp" alt="Washgo 標誌"></span><b>Washgo</b><small>解決送洗靠打電話。你可以下單、看進度、收送。</small></button>
+      <button type="button" data-go="washgo" style="--c:var(--washgo);--c-ink:var(--washgo-ink)"><span class="pl"><img src="i/mark-washgo.webp" alt="Washgo 標誌"></span><b>Washgo</b><small>解決打電話、紙本、派車。你可以下單、看進度、收送、儲值。</small></button>
     </div>
     <ol class="beats">
       <li><span class="k">01</span><b>做哪幾套</b><span>TaskGo 管工作，Homigo 管居住，Washgo 管生活。</span></li>
@@ -341,7 +347,15 @@ html,body{margin:0}
     <button type="button" data-jump="tg-solve">先看問題</button>
     <button type="button" data-jump="tg-do">客戶可以做</button>
     <button type="button" data-jump="tg-see">看系統與短片</button>
+    <button type="button" data-jump="tg-edm">下載 EDM</button>
   </nav>
+  <div class="share jump-target" id="tg-edm">
+    <div><b>一頁 EDM</b><span>PDF 可下載，連結可轉傳給需要的人。</span></div>
+    <div class="share-actions">
+      <a class="btn" href="edm/taskgo.pdf" download="TaskGo-服務簡介.pdf">下載 PDF</a>
+      <button type="button" class="btn ghost" data-share="https://go-marketing-center.pages.dev/showcase/edm/taskgo.pdf">複製連結</button>
+    </div>
+  </div>
   <section class="sec jump-target" id="tg-solve">
     <div class="label">你是不是也這樣</div>
     <div class="pain">
@@ -411,7 +425,15 @@ html,body{margin:0}
     <button type="button" data-jump="hm-life">房子怎麼走</button>
     <button type="button" data-jump="hm-do">客戶可以做</button>
     <button type="button" data-jump="hm-link">報修怎麼變工單</button>
+    <button type="button" data-jump="hm-edm">下載 EDM</button>
   </nav>
+  <div class="share jump-target" id="hm-edm">
+    <div><b>一頁 EDM</b><span>PDF 可下載，連結可轉傳給需要的人。</span></div>
+    <div class="share-actions">
+      <a class="btn" href="edm/homigo.pdf" download="Homigo-服務簡介.pdf">下載 PDF</a>
+      <button type="button" class="btn ghost" data-share="https://go-marketing-center.pages.dev/showcase/edm/homigo.pdf">複製連結</button>
+    </div>
+  </div>
   <section class="sec jump-target" id="hm-life">
     <div class="label">一棟房子的一生</div>
     <div class="life"><span>招租</span><i>→</i><span>簽約</span><i>→</i><span>入住點交</span><i>→</i><span>收租</span><i>→</i><span>報修</span><i>→</i><span>退租</span><i>→</i><span>再招租</span></div>
@@ -468,42 +490,75 @@ html,body{margin:0}
 </template>
 
 <template id="pg-washgo">
-  <div class="opener"><div><span class="eyebrow">第三章 · Washgo 洗衣與收送</span><h2>衣物送洗，<mark>交給 Washgo</mark></h2><p class="who">洗滌產業的智慧管理平台。消費者用 LINE 送洗，品牌用同一套後台經營。店名與會員仍然是你的。</p></div><div class="logo"><img src="i/mark-washgo.webp" alt="Washgo 標誌"></div></div>
+  <div class="opener"><div><span class="eyebrow">第三章 · Washgo 洗衣與收送</span><h2>衣物送洗，<mark>交給 Washgo</mark></h2><p class="who">洗滌產業的智慧管理平台。客人用 LINE 送洗，不必另裝 App。門市、司機、品牌用同一套後台。店名、價目、會員仍然是你的。</p></div><div class="logo"><img src="i/mark-washgo.webp" alt="Washgo 標誌"></div></div>
   <ol class="beats">
-    <li><span class="k">解決</span><b>送洗靠打電話</b><span>客人問洗好了沒，門市用本子記，司機路線在群組裡。</span></li>
-    <li><span class="k">誰在用</span><b>客人、門市、司機</b><span>客人走 LINE，門市與司機走同一套後台。</span></li>
-    <li><span class="k">你可以</span><b>從收件到送回</b><span>先報價再洗，進度推播，取件與送返都有簽名。</span></li>
+    <li><span class="k">解決</span><b>打電話、紙本、派車</b><span>客人問洗好了沒，收件寫在單據上，司機早上還在群組要地址。</span></li>
+    <li><span class="k">誰在用</span><b>客人、門市、司機、品牌</b><span>客人走 LINE，門市與品牌看後台，司機收的是今日任務。</span></li>
+    <li><span class="k">你可以</span><b>一張單走完</b><span>下單、報價簽名、品管、收送、點數，都留在同一筆訂單。</span></li>
   </ol>
   <nav class="jumps" aria-label="這一章">
-    <button type="button" data-jump="wg-do">客戶可以做</button>
-    <button type="button" data-jump="wg-see">看現場與影片</button>
+    <button type="button" data-jump="wg-solve">三個斷點</button>
+    <button type="button" data-jump="wg-do">誰能做什麼</button>
+    <button type="button" data-jump="wg-flow">衣服怎麼走</button>
+    <button type="button" data-jump="wg-see">系統短片</button>
+    <button type="button" data-jump="wg-edm">下載 EDM</button>
   </nav>
+  <div class="share jump-target" id="wg-edm">
+    <div><b>一頁 EDM</b><span>PDF 可下載，連結可轉傳給需要的人。</span></div>
+    <div class="share-actions">
+      <a class="btn" href="edm/washgo.pdf" download="Washgo-服務簡介.pdf">下載 PDF</a>
+      <button type="button" class="btn ghost" data-share="https://go-marketing-center.pages.dev/showcase/edm/washgo.pdf">複製連結</button>
+    </div>
+  </div>
+  <section class="sec jump-target" id="wg-solve">
+    <div class="label">傳統門市先卡住的三件事</div>
+    <ol class="steps">
+      <li><span class="k">01</span><b>客人問進度</b><p>靠人工回 LINE。洗好了沒要翻單，訊息一多，客訴就跟著來。</p></li>
+      <li><span class="k">02</span><b>收送對不上</b><p>紙本容易丟。司機問今天去哪，送到了客人又說沒收到。</p></li>
+      <li><span class="k">03</span><b>儲值對不起來</b><p>剩多少寫在本子上。扣了幾次，跟熟客一對就吵。</p></li>
+    </ol>
+  </section>
   <section class="sec jump-target" id="wg-do">
-    <div class="label">客戶可以做的事</div>
-    <ul class="roles">
-      <li><span class="k">送洗的客人</span><b>下單、同意、追進度</b><p>到府收送或門市送洗、清點後確認報價才洗、看訂單走到哪、用點數儲值。</p></li>
-      <li><span class="k">門市</span><b>收件到待取一件事</b><p>開班看待辦、收件報價、品管與重洗、回貨待取、幫客人處理點數。</p></li>
-      <li><span class="k">司機</span><b>今天的路看得懂</b><p>看今日任務、到府取件、配送送回。路線、電子簽名、運費結算在同一張任務。</p></li>
+    <div class="label">四種人，各做各的</div>
+    <ul class="roles four">
+      <li><span class="k">送洗的客人</span><b>LINE 就能送洗</b><p>加入官方帳號後，選到府收送或自行到店。報價在手機簽名，追蹤看洗到哪，點數不用翻本子。</p></li>
+      <li><span class="k">門市</span><b>開班就知道先做哪件</b><p>待辦、收件五步驟、逐件報價、品管對照照片、回貨待取、櫃檯加點，卡在哪裡看得到。</p></li>
+      <li><span class="k">司機</span><b>今天的路不用再問</b><p>派遣清單排好就推到 LINE。到府取件、配送送回，地址與件數出發前看得到，兩端都簽名。</p></li>
+      <li><span class="k">品牌</span><b>店還是你的店</b><p>多門市看同一套總覽。價目、會員、加值報表各自獨立，不跟其他品牌合併。</p></li>
     </ul>
   </section>
   <section class="sec">
-    <div class="label">兩邊都照顧到</div>
+    <div class="label">同一件事，以前和現在</div>
     <div class="cols">
-      <div><h3 style="font-size:19px;margin-bottom:6px">給送洗的客人</h3><ul class="kv">
-        <li><b>三種方式</b><span>到府收送、門市送洗、門市自取</span></li>
-        <li><b>先講價格</b><span>清點後線上報價，同意了才開始洗</span></li>
-        <li><b>看得到衣服</b><span>25 個以上節點，狀態推播到 LINE</span></li>
-        <li><b>洗壞有紀錄</b><span>逐件品管，取件與送返都有電子簽名</span></li>
-        <li><b>點數帶得走</b><span>GoCoin，1 點 = NT$1，永久不過期</span></li></ul></div>
-      <div><h3 style="font-size:19px;margin-bottom:6px">給品牌、門市、司機</h3><ul class="kv">
-        <li><b>一套後台</b><span>訂單、物流、客戶、價目、活動、帳務</span></li>
-        <li><b>多門市</b><span>門市與洗滌中心之間的調撥看得到</span></li>
-        <li><b>品牌獨立</b><span>店名、價目、會員資料不跟其他品牌合併</span></li>
-        <li><b>司機任務</b><span>路線、電子簽名、運費結算</span></li>
-        <li><b>現場工具</b><span>門市收件、掃碼品管、重洗輪次</span></li></ul></div>
+      <div><h3 style="font-size:19px;margin-bottom:6px">以前</h3><ul class="kv">
+        <li><b>紀錄</b><span>手寫收件單，幾件、材質、污漬事後說不清</span></li>
+        <li><b>進度</b><span>電話和 LINE 來回問，店員翻單翻半天</span></li>
+        <li><b>派車</b><span>地址在群組裡再傳一次，送回容易漏</span></li>
+        <li><b>會員</b><span>儲值寫本子，餘額對不起來</span></li></ul></div>
+      <div><h3 style="font-size:19px;margin-bottom:6px">用了 Washgo</h3><ul class="kv">
+        <li><b>紀錄</b><span>收貨覆核、逐件報價、簽名確認，才開始洗</span></li>
+        <li><b>進度</b><span>進度條與追蹤連結推給客人，自己看</span></li>
+        <li><b>派車</b><span>排好行程通知司機，運送可訂閱日曆</span></li>
+        <li><b>會員</b><span>GoCoin，1 點 = NT$1。LINE 或櫃檯儲值，報表對帳</span></li></ul></div>
     </div>
   </section>
+  <section class="sec jump-target" id="wg-flow">
+    <div class="label">一件衣服怎麼走完</div>
+    <ol class="flow">
+      <li><span class="dot">1</span><b>LINE 下單</b><span>到府收送或自行到店，不用裝 App</span></li>
+      <li><span class="dot">2</span><b>收件報價</b><span>查會員、拆袋覆核、逐件列價</span></li>
+      <li><span class="dot">3</span><b>簽名才洗</b><span>客人確認後才開洗</span></li>
+      <li><span class="dot">4</span><b>品管</b><span>對照送洗照片，不乾淨就重洗</span></li>
+      <li><span class="dot">5</span><b>自己看</b><span>追蹤連結推到 LINE</span></li>
+      <li><span class="dot">6</span><b>取回</b><span>待自取或司機送回，點數一起結</span></li>
+    </ol>
+  </section>
   <section class="sec jump-target" id="wg-see">
+    <div class="label">系統短片 · 點一下播放</div>
+    <div class="reels" data-reels="washgo"></div>
+    <p class="note">直式短片，可左右滑動。畫面中的客人姓名與金額為示範資料。</p>
+  </section>
+  <section class="sec">
     <div class="label">已經在現場</div>
     <h3>先在真實門市跑通，再開放品牌加入</h3>
     <figure class="photo"><img src="i/washgo-field.jpg" alt="Washgo 在洗楽門市的收件、品管、司機任務畫面" loading="lazy"><figcaption>經濟日報 2026/09/16 報導配圖（匠管／提供）</figcaption></figure>
@@ -515,7 +570,7 @@ html,body{margin:0}
     </ul>
   </section>
   <section class="sec">
-    <div class="label">流程影片 · TaskGo 報修轉送洗</div>
+    <div class="label">和 TaskGo 怎麼接 · 修繕轉送洗</div>
     <div data-wide="washlink"></div>
   </section>
   <section class="sec">
@@ -557,8 +612,16 @@ html,body{margin:0}
   <ul class="who-list">
     <li style="--c-ink:var(--taskgo-ink)"><span><span class="k">工程行、工班、統包</span><br><b>TaskGo</b></span><span>派工、現場照片、報價簽名、請款。師傅用 LINE。現在可免費試用 14 天。</span></li>
     <li style="--c-ink:var(--homigo-ink)"><span><span class="k">房東、包租代管</span><br><b>Homigo</b></span><span>招租到退租、收租、報修。與達觀共同推動，免費開始。</span></li>
-    <li style="--c-ink:var(--washgo-ink)"><span><span class="k">洗衣、乾洗品牌</span><br><b>Washgo</b></span><span>LINE 送洗、門市、品管、收送。品牌與會員保持獨立。</span></li>
+    <li style="--c-ink:var(--washgo-ink)"><span><span class="k">洗衣、乾洗品牌</span><br><b>Washgo</b></span><span>LINE 送洗、報價簽名、品管、收送、點數。品牌與會員保持獨立。</span></li>
   </ul>
+  <section class="sec">
+    <div class="label">一頁 EDM，可轉傳</div>
+    <div class="share-actions">
+      <a class="btn" href="edm/taskgo.pdf" download="TaskGo-服務簡介.pdf">TaskGo PDF</a>
+      <a class="btn" href="edm/homigo.pdf" download="Homigo-服務簡介.pdf">Homigo PDF</a>
+      <a class="btn" href="edm/washgo.pdf" download="Washgo-服務簡介.pdf">Washgo PDF</a>
+    </div>
+  </section>
   <div class="close"><h2>一個場景先做好，<br>再把下一個接上。</h2></div>
   <div class="contact">
     <span class="eyebrow">聯絡匠管</span>
@@ -574,7 +637,7 @@ const PAGES=[
   {id:"method",tpl:"pg-method",short:"方法",title:"三個產業，同一套進入方式",sub:"人願意用 → 事情留得住 → AI 才有依據",c:"brand"},
   {id:"taskgo",tpl:"pg-taskgo",short:"TaskGo",title:"TaskGo 修繕與工程",sub:"解決群組洗掉紀錄。後勤、師傅、業主各自能做的事",c:"taskgo"},
   {id:"homigo",tpl:"pg-homigo",short:"Homigo",title:"Homigo 租屋與居住",sub:"解決租屋靠翻聊天室。房東、房客、代管能做的事",c:"homigo"},
-  {id:"washgo",tpl:"pg-washgo",short:"Washgo",title:"Washgo 洗衣與收送",sub:"解決送洗靠打電話。客人、門市、司機能做的事",c:"washgo"},
+  {id:"washgo",tpl:"pg-washgo",short:"Washgo",title:"Washgo 洗衣與收送",sub:"解決打電話、紙本、派車。客人、門市、司機、品牌能做的事",c:"washgo"},
   {id:"link",tpl:"pg-link",short:"串接",title:"三個系統怎麼接起來",sub:"現在在跑的，和下一步",c:"brand"},
   {id:"contact",tpl:"pg-contact",short:"找誰",title:"找誰、怎麼聯絡",sub:"對上你的現場",c:"brand"}
 ];
@@ -585,6 +648,14 @@ const VIDEOS={
     {f:"field",t:"現場管理",d:"0:44",p:"人在工地用手機，調出照片、進度、簽名、請款。"},
     {f:"map",t:"專案地圖",d:"0:38",p:"案場釘在地圖上，點開看照片與維修車動態。"},
     {f:"money",t:"收款與毛利",d:"1:15",p:"收款提醒、發票明細、修繕單毛利，一看就知道。"}
+  ],
+  washgo:[
+    {f:"ops-center-shift",t:"開班待辦",d:"1:03",p:"一開門先看總覽：待處理幾件、卡在哪，待接單、洗滌中、配送中分開做。",src:"/shorts/washgo/ops-center-shift.mp4",poster:"/shorts/washgo/ops-center-shift.jpg"},
+    {f:"intake-quote-sign",t:"收件報價",d:"1:04",p:"查會員、收貨覆核、逐件報價。客人簽名確認了才開洗。",src:"/shorts/washgo/intake-quote-sign.mp4",poster:"/shorts/washgo/intake-quote-sign.jpg"},
+    {f:"order-tracking",t:"訂單進度",d:"1:08",p:"姓名、電話、訂單號一查就到。進度條與追蹤連結推給客人自己看。",src:"/shorts/washgo/order-tracking.mp4",poster:"/shorts/washgo/order-tracking.jpg"},
+    {f:"qc-rewash",t:"品管重洗",d:"0:55",p:"對照收件照片逐件看。通過或需重洗，貼紙碼找得到那一件。",src:"/shorts/washgo/qc-rewash.mp4",poster:"/shorts/washgo/qc-rewash.jpg"},
+    {f:"driver-tasks",t:"司機任務",d:"1:06",p:"派遣清單排行程並通知司機。回貨覆核、待送回分開，行程可訂閱日曆。",src:"/shorts/washgo/driver-tasks.mp4",poster:"/shorts/washgo/driver-tasks.jpg"},
+    {f:"points-topup",t:"點數儲值",d:"1:04",p:"方案先設好、贈點自動算。LINE 儲值或櫃檯加點，加值報表一張對清楚。",src:"/shorts/washgo/points-topup.mp4",poster:"/shorts/washgo/points-topup.jpg"}
   ],
   washlink:{f:"washlink",t:"修繕轉送洗",d:"1:57",p:"TaskGo 報修單一步步轉進 Washgo：選門市自取或司機送回，這一單九五折，轉介由系統入帳。"}
 };
@@ -619,13 +690,23 @@ function render(dir){
   if(toc) PAGES.forEach((q,i)=>{ if(i===0)return; toc.append(el("li",{tabindex:"0",role:"link",onclick:()=>go(i),onkeydown:e=>{if(e.key==="Enter")go(i);}},[el("span",{class:"n",text:pad(i+1)}),el("span",{},[el("b",{text:q.title}),el("small",{text:q.sub})]),el("span",{class:"pg",text:"p."+pad(i+1)})]));});
   page.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>go(PAGES.findIndex(q=>q.id===b.dataset.go))));
   page.querySelectorAll("[data-jump]").forEach(b=>b.addEventListener("click",()=>{const t=document.getElementById(b.dataset.jump); if(t) t.scrollIntoView({behavior:"smooth",block:"start"});}));
+  const clip=(v,kind)=>v[kind]||("v/"+v.f+(kind==="poster"?".jpg":".mp4"));
   page.querySelectorAll("[data-reels]").forEach(box=>VIDEOS[box.dataset.reels].forEach(v=>box.append(el("div",{class:"reel"},[
-    el("video",{controls:"",playsinline:"",preload:"none",poster:"v/"+v.f+".jpg",src:"v/"+v.f+".mp4","aria-label":v.t}),
+    el("video",{controls:"",playsinline:"",preload:"none",poster:clip(v,"poster"),src:clip(v,"src"),"aria-label":v.t}),
     el("div",{class:"vt"},[el("b",{text:v.t}),el("span",{text:v.d})]),el("p",{text:v.p})]))));
   page.querySelectorAll("[data-wide]").forEach(box=>{const v=VIDEOS[box.dataset.wide]; box.append(el("div",{class:"wide"},[
-    el("video",{controls:"",playsinline:"",preload:"none",poster:"v/"+v.f+".jpg",src:"v/"+v.f+".mp4","aria-label":v.t}),
+    el("video",{controls:"",playsinline:"",preload:"none",poster:clip(v,"poster"),src:clip(v,"src"),"aria-label":v.t}),
     el("div",{class:"vt"},[el("b",{text:v.t}),el("span",{text:v.d})]),el("p",{text:v.p})]));});
   page.querySelectorAll("video").forEach(v=>v.addEventListener("play",()=>page.querySelectorAll("video").forEach(o=>{if(o!==v)try{o.pause();}catch(e){}})));
+  page.querySelectorAll("[data-share]").forEach(b=>b.addEventListener("click",async()=>{const label=b.dataset.label||b.textContent; b.dataset.label=label;
+    const text=b.dataset.share; let ok=false;
+    try{await navigator.clipboard.writeText(text);ok=true;}catch(e){
+      const ta=document.createElement("textarea"); ta.value=text; ta.setAttribute("readonly","");
+      ta.style.position="fixed"; ta.style.left="-999px"; document.body.append(ta); ta.select();
+      try{ok=document.execCommand("copy");}catch(err){} ta.remove();
+    }
+    b.textContent=ok?"已複製連結":text;
+    setTimeout(()=>b.textContent=label,1600);}));
   page.querySelectorAll("[data-copy]").forEach(b=>b.addEventListener("click",async()=>{const t=$("#"+b.dataset.copy).textContent;
     try{await navigator.clipboard.writeText(t);b.textContent="已複製";}catch(e){const r=document.createRange();r.selectNodeContents($("#"+b.dataset.copy));const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent="已選取";}
     setTimeout(()=>b.textContent="複製",1600);}));

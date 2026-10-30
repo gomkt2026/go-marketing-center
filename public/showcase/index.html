@@ -237,6 +237,12 @@ a.btn{text-decoration:none;display:inline-block}
 .roles .k{font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;color:var(--c-ink)}
 .roles b{font-family:var(--f-display);font-weight:400;font-size:18px}
 .roles p{font-size:14px;color:var(--muted)}
+.lanes{display:grid;grid-template-columns:1fr;gap:10px}
+@media (min-width:640px){.lanes{grid-template-columns:repeat(3,1fr)}}
+.lanes li{padding:14px 16px;border-radius:12px;background:var(--soft);border-top:4px solid var(--c,var(--brand));display:flex;flex-direction:column;gap:4px;min-width:0}
+.lanes .k{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;color:var(--c-ink)}
+.lanes b{font-family:var(--f-display);font-weight:400;font-size:22px}
+.lanes p{font-size:14px;color:var(--muted);line-height:1.5}
 .press figure{margin:0;display:flex;flex-direction:column;gap:6px}
 .press figcaption{font-size:12px;color:var(--muted)}
 .press.stack{grid-template-columns:1fr}
@@ -315,7 +321,7 @@ html,body{margin:0}
   <div class="cover">
     <span class="eyebrow">匠管股份有限公司 Inforcraft · 整體服務展示書</span>
     <h1><span class="a">工作、</span><span class="b">居住、</span><span class="w">生活</span></h1>
-    <p class="lead">匠管做三套系統，都從 LINE 開始。這一本先回答三件事：做哪幾套、各解決什麼問題、客戶可以做哪些事。左右滑或按下一頁，一章看完再進下一章。</p>
+    <p class="lead">匠管做三套系統，都從 LINE 開始。先看各解決什麼、客戶可以做什麼，再看已經接上的 API，最後看這三個入口怎麼收成一個生態。左右滑或按下一頁，一章看完再進下一章。</p>
     <div class="trio">
       <button type="button" data-go="taskgo" style="--c:var(--taskgo);--c-ink:var(--taskgo-ink)"><span class="pl"><img src="i/logo-taskgo.webp" alt="TaskGo 標誌"></span><b>TaskGo</b><small>解決紀錄被群組洗掉。你可以派工、回報、請款。</small></button>
       <button type="button" data-go="homigo" style="--c:var(--homigo);--c-ink:var(--homigo-ink)"><span class="pl"><img src="i/logo-homigo.webp" alt="Homigo 標誌"></span><b>Homigo</b><small>解決租屋靠翻聊天室。你可以收租、報修、退租。</small></button>
@@ -662,7 +668,6 @@ html,body{margin:0}
     <button type="button" data-jump="lk-repair">報修進工單</button>
     <button type="button" data-jump="lk-wash">修繕轉送洗</button>
     <button type="button" data-jump="lk-play">匠城呈現</button>
-    <button type="button" data-jump="lk-next">下一步</button>
   </nav>
   <section class="sec jump-target" id="lk-repair">
     <div class="label">報修進工單 · Homigo × TaskGo</div>
@@ -711,15 +716,53 @@ html,body{margin:0}
     <div class="catalog" data-reels="linkPlay"></div>
     <figure class="photo"><img src="i/jiangcheng.jpg" alt="匠城出任務遊戲宣傳圖" loading="lazy"><figcaption>匠城出任務是另外一款小遊戲：騎車接報修、送鑰匙、收衣服，90 秒一局。上面的匠城呈現用的是同一座城，給的是這一筆案子的結案，不是叫人來玩。</figcaption></figure>
   </section>
-  <section class="sec jump-target" id="lk-next">
-    <div class="label">公開說過、逐步在做</div>
+  <div class="share">
+    <div><b>這三條已經接上</b><span>下一章看匠管怎麼把工作、居住、生活收成一個生態，以及還會接上的服務。</span></div>
+    <button type="button" class="btn" data-go="eco">下一章 · 生態</button>
+  </div>
+</template>
+
+<template id="pg-eco">
+  <div class="opener"><div><span class="eyebrow">第五章 · 生態</span><h2>三個原本各做各的現場，<mark>收成一個生態</mark></h2><p class="who">工地、租屋、洗衣店本來不相干。匠管先讓每一邊自己跑得起來，需要合作時才用 API 接上，再沿著這條路把服務變多。</p></div></div>
+  <ol class="steps">
+    <li><span class="k">01</span><b>各自做好</b><p>TaskGo 管工作，Homigo 管居住，Washgo 管生活。店名、工班、房東的做法留在自己的系統裡。</p></li>
+    <li><span class="k">02</span><b>API 接上</b><p>報修進工單、修繕轉送洗、匠城呈現。上一章是這三條的實際畫面。</p></li>
+    <li><span class="k">03</span><b>生態變大</b><p>同一個人的房子、修繕、洗衣可以接在一起。接下來再接更多居住與生活的服務。</p></li>
+  </ol>
+  <section class="sec" id="ec-three">
+    <div class="label">三個入口，仍然是三個系統</div>
+    <ul class="lanes">
+      <li style="--c:var(--taskgo);--c-ink:var(--taskgo-ink)"><span class="k">工作</span><b>TaskGo</b><p>工程行、工班把派工、照片、簽名、請款留在同一張單。師傅用 LINE。</p></li>
+      <li style="--c:var(--homigo);--c-ink:var(--homigo-ink)"><span class="k">居住</span><b>Homigo</b><p>房東、房客、代管把招租、收租、報修、退租收回 LINE。與達觀共同推動。</p></li>
+      <li style="--c:var(--washgo);--c-ink:var(--washgo-ink)"><span class="k">生活</span><b>Washgo</b><p>洗衣品牌用 LINE 收送、報價、品管。店名、價目、會員仍然是品牌自己的。</p></li>
+    </ul>
+    <p class="note">不為了合成一個品牌，去改業者原本的店名與做法。合作發生時才串接。</p>
+  </section>
+  <section class="sec">
+    <div class="label">已經用 API 接上的三條</div>
+    <h3>上一章是畫面，這一章是這三條為什麼算同一個生態</h3>
     <ul class="adv">
-      <li><b>住宅服務</b><p>串聯裝修、維修、清潔，以及保險與金融夥伴。</p></li>
-      <li><b>API 互聯</b><p>業者保持自己的品牌與做法，需要合作時才把服務接上。</p></li>
-      <li><b>AI 進流程</b><p>報修分類、智慧客服、行政流程。前提是現場先有資料。</p></li>
+      <li style="--c-ink:var(--homigo-ink)"><b>住的人找得到工班</b><p>房客在 Homigo 拍照報修，房東決定找師傅後，TaskGo 產生案號。進度與結案回到房東端。</p></li>
+      <li style="--c-ink:var(--washgo-ink)"><b>修繕可以轉去送洗</b><p>TaskGo 報修單點洗滌服務，進 Washgo。門市自取或司機送回，這一單九五折，轉介入帳。</p></li>
+      <li style="--c-ink:var(--taskgo-ink)"><b>客人用同一套方式看懂</b><p>TaskGo 結案、Washgo 洗滌進度，都用匠城把工序演一遍。書面報告還在，動畫是給人看的那一層。</p></li>
+    </ul>
+    <div class="share">
+      <div><b>要看系統畫面</b><span>報修工單、轉送洗、匠城呈現都在上一章。</span></div>
+      <button type="button" class="btn" data-go="link">回上一章</button>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="label">匠管要走到的地方</div>
+    <h3>入口先站穩，服務再往外接</h3>
+    <p class="lead">TaskGo、Homigo、Washgo 是進入工地、租屋、洗衣這三個產業的入口。每一個先解決一個真實問題。接得起來的先接。還沒做完的，標成逐步在做。</p>
+    <ul class="adv">
+      <li><b>住宅服務</b><p>Homigo 的報導寫過下一步：串聯裝修、維修、清潔，以及保險與金融夥伴。方向已公開，逐步在做。</p></li>
+      <li><b>更多 API</b><p>業者保持自己的品牌與做法。需要合作時才把服務接上，店名維持業者自己的。</p></li>
+      <li><b>AI 進流程</b><p>報修分類、智慧客服、行政流程。用的是現場先留下的資料。</p></li>
     </ul>
     <div class="quote"><p>「Taskgo、Homigo、Washgo 是我們進入產業的入口。每一個產品先解決一個真實問題，再慢慢把不同場景串起來。」</p><cite>匠管執行長 陳炳寬｜經濟日報</cite></div>
   </section>
+  <div class="close"><h2>一個場景先做好，<br>再把下一個接上。</h2></div>
 </template>
 
 <template id="pg-contact">
@@ -754,6 +797,7 @@ const PAGES=[
   {id:"homigo",tpl:"pg-homigo",short:"Homigo",title:"Homigo 租屋與居住",sub:"解決記帳、對帳、報修沒下文、退租爭議",c:"homigo"},
   {id:"washgo",tpl:"pg-washgo",short:"Washgo",title:"Washgo 洗衣與收送",sub:"解決打電話、紙本、派車。客人、門市、司機、品牌能做的事",c:"washgo"},
   {id:"link",tpl:"pg-link",short:"串接",title:"三個系統怎麼接起來",sub:"報修工單、轉送洗、匠城呈現，各有畫面",c:"brand"},
+  {id:"eco",tpl:"pg-eco",short:"生態",title:"三個系統收成一個生態",sub:"先各自做好，再用 API 接上，接著把服務變多",c:"brand"},
   {id:"contact",tpl:"pg-contact",short:"找誰",title:"找誰、怎麼聯絡",sub:"對上你的現場",c:"brand"}
 ];
 const VIDEOS={

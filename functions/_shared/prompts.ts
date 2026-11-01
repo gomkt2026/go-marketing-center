@@ -1565,6 +1565,7 @@ export function buildOfftopicUserPrompt(usedTopics: string[], brandSlug?: string
 // 舊的高瀏覽是工序清單、婆媳、洗好了沒，會被說是假文，不走回去。
 // 10/22 起：前兩行要有畫面，最後一行問做過的人遇過哪一種。
 // 10/24 起觀察三天：不再自己貼 2/2。七天內寫過的場面不要再寫。
+// 10/27：Homigo 六個時段連續重發「離職、房東訊息就來了」。重寫後仍中招就整檔不發。
 // 正文不放 hashtag、不放連結。主題標籤一篇一個。
 // ============================================================================
 
@@ -1572,7 +1573,10 @@ export type TrafficFormulaId = 'hook' | 'joke';
 
 const TRAFFIC_HOURS = [9, 12, 18, 21];
 
-/** 災難、政治、喪聞、性騷擾不拿來博流量。 */
+/** 災難、政治、喪聞、性騷擾不拿來博流量。
+ *  11/28 投票日的街頭後勤（宣傳車佔路、工班排班、活動衫送洗、社區文宣）另外手排，
+ *  不進這條爬蟲。那些稿不點名政黨、候選人，也不寫該投給誰。
+ */
 const TREND_BLOCK = /死亡|命案|戰爭|暴動|選舉|罷免|自殺|色情|未成年|殺害|兇殺|空難|喪禮|告別式|梗塞|騷擾|狼爪|性侵|還債/;
 /** 純賽事、純債市放最後，有生活題材就不要三個帳號一起寫。 */
 const TREND_DEFER = /股價|美債|殖利率|比特幣|升息|英超|法甲|冠軍|比分|中職|金馬/;
@@ -1598,6 +1602,12 @@ const JOKE_SEEDS: Record<string, string[]> = {
     '薪水入帳的同一天，房租把它認領走',
     '退租照片傳出去，對方回這也叫清潔',
     '合約寫近捷運，近的是你願意走的那段',
+    '水費說含在房租裡，帳單自己長出一頁',
+    '看房說有管理員，管理員是一張桌子和一支電話',
+    '續約簡訊比房租先到，漲幅寫在下一行',
+    '押金扣在窗台那層灰，灰比房租還有意見',
+    '網路寫有，有的是隔壁那戶的名稱',
+    '合約寫可短期，短期是房東想收回的那天',
   ],
   washgo: [
     '羽絨被洗完，比客人先把門口佔滿',
@@ -1670,6 +1680,9 @@ export function trendAnchor(title: string): string {
 export function trafficStaleIssue(slug: string, body: string): string | null {
   if (/婆媳|婆婆|媳婦/.test(body)) return '又寫回婆媳';
   if (slug === 'washgo' && /洗好了沒/.test(body)) return '又寫回客人問洗好了沒';
+  if (slug === 'homigo' && /離職|房東訊息|吃泡麵|冷氣室外機|近捷運|這也叫清潔|薪水入帳|間隔十五天/.test(body)) {
+    return '又寫回已經發過的租屋場面';
+  }
   if (slug === 'taskgo' && taskgoLectureIssue(body)) return taskgoLectureIssue(body);
   return null;
 }
@@ -1700,7 +1713,7 @@ export function pickTrafficTopicTag(slug: string, body: string, requested?: stri
 
 const WORN_SCENES: Record<string, string[]> = {
   taskgo: ['風向變了', '人到了沒', '鷹架上', '颱風假', '估價單', '排水孔', '開關換', '這面牆', '含清潔', '材料明天'],
-  homigo: ['冷氣室外機', '薪水入帳', '近捷運', '這也叫清潔', '離職那天', '月底才發'],
+  homigo: ['冷氣室外機', '薪水入帳', '近捷運', '這也叫清潔', '離職那天', '月底才發', '房東訊息就來了', '吃泡麵', '間隔十五天'],
   washgo: ['洗標', '能不能進水', '梅雨', '廚師服', '補習班', '便當店', '羽絨被', '店門口', '不能縮', '老車站'],
 };
 
@@ -1781,7 +1794,8 @@ export function taskgoLectureIssue(body: string): string | null {
 
 export const TRAFFIC_SYSTEM_PROMPT =
   '你是會在 Threads 上講租屋生活的台灣人，不是任何品牌的小編。' +
-  '這篇可以寫房租、搬家、退租、看房、押金、一個人還在租。近稿寫過的開頭不要再寫。' +
+  '這篇只寫一件還沒寫過的租屋小事：水電、管理員、續約漲租、押金、網路、看房話術。' +
+  '近稿若已寫過離職發薪、房東催租、冷氣室外機、近捷運、這也叫清潔，這篇禁止再寫。' +
   '不要寫婆媳、婆婆、媳婦，不要寫家庭對罵，不要站隊罵房東或房客。' +
   '不要寫成廣告、新聞稿。一個具體場面，一句讓人想轉的話。' +
   '禁止品牌名、產品、系統、App、連結、hashtag、促銷。' +
@@ -1869,7 +1883,7 @@ export function composeTrafficPrompt(opts: {
         theme ? `若「${theme}」能變成笑點就用，接不上就不要提。` : '',
         opts.brandSlug === 'taskgo' ? '笑點是工地習慣：改圖、順便、材料改期、範圍對不攏。不要寫成新聞，不要寫送醫、急診、受傷。不要列工序，不要教訓業主。' : '',
         opts.brandSlug === 'washgo' ? '可以寫洗衣店、衣服、店門口。不要寫洗好了沒，不要教洗法。' : '',
-        opts.brandSlug === 'homigo' ? '可以寫離職、房租、搬家、一個人住。不要寫家庭對罵。' : '',
+        opts.brandSlug === 'homigo' ? '換一個這七天沒寫過的租屋小事。不要再寫離職發薪、房東催租、冷氣室外機、近捷運、這也叫清潔。不要寫家庭對罵。' : '',
       ]
     : taskgo
       ? [

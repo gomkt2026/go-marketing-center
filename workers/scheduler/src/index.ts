@@ -637,6 +637,13 @@ async function ensureDailyThemePublishJobs(env: Env, slugs: string[]): Promise<v
       console.log(`[catchup] ${row.slug} IG 仍無配圖,略過建單`);
       continue;
     }
+    if (row.platform === 'facebook' || row.platform === 'instagram') {
+      const account = await getMetaAccount(env, row.brand_id, row.platform);
+      if (!account?.autoPublish) {
+        console.log(`[catchup] ${row.slug}/${row.platform} 未開自動發布,不補每日主題單`);
+        continue;
+      }
+    }
     const slotAt = row.slot_at ?? new Date().toISOString();
     await sql`
       INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)

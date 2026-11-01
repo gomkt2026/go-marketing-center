@@ -802,12 +802,39 @@ export async function generateTrafficPost(
               ? '可以寫洗衣店和衣服。不要寫洗好了沒，不要列功能，不要提別的店，不要寫婆媳。禁止簡體、大陸用語。回傳同格式 JSON。'
               : taskgo
                 ? '寫一個現場判斷，或一則工地習慣的笑話。不要取名字，不要寫假對話，不要寫送醫、急診、受傷。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
-                : '可以寫離職、房租、搬家。不要寫婆媳、家庭對罵。不要站隊罵人。禁止簡體、大陸用語、「男生都」「女生都」。回傳同格式 JSON。'),
+                : '換成這七天沒寫過的租屋小事：水電、管理員、續約、押金、網路、看房話術。不要再寫離職發薪、房東催租、冷氣室外機、近捷運、這也叫清潔。不要寫婆媳、家庭對罵。禁止簡體、大陸用語、「男生都」「女生都」。回傳同格式 JSON。'),
         },
       ],
       temperature: 0.7,
     });
     post = finishTrafficPost(post, params.brandSlug);
+  }
+
+  if (params.brandSlug === 'homigo') {
+    const repeated = trafficStaleIssue(params.brandSlug, post.body)
+      || trafficSceneIssue(params.brandSlug, post.body, params.usedTopics)
+      || trafficEndingIssue(post.body);
+    if (repeated) {
+      post = await socialChatJson<GeneratedPost>(env, {
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+          { role: 'assistant', content: JSON.stringify(post) },
+          {
+            role: 'user',
+            content: `這篇還是不合格：${repeated}。換成水電、管理員、續約漲租、押金、網路或看房話術裡，這七天沒寫過的一件小事。` +
+              '禁止再寫離職、月底才發薪水、房東訊息就來了、吃泡麵、冷氣室外機、近捷運、這也叫清潔。' +
+              '至少三行。最後一行是做過的人才答得上來的問句。replyBody 留空字串。回傳同格式 JSON。',
+          },
+        ],
+        temperature: 0.4,
+      });
+      post = finishTrafficPost(post, params.brandSlug);
+      const still = trafficStaleIssue(params.brandSlug, post.body)
+        || trafficSceneIssue(params.brandSlug, post.body, params.usedTopics)
+        || trafficEndingIssue(post.body);
+      if (still) throw new Error(`Homigo 這一檔還在重發（${still}），先不發`);
+    }
   }
 
   const prediction = params.skipPrediction

@@ -1479,6 +1479,8 @@ export const api = {
 
 // -- 活動報名(公開端,無需登入) ----------------------------------------------
 export const publicApi = {
+  officeLive: () => request<import('@/pages/office/types').OfficeSnapshot>('/api/office/live'),
+
   event: (slug: string) =>
     request<{
       event: Pick<import('@/types').EventRecord, 'id' | 'slug' | 'title' | 'description' | 'location' | 'eventDate' | 'status' | 'formFields' | 'priceLabel' | 'lineAddFriendUrl' | 'edmImages'>;

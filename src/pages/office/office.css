@@ -198,7 +198,7 @@
   min-height: 0;
   display: grid;
   place-items: center;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .float-layer {
@@ -211,7 +211,7 @@
 .float-card {
   position: absolute;
   width: max-content;
-  max-width: 280px;
+  max-width: min(280px, calc(100% - 20px));
   padding: 8px 12px;
   border-radius: 14px;
   background: rgba(255, 250, 242, 0.97);
@@ -1362,14 +1362,27 @@
 }
 .advice button:disabled { opacity: 0.45; cursor: default; }
 
-.office-page.is-demo {
+.office-page.is-demo,
+.office-page.is-view {
   position: fixed;
   inset: 0;
   z-index: 80;
   margin: 0;
-  width: 100vw;
+  width: 100%;
   height: 100dvh;
   min-height: 0;
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  box-sizing: border-box;
+}
+
+.office-page.is-view .station,
+.office-page.is-view .walker,
+.office-page.is-view .scoreboard button {
+  pointer-events: none;
 }
 
 .office-page.is-meeting .wall { filter: brightness(0.78); }
@@ -1553,14 +1566,45 @@
   .office-page {
     margin: -16px;
     height: calc(100dvh - 56px);
+    min-height: 0;
+  }
+
+  .office-page.is-view {
+    margin: 0;
+    height: 100dvh;
   }
 
   .office-hud {
     flex-direction: column;
+    gap: 8px;
+  }
+
+  .office-title {
+    font-size: 18px;
   }
 
   .office-counts {
+    flex-wrap: nowrap;
     justify-content: flex-start;
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .office-counts > * {
+    flex: none;
+  }
+
+  .office-roster,
+  .talkbox {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    z-index: 30;
+    margin: 0;
+    max-height: min(46dvh, 360px);
+    overflow: auto;
   }
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { api, publicApi } from '@/lib/api';
 import { createOfficeAmbience, type DanceKind } from './office-audio';
 import { compactNumber, deskWork, liveAsk, nextBoard, officeMoment, officeReply, type Ask, type LiveReply } from './talk';
 import type { OfficeAgent, OfficeSnapshot, OfficeStatPeriod } from './types';
@@ -217,9 +217,10 @@ function FloatingTalk({
         const el = root.querySelector(`[data-who="${who}"]`) ?? root.querySelector(`[data-station="${who}"]`);
         const rect = el?.getBoundingClientRect();
         const rawX = rect ? rect.left + rect.width / 2 - host.left : host.width / 2;
-        const rawY = rect ? rect.top - host.top : 96;
-        const x = Math.min(host.width - 150, Math.max(150, rawX));
-        const y = Math.max(8, rawY);
+        const rawY = rect ? rect.top - host.top : 120;
+        const edge = Math.max(24, Math.min(150, host.width * 0.32));
+        const x = Math.min(host.width - edge, Math.max(edge, rawX));
+        const y = Math.max(host.width < 720 ? 108 : 28, rawY);
         return { ...note, x, y };
       });
       const mark = next.map((spot) => `${spot.id}:${Math.round(spot.x)}:${Math.round(spot.y)}`).join('|');
@@ -240,7 +241,7 @@ function FloatingTalk({
         <div
           key={spot.id}
           className="float-card"
-          style={{ left: spot.x, top: spot.y, transform: `translate(-50%, calc(-100% - ${8 + (index % 2) * 46}px))` }}
+          style={{ left: spot.x, top: spot.y, transform: `translate(-50%, calc(-100% - ${8 + (index % 2) * 36}px))` }}
         >
           <b>{spot.who}</b>
           <span>{spot.text}</span>
@@ -250,7 +251,7 @@ function FloatingTalk({
   );
 }
 
-export function Office() {
+export function Office({ view = false }: { view?: boolean }) {
   const [data, setData] = useState<OfficeSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -286,7 +287,7 @@ export function Office() {
     let stop = false;
     const load = async () => {
       try {
-        const next = await api.office();
+        const next = view ? await publicApi.officeLive() : await api.office();
         if (!stop) {
           setData(next);
           setError(null);
@@ -303,7 +304,7 @@ export function Office() {
       stop = true;
       window.clearInterval(timer);
     };
-  }, [tick]);
+  }, [tick, view]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -323,12 +324,10 @@ export function Office() {
     if (!el) return;
     const apply = () => {
       const rect = el.getBoundingClientRect();
-      const widthScale = rect.width / ROOM_W;
-      const heightScale = rect.height / ROOM_H;
-      const next = rect.width < 900
-        ? Math.min(1, Math.max(widthScale, heightScale))
-        : Math.min(widthScale, heightScale);
-      if (next > 0.2) setScale(next);
+      const widthScale = Math.max(0, rect.width - 16) / ROOM_W;
+      const heightScale = Math.max(0, rect.height - 16) / ROOM_H;
+      const next = Math.min(widthScale, heightScale);
+      if (next > 0.05) setScale((current) => (Math.abs(current - next) > 0.008 ? next : current));
     };
     apply();
     const observer = new ResizeObserver(apply);
@@ -604,18 +603,19 @@ export function Office() {
   }
 
   return (
-    <div ref={pageRef} className={`office-page${meeting ? ' is-meeting' : ''}${demo ? ' is-demo' : ''}`}>
+    <div ref={pageRef} className={`office-page${meeting ? ' is-meeting' : ''}${demo ? ' is-demo' : ''}${view ? ' is-view' : ''}`}>
       <header className="office-hud">
         <div className="office-title">
           Go 行銷辦公室
-          <small>{data?.quiet ? '凌晨這一班只留方向，八點才發' : '點一個人，直接問，他用手上的資料回答'}</small>
-          {data?.standup?.film_url ? (
+          <small>{view ? '展示畫面，只能看' : data?.quiet ? '凌晨這一班只留方向，八點才發' : '點一個人，直接問，他用手上的資料回答'}</small>
+          {!view && <a className="office-film" href="/watch/office" target="_blank" rel="noreferrer">手機展示連結</a>}
+          {data?.standup?.film_url && !view ? (
             <a className="office-film" href={data.standup.film_url} target="_blank" rel="noreferrer">看這一班的會議影片</a>
-          ) : data?.standup?.film_status === 'script' ? (
+          ) : data?.standup?.film_status === 'script' && !view ? (
             <span className="office-film">這一班的影片還在做，做好會放進三個品牌的素材庫</span>
           ) : null}
         </div>
-        <div className="office-counts">
+        {!view && <div className="office-counts">
           <span>閒置 {counts.idle}</span>
           <span>工作中 {counts.working}</span>
           <button
@@ -650,9 +650,9 @@ export function Office() {
           <button type="button" className={`office-switch${data?.autoPublish === false ? ' is-off' : ''}`} onClick={() => void toggle()} disabled={!data || switchBusy}>
             {data?.autoPublish === false ? '自動發文關著' : '自動發文開著'}
           </button>
-        </div>
+        </div>}
       </header>
-      {roster && (
+      {!view && roster && (
         <section className={`office-roster is-${roster}`} aria-label={roster === 'blocked' ? '卡住的人' : '完成的人'}>
           <header>
             <strong>{roster === 'blocked' ? '卡住的原因' : '完成的結果'}</strong>
@@ -667,7 +667,7 @@ export function Office() {
                 <span>{row.task}</span>
                 {(row.piece || row.excerpt) && <small>{row.piece}{row.excerpt ? ` ${row.excerpt}` : ''}</small>}
               </button>
-              {row.href && <Link to={row.href}>打開原稿</Link>}
+              {!view && row.href && <Link to={row.href}>打開原稿</Link>}
             </article>
           ))}
         </section>
@@ -706,7 +706,7 @@ export function Office() {
               <div className="period">
                 <strong>{periodLabel}</strong>
                 {(['1', '7', '28'] as const).map((value) => (
-                  <button key={value} type="button" className={period === value ? 'is-on' : ''} onClick={() => setPeriod(value)}>
+                  <button key={value} type="button" className={period === value ? 'is-on' : ''} disabled={view} onClick={() => { if (!view) setPeriod(value); }}>
                     {value === '1' ? '1天' : value === '7' ? '7天' : '28天'}
                   </button>
                 ))}
@@ -757,7 +757,7 @@ export function Office() {
                   aria-label={`${label}，${agent?.task ?? '等下一班晨會'}`}
                   onMouseEnter={() => showPeek(label)}
                   onMouseLeave={hidePeek}
-                  onClick={() => { if (!agent) return; setSpoken(null); setSelected(agent.id); }}
+                  onClick={() => { if (view || !agent) return; setSpoken(null); setSelected(agent.id); }}
                 >
                   <span className="tip">{agent?.task ?? '等下一班晨會'}</span>
                   <span className="who-space" />
@@ -786,7 +786,7 @@ export function Office() {
                   aria-label={label}
                   onMouseEnter={() => showPeek(label)}
                   onMouseLeave={hidePeek}
-                  onClick={() => { if (!agent) return; setSpoken(null); setSelected(agent.id); }}
+                  onClick={() => { if (view || !agent) return; setSpoken(null); setSelected(agent.id); }}
                 >
                   <span className="doll" style={{ ['--mat' as string]: station.mat }}>
                     <Face src={station.portrait} crop={station.crop} alt={label} tint={station.mat} />
@@ -807,7 +807,7 @@ export function Office() {
         <FloatingTalk rootRef={fitRef} notes={floatNotes} />
       </div>
 
-      {chosen && reply && (
+      {!view && chosen && reply && (
         <aside className="talkbox">
           <button type="button" className="office-close" onClick={() => setSelected(null)} aria-label="關閉">×</button>
           <img className="talk-face" src={STATIONS.find((station) => matchAgent([chosen], station))?.portrait ?? ''} alt="" />
@@ -842,4 +842,8 @@ export function Office() {
       )}
     </div>
   );
+}
+
+export function OfficeLive() {
+  return <Office view />;
 }

@@ -52,6 +52,7 @@
 }
 
 .office-counts span,
+.office-count,
 .office-switch,
 .office-music {
   border: 1px solid rgba(170, 230, 240, 0.28);
@@ -62,6 +63,7 @@
   color: #d7f4fb;
 }
 
+.office-count,
 .office-switch,
 .office-music {
   cursor: pointer;
@@ -69,6 +71,87 @@
   display: inline-flex;
   align-items: center;
 }
+
+.office-count.is-on {
+  color: #07141c;
+  background: #7ee0ff;
+  border-color: #7ee0ff;
+}
+
+.office-count.is-blocked {
+  color: #f0c7a2;
+  border-color: rgba(240, 170, 110, 0.55);
+}
+
+.office-count.is-blocked.is-on {
+  color: #2a1408;
+  background: #f0c7a2;
+}
+
+.office-roster {
+  margin: 0 18px 8px;
+  padding: 10px 12px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: 14px;
+  background: rgba(7, 22, 32, 0.94);
+  border: 1px solid rgba(126, 224, 255, 0.35);
+}
+
+.office-roster.is-blocked {
+  border-color: rgba(240, 170, 110, 0.55);
+}
+
+.office-roster header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.office-roster header strong { color: #f4fcff; font-size: 14px; }
+.office-roster header button {
+  border: 0;
+  background: transparent;
+  color: #9be7ff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.office-roster article {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-top: 1px solid rgba(170, 230, 240, 0.16);
+}
+
+.office-roster article button {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.office-roster article b { display: block; color: #7ee0ff; font-size: 14px; }
+.office-roster.is-blocked article b { color: #f0c7a2; }
+.office-roster article span,
+.office-roster article small {
+  display: block;
+  margin-top: 2px;
+  color: #e7f7fb;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.office-roster article small { color: #9ec4ce; }
+.office-roster article a { flex: none; color: #7ee0ff; font-size: 12px; padding-top: 2px; }
+.office-roster > p { margin: 0; color: #9ec4ce; font-size: 13px; }
 
 .office-switch:disabled { opacity: 0.6; cursor: wait; }
 
@@ -809,7 +892,8 @@
 .station.is-speaking .say { opacity: 1; bottom: calc(100% + 18px); }
 
 .station.is-picked .portrait,
-.station.is-speaking .portrait {
+.station.is-speaking .portrait,
+.station.is-roster .portrait {
   box-shadow: 0 0 0 3px #fff4c8, 0 0 0 6px var(--mat), 0 10px 16px rgba(0, 0, 0, 0.28);
 }
 

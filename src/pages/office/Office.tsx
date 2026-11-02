@@ -210,6 +210,7 @@ export function Office() {
   const [noteSaved, setNoteSaved] = useState('');
   const [spoken, setSpoken] = useState<LiveReply | null>(null);
   const [said, setSaid] = useState<{ agentId: string; line: string } | null>(null);
+  const [roster, setRoster] = useState<'done' | 'blocked' | null>(null);
   const fitRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const ambience = useRef<ReturnType<typeof createOfficeAmbience> | null>(null);
@@ -361,6 +362,25 @@ export function Office() {
     return { idle: Math.max(0, agents.length - working - done - blocked), working, done, blocked };
   }, [data]);
 
+  const rosterRows = useMemo(() => {
+    if (!roster || !data) return [];
+    return STATIONS.flatMap((station) => {
+      const agent = matchAgent(data.agents, station);
+      if (!agent || agent.status !== roster) return [];
+      const task = agent.task?.trim() || (roster === 'blocked' ? '卡住了，原因沒寫下來' : '完成了，結果沒寫下來');
+      const piece = agent.preview?.title ? `《${agent.preview.title}》` : '';
+      const excerpt = agent.preview?.body?.replace(/\s+/g, ' ').trim().slice(0, 90) ?? '';
+      return [{
+        id: agent.id,
+        name: nickname(agent, station.name),
+        task,
+        piece,
+        excerpt,
+        href: manuscriptHref(agent),
+      }];
+    });
+  }, [roster, data]);
+
   const chosen = data?.agents.find((agent) => agent.id === selected) ?? null;
   const visibleBubbles = meeting ? bubbles.slice(bubbleAt % Math.max(bubbles.length, 1)).slice(0, 3) : [];
   const clock = taipeiParts(now);
@@ -480,8 +500,22 @@ export function Office() {
         <div className="office-counts">
           <span>閒置 {counts.idle}</span>
           <span>工作中 {counts.working}</span>
-          <span>完成 {counts.done}</span>
-          {counts.blocked > 0 && <span>卡住 {counts.blocked}</span>}
+          <button
+            type="button"
+            className={`office-count${roster === 'done' ? ' is-on' : ''}`}
+            aria-expanded={roster === 'done'}
+            onClick={() => setRoster((current) => current === 'done' ? null : 'done')}
+          >
+            完成 {counts.done}
+          </button>
+          <button
+            type="button"
+            className={`office-count is-blocked${roster === 'blocked' ? ' is-on' : ''}`}
+            aria-expanded={roster === 'blocked'}
+            onClick={() => setRoster((current) => current === 'blocked' ? null : 'blocked')}
+          >
+            卡住 {counts.blocked}
+          </button>
           <button type="button" className={`office-music${musicOn ? ' is-on' : ''}`} aria-pressed={musicOn} onClick={toggleMusic}>
             <span className="eq" aria-hidden><i /><i /><i /></span>
             {musicOn ? '音樂開著' : '播放音樂'}
@@ -500,6 +534,26 @@ export function Office() {
           </button>
         </div>
       </header>
+      {roster && (
+        <section className={`office-roster is-${roster}`} aria-label={roster === 'blocked' ? '卡住的人' : '完成的人'}>
+          <header>
+            <strong>{roster === 'blocked' ? '卡住的原因' : '完成的結果'}</strong>
+            <button type="button" onClick={() => setRoster(null)}>關閉</button>
+          </header>
+          {rosterRows.length === 0 ? (
+            <p>{roster === 'blocked' ? '現在沒有人卡住。' : '這一班還沒有人完成。'}</p>
+          ) : rosterRows.map((row) => (
+            <article key={row.id} className={selected === row.id ? 'is-on' : ''}>
+              <button type="button" onClick={() => { setSpoken(null); setSelected(row.id); }}>
+                <b>{row.name}</b>
+                <span>{row.task}</span>
+                {(row.piece || row.excerpt) && <small>{row.piece}{row.excerpt ? ` ${row.excerpt}` : ''}</small>}
+              </button>
+              {row.href && <Link to={row.href}>打開原稿</Link>}
+            </article>
+          ))}
+        </section>
+      )}
       {data?.standup?.note && <div className="office-note">{data.standup.note}</div>}
       {error && <div className="office-note">{error}</div>}
       {loading && !data && <div className="office-note">辦公室正在亮燈…</div>}
@@ -583,7 +637,7 @@ export function Office() {
                 <button
                   key={key}
                   type="button"
-                  className={`station is-${status}${selected && agent?.id === selected ? ' is-picked' : ''}${saying ? ' is-speaking' : ''}${away ? ' is-away' : ''}`}
+                  className={`station is-${status}${selected && agent?.id === selected ? ' is-picked' : ''}${roster && status === roster ? ' is-roster' : ''}${saying ? ' is-speaking' : ''}${away ? ' is-away' : ''}`}
                   style={{ left: station.x, top: station.y, zIndex: 10 + index, ['--mat' as string]: station.mat, animationDelay: `${index * 0.35}s` }}
                   aria-label={`${label}，${agent?.task ?? '等下一班晨會'}`}
                   onClick={() => { if (!agent) return; setSpoken(null); setSelected(agent.id); }}

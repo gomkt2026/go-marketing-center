@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { createOfficeAmbience, type DanceKind } from './office-audio';
-import { compactNumber, liveAsk, nextBoard, officeReply, pairLines, type Ask, type LiveReply } from './talk';
+import { compactNumber, deskWork, liveAsk, nextBoard, officeMoment, officeReply, type Ask, type LiveReply } from './talk';
 import type { OfficeAgent, OfficeSnapshot, OfficeStatPeriod } from './types';
 import './office.css';
 
@@ -58,28 +58,33 @@ function themeFor(data: OfficeSnapshot | null, slug: string | null) {
   return data?.standup?.directive?.brands?.find((brand) => brand.slug === slug)?.theme ?? '';
 }
 
-function screenCopy(station: Station, agent: OfficeAgent | undefined, data: OfficeSnapshot | null) {
+function screenCopy(station: Station, agent: OfficeAgent | undefined, data: OfficeSnapshot | null, beat = 0) {
   const task = agent?.task ?? '';
   const theme = themeFor(data, station.slug);
   const line = (theme || task || '等下一班晨會').replace(/\s+/g, ' ');
+  const work = deskWork(station.name, beat);
+  if (agent?.status === 'blocked' && task.trim()) {
+    return { title: work?.title ?? '卡住', line: task.trim() };
+  }
   if (station.screen === 'ticker') {
     const titles = (data?.keywords ?? []).filter(Boolean).slice(0, 8);
     return { title: '熱門', line: titles.length ? titles.join('  ·  ') : '在收頭條' };
   }
   if (station.screen === 'wave') {
     const episode = data?.podcasts?.[0];
-    return { title: '錄音', line: episode?.title || data?.standup?.directive?.podcastTopic || '等這一集的題目' };
+    return { title: '對稿', line: episode?.title || data?.standup?.directive?.podcastTopic || work?.line || '在對這一集的場面' };
   }
   if (station.screen === 'timeline') {
     const video = data?.videos?.[0];
-    return { title: '剪接', line: video?.title || '在等素材' };
+    return { title: '剪片', line: video?.title || work?.line || '在等素材' };
   }
+  if (work) return work;
   if (station.screen === 'swatch') return { title: '配圖', line: data?.standup?.directive?.imageBrief || line };
   if (station.screen === 'plan') return { title: '策略', line };
-  if (station.screen === 'queue') return { title: '排程', line };
-  if (station.screen === 'jobs') return { title: '派工', line };
-  if (station.screen === 'homes') return { title: '物件', line };
-  return { title: '洗衣', line };
+  if (station.screen === 'queue') return { title: 'PO文', line };
+  if (station.screen === 'jobs') return { title: '報價', line };
+  if (station.screen === 'homes') return { title: '管理', line };
+  return { title: '洗滌', line };
 }
 
 function manuscriptHref(agent: OfficeAgent): string | null {
@@ -187,6 +192,64 @@ function WindowPane({ phase, moon }: { phase: 'dawn' | 'day' | 'dusk' | 'night';
   );
 }
 
+function FloatingTalk({
+  rootRef,
+  notes,
+}: {
+  rootRef: RefObject<HTMLDivElement | null>;
+  notes: { id: string; who: string; text: string }[];
+}) {
+  const [spots, setSpots] = useState<{ id: string; who: string; text: string; x: number; y: number }[]>([]);
+  const signature = notes.map((note) => `${note.id}\u0000${note.who}\u0000${note.text}`).join('\u0001');
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || notes.length === 0) {
+      setSpots([]);
+      return;
+    }
+    let frame = 0;
+    let last = '';
+    const place = () => {
+      const host = root.getBoundingClientRect();
+      const next = notes.map((note) => {
+        const who = CSS.escape(note.who);
+        const el = root.querySelector(`[data-who="${who}"]`) ?? root.querySelector(`[data-station="${who}"]`);
+        const rect = el?.getBoundingClientRect();
+        const rawX = rect ? rect.left + rect.width / 2 - host.left : host.width / 2;
+        const rawY = rect ? rect.top - host.top : 96;
+        const x = Math.min(host.width - 150, Math.max(150, rawX));
+        const y = Math.max(8, rawY);
+        return { ...note, x, y };
+      });
+      const mark = next.map((spot) => `${spot.id}:${Math.round(spot.x)}:${Math.round(spot.y)}`).join('|');
+      if (mark !== last) {
+        last = mark;
+        setSpots(next);
+      }
+      frame = window.requestAnimationFrame(place);
+    };
+    frame = window.requestAnimationFrame(place);
+    return () => window.cancelAnimationFrame(frame);
+  }, [rootRef, signature]);
+
+  if (spots.length === 0) return null;
+  return (
+    <div className="float-layer" aria-live="polite">
+      {spots.map((spot, index) => (
+        <div
+          key={spot.id}
+          className="float-card"
+          style={{ left: spot.x, top: spot.y, transform: `translate(-50%, calc(-100% - ${8 + (index % 2) * 46}px))` }}
+        >
+          <b>{spot.who}</b>
+          <span>{spot.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Office() {
   const [data, setData] = useState<OfficeSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -202,7 +265,9 @@ export function Office() {
   const [ask, setAsk] = useState<Ask>('now');
   const [period, setPeriod] = useState<OfficeStatPeriod>('28');
   const [walks, setWalks] = useState<Record<string, { x: number; y: number }>>({});
-  const [chat, setChat] = useState<{ a: string; b: string; lineA: string; lineB: string } | null>(null);
+  const [chat, setChat] = useState<{ who: string; text: string }[] | null>(null);
+  const [beat, setBeat] = useState(0);
+  const beatRef = useRef(0);
   const [dance, setDance] = useState<DanceKind | null>(null);
   const danceTimer = useRef(0);
   const [note, setNote] = useState('');
@@ -211,6 +276,8 @@ export function Office() {
   const [spoken, setSpoken] = useState<LiveReply | null>(null);
   const [said, setSaid] = useState<{ agentId: string; line: string } | null>(null);
   const [roster, setRoster] = useState<'done' | 'blocked' | null>(null);
+  const [peek, setPeek] = useState<string | null>(null);
+  const peekTimer = useRef(0);
   const fitRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const ambience = useRef<ReturnType<typeof createOfficeAmbience> | null>(null);
@@ -322,29 +389,35 @@ export function Office() {
         if (agent?.id && agent.id === selected) return false;
         return (agent?.status ?? 'done') !== 'working';
       });
-      if (idle.length < 2) {
+      if (!idle.length) {
         later(meet, 8000);
         return;
       }
-      const first = idle[Math.floor(Math.random() * idle.length)];
-      const rest = idle.filter((station) => station !== first);
-      const second = rest[Math.floor(Math.random() * rest.length)];
-      const lines = pairLines(first.name, second.name, data);
-      setWalks({
-        [stationKey(first)]: { x: 430, y: 530 },
-        [stationKey(second)]: { x: 536, y: 530 },
-      });
+      const moment = officeMoment(idle.map((station) => station.name), data, beatRef.current);
+      beatRef.current += 1;
+      setBeat(beatRef.current);
+      if (moment.gather) {
+        const spots: Record<string, { x: number; y: number }> = {};
+        moment.who.forEach((name, index) => {
+          const station = STATIONS.find((item) => item.name === name);
+          if (!station) return;
+          spots[stationKey(station)] = index === 0 ? { x: 430, y: 530 } : { x: 536, y: 530 };
+        });
+        setWalks(spots);
+      } else {
+        setWalks({});
+      }
       later(() => {
         if (!alive) return;
-        setChat({ a: first.name, b: second.name, lineA: lines.left, lineB: lines.right });
-        const talk = 5000 + Math.floor(Math.random() * 5000);
+        setChat(moment.lines);
+        const talk = moment.gather ? 6200 : 4600;
         later(() => {
           if (!alive) return;
           setWalks({});
           setChat(null);
-          later(meet, 5000);
+          later(meet, moment.gather ? 2800 : 1400);
         }, talk);
-      }, 3600);
+      }, moment.gather ? 2800 : 250);
     };
     later(meet, 1800);
     return () => {
@@ -383,6 +456,51 @@ export function Office() {
 
   const chosen = data?.agents.find((agent) => agent.id === selected) ?? null;
   const visibleBubbles = meeting ? bubbles.slice(bubbleAt % Math.max(bubbles.length, 1)).slice(0, 3) : [];
+  const floatNotes = useMemo(() => {
+    const notes: { id: string; who: string; text: string }[] = [];
+    const seen = new Set<string>();
+    const add = (id: string, who: string, text: string) => {
+      const line = text.replace(/\s+/g, ' ').trim();
+      if (!who || !line || seen.has(who)) return;
+      seen.add(who);
+      notes.push({ id, who, text: line });
+    };
+    chat?.forEach((line, index) => add(`chat-${index}`, line.who, line.text));
+    if (said) {
+      const speaker = data?.agents.find((agent) => agent.id === said.agentId);
+      const station = STATIONS.find((item) => speaker && matchAgent([speaker], item));
+      add('said', speaker ? nickname(speaker, station?.name ?? '') : station?.name ?? '', said.line);
+    }
+    visibleBubbles.forEach((bubble, index) => add(`meet-${index}`, bubble.who, bubble.text));
+    if (selected) {
+      const speaker = data?.agents.find((agent) => agent.id === selected);
+      const station = STATIONS.find((item) => speaker && matchAgent([speaker], item));
+      if (station) {
+        const copy = screenCopy(station, speaker, data, beat);
+        add('selected', nickname(speaker, station.name), speaker?.task?.trim() || copy.line);
+      }
+    }
+    if (peek) {
+      const station = STATIONS.find((item) => item.name === peek) ?? STATIONS.find((item) => {
+        const agent = data ? matchAgent(data.agents, item) : undefined;
+        return nickname(agent, item.name) === peek;
+      });
+      if (station) {
+        const agent = data ? matchAgent(data.agents, station) : undefined;
+        const copy = screenCopy(station, agent, data, beat);
+        add('peek', nickname(agent, station.name), agent?.task?.trim() || copy.line);
+      }
+    }
+    return notes.slice(0, 4);
+  }, [chat, said, visibleBubbles, peek, data]);
+  const showPeek = (who: string) => {
+    window.clearTimeout(peekTimer.current);
+    setPeek(who);
+  };
+  const hidePeek = () => {
+    window.clearTimeout(peekTimer.current);
+    peekTimer.current = window.setTimeout(() => setPeek(null), 140);
+  };
   const clock = taipeiParts(now);
   const phase = skyPhase(clock.h);
   const board = nextBoard(data);
@@ -620,19 +738,12 @@ export function Office() {
                 <i className="steam" />
               </div>
               {meeting && <div className="meet-flag">晨會中</div>}
-              {meeting && visibleBubbles.length > 0 && (
-                <div className="office-bubbles">
-                  {visibleBubbles.map((bubble) => (
-                    <p key={`${bubble.who}-${bubble.text}`}><b>{bubble.who}</b>{bubble.text}</p>
-                  ))}
-                </div>
-              )}
             </div>
 
             {STATIONS.map((station, index) => {
               const agent = data ? matchAgent(data.agents, station) : undefined;
               const label = nickname(agent, station.name);
-              const copy = screenCopy(station, agent, data);
+              const copy = screenCopy(station, agent, data, beat);
               const saying = visibleBubbles.find((bubble) => bubble.who === label);
               const status = agent?.status ?? 'done';
               const key = stationKey(station);
@@ -644,10 +755,11 @@ export function Office() {
                   className={`station is-${status}${selected && agent?.id === selected ? ' is-picked' : ''}${roster && status === roster ? ' is-roster' : ''}${saying ? ' is-speaking' : ''}${away ? ' is-away' : ''}`}
                   style={{ left: station.x, top: station.y, zIndex: 10 + Math.round(station.y / 8), ['--mat' as string]: station.mat, animationDelay: `${index * 0.35}s` }}
                   aria-label={`${label}，${agent?.task ?? '等下一班晨會'}`}
+                  onMouseEnter={() => showPeek(label)}
+                  onMouseLeave={hidePeek}
                   onClick={() => { if (!agent) return; setSpoken(null); setSelected(agent.id); }}
                 >
                   <span className="tip">{agent?.task ?? '等下一班晨會'}</span>
-                  {saying && <span className="say">{saying.text}</span>}
                   <span className="who-space" />
                   <span className="chair" />
                   <Monitor kind={station.screen} title={copy.title} line={copy.line} />
@@ -663,19 +775,19 @@ export function Office() {
               const walk = walks[key];
               const agent = data ? matchAgent(data.agents, station) : undefined;
               const label = nickname(agent, station.name);
-              const line = said && agent?.id === said.agentId
-                ? said.line
-                : chat?.a === station.name ? chat.lineA : chat?.b === station.name ? chat.lineB : '';
               return (
                 <button
                   key={`walk-${key}`}
                   type="button"
                   className={`walker${walk ? ' is-away' : ''}${dance ? ` is-dancing is-${dance}` : ''}${selected && agent?.id === selected ? ' is-picked' : ''}`}
                   style={{ left: walk ? walk.x : station.x + 50, top: walk ? walk.y : station.y, zIndex: dance ? 80 + index : 30 + Math.round((walk ? walk.y : station.y) / 8) }}
+                  data-who={label}
+                  data-station={station.name}
                   aria-label={label}
+                  onMouseEnter={() => showPeek(label)}
+                  onMouseLeave={hidePeek}
                   onClick={() => { if (!agent) return; setSpoken(null); setSelected(agent.id); }}
                 >
-                  {line && !dance && <span className="bubble">{line}</span>}
                   <span className="doll" style={{ ['--mat' as string]: station.mat }}>
                     <Face src={station.portrait} crop={station.crop} alt={label} tint={station.mat} />
                     <i className="arm left" />
@@ -692,6 +804,7 @@ export function Office() {
             </div>
           </div>
         </div>
+        <FloatingTalk rootRef={fitRef} notes={floatNotes} />
       </div>
 
       {chosen && reply && (

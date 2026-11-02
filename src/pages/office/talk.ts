@@ -73,35 +73,118 @@ export function nextBoard(data: OfficeSnapshot | null): { title: string; lines: 
   };
 }
 
-function clip(text: string, max = 36) {
-  const flat = text.replace(/\s+/g, ' ');
-  return flat.length > max ? `${flat.slice(0, max)}…` : flat;
+const DESK_WORK: Record<string, { title: string; line: string }[]> = {
+  阿豪: [
+    { title: '報價', line: '在對這一趟，金額先不寫出來' },
+    { title: '派工', line: '在看誰先到場' },
+  ],
+  小咪: [
+    { title: '管理', line: '在對這間的鑰匙和備註' },
+    { title: '管理', line: '三處資料先收到一起' },
+  ],
+  阿樂: [
+    { title: '洗滌', line: '在看客人問洗好了沒' },
+    { title: '洗滌', line: '只看櫃檯進度，不教洗法' },
+  ],
+  發文小編: [
+    { title: 'PO文', line: '在排下一則，三個品牌分開' },
+    { title: 'PO文', line: '到點的那一則再送出去' },
+  ],
+  影片小編: [
+    { title: '剪片', line: '在剪這支的節奏' },
+    { title: '剪片', line: '素材不夠就不假裝剪完' },
+  ],
+  圖片小編: [
+    { title: '配圖', line: '在對這一張的場面' },
+    { title: '配圖', line: '這張不做成語錄卡' },
+  ],
+  行銷小編: [
+    { title: '策略', line: '在把三個題收成結論' },
+    { title: '策略', line: '硬跟熱門的那則先拿掉' },
+  ],
+  Podcast小編: [
+    { title: '對稿', line: '在對這一集要講的場面' },
+    { title: '對稿', line: '沒查到的數字這集不補' },
+  ],
+};
+
+export function deskWork(name: string, beat: number): { title: string; line: string } | null {
+  const rows = DESK_WORK[name];
+  if (!rows?.length) return null;
+  return rows[Math.abs(beat) % rows.length];
 }
 
-export function pairLines(left: string, right: string, data: OfficeSnapshot | null): { left: string; right: string } {
-  const keyword = data?.keywords?.[0];
-  const jobs = ['taskgo', 'homigo', 'washgo'].map((slug) => jobLine(slug, data)).join('。');
-  if (left === '新聞收集' || right === '新聞收集') {
-    return {
-      left: clip(keyword ? `熱門現在是「${keyword}」` : '這輪熱門關鍵字還沒抓到'),
-      right: clip(keyword ? '三個品牌分開用，不硬湊成同一篇' : '等關鍵字進來再排方向'),
-    };
+export interface OfficeMoment {
+  who: string[];
+  lines: { who: string; text: string }[];
+  gather: boolean;
+}
+
+interface Exchange {
+  a: string;
+  b: string;
+  lineA: string;
+  lineB: string;
+}
+
+function conclusions(): Exchange[] {
+  return [
+    { a: '阿豪', b: '發文小編', lineA: '業主問這面牆多少，金額我先不寫', lineB: '結論：報價留在現場。貼文只寫收工前多看一眼' },
+    { a: '小咪', b: '行銷小編', lineA: '鑰匙、合約、報修還是三個地方', lineB: '結論：先把物件管齊。文案不站房東也不站房客' },
+    { a: '阿樂', b: '發文小編', lineA: '我在看洗滌詢問，客人又問洗好了沒', lineB: '結論：只PO櫃檯那一問，不教怎麼洗' },
+    { a: '影片小編', b: '發文小編', lineA: '這支我在剪，還不能當今晚的檔', lineB: '結論：先放素材庫，不排進下一則' },
+    { a: '圖片小編', b: '阿豪', lineA: '這張要海軍藍斜切，不要語錄卡', lineB: '結論：圖跟收工那個場面一起出' },
+    { a: '行銷小編', b: '阿豪', lineA: 'Threads 前兩行要是一個場面，不是品牌介紹', lineB: '結論：我寫收工前多看一眼，不叫人私訊' },
+    { a: '行銷小編', b: '小咪', lineA: '同一則熱門，三個帳號不能貼同一篇', lineB: '結論：我這篇寫事情散在三處，不寫法條' },
+    { a: '發文小編', b: '阿樂', lineA: 'PO文第一句要讓人停住，不要先報品牌名', lineB: '結論：我寫客人問洗好了沒，不教怎麼洗' },
+    { a: '影片小編', b: '圖片小編', lineA: '這支先剪節奏，字卡不要蓋臉', lineB: '結論：圖也留一個場面，不做成語錄卡' },
+    { a: 'Podcast小編', b: '行銷小編', lineA: '這一集要有一個聽完想轉的點', lineB: '結論：講品牌自己的場面，不報沒查到的數字' },
+  ];
+}
+
+function jokes(keyword: string): Exchange[] {
+  const hot = `「${keyword}」`;
+  return [
+    { a: '新聞收集', b: '阿樂', lineA: `熱門是${hot}，我差點拿去寫衣服`, lineB: '哈哈先停。結論：接不上就不發，接得上只寫客人問洗好了沒' },
+    { a: '新聞收集', b: '阿豪', lineA: `${hot}在轉，工地群組會笑`, lineB: '哈哈看過就好。結論：不寫金額、不編成故事，仍寫收工多看一眼' },
+    { a: '新聞收集', b: '小咪', lineA: `${hot}很熱，租屋帳號要不要跟`, lineB: '哈哈先別。結論：不站邊，這則仍寫三處對不上' },
+    { a: '行銷小編', b: '發文小編', lineA: `${hot}當笑話可以，當三篇稿不行`, lineB: '結論：笑完各寫各的場面，複製的那則不作' },
+  ];
+}
+
+function soloLine(name: string, keyword: string | null, salt: number): string {
+  if (name === '新聞收集') {
+    return keyword ? `我在看熱門，現在是「${keyword}」` : '這一輪熱門還沒抓到，我先看著';
   }
-  if (left === '發文小編' || right === '發文小編') {
-    return {
-      left: '三個品牌的下一則我對過了',
-      right: clip(jobs, 42),
-    };
-  }
-  if ((left === '小咪' && right === '阿樂') || (left === '阿樂' && right === '小咪')) {
-    return {
-      left: clip(jobLine('homigo', data)),
-      right: clip(jobLine('washgo', data)),
-    };
-  }
+  const work = deskWork(name, salt);
+  if (work) return `我在${work.title}，${work.line.replace(/^在/, '')}`;
+  return '我先把手上這件做完';
+}
+
+export function officeMoment(names: string[], data: OfficeSnapshot | null, salt: number): OfficeMoment {
+  const pool = names.filter(Boolean);
+  if (!pool.length) return { who: [], lines: [], gather: false };
+  const keyword = data?.keywords?.find((item) => item.trim())?.trim() ?? null;
+  const mode = Math.abs(salt) % 5;
+  const solo = (shift = 0): OfficeMoment => {
+    const who = pool[(Math.abs(salt) + shift) % pool.length];
+    const text = soloLine(who, keyword, salt + shift);
+    return { who: [who], lines: [{ who, text }], gather: false };
+  };
+  if (mode <= 1 || pool.length < 2) return solo();
+  const source = mode === 4 && keyword ? jokes(keyword) : conclusions();
+  const open = source.filter((item) => pool.includes(item.a) && pool.includes(item.b));
+  const bag = open.length ? open : conclusions().filter((item) => pool.includes(item.a) && pool.includes(item.b));
+  if (!bag.length) return solo();
+  const round = Math.floor(Math.abs(salt) / 5);
+  const pick = bag[(round + mode * 3) % bag.length];
   return {
-    left: clip(keyword ? `可以碰的熱門是「${keyword}」` : '這班先對下一則排程'),
-    right: '對到了再寫，沒有的數字不補',
+    who: [pick.a, pick.b],
+    lines: [
+      { who: pick.a, text: pick.lineA },
+      { who: pick.b, text: pick.lineB },
+    ],
+    gather: mode === 3,
   };
 }
 
@@ -207,6 +290,11 @@ function topicOf(text: string): Ask | 'hot' | 'show' | 'film' | 'picture' | null
   if (/配圖|圖片|海報/.test(text)) return 'picture';
   if (/現在|在做|在忙|手上|誰/.test(text)) return 'now';
   return null;
+}
+
+function clip(text: string, max = 36) {
+  const flat = text.replace(/\s+/g, ' ');
+  return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 }
 
 export function liveAsk(

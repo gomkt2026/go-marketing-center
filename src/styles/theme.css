@@ -414,7 +414,24 @@ a {
 }
 
 @media (max-width: 960px) {
+  .app-shell {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-main-col {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .app-main {
+    height: calc(100dvh - 56px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     padding: 16px 16px max(20px, env(safe-area-inset-bottom));
   }
 

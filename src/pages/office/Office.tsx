@@ -192,6 +192,43 @@ function WindowPane({ phase, moon }: { phase: 'dawn' | 'day' | 'dusk' | 'night';
   );
 }
 
+function ClockHands() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const clock = taipeiParts(now);
+  return (
+    <>
+      <i className="hand hour" style={{ transform: `rotate(${(clock.h % 12) * 30 + clock.m * 0.5}deg)` }} />
+      <i className="hand min" style={{ transform: `rotate(${clock.m * 6}deg)` }} />
+      <i className="hand sec" style={{ transform: `rotate(${clock.s * 6}deg)` }} />
+    </>
+  );
+}
+
+function OfficeSky() {
+  const [hour, setHour] = useState(() => taipeiParts(new Date()).h);
+  useEffect(() => {
+    const timer = window.setInterval(() => setHour(taipeiParts(new Date()).h), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const phase = skyPhase(hour);
+  return (
+    <>
+      <div className="windows">
+        <WindowPane phase={phase} />
+        <WindowPane phase={phase} moon />
+        <WindowPane phase={phase} />
+      </div>
+      <div className="clock" aria-hidden>
+        <ClockHands />
+      </div>
+    </>
+  );
+}
+
 function FloatingTalk({
   rootRef,
   notes,
@@ -208,11 +245,14 @@ function FloatingTalk({
       setSpots([]);
       return;
     }
-    let frame = 0;
     let last = '';
     const place = () => {
+      if (document.hidden) return;
       const host = root.getBoundingClientRect();
-      const next = notes.map((note) => {
+      const compact = host.width < 720;
+      const shown = compact ? notes.slice(0, 1) : notes;
+      const next = shown.map((note) => {
+        if (compact) return { ...note, x: host.width / 2, y: 8 };
         const who = CSS.escape(note.who);
         const el = root.querySelector(`[data-who="${who}"]`) ?? root.querySelector(`[data-station="${who}"]`);
         const rect = el?.getBoundingClientRect();
@@ -220,7 +260,7 @@ function FloatingTalk({
         const rawY = rect ? rect.top - host.top : 120;
         const edge = Math.max(24, Math.min(150, host.width * 0.32));
         const x = Math.min(host.width - edge, Math.max(edge, rawX));
-        const y = Math.max(host.width < 720 ? 108 : 28, rawY);
+        const y = Math.max(28, rawY);
         return { ...note, x, y };
       });
       const mark = next.map((spot) => `${spot.id}:${Math.round(spot.x)}:${Math.round(spot.y)}`).join('|');
@@ -228,10 +268,10 @@ function FloatingTalk({
         last = mark;
         setSpots(next);
       }
-      frame = window.requestAnimationFrame(place);
     };
-    frame = window.requestAnimationFrame(place);
-    return () => window.cancelAnimationFrame(frame);
+    place();
+    const timer = window.setInterval(place, 500);
+    return () => window.clearInterval(timer);
   }, [rootRef, signature]);
 
   if (spots.length === 0) return null;
@@ -240,8 +280,8 @@ function FloatingTalk({
       {spots.map((spot, index) => (
         <div
           key={spot.id}
-          className="float-card"
-          style={{ left: spot.x, top: spot.y, transform: `translate(-50%, calc(-100% - ${8 + (index % 2) * 36}px))` }}
+          className={`float-card${spot.y <= 8 ? ' is-docked' : ''}`}
+          style={{ left: spot.x, top: spot.y, transform: spot.y <= 8 ? 'translate(-50%, 0)' : `translate(-50%, calc(-100% - ${8 + (index % 2) * 36}px))` }}
         >
           <b>{spot.who}</b>
           <span>{spot.text}</span>
@@ -260,7 +300,6 @@ export function Office({ view = false }: { view?: boolean }) {
   const [switchBusy, setSwitchBusy] = useState(false);
   const [tick, setTick] = useState(0);
   const [scale, setScale] = useState(1);
-  const [now, setNow] = useState(() => new Date());
   const [musicOn, setMusicOn] = useState(false);
   const [demo, setDemo] = useState(false);
   const [ask, setAsk] = useState<Ask>('now');
@@ -282,10 +321,15 @@ export function Office({ view = false }: { view?: boolean }) {
   const fitRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const ambience = useRef<ReturnType<typeof createOfficeAmbience> | null>(null);
+  const dataRef = useRef(data);
+  const selectedRef = useRef(selected);
+  dataRef.current = data;
+  selectedRef.current = selected;
 
   useEffect(() => {
     let stop = false;
     const load = async () => {
+      if (document.hidden) return;
       try {
         const next = view ? await publicApi.officeLive() : await api.office();
         if (!stop) {
@@ -293,23 +337,21 @@ export function Office({ view = false }: { view?: boolean }) {
           setError(null);
         }
       } catch (e) {
-        if (!stop) setError(e instanceof Error ? e.message : '載入失敗');
+        if (!stop && !dataRef.current) setError(e instanceof Error ? e.message : '載入失敗');
       } finally {
         if (!stop) setLoading(false);
       }
     };
     void load();
     const timer = window.setInterval(load, 45000);
+    const onShow = () => { if (!document.hidden) void load(); };
+    document.addEventListener('visibilitychange', onShow);
     return () => {
       stop = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onShow);
     };
   }, [tick, view]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     ambience.current = createOfficeAmbience();
@@ -322,17 +364,25 @@ export function Office({ view = false }: { view?: boolean }) {
   useLayoutEffect(() => {
     const el = fitRef.current;
     if (!el) return;
+    let timer = 0;
     const apply = () => {
       const rect = el.getBoundingClientRect();
+      if (rect.width < 40 || rect.height < 40) return;
       const widthScale = Math.max(0, rect.width - 16) / ROOM_W;
       const heightScale = Math.max(0, rect.height - 16) / ROOM_H;
       const next = Math.min(widthScale, heightScale);
-      if (next > 0.05) setScale((current) => (Math.abs(current - next) > 0.008 ? next : current));
+      if (next > 0.05) setScale((current) => (Math.abs(current - next) > 0.02 ? next : current));
     };
     apply();
-    const observer = new ResizeObserver(apply);
+    const observer = new ResizeObserver(() => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(apply, 150);
+    });
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
   }, []);
 
   const bubbles = data?.standup?.bubbles ?? [];
@@ -383,16 +433,18 @@ export function Office({ view = false }: { view?: boolean }) {
     };
     const meet = () => {
       if (!alive) return;
+      const snapshot = dataRef.current;
+      const picked = selectedRef.current;
       const idle = STATIONS.filter((station) => {
-        const agent = data ? matchAgent(data.agents, station) : undefined;
-        if (agent?.id && agent.id === selected) return false;
+        const agent = snapshot ? matchAgent(snapshot.agents, station) : undefined;
+        if (agent?.id && agent.id === picked) return false;
         return (agent?.status ?? 'done') !== 'working';
       });
       if (!idle.length) {
         later(meet, 8000);
         return;
       }
-      const moment = officeMoment(idle.map((station) => station.name), data, beatRef.current);
+      const moment = officeMoment(idle.map((station) => station.name), snapshot, beatRef.current);
       beatRef.current += 1;
       setBeat(beatRef.current);
       if (moment.gather) {
@@ -424,7 +476,7 @@ export function Office({ view = false }: { view?: boolean }) {
       timers.forEach((id) => window.clearTimeout(id));
       setChat(null);
     };
-  }, [data, selected, meeting, dance]);
+  }, [selected, meeting, dance]);
 
   const counts = useMemo(() => {
     const agents = data?.agents ?? [];
@@ -500,8 +552,6 @@ export function Office({ view = false }: { view?: boolean }) {
     window.clearTimeout(peekTimer.current);
     peekTimer.current = window.setTimeout(() => setPeek(null), 140);
   };
-  const clock = taipeiParts(now);
-  const phase = skyPhase(clock.h);
   const board = nextBoard(data);
   const preset = chosen && data ? officeReply(chosen, ask, data, period) : null;
   const reply = spoken ?? preset;
@@ -673,7 +723,12 @@ export function Office({ view = false }: { view?: boolean }) {
         </section>
       )}
       {data?.standup?.note && <div className="office-note">{data.standup.note}</div>}
-      {error && <div className="office-note">{error}</div>}
+      {error && !data && (
+        <div className="office-note">
+          辦公室這次沒載入。
+          <button type="button" onClick={() => setTick((n) => n + 1)}>再試一次</button>
+        </div>
+      )}
       {loading && !data && <div className="office-note">辦公室正在亮燈…</div>}
 
       <div className="office-fit" ref={fitRef}>
@@ -687,20 +742,11 @@ export function Office({ view = false }: { view?: boolean }) {
               <strong>{board.title}</strong>
               {board.lines.map((line) => <p key={line}>{line}</p>)}
             </div>
-            <div className="windows">
-              <WindowPane phase={phase} />
-              <WindowPane phase={phase} moon />
-              <WindowPane phase={phase} />
-            </div>
+            <OfficeSky />
             <div className="brand-wall" aria-label="TaskGo、Homigo、Washgo">
               <img src="/brands/taskgo-logo.png" alt="TaskGo" />
               <img src="/office/logo-homigo.png" alt="Homigo" />
               <img src="/office/logo-washgo.png" alt="Washgo" />
-            </div>
-            <div className="clock" aria-hidden>
-              <i className="hand hour" style={{ transform: `rotate(${(clock.h % 12) * 30 + clock.m * 0.5}deg)` }} />
-              <i className="hand min" style={{ transform: `rotate(${clock.m * 6}deg)` }} />
-              <i className="hand sec" style={{ transform: `rotate(${clock.s * 6}deg)` }} />
             </div>
             <div className="scoreboard">
               <div className="period">

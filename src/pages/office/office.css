@@ -6,6 +6,8 @@
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  touch-action: manipulation;
+  overscroll-behavior: none;
   color: #e7f7fb;
   background:
     radial-gradient(900px 280px at 50% -10%, rgba(90, 190, 210, 0.2), transparent 55%),
@@ -190,6 +192,19 @@
   margin: 0 18px 6px;
   color: #f0c7a2;
   font-size: 13px;
+}
+
+.office-note button {
+  margin-left: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #7ee0ff;
+  color: #12303a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
 }
 
 .office-fit {
@@ -1563,9 +1578,19 @@
 }
 
 @media (max-width: 960px) {
-  .office-page {
-    margin: -16px;
+  .app-main:has(.office-page) {
+    display: flex;
+    flex-direction: column;
     height: calc(100dvh - 56px);
+    max-height: calc(100dvh - 56px);
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .office-page {
+    margin: 0;
+    flex: 1;
+    height: auto;
     min-height: 0;
   }
 
@@ -1605,6 +1630,32 @@
     margin: 0;
     max-height: min(46dvh, 360px);
     overflow: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .office-room {
+    --tilt: 0deg;
+    perspective: none;
+  }
+
+  .floor-stage .walker {
+    transform: none;
+    transition-duration: 0.8s;
+  }
+
+  .office-room:not(.is-dancing),
+  .office-room:not(.is-dancing) * {
+    animation: none !important;
+  }
+
+  .float-card.is-docked {
+    width: min(360px, calc(100% - 16px));
+    max-width: calc(100% - 16px);
+  }
+
+  .float-card span {
+    overflow-wrap: anywhere;
   }
 }
 

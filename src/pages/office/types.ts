@@ -49,6 +49,8 @@ export interface OfficeSnapshot {
     apply_to_generation: boolean;
     valid_until: string | null;
     note: string | null;
+    film_url?: string | null;
+    film_status?: string | null;
   } | null;
   signals: { id: string; title: string; summary: string | null; source_url: string | null; slug: string }[];
   podcasts: { id: string; title: string; status: string }[];

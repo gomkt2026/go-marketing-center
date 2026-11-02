@@ -144,7 +144,7 @@ export function parseStandupPayload(raw: unknown, signals: SignalFact[]): Office
     const facts = picked
       .map((signal) => [signal.title, signal.summary].filter(Boolean).join('：'))
       .slice(0, 4);
-    const theme = asString(found?.theme, 40) || picked[0]?.title || '延續已經驗證過的題，不開新宣稱';
+    const theme = asString(found?.theme, 40) || picked[0]?.title || '這輪沒接上熱門，先寫品牌自己的一個場面';
     brands.push({
       slug,
       theme,
@@ -214,9 +214,9 @@ export function nameplates(plan: OfficePlan, ctx: {
       : '通過檢查的稿直接排進發布';
   const imageTheme = plan.imageBrief || bySlug[plan.imageSlug]?.theme || '這一班的題';
   return [
-    { key: 'taskgo', status: 'done', task: `正在把「${bySlug.taskgo?.theme ?? ''}」收進品牌筆記` },
-    { key: 'homigo', status: 'done', task: `正在把「${bySlug.homigo?.theme ?? ''}」收進品牌筆記` },
-    { key: 'washgo', status: 'done', task: `正在把「${bySlug.washgo?.theme ?? ''}」收進品牌筆記` },
+    { key: 'taskgo', status: 'done', task: `這一班只寫：${bySlug.taskgo?.theme ?? ''}` },
+    { key: 'homigo', status: 'done', task: `這一班只寫：${bySlug.homigo?.theme ?? ''}` },
+    { key: 'washgo', status: 'done', task: `這一班只寫：${bySlug.washgo?.theme ?? ''}` },
     { key: 'news', status: 'done', task: plan.citations[0] ? `在看：${plan.citations[0].slice(0, 32)}` : '這輪沒有新的熱門題' },
     { key: 'strategy', status: 'done', task: '這一班的三個發文方向定了' },
     { key: 'publisher', status: ctx.autoPublish ? 'done' : 'blocked', task: publishTask },
@@ -233,10 +233,11 @@ export function scrubPlanThemes(plan: OfficePlan, claimsBySlug: Record<string, s
       const claims = claimsBySlug[brand.slug] ?? [];
       const problem = factProblem(brand.theme, claims, brand.facts);
       if (!problem) return brand;
-      return {
-        ...brand,
-        theme: brand.facts[0]?.split('：')[0] || '延續已經驗證過的題，不開新宣稱',
-      };
+      const fromFact = brand.facts[0]?.split('：')[0]?.slice(0, 40) ?? '';
+      const theme = fromFact && !factProblem(fromFact, claims, brand.facts)
+        ? fromFact
+        : '這輪沒接上熱門，先寫品牌自己的一個場面';
+      return { ...brand, theme };
     }),
   };
 }

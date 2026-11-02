@@ -36,6 +36,14 @@
   letter-spacing: 0;
 }
 
+.office-film {
+  display: inline-block;
+  margin-top: 6px;
+  color: #7ee0ff;
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .office-counts {
   display: flex;
   gap: 8px;

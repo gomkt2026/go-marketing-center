@@ -471,6 +471,11 @@ export function Office() {
         <div className="office-title">
           Go 行銷辦公室
           <small>{data?.quiet ? '凌晨這一班只留方向，八點才發' : '點一個人，直接問，他用手上的資料回答'}</small>
+          {data?.standup?.film_url ? (
+            <a className="office-film" href={data.standup.film_url} target="_blank" rel="noreferrer">看這一班的會議影片</a>
+          ) : data?.standup?.film_status === 'script' ? (
+            <span className="office-film">這一班的影片還在做，做好會放進三個品牌的素材庫</span>
+          ) : null}
         </div>
         <div className="office-counts">
           <span>閒置 {counts.idle}</span>

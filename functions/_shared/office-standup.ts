@@ -2,6 +2,8 @@ import type { Env } from './env';
 import { getSql } from './db';
 import { claudeChatJsonWithUsage } from './claude';
 import { ensureOfficeSuggestions, setOfficeActivity } from './office-directive';
+import { fetchGoogleTrendsTW, fetchTaiwanNews } from './sources';
+import { saveOfficeFilmScript, speakOfficeMeeting } from './office-film';
 import {
   BRAND_SLUGS,
   OFFICE_CAST,
@@ -41,6 +43,57 @@ async function autoPublishOn(env: Env): Promise<boolean> {
   const sql = getSql(env);
   const rows = await sql`SELECT auto_publish FROM office_settings WHERE id = 1`;
   return (rows[0] as { auto_publish?: boolean } | undefined)?.auto_publish !== false;
+}
+
+async function liveHotLeads(): Promise<SignalFact[]> {
+  try {
+    const [trends, news] = await Promise.race([
+      Promise.all([fetchGoogleTrendsTW(8), fetchTaiwanNews(6)]),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('hot-timeout')), 2500)),
+    ]);
+    const seen = new Set<string>();
+    const out: SignalFact[] = [];
+    for (const item of [...trends, ...news]) {
+      const title = item.title.replace(/\s+/g, ' ').trim().slice(0, 28);
+      const key = title.toLowerCase();
+      if (title.length < 2 || seen.has(key)) continue;
+      seen.add(key);
+      out.push({ title, summary: item.snippet?.slice(0, 80) ?? null, url: item.url ?? null });
+      if (out.length >= 12) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function recentByBrand(rows: { slug: string; title: string }[]): string {
+  const grouped: Record<string, string[]> = {};
+  for (const row of rows) {
+    const title = row.title?.trim();
+    if (!title) continue;
+    grouped[row.slug] = grouped[row.slug] ?? [];
+    if (grouped[row.slug].length < 6) grouped[row.slug].push(title.slice(0, 32));
+  }
+  return BRAND_SLUGS.map((slug) => `${slug}：${grouped[slug]?.join('、') || '這十天沒有標題'}`).join('\n');
+}
+
+function learningByBrand(rows: { slug: string; insight: string; supporting_data: unknown }[]): string {
+  const grouped: Record<string, string[]> = {};
+  for (const row of rows) {
+    const hooks = row.supporting_data && typeof row.supporting_data === 'object'
+      ? (row.supporting_data as { winning_hooks?: unknown }).winning_hooks
+      : [];
+    const bits = [
+      row.insight?.trim(),
+      ...(Array.isArray(hooks) ? hooks.map((hook) => String(hook).trim()) : []),
+    ].filter(Boolean).slice(0, 2);
+    if (!bits.length) continue;
+    grouped[row.slug] = grouped[row.slug] ?? [];
+    if (grouped[row.slug].length < 3) grouped[row.slug].push(bits.join('／').slice(0, 80));
+  }
+  const text = BRAND_SLUGS.map((slug) => `${slug}：${grouped[slug]?.join('；') || '無'}`).join('\n');
+  return text.includes('：') ? text : '無';
 }
 
 async function insertStandup(
@@ -104,7 +157,8 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
   }
 
   await ensureOfficeSuggestions(env).catch(() => undefined);
-  const [signalRows, claimRows, podcastRows, videoRows, brandRows, adviceRows] = await Promise.all([
+  const hotLeads = liveHotLeads();
+  const [signalRows, claimRows, podcastRows, videoRows, brandRows, adviceRows, recentRows, learningRows, hot] = await Promise.all([
     sql`
       SELECT ms.title, ms.summary, ms.source_url, b.slug
       FROM market_signals ms
@@ -146,13 +200,43 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
       ORDER BY s.created_at DESC
       LIMIT 12
     `.catch(() => []),
+    sql`
+      SELECT b.slug, c.title
+      FROM contents c
+      JOIN brands b ON b.id = c.brand_id
+      WHERE b.slug IN ('taskgo', 'homigo', 'washgo')
+        AND c.status IN ('published', 'scheduled')
+        AND c.title IS NOT NULL
+        AND c.created_at > now() - interval '10 days'
+      ORDER BY c.created_at DESC
+      LIMIT 24
+    `.catch(() => []),
+    sql`
+      SELECT b.slug, lr.insight, lr.supporting_data
+      FROM learning_records lr
+      JOIN brands b ON b.id = lr.brand_id
+      WHERE b.slug IN ('taskgo', 'homigo', 'washgo')
+        AND lr.status = 'approved'
+      ORDER BY lr.created_at DESC
+      LIMIT 9
+    `.catch(() => []),
+    hotLeads,
   ]);
 
-  const signals: SignalFact[] = (signalRows as { title: string; summary: string | null; source_url: string | null }[])
-    .map((row) => ({ title: row.title, summary: row.summary, url: row.source_url }));
+  const hotFacts: SignalFact[] = hot;
+  const signals: SignalFact[] = [
+    ...hotFacts,
+    ...(signalRows as { title: string; summary: string | null; source_url: string | null }[])
+      .map((row) => ({ title: row.title, summary: row.summary, url: row.source_url })),
+  ];
   const signalText = signals.length
-    ? signals.map((signal, index) => `${index}. ${signal.title}${signal.summary ? ` — ${signal.summary.slice(0, 80)}` : ''}`).join('\n')
-    : '（這三天沒有新的情報）';
+    ? signals.map((signal, index) => {
+      const lane = index < hotFacts.length ? '熱門' : '情報';
+      return `${index}. [${lane}] ${signal.title}${signal.summary ? ` — ${signal.summary.slice(0, 80)}` : ''}`;
+    }).join('\n')
+    : '（這一輪沒有熱門，也沒有三天內的情報）';
+  const recentText = recentByBrand(recentRows as { slug: string; title: string }[]);
+  const learningText = learningByBrand(learningRows as { slug: string; insight: string; supporting_data: unknown }[]);
   const claimsBySlug: Record<string, string[]> = {};
   for (const row of claimRows as { slug: string; statement: string }[]) {
     claimsBySlug[row.slug] = claimsBySlug[row.slug] ?? [];
@@ -167,20 +251,25 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
   let outputTokens = 0;
   try {
     const completion = await claudeChatJsonWithUsage<unknown>(env, {
-      temperature: 0.4,
-      maxTokens: 1200,
+      temperature: 0.7,
+      maxTokens: 1600,
       messages: [
         {
           role: 'system',
           content: [
-            '你是 Go 行銷中心的晨會記錄。只根據下面給的情報做決定，不准添媒體露出、客戶數、排名或沒出現的細節。',
-            '回傳一個 JSON：{"brands":[{"slug":"taskgo|homigo|washgo","theme":"40字內方向","doMore":["短句"],"doLess":["短句"],"signalIndexes":[情報編號]}],"podcastTopic":"40字內","imageBrief":"60字內","imageSlug":"taskgo|homigo|washgo","videoNote":"60字內","lines":[{"who":"阿豪|小咪|阿樂|新聞收集|行銷小編|發文小編|Podcast小編|圖片小編|影片小編","text":"42字內現在進行式"}]}',
-            'lines 最多 8 句。signalIndexes 只能用下面出現的編號。負責人交代只能當成方向，不能寫成已經發生的新聞、數字或媒體露出。',
+            '你是 Go 行銷中心的晨會記錄。三個品牌要像台灣社群在聊天，不要像顧問在寫策略。',
+            '只准使用下面清單裡出現過的關鍵字和事實。不准添媒體名、客戶數、排名、瀏覽數，也不准把沒出現的新聞說成已經發生。',
+            '回傳一個 JSON：{"brands":[{"slug":"taskgo|homigo|washgo","theme":"40字內、像 Threads 前兩行會停下來的一句話","doMore":["這一則的場面，不要寫策略"],"doLess":["這一篇不要碰的說法"],"signalIndexes":[清單編號]}],"podcastTopic":"40字內的一個場面","imageBrief":"60字內的一個畫面","imageSlug":"taskgo|homigo|washgo","videoNote":"60字內","lines":[{"who":"阿豪|小咪|阿樂|新聞收集|行銷小編|發文小編|Podcast小編|圖片小編|影片小編","text":"42字內"}]}',
+            '三個品牌必須各接不同編號。接不上自己的牌子就換一條，不要三個人寫同一則租屋或同一則工安。',
+            'theme 要是一個具體場面或一句沒被接住的話。禁止「建立信任」「團隊文化」「合規」「指南」「透明溝通」這種總結句。',
+            '阿豪只講工地、派工、回報對不攏，句子短。小咪只講租屋場面，不站隊罵房東或房客。阿樂只講洗衣店櫃台、洗標、羽絨、客人問洗好了沒；租屋新聞接不上就寫店裡的事。',
+            'lines 4 到 6 句，要有人把題目搶走或反對，禁止每句都以「正在」開頭。新聞收集只報關鍵字，不把三個品牌收成同一篇。',
+            '近十天發過的標題不要再寫同一句。負責人交代只當方向，不能寫成新聞或數字。',
           ].join('\n'),
         },
         {
           role: 'user',
-          content: `情報:\n${signalText}\n\n不可宣稱:\n${claimText}\n\n負責人交代:\n${(adviceRows as { nickname: string; body: string }[]).map((row) => `${row.nickname}：${row.body}`).join('\n') || '無'}\n\n未上架 Podcast:${podcasts.map((item) => item.title).join('、') || '無'}\n影片:${videos.map((item) => `${item.title}(${item.status})`).join('、') || '無'}`,
+          content: `現在熱門與三天內情報:\n${signalText}\n\n近十天已發或已排的標題:\n${recentText}\n\n成效上記得住的切角:\n${learningText}\n\n不可宣稱:\n${claimText}\n\n負責人交代:\n${(adviceRows as { nickname: string; body: string }[]).map((row) => `${row.nickname}：${row.body}`).join('\n') || '無'}\n\n未上架 Podcast:${podcasts.map((item) => item.title).join('、') || '無'}\n影片:${videos.map((item) => `${item.title}(${item.status})`).join('、') || '無'}`,
         },
       ],
     });
@@ -219,12 +308,20 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
 
   plan = scrubPlanThemes(plan, claimsBySlug);
   plan.bubbles = plan.bubbles.filter((bubble) => !factProblem(bubble.text, Object.values(claimsBySlug).flat(), plan!.citations));
+  const lively = plan.bubbles.filter((bubble) => !/^正在/.test(bubble.text));
+  if (lively.length >= 3) plan.bubbles = lively;
   const plates = nameplates(plan, { quiet, autoPublish: enabled, videos, podcasts });
   if (!plan.bubbles.length) {
     plan.bubbles = plates.slice(0, 8).map((plate) => ({
       who: OFFICE_CAST.find((cast) => cast.key === plate.key)?.nickname ?? plate.key,
       text: plate.task.slice(0, 42),
     }));
+  }
+
+  const spoken = await speakOfficeMeeting(env, plan).catch(() => null);
+  if (spoken) {
+    inputTokens += spoken.inputTokens;
+    outputTokens += spoken.outputTokens;
   }
 
   const costUsd = haikuCostUsd(inputTokens, outputTokens);
@@ -260,6 +357,19 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
       VALUES (${brandId}::uuid, ${agentId}::uuid, ${standupId}::uuid, ${brand.sourceUrl}, ${brand.finding})
     `;
   }
+
+  await (async () => {
+    const stamped = await sql`SELECT started_at FROM office_standups WHERE id = ${standupId}::uuid`;
+    const startedAt = new Date((stamped[0] as { started_at: string }).started_at).toISOString();
+    await saveOfficeFilmScript(env, {
+      id: standupId,
+      startedAt,
+      hook: spoken?.hook,
+      close: spoken?.close,
+      lines: spoken && spoken.lines.length ? spoken.lines : plan.bubbles,
+      themes: plan.brands.map((brand) => ({ slug: brand.slug, theme: brand.theme })),
+    });
+  })().catch((e) => console.error('[office-film] 會議腳本沒寫入', e));
 
   return {
     status: 'completed',

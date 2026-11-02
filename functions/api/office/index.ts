@@ -4,6 +4,7 @@ import { requireAuth } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
 import { json, failLoad } from '../../_shared/response';
 import { ensureOfficeSuggestions, setOfficeAutoPublish } from '../../_shared/office-directive';
+import { ensureOfficeFilmColumns } from '../../_shared/office-film';
 import { OFFICE_MONTHLY_BUDGET_USD, isOfficeQuietHour } from '../../_shared/office-facts';
 import { fetchGoogleTrendsTW, fetchTaiwanNews } from '../../_shared/sources';
 import { extractKeywords } from '../trending';
@@ -63,18 +64,27 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   try {
     const sql = getSql(context.env);
     await ensureOfficeSuggestions(context.env).catch(() => undefined);
+    const filmReady = await ensureOfficeFilmColumns(context.env).then(() => true).catch(() => false);
+    const standupQuery = filmReady
+      ? sql`
+          SELECT id, started_at, status, directive, bubbles, cost_usd, apply_to_generation, valid_until, note, film_url, film_status
+          FROM office_standups
+          ORDER BY started_at DESC
+          LIMIT 1
+        `
+      : sql`
+          SELECT id, started_at, status, directive, bubbles, cost_usd, apply_to_generation, valid_until, note
+          FROM office_standups
+          ORDER BY started_at DESC
+          LIMIT 1
+        `;
     const hotWords = Promise.race([
       Promise.all([fetchGoogleTrendsTW(12), fetchTaiwanNews(8)]),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('hot-timeout')), 2500)),
     ]).catch(() => [[], []] as [{ title: string }[], { title: string }[]]);
     const [settings, standups, agents, signals, podcasts, videos, spentRows, findings, statRows, nextRows, suggestionRows, hot] = await Promise.all([
       sql`SELECT auto_publish FROM office_settings WHERE id = 1`,
-      sql`
-        SELECT id, started_at, status, directive, bubbles, cost_usd, apply_to_generation, valid_until, note
-        FROM office_standups
-        ORDER BY started_at DESC
-        LIMIT 1
-      `,
+      standupQuery,
       sql`
         SELECT a.id, a.display_name, a.avatar_color, a.persona, r.code AS role_code,
                b.slug AS brand_slug,

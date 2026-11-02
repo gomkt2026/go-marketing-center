@@ -39,7 +39,7 @@ import { notifyPendingReviewDigest, notifyPublishFailed } from '../../../functio
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from '../../../functions/_shared/auto-post-brands';
 import { runSeoAutoPublish } from '../../../functions/_shared/seo-autopublish';
 import {
-  SYSTEM_SHORT_SLOTS, catchupSystemShortSlot, generateSystemShortSlot, hasSystemShorts,
+  SYSTEM_SHORT_SLOTS, catchupSystemShortSlot, generateSystemShortSlot, hasSystemShorts, isSystemShortDay,
 } from '../../../functions/_shared/system-short-slots';
 
 const AUTO_DRAFT_THRESHOLD = 0.75;
@@ -1242,7 +1242,7 @@ async function halfHourlyDispatch(env: Env): Promise<void> {
       }
     }
     const shortDue = SYSTEM_SHORT_SLOTS.filter((s) => s.hourTw === genHour);
-    if (shortDue.length) {
+    if (shortDue.length && isSystemShortDay(slotAt)) {
       const shortSlugs = (await listAutoPostSlugs(env)).filter(hasSystemShorts);
       for (const slug of shortSlugs) {
         for (const slot of shortDue) {

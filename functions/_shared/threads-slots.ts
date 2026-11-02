@@ -197,6 +197,14 @@ async function writeTrafficDraft(
     now: slotMs,
     skipPrediction: true,
   });
+  if (theme?.includes('洋流')) {
+    const scrollStop: Record<string, string> = {
+      taskgo: 'https://go-marketing-center.pages.dev/showcase/i/pain-boss.jpg',
+      washgo: 'https://go-marketing-center.pages.dev/showcase/i/washgo-field.jpg',
+      homigo: 'https://go-marketing-center.pages.dev/showcase/i/homigo-home.jpg',
+    };
+    post.imageUrl = scrollStop[brand.slug] ?? post.imageUrl;
+  }
   if (await brandHasHourContent(env, brand.id, slotAt)) return null;
   const { contentId } = await saveGeneratedContent(env, {
     brandCtx: { brandId: brand.id, slug: brand.slug, name: brand.name, systemPrompt: '' },
@@ -557,7 +565,7 @@ export async function promoteDueThreadsSafetyNet(env: Env): Promise<number> {
         updated_at = now()
     WHERE target_platform = 'threads'
       AND status IN ('pending_review', 'scheduled')
-      AND coalesce(generation_prompt_meta->>'source', '') <> 'threads_game'
+      AND coalesce(generation_prompt_meta->>'source', '') NOT IN ('threads_game', 'showcase_book')
       AND coalesce(generation_prompt_meta->>'replyBody', '') <> ''
       AND created_at > now() - interval '3 days'
   `;

@@ -949,6 +949,11 @@ export function buildPostUserPrompt(params: {
   const headlineSpec = assetPain
     ? ASSET_PAIN_HEADLINE_JSON_SPEC
     : overlayHeadline ? POSTER_HEADLINE_JSON_SPEC : '';
+  const ageVoice = params.platform === 'facebook'
+    ? '這篇給 Facebook。讀者多半四十歲以上的老闆、店主、工班頭。句子短，講人、講今天的麻煩，用他們平常會講的話。不要網路流行語，不要「數位轉型」「賦能」。和 IG 講同一件事時，句子不要一樣。立場中立，不評論政黨或該投給誰。'
+    : params.platform === 'instagram'
+      ? '這篇給 Instagram。讀者偏年輕。第一行就要停得下來，句子更短、節奏更快，仍然接地氣，像在講自己的班，不是廣告。和 FB 講同一件事時，句子不要一樣。立場中立，不評論政黨或該投給誰。'
+      : '';
   return [
     `請針對以下主題,為 ${params.platform} 平台寫一篇貼文。`,
     `主題:${params.topic}`,
@@ -956,6 +961,7 @@ export function buildPostUserPrompt(params: {
     '',
     guideline,
     laneBlock,
+    ageVoice,
     searchBlock,
     params.extraInstruction ?? '',
     assetPain
@@ -1573,18 +1579,19 @@ export type TrafficFormulaId = 'hook' | 'joke';
 
 const TRAFFIC_HOURS = [9, 12, 18, 21];
 
-/** 災難、政治、喪聞、性騷擾不拿來博流量。
- *  11/28 投票日的街頭後勤（宣傳車佔路、工班排班、活動衫送洗、社區文宣）另外手排，
- *  不進這條爬蟲。那些稿不點名政黨、候選人，也不寫該投給誰。
+/** 災難、政治表態、喪聞、性騷擾不拿來博流量。
+ *  「洋流」這個詞可以接，但標題會被收成這兩個字再寫。
+ *  正文只寫店裡、巷口、梯間碰到的布條、車、喇叭，不寫人名、政黨、該投給誰。
  */
 const TREND_BLOCK = /死亡|命案|戰爭|暴動|選舉|罷免|自殺|色情|未成年|殺害|兇殺|空難|喪禮|告別式|梗塞|騷擾|狼爪|性侵|還債/;
+const CURRENT_WORD = '洋流';
 /** 純賽事、純債市放最後，有生活題材就不要三個帳號一起寫。 */
 const TREND_DEFER = /股價|美債|殖利率|比特幣|升息|英超|法甲|冠軍|比分|中職|金馬/;
 
 const BRAND_TREND_FIT: Record<string, RegExp> = {
-  taskgo: /颱風|豪雨|地震|漏水|淹水|裝修|營造|工地|施工|老屋|壁癌|停班|薔/,
-  homigo: /房租|房價|租屋|租金|離職|薪水|搬家|居住|失業/,
-  washgo: /車站|店面|鐵軌|地下化|回憶|下雨|洗衣|衣服|梅雨|換季/,
+  taskgo: /颱風|豪雨|地震|漏水|淹水|裝修|營造|工地|施工|老屋|壁癌|停班|薔|洋流/,
+  homigo: /房租|房價|租屋|租金|離職|薪水|搬家|居住|失業|洋流/,
+  washgo: /車站|店面|鐵軌|地下化|回憶|下雨|洗衣|衣服|梅雨|換季|洋流/,
 };
 
 const JOKE_SEEDS: Record<string, string[]> = {
@@ -1634,6 +1641,13 @@ export function usableTrends(titles: string[]): string[] {
     title = title.replace(/\s*[-|｜]\s*(自由時報|自由電子報|聯合報|ETtoday|三立|TVBS|中央社|Yahoo).*$/i, '').trim();
     if (title.length > 36) title = title.slice(0, 28);
     const key = title.replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '');
+    if (/洋流/.test(title)) {
+      if (!seen.has(CURRENT_WORD)) {
+        seen.add(CURRENT_WORD);
+        fresh.unshift(CURRENT_WORD);
+      }
+      continue;
+    }
     if (key.length < 2 || seen.has(key) || TREND_BLOCK.test(title)) continue;
     seen.add(key);
     (TREND_DEFER.test(title) ? deferred : fresh).push(title);
@@ -1701,6 +1715,7 @@ const BRAND_TOPIC_DEFAULT: Record<string, string> = {
 
 /** 一篇一個、跟正文同一件事的主題標籤。對不上就用這個品牌的生活面。 */
 export function pickTrafficTopicTag(slug: string, body: string, requested?: string | null): string {
+  if (body.includes('洋流')) return '洋流';
   const clean = (requested ?? '').replace(/[#＃\s]/g, '').replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '').slice(0, 12);
   const words = BRAND_TOPIC_WORDS[slug] ?? BRAND_TOPIC_WORDS.homigo;
   const allowed = clean.length >= 2
@@ -1852,7 +1867,8 @@ export function composeTrafficPrompt(opts: {
   const isJoke = opts.formula === 'joke';
   const taskgo = opts.brandSlug === 'taskgo';
   const theme = (opts.theme ?? '').trim();
-  const anchor = !isJoke && theme ? trendAnchor(theme) : '';
+  const anchor = !isJoke && theme ? (theme.includes('洋流') ? '洋流' : trendAnchor(theme)) : '';
+  const currentWave = theme.includes('洋流');
   const maxChars = isJoke ? 170 : opts.brandSlug === 'washgo' ? 210 : 250;
   const minChars = isJoke ? 50 : 80;
   const label = isJoke ? (taskgo ? '工地笑話' : '品牌笑話') : (taskgo ? '工地判斷' : '時事小故事');
@@ -1867,6 +1883,9 @@ export function composeTrafficPrompt(opts: {
     '前兩行就要有畫面，沒點開也看得懂。',
     '笑點或想被轉出去的那一句放倒數第二行。最後一行只能有一個問句，問做過的人遇過哪一種。不要寫「你們覺得呢」「有共鳴嗎」。',
     '不要自己回文。replyBody 回傳空字串。',
+    currentWave
+      ? '這則熱門只准寫成店裡、巷口或梯間碰到的布條、車、喇叭。正文要出現「洋流」。禁止任何人名、政黨、縣市候選人，禁止寫支持、投給、下架。不評價這股人潮。顏色可以每一件都不一樣。'
+      : '',
     `topicTag 只放一個跟這篇同一件事的詞，2 到 8 個字，不要井號。對不上就用「${defaultTag}」。`,
     worn.length ? `這七天已經寫過這些場面，正文禁止再出現：${worn.join('、')}。` : '',
     openings.length ? `這些開頭最近用過，禁止再以同樣的八個字起頭：${openings.join('、')}。` : '',

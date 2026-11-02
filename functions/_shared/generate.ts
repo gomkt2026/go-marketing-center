@@ -837,6 +837,24 @@ export async function generateTrafficPost(
     }
   }
 
+  const namedSide = /賴清德|沈伯洋|蔣萬安|民進黨|國民黨|民眾黨|時代力量|柯文哲|小水滴|投給|下架/;
+  if (namedSide.test(post.body)) {
+    post = await socialChatJson<GeneratedPost>(env, {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+        { role: 'assistant', content: JSON.stringify(post) },
+        {
+          role: 'user',
+          content: '這篇出現了人名、政黨或投票表態。改成店裡、巷口或梯間碰到的一件小事。可以寫「洋流」這個大家在講的現象，禁止任何人名、政黨、支持、投給、下架。不評價。至少三行，最後一行是問句。回傳同格式 JSON。',
+        },
+      ],
+      temperature: 0.4,
+    });
+    post = finishTrafficPost(post, params.brandSlug);
+    if (namedSide.test(post.body)) throw new Error('這一檔寫到站隊，先不發');
+  }
+
   const prediction = params.skipPrediction
     ? { score: 0, analysis: '', suggestions: [] }
     : await socialChatJson<EngagementPrediction>(env, {

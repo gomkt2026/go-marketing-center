@@ -12,7 +12,7 @@ import {
 } from './system-shorts';
 
 /**
- * 每天的系統短影片檔：TaskGo、Washgo 各輪播一支短片，只發 FB 粉專影片和 IG Reels。
+ * 系統短影片檔：TaskGo、Washgo 隔一天各輪播一支，只發 FB 粉專影片和 IG Reels。
  * Threads 文字中位數約 200，同一支影片在 Threads 只有幾十次觀看，不再排進 Threads。
  * 同一天兩個平台用同一支，隔天換下一支（最久沒發的先發）。
  */
@@ -22,6 +22,12 @@ export const SYSTEM_SHORT_SLOTS: { platform: Extract<SocialPlatform, 'facebook' 
   { platform: 'facebook', hourTw: 20 },
   { platform: 'instagram', hourTw: 20 },
 ];
+
+/** 隔一天一支。以台灣日期的「日」為準，雙數日才發（2、4、6…）。 */
+export function isSystemShortDay(now: Date): boolean {
+  const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return tw.getUTCDate() % 2 === 0;
+}
 
 export function hasSystemShorts(slug: string): boolean {
   return shortsForBrand(slug).length > 0;
@@ -74,8 +80,8 @@ async function autoPublishOn(env: Env, brandId: string, platform: 'facebook' | '
 }
 
 const PLATFORM_HINT: Record<'facebook' | 'instagram' | 'threads', string> = {
-  facebook: 'FB 粉專影片的說明文字：開頭一句痛點，接著三到四個系統重點，最後一句收尾。',
-  instagram: 'IG Reels 的說明：第一行就是痛點鉤子，讓人停下來看完影片；條列功能，hashtag 放最後。',
+  facebook: 'FB 影片說明，給四十歲以上的老闆、店主、工班頭。第一句講今天碰到的麻煩，接著用他們平常講話的方式講影片裡的事。句子短，不要網路流行語，不要條列術語，不要「數位轉型」。立場中立，不評論政治。',
+  instagram: 'IG Reels 說明，給較年輕的人。第一行就要讓人停下來。短句、節奏快，講同一支影片，但不要跟 FB 用同一套句子。接地氣，像在講自己的班，不要廣告腔。立場中立，不評論政治。',
   threads: 'Threads 附影片：口語、像老闆在聊天，五行內，不用條列、不放 hashtag。',
 };
 
@@ -85,7 +91,7 @@ export async function generateSystemShortSlot(
   params: { slug: string; platform: 'facebook' | 'instagram' | 'threads'; slotAt: Date },
 ): Promise<string | null> {
   const { slug, platform, slotAt } = params;
-  if (!hasSystemShorts(slug)) return null;
+  if (!hasSystemShorts(slug) || !isSystemShortDay(slotAt)) return null;
   const sql = getSql(env);
   const brands = await sql`SELECT id FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1`;
   const brandId = (brands[0] as { id?: string } | undefined)?.id;
@@ -155,7 +161,7 @@ export async function generateSystemShortSlot(
 
 /** 今天已到生成時間、還沒產的短影片檔，補一則。leadHours 前就可以先產。 */
 export async function catchupSystemShortSlot(env: Env, slug: string, leadHours: number, now = new Date()): Promise<boolean> {
-  if (!hasSystemShorts(slug)) return false;
+  if (!hasSystemShorts(slug) || !isSystemShortDay(now)) return false;
   const sql = getSql(env);
   const brands = await sql`SELECT id FROM brands WHERE slug = ${slug} AND is_active = true LIMIT 1`;
   const brandId = (brands[0] as { id?: string } | undefined)?.id;

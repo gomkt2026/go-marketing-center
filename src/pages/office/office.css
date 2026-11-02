@@ -928,8 +928,131 @@
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
 }
 
-.walker.is-away em { display: inline-block; }
-.walker.is-away .portrait { animation: walk-bob 0.45s ease-in-out infinite; }
+.walker.is-away em,
+.walker.is-dancing em { display: inline-block; }
+
+.doll { display: contents; }
+
+.walker.is-dancing {
+  transition: left 1.15s ease-in-out, top 1.15s ease-in-out;
+}
+
+.walker.is-dancing .doll {
+  display: block;
+  position: relative;
+  width: 72px;
+  height: 118px;
+  margin: 0 auto;
+  animation-delay: var(--lag);
+}
+
+.walker.is-dancing .portrait,
+.walker.is-dancing .face-fallback {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 0;
+  width: 46px;
+  height: 46px;
+  transform: translateX(-50%);
+  animation: none;
+}
+
+.walker.is-dancing .torso,
+.walker.is-dancing .arm,
+.walker.is-dancing .leg { display: block; position: absolute; }
+
+.walker.is-dancing .torso {
+  z-index: 1;
+  left: 50%;
+  top: 34px;
+  width: 36px;
+  height: 40px;
+  margin-left: -18px;
+  border-radius: 14px 14px 8px 8px;
+  background: var(--mat);
+  box-shadow: inset 0 -8px 0 rgba(0, 0, 0, 0.12);
+}
+
+.walker.is-dancing .arm {
+  z-index: 2;
+  top: 40px;
+  width: 10px;
+  height: 30px;
+  border-radius: 8px;
+  background: #f0c7a8;
+  transform-origin: 50% 4px;
+}
+
+.walker.is-dancing .arm.left { left: 12px; }
+.walker.is-dancing .arm.right { right: 12px; }
+
+.walker.is-dancing .arm::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #f0c7a8;
+}
+
+.walker.is-dancing .leg {
+  z-index: 1;
+  top: 68px;
+  width: 12px;
+  height: 34px;
+  border-radius: 7px;
+  background: #6d7f96;
+  transform-origin: 50% 3px;
+}
+
+.walker.is-dancing .leg.left { left: 26px; }
+.walker.is-dancing .leg.right { right: 26px; }
+
+.walker.is-dancing .leg::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  bottom: 0;
+  width: 14px;
+  height: 6px;
+  border-radius: 3px;
+  background: #1b2430;
+}
+
+.walker.is-sidestep .doll { animation: sidestep 0.72s ease-in-out infinite; animation-delay: var(--lag); }
+.walker.is-sidestep .arm.left { animation: arm-swing 0.72s ease-in-out infinite; animation-delay: var(--lag); }
+.walker.is-sidestep .arm.right { animation: arm-swing 0.72s ease-in-out infinite reverse; animation-delay: var(--lag); }
+.walker.is-sidestep .leg.left { animation: step-l 0.72s ease-in-out infinite; animation-delay: var(--lag); }
+.walker.is-sidestep .leg.right { animation: step-r 0.72s ease-in-out infinite; animation-delay: var(--lag); }
+
+.walker.is-naughty .doll { animation: naughty-bounce 0.46s ease-in-out infinite; animation-delay: var(--lag); }
+.walker.is-naughty .arm { top: 20px; height: 26px; }
+.walker.is-naughty .arm.left { animation: cheek-l 0.46s ease-in-out infinite; animation-delay: var(--lag); }
+.walker.is-naughty .arm.right { animation: cheek-r 0.46s ease-in-out infinite; animation-delay: var(--lag); }
+.walker.is-naughty .leg { animation: knee 0.46s ease-in-out infinite; animation-delay: var(--lag); }
+
+.dance-flag {
+  position: absolute;
+  z-index: 60;
+  left: 50%;
+  top: 608px;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff8ef;
+  color: #17303a;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.office-room.is-dancing .lounge {
+  box-shadow: 0 0 36px rgba(255, 214, 120, 0.55);
+}
+.walker.is-away:not(.is-dancing) .portrait { animation: walk-bob 0.45s ease-in-out infinite; }
 .station.is-away .keys b { animation: none; opacity: 0.35; }
 
 .talkbox {
@@ -1087,6 +1210,38 @@
 }
 @keyframes eq {
   to { height: 10px; }
+}
+@keyframes sidestep {
+  0%, 100% { transform: translateX(-12px) rotate(-7deg); }
+  50% { transform: translateX(12px) rotate(7deg); }
+}
+@keyframes arm-swing {
+  0%, 100% { transform: rotate(32deg); }
+  50% { transform: rotate(-32deg); }
+}
+@keyframes step-l {
+  0%, 100% { transform: translateX(-7px) rotate(10deg); }
+  50% { transform: translateX(3px) rotate(-6deg); }
+}
+@keyframes step-r {
+  0%, 100% { transform: translateX(3px) rotate(-6deg); }
+  50% { transform: translateX(7px) rotate(10deg); }
+}
+@keyframes naughty-bounce {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(-14px) rotate(6deg); }
+}
+@keyframes cheek-l {
+  0%, 100% { transform: rotate(-72deg); }
+  50% { transform: rotate(-28deg); }
+}
+@keyframes cheek-r {
+  0%, 100% { transform: rotate(72deg); }
+  50% { transform: rotate(28deg); }
+}
+@keyframes knee {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: scaleY(0.86); }
 }
 @keyframes walk-bob {
   0%, 100% { transform: translateY(0); }

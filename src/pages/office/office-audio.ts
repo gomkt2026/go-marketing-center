@@ -1,7 +1,11 @@
+export type DanceKind = 'naughty' | 'sidestep';
+
 type Ambience = {
   start: () => void;
   stop: () => void;
   dispose: () => void;
+  playDance: (kind: DanceKind) => void;
+  stopDance: () => void;
 };
 
 const C = 261.63;
@@ -29,8 +33,12 @@ export function createOfficeAmbience(): Ambience {
   let ctx: AudioContext | null = null;
   let master: GainNode | null = null;
   let piano: GainNode | null = null;
+  let beat: GainNode | null = null;
   let timer = 0;
+  let danceTimer = 0;
   let stopped = true;
+  let danceOn = false;
+  let danceKind: DanceKind = 'sidestep';
   let step = 0;
 
   function note(freq: number, when: number, dur: number, peak: number) {
@@ -81,6 +89,9 @@ export function createOfficeAmbience(): Ambience {
     master.gain.value = 0.8;
     piano = ctx.createGain();
     piano.gain.value = 1;
+    beat = ctx.createGain();
+    beat.gain.value = 0.0001;
+    beat.connect(master);
     const warm = ctx.createBiquadFilter();
     warm.type = 'lowpass';
     warm.frequency.value = 2400;
@@ -114,13 +125,64 @@ export function createOfficeAmbience(): Ambience {
     drone.start();
   }
 
+  function thump(when: number, freq: number, peak: number) {
+    if (!ctx || !beat) return;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, when);
+    osc.frequency.exponentialRampToValueAtTime(48, when + 0.14);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(peak, when);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.2);
+    osc.connect(gain);
+    gain.connect(beat);
+    osc.start(when);
+    osc.stop(when + 0.22);
+  }
+
+  function tick(when: number, freq: number, peak: number) {
+    if (!ctx || !beat) return;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, when);
+    gain.gain.exponentialRampToValueAtTime(peak, when + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.12);
+    osc.connect(gain);
+    gain.connect(beat);
+    osc.start(when);
+    osc.stop(when + 0.14);
+  }
+
+  function danceLoop() {
+    if (!ctx || !beat || !danceOn) return;
+    const naughty = danceKind === 'naughty';
+    const beatLen = naughty ? 0.42 : 0.56;
+    const start = ctx.currentTime + 0.04;
+    for (let i = 0; i < 8; i++) {
+      const at = start + i * beatLen;
+      thump(at, i % 2 === 0 ? 120 : 90, i % 2 === 0 ? 0.22 : 0.12);
+      if (naughty) {
+        tick(at + beatLen * 0.5, i % 2 === 0 ? 784 : 988, 0.05);
+      } else if (i % 2 === 1) {
+        tick(at, 523, 0.04);
+      }
+      tick(at, naughty ? (i % 4 === 0 ? 196 : 247) : (i % 2 === 0 ? 131 : 196), 0.06);
+    }
+    danceTimer = window.setTimeout(danceLoop, beatLen * 8 * 1000 - 60);
+  }
+
   function close() {
     stopped = true;
+    danceOn = false;
     window.clearTimeout(timer);
+    window.clearTimeout(danceTimer);
     void ctx?.close();
     ctx = null;
     master = null;
     piano = null;
+    beat = null;
   }
 
   return {
@@ -132,11 +194,31 @@ export function createOfficeAmbience(): Ambience {
       stopped = false;
       ensure();
       if (!ctx) return;
+      if (piano) piano.gain.setValueAtTime(danceOn ? 0.12 : 1, ctx.currentTime);
       void ctx.resume();
       window.clearTimeout(timer);
       loop();
     },
     stop: close,
     dispose: close,
+    playDance(kind) {
+      danceKind = kind;
+      ensure();
+      if (!ctx || !beat) return;
+      danceOn = true;
+      void ctx.resume();
+      beat.gain.cancelScheduledValues(ctx.currentTime);
+      beat.gain.setValueAtTime(1, ctx.currentTime);
+      if (piano) piano.gain.setValueAtTime(stopped ? 0.0001 : 0.12, ctx.currentTime);
+      window.clearTimeout(danceTimer);
+      danceLoop();
+    },
+    stopDance() {
+      danceOn = false;
+      window.clearTimeout(danceTimer);
+      if (ctx && piano && !stopped) piano.gain.setValueAtTime(1, ctx.currentTime);
+      if (ctx && beat) beat.gain.setValueAtTime(0.0001, ctx.currentTime);
+      if (stopped) close();
+    },
   };
 }

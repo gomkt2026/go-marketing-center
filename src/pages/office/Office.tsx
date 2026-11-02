@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api';
-import { createOfficeAmbience } from './office-audio';
+import { createOfficeAmbience, type DanceKind } from './office-audio';
 import { compactNumber, nextBoard, officeReply, pairLines, type Ask } from './talk';
 import type { OfficeAgent, OfficeSnapshot, OfficeStatPeriod } from './types';
 import './office.css';
@@ -23,6 +23,11 @@ const STATIONS = [
 
 type Station = (typeof STATIONS)[number];
 type ScreenKind = Station['screen'];
+
+const DANCE_SPOTS = [0, 1, 2, 3, 4, 5, 6, 7, 8].map((index) => ({
+  x: 168 + index * 88,
+  y: 668,
+}));
 
 const BRAND_ORDER = ['taskgo', 'homigo', 'washgo'] as const;
 const BRAND_LABEL: Record<string, string> = { taskgo: 'TaskGo', homigo: 'Homigo', washgo: 'Washgo' };
@@ -198,6 +203,8 @@ export function Office() {
   const [period, setPeriod] = useState<OfficeStatPeriod>('28');
   const [walks, setWalks] = useState<Record<string, { x: number; y: number }>>({});
   const [chat, setChat] = useState<{ a: string; b: string; lineA: string; lineB: string } | null>(null);
+  const [dance, setDance] = useState<DanceKind | null>(null);
+  const danceTimer = useRef(0);
   const [note, setNote] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
   const [noteSaved, setNoteSaved] = useState('');
@@ -235,7 +242,10 @@ export function Office() {
 
   useEffect(() => {
     ambience.current = createOfficeAmbience();
-    return () => ambience.current?.dispose();
+    return () => {
+      window.clearTimeout(danceTimer.current);
+      ambience.current?.dispose();
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -293,6 +303,7 @@ export function Office() {
   }, []);
 
   useEffect(() => {
+    if (dance) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     if (meeting) return;
     let alive = true;
@@ -336,10 +347,9 @@ export function Office() {
     return () => {
       alive = false;
       timers.forEach((id) => window.clearTimeout(id));
-      setWalks({});
       setChat(null);
     };
-  }, [data, selected, meeting]);
+  }, [data, selected, meeting, dance]);
 
   const counts = useMemo(() => {
     const agents = data?.agents ?? [];
@@ -372,6 +382,30 @@ export function Office() {
     } finally {
       setSwitchBusy(false);
     }
+  }
+
+  function endDance() {
+    window.clearTimeout(danceTimer.current);
+    setDance(null);
+    setWalks({});
+    ambience.current?.stopDance();
+  }
+
+  function beginDance(kind: DanceKind) {
+    window.clearTimeout(danceTimer.current);
+    if (dance === kind) {
+      endDance();
+      return;
+    }
+    const spots: Record<string, { x: number; y: number }> = {};
+    STATIONS.forEach((station, index) => {
+      spots[stationKey(station)] = DANCE_SPOTS[index];
+    });
+    setChat(null);
+    setWalks(spots);
+    setDance(kind);
+    ambience.current?.playDance(kind);
+    danceTimer.current = window.setTimeout(endDance, 16000);
   }
 
   function toggleMusic() {
@@ -433,6 +467,12 @@ export function Office() {
             <span className="eq" aria-hidden><i /><i /><i /></span>
             {musicOn ? '音樂開著' : '播放音樂'}
           </button>
+          <button type="button" className={`office-music${dance === 'naughty' ? ' is-on' : ''}`} onClick={() => beginDance('naughty')}>
+            {dance === 'naughty' ? '停下' : '跳你好壞'}
+          </button>
+          <button type="button" className={`office-music${dance === 'sidestep' ? ' is-on' : ''}`} onClick={() => beginDance('sidestep')}>
+            {dance === 'sidestep' ? '停下' : '跳閃身步'}
+          </button>
           <button type="button" className="office-music" onClick={() => void (demo ? leaveDemo() : enterDemo())}>
             {demo ? '結束展示' : '全螢幕展示'}
           </button>
@@ -447,7 +487,7 @@ export function Office() {
 
       <div className="office-fit" ref={fitRef}>
         <div className="office-scaler" style={{ width: ROOM_W * scale, height: ROOM_H * scale }}>
-          <div className="office-room" style={{ width: ROOM_W, height: ROOM_H, transform: `scale(${scale})` }}>
+          <div className={`office-room${dance ? ' is-dancing' : ''}`} style={{ width: ROOM_W, height: ROOM_H, transform: `scale(${scale})` }}>
             <div className="wall" />
             <div className="floor" />
             <div className="baseboard" />
@@ -495,6 +535,7 @@ export function Office() {
             <div className="shelf" aria-hidden><i /><i /><i /><i /></div>
             <div className="plant" aria-hidden><i className="leaf a" /><i className="leaf b" /><i className="leaf c" /><i className="pot" /></div>
 
+            {dance && <div className="dance-flag">{dance === 'naughty' ? '全體小編：你好壞' : '全體小編：閃身步'}</div>}
             <div className="lounge">
               <div className="sofa" />
               <div className="coffee">
@@ -550,13 +591,20 @@ export function Office() {
                 <button
                   key={`walk-${key}`}
                   type="button"
-                  className={`walker${walk ? ' is-away' : ''}${selected && agent?.id === selected ? ' is-picked' : ''}`}
-                  style={{ left: walk ? walk.x : station.x + 50, top: walk ? walk.y : station.y, zIndex: walk ? 40 : 20 + index }}
+                  className={`walker${walk ? ' is-away' : ''}${dance ? ` is-dancing is-${dance}` : ''}${selected && agent?.id === selected ? ' is-picked' : ''}`}
+                  style={{ left: walk ? walk.x : station.x + 50, top: walk ? walk.y : station.y, zIndex: dance ? 50 + index : walk ? 40 : 20 + index }}
                   aria-label={label}
                   onClick={() => agent && setSelected(agent.id)}
                 >
-                  {line && <span className="bubble">{line}</span>}
-                  <Face src={station.portrait} crop={station.crop} alt={label} tint={station.mat} />
+                  {line && !dance && <span className="bubble">{line}</span>}
+                  <span className="doll" style={{ ['--mat' as string]: station.mat, ['--lag' as string]: `${index * 0.07}s` }}>
+                    <Face src={station.portrait} crop={station.crop} alt={label} tint={station.mat} />
+                    <i className="arm left" />
+                    <i className="arm right" />
+                    <i className="torso" />
+                    <i className="leg left" />
+                    <i className="leg right" />
+                  </span>
                   <em>{label}</em>
                 </button>
               );

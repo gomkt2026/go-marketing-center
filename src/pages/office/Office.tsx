@@ -462,8 +462,8 @@ export function Office() {
             </div>
             <div className="brand-wall" aria-label="TaskGo、Homigo、Washgo">
               <img src="/brands/taskgo-logo.png" alt="TaskGo" />
-              <img src="/brands/homigo-logo.png" alt="Homigo" />
-              <img src="/brands/washgo-logo.png" alt="Washgo" />
+              <img src="/office/logo-homigo.png" alt="Homigo" />
+              <img src="/office/logo-washgo.png" alt="Washgo" />
             </div>
             <div className="clock" aria-hidden>
               <i className="hand hour" style={{ transform: `rotate(${(clock.h % 12) * 30 + clock.m * 0.5}deg)` }} />

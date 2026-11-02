@@ -19,6 +19,23 @@ export interface OfficePack {
 
 const INACTIVE: OfficePack = { active: false, theme: '', line: '', facts: [], cannotClaims: [] };
 
+export async function ensureOfficeSuggestions(env: Env) {
+  const sql = getSql(env);
+  await sql`
+    CREATE TABLE IF NOT EXISTS office_suggestions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      agent_id UUID NOT NULL REFERENCES ai_agents(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_office_suggestions_agent
+    ON office_suggestions (agent_id, created_at DESC)
+  `;
+}
+
 export async function loadOfficePack(env: Env, brandId: string, slug: string): Promise<OfficePack> {
   try {
     const sql = getSql(env);

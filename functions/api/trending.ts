@@ -45,7 +45,7 @@ function headlineKey(title: string): string {
  * 熱門關鍵字：重複出現的完整標題只留一條，短詞必須跨到不同標題才算。
  * 不再對長標題做 8 字滑動視窗，避免「台南車站百年鐵軌」被切成一串重疊碎片。
  */
-function extractKeywords(titles: string[], limit = 28): KeywordItem[] {
+export function extractKeywords(titles: string[], limit = 28): KeywordItem[] {
   const headlineCount = new Map<string, number>();
   const shortHeads = new Map<string, Set<string>>();
 

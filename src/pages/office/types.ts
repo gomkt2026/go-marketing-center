@@ -55,8 +55,17 @@ export interface OfficeSnapshot {
   videos: { id: string; title: string; status: string; final_url: string | null; preview_url: string | null }[];
   findings: { slug: string; summary: string; source_url: string | null }[];
   agents: OfficeAgent[];
-  brandStats?: OfficeBrandStat[];
-  nextJob?: OfficeNextJob | null;
+  brandStats?: Record<'1' | '7' | '28', OfficeBrandStat[]>;
+  nextJobs?: OfficeNextJob[];
+  keywords?: string[];
+  suggestions?: OfficeSuggestion[];
+}
+
+export interface OfficeSuggestion {
+  id: string;
+  agentId: string;
+  body: string;
+  createdAt: string;
 }
 
 export interface OfficeBrandStat {
@@ -69,7 +78,9 @@ export interface OfficeBrandStat {
 
 export interface OfficeNextJob {
   slug: string;
-  title: string;
-  platform: string;
+  title: string | null;
+  platform: string | null;
   scheduledAt: string | null;
 }
+
+export type OfficeStatPeriod = '1' | '7' | '28';

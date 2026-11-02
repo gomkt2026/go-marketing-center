@@ -1320,6 +1320,16 @@ CREATE TABLE IF NOT EXISTS agent_activity (
   CONSTRAINT agent_activity_status_check CHECK (status IN ('working', 'done', 'blocked'))
 );
 
+CREATE TABLE IF NOT EXISTS office_suggestions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id    UUID NOT NULL REFERENCES ai_agents(id) ON DELETE CASCADE,
+  user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+  body        TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_office_suggestions_agent
+  ON office_suggestions (agent_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS agent_findings (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   brand_id    UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,

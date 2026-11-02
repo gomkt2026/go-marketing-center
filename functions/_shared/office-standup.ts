@@ -1,7 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { claudeChatJsonWithUsage } from './claude';
-import { setOfficeActivity } from './office-directive';
+import { ensureOfficeSuggestions, setOfficeActivity } from './office-directive';
 import {
   BRAND_SLUGS,
   OFFICE_CAST,
@@ -103,7 +103,8 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
     return { status: 'budget_exhausted', standupId, note: '這班額度用完', applyToGeneration: false, themes: [] };
   }
 
-  const [signalRows, claimRows, podcastRows, videoRows, brandRows] = await Promise.all([
+  await ensureOfficeSuggestions(env).catch(() => undefined);
+  const [signalRows, claimRows, podcastRows, videoRows, brandRows, adviceRows] = await Promise.all([
     sql`
       SELECT ms.title, ms.summary, ms.source_url, b.slug
       FROM market_signals ms
@@ -137,6 +138,14 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
       LIMIT 5
     `,
     sql`SELECT id, slug FROM brands WHERE slug IN ('taskgo', 'homigo', 'washgo')`,
+    sql`
+      SELECT coalesce(a.persona->>'nickname', a.display_name) AS nickname, s.body
+      FROM office_suggestions s
+      JOIN ai_agents a ON a.id = s.agent_id
+      WHERE s.created_at > now() - interval '14 days'
+      ORDER BY s.created_at DESC
+      LIMIT 12
+    `.catch(() => []),
   ]);
 
   const signals: SignalFact[] = (signalRows as { title: string; summary: string | null; source_url: string | null }[])
@@ -166,12 +175,12 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
           content: [
             '你是 Go 行銷中心的晨會記錄。只根據下面給的情報做決定，不准添媒體露出、客戶數、排名或沒出現的細節。',
             '回傳一個 JSON：{"brands":[{"slug":"taskgo|homigo|washgo","theme":"40字內方向","doMore":["短句"],"doLess":["短句"],"signalIndexes":[情報編號]}],"podcastTopic":"40字內","imageBrief":"60字內","imageSlug":"taskgo|homigo|washgo","videoNote":"60字內","lines":[{"who":"阿豪|小咪|阿樂|新聞收集|行銷小編|發文小編|Podcast小編|圖片小編|影片小編","text":"42字內現在進行式"}]}',
-            'lines 最多 8 句。signalIndexes 只能用下面出現的編號。',
+            'lines 最多 8 句。signalIndexes 只能用下面出現的編號。負責人交代只能當成方向，不能寫成已經發生的新聞、數字或媒體露出。',
           ].join('\n'),
         },
         {
           role: 'user',
-          content: `情報:\n${signalText}\n\n不可宣稱:\n${claimText}\n\n未上架 Podcast:${podcasts.map((item) => item.title).join('、') || '無'}\n影片:${videos.map((item) => `${item.title}(${item.status})`).join('、') || '無'}`,
+          content: `情報:\n${signalText}\n\n不可宣稱:\n${claimText}\n\n負責人交代:\n${(adviceRows as { nickname: string; body: string }[]).map((row) => `${row.nickname}：${row.body}`).join('\n') || '無'}\n\n未上架 Podcast:${podcasts.map((item) => item.title).join('、') || '無'}\n影片:${videos.map((item) => `${item.title}(${item.status})`).join('、') || '無'}`,
         },
       ],
     });

@@ -15,7 +15,7 @@
 BEGIN;
 
 TRUNCATE TABLE
-  agent_findings, agent_activity, office_standups,
+  office_suggestions, agent_findings, agent_activity, office_standups,
   activity_logs, learning_records, performance_reports, publishing_logs,
   publishing_jobs, content_reviews, content_assets, content_versions, contents,
   event_registrations, event_referrers, event_sessions, events,

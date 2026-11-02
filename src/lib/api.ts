@@ -1469,6 +1469,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ autoPublish }),
     }),
+
+  addOfficeSuggestion: (agentId: string, suggestion: string) =>
+    request<{ ok: boolean }>('/api/office', {
+      method: 'POST',
+      body: JSON.stringify({ agentId, suggestion }),
+    }),
 };
 
 // -- 活動報名(公開端,無需登入) ----------------------------------------------

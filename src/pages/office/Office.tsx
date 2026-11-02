@@ -2,19 +2,19 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { createOfficeAmbience } from './office-audio';
-import { compactNumber, nextLine, officeReply, type Ask } from './talk';
-import type { OfficeAgent, OfficeSnapshot } from './types';
+import { compactNumber, nextBoard, officeReply, pairLines, type Ask } from './talk';
+import type { OfficeAgent, OfficeSnapshot, OfficeStatPeriod } from './types';
 import './office.css';
 
 const ROOM_W = 1120;
 const ROOM_H = 840;
 
 const STATIONS = [
-  { role: 'brand_ai', slug: 'taskgo', name: '阿豪', x: 40, y: 236, mat: '#e2a23a', screen: 'jobs', portrait: '/brands/taskgo-ahao.png', crop: 'center 14%' },
+  { role: 'brand_ai', slug: 'taskgo', name: '阿豪', x: 40, y: 292, mat: '#e2a23a', screen: 'jobs', portrait: '/brands/taskgo-ahao.png', crop: 'center 14%' },
   { role: 'brand_ai', slug: 'homigo', name: '小咪', x: 52, y: 430, mat: '#d9c7a6', screen: 'homes', portrait: '/brands/homigo-xiaomi.png', crop: 'center 16%' },
   { role: 'brand_ai', slug: 'washgo', name: '阿樂', x: 36, y: 624, mat: '#7eb6e0', screen: 'laundry', portrait: '/brands/washgo-ale.png', crop: 'center 18%' },
-  { role: 'market_analyst', slug: null, name: '新聞收集', x: 640, y: 228, mat: '#b7ddd4', screen: 'ticker', portrait: '/office/cast-news.jpg', crop: 'center 18%' },
-  { role: 'content_strategist', slug: null, name: '行銷小編', x: 872, y: 240, mat: '#f2c14e', screen: 'plan', portrait: '/office/cast-strategy.jpg', crop: 'center 16%' },
+  { role: 'market_analyst', slug: null, name: '新聞收集', x: 640, y: 300, mat: '#b7ddd4', screen: 'ticker', portrait: '/office/cast-news.jpg', crop: 'center 18%' },
+  { role: 'content_strategist', slug: null, name: '行銷小編', x: 872, y: 308, mat: '#f2c14e', screen: 'plan', portrait: '/office/cast-strategy.jpg', crop: 'center 16%' },
   { role: 'publisher', slug: null, name: '發文小編', x: 656, y: 424, mat: '#7ee0ff', screen: 'queue', portrait: '/office/cast-publisher.jpg', crop: 'center 20%' },
   { role: 'podcast_producer', slug: null, name: 'Podcast小編', x: 860, y: 436, mat: '#f0b429', screen: 'wave', portrait: '/office/cast-podcast.jpg', crop: 'center 14%' },
   { role: 'art_director', slug: null, name: '圖片小編', x: 644, y: 616, mat: '#f4a6c4', screen: 'swatch', portrait: '/office/cast-art.jpg', crop: 'center 10%' },
@@ -23,12 +23,6 @@ const STATIONS = [
 
 type Station = (typeof STATIONS)[number];
 type ScreenKind = Station['screen'];
-
-const LOUNGE_SPOTS = [
-  { x: 348, y: 508 },
-  { x: 456, y: 572 },
-  { x: 524, y: 496 },
-];
 
 const BRAND_ORDER = ['taskgo', 'homigo', 'washgo'] as const;
 const BRAND_LABEL: Record<string, string> = { taskgo: 'TaskGo', homigo: 'Homigo', washgo: 'Washgo' };
@@ -64,8 +58,8 @@ function screenCopy(station: Station, agent: OfficeAgent | undefined, data: Offi
   const theme = themeFor(data, station.slug);
   const line = (theme || task || '等下一班晨會').replace(/\s+/g, ' ');
   if (station.screen === 'ticker') {
-    const titles = (data?.signals ?? []).map((signal) => signal.title).filter(Boolean).slice(0, 4);
-    return { title: '新聞', line: titles.length ? titles.join('  ·  ') : '在收頭條' };
+    const titles = (data?.keywords ?? []).filter(Boolean).slice(0, 8);
+    return { title: '熱門', line: titles.length ? titles.join('  ·  ') : '在收頭條' };
   }
   if (station.screen === 'wave') {
     const episode = data?.podcasts?.[0];
@@ -164,15 +158,23 @@ function TypedText({ text }: { text: string }) {
   return <>{text.slice(0, count)}</>;
 }
 
-function WindowPane({ moon }: { moon?: boolean }) {
+function skyPhase(hour: number): 'dawn' | 'day' | 'dusk' | 'night' {
+  if (hour >= 6 && hour < 9) return 'dawn';
+  if (hour >= 9 && hour < 16) return 'day';
+  if (hour >= 16 && hour < 19) return 'dusk';
+  return 'night';
+}
+
+function WindowPane({ phase, moon }: { phase: 'dawn' | 'day' | 'dusk' | 'night'; moon?: boolean }) {
   return (
     <div className="window">
-      <div className="sky">
-        {moon && <i className="moon" />}
+      <div className={`sky is-${phase}`}>
+        {phase === 'day' && <i className="sun" />}
+        {phase === 'night' && moon && <i className="moon" />}
         <i className="bldg b1" />
         <i className="bldg b2" />
         <i className="bldg b3" />
-        {WINDOW_LIGHTS.map((light) => (
+        {(phase === 'night' || phase === 'dusk') && WINDOW_LIGHTS.map((light) => (
           <i key={`${light.l}-${light.t}`} className="win-light" style={{ left: light.l, top: light.t, animationDelay: light.d }} />
         ))}
       </div>
@@ -193,7 +195,12 @@ export function Office() {
   const [musicOn, setMusicOn] = useState(false);
   const [demo, setDemo] = useState(false);
   const [ask, setAsk] = useState<Ask>('now');
+  const [period, setPeriod] = useState<OfficeStatPeriod>('28');
   const [walks, setWalks] = useState<Record<string, { x: number; y: number }>>({});
+  const [chat, setChat] = useState<{ a: string; b: string; lineA: string; lineB: string } | null>(null);
+  const [note, setNote] = useState('');
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [noteSaved, setNoteSaved] = useState('');
   const fitRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const ambience = useRef<ReturnType<typeof createOfficeAmbience> | null>(null);
@@ -264,6 +271,8 @@ export function Office() {
   useEffect(() => {
     if (!selected) return;
     setAsk('now');
+    setNote('');
+    setNoteSaved('');
   }, [selected]);
 
   useEffect(() => {
@@ -285,30 +294,52 @@ export function Office() {
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    let cursor = 0;
-    const timer = window.setInterval(() => {
+    if (meeting) return;
+    let alive = true;
+    const timers: number[] = [];
+    const later = (fn: () => void, ms: number) => {
+      const id = window.setTimeout(fn, ms);
+      timers.push(id);
+    };
+    const meet = () => {
+      if (!alive) return;
       const idle = STATIONS.filter((station) => {
         const agent = data ? matchAgent(data.agents, station) : undefined;
         if (agent?.id && agent.id === selected) return false;
         return (agent?.status ?? 'done') !== 'working';
       });
-      if (idle.length === 0) return;
-      const station = idle[cursor % idle.length];
-      const key = stationKey(station);
-      const spot = LOUNGE_SPOTS[cursor % LOUNGE_SPOTS.length];
-      cursor += 1;
-      setWalks((prev) => ({ ...prev, [key]: spot }));
-      window.setTimeout(() => {
-        setWalks((prev) => {
-          if (!prev[key]) return prev;
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
-      }, 9000);
-    }, 7000);
-    return () => window.clearInterval(timer);
-  }, [data, selected]);
+      if (idle.length < 2) {
+        later(meet, 8000);
+        return;
+      }
+      const first = idle[Math.floor(Math.random() * idle.length)];
+      const rest = idle.filter((station) => station !== first);
+      const second = rest[Math.floor(Math.random() * rest.length)];
+      const lines = pairLines(first.name, second.name, data);
+      setWalks({
+        [stationKey(first)]: { x: 430, y: 530 },
+        [stationKey(second)]: { x: 536, y: 530 },
+      });
+      later(() => {
+        if (!alive) return;
+        setChat({ a: first.name, b: second.name, lineA: lines.left, lineB: lines.right });
+        const talk = 5000 + Math.floor(Math.random() * 5000);
+        later(() => {
+          if (!alive) return;
+          setWalks({});
+          setChat(null);
+          later(meet, 5000);
+        }, talk);
+      }, 3600);
+    };
+    later(meet, 1800);
+    return () => {
+      alive = false;
+      timers.forEach((id) => window.clearTimeout(id));
+      setWalks({});
+      setChat(null);
+    };
+  }, [data, selected, meeting]);
 
   const counts = useMemo(() => {
     const agents = data?.agents ?? [];
@@ -321,11 +352,14 @@ export function Office() {
   const chosen = data?.agents.find((agent) => agent.id === selected) ?? null;
   const visibleBubbles = meeting ? bubbles.slice(bubbleAt % Math.max(bubbles.length, 1)).slice(0, 3) : [];
   const clock = taipeiParts(now);
-  const upcoming = nextLine(data);
-  const reply = chosen && data ? officeReply(chosen, ask, data) : null;
-  const stats = BRAND_ORDER.map((slug) => data?.brandStats?.find((row) => row.slug === slug) ?? {
+  const phase = skyPhase(clock.h);
+  const board = nextBoard(data);
+  const reply = chosen && data ? officeReply(chosen, ask, data, period) : null;
+  const stats = BRAND_ORDER.map((slug) => data?.brandStats?.[period]?.find((row) => row.slug === slug) ?? {
     slug, posts: 0, views: 0, reach: 0, interactions: 0,
   });
+  const remembered = chosen ? data?.suggestions?.find((item) => item.agentId === chosen.id) : undefined;
+  const periodLabel = period === '1' ? '今天' : period === '7' ? '近 7 天' : '近 28 天';
 
   async function toggle() {
     if (!data || switchBusy) return;
@@ -358,6 +392,21 @@ export function Office() {
       await pageRef.current?.requestFullscreen();
     } catch {
       /* 全螢幕被瀏覽器擋住時，仍用蓋住整個畫面的展示層 */
+    }
+  }
+
+  async function sendNote() {
+    if (!chosen || note.trim().length < 2 || noteBusy) return;
+    setNoteBusy(true);
+    try {
+      await api.addOfficeSuggestion(chosen.id, note.trim());
+      setNote('');
+      setNoteSaved('已記下，下一班晨會會拿來當方向');
+      setTick((n) => n + 1);
+    } catch (e) {
+      setNoteSaved(e instanceof Error ? e.message : '沒記下');
+    } finally {
+      setNoteBusy(false);
     }
   }
 
@@ -402,17 +451,19 @@ export function Office() {
             <div className="wall" />
             <div className="floor" />
             <div className="baseboard" />
-            <i className="pendant left" />
-            <i className="pendant right" />
-
             <div className="whiteboard">
-              <strong>{upcoming.title}</strong>
-              <p className="next-detail">{upcoming.detail}</p>
+              <strong>{board.title}</strong>
+              {board.lines.map((line) => <p key={line}>{line}</p>)}
             </div>
             <div className="windows">
-              <WindowPane />
-              <WindowPane moon />
-              <WindowPane />
+              <WindowPane phase={phase} />
+              <WindowPane phase={phase} moon />
+              <WindowPane phase={phase} />
+            </div>
+            <div className="brand-wall" aria-label="TaskGo、Homigo、Washgo">
+              <img src="/brands/taskgo-logo.png" alt="TaskGo" />
+              <img src="/brands/homigo-logo.png" alt="Homigo" />
+              <img src="/brands/washgo-logo.png" alt="Washgo" />
             </div>
             <div className="clock" aria-hidden>
               <i className="hand hour" style={{ transform: `rotate(${(clock.h % 12) * 30 + clock.m * 0.5}deg)` }} />
@@ -420,7 +471,14 @@ export function Office() {
               <i className="hand sec" style={{ transform: `rotate(${clock.s * 6}deg)` }} />
             </div>
             <div className="scoreboard">
-              <strong>近 28 天</strong>
+              <div className="period">
+                <strong>{periodLabel}</strong>
+                {(['1', '7', '28'] as const).map((value) => (
+                  <button key={value} type="button" className={period === value ? 'is-on' : ''} onClick={() => setPeriod(value)}>
+                    {value === '1' ? '1天' : value === '7' ? '7天' : '28天'}
+                  </button>
+                ))}
+              </div>
               {stats.map((row) => (
                 <p key={row.slug}>
                   <b>{BRAND_LABEL[row.slug]}</b>
@@ -487,6 +545,7 @@ export function Office() {
               const walk = walks[key];
               const agent = data ? matchAgent(data.agents, station) : undefined;
               const label = nickname(agent, station.name);
+              const line = chat?.a === station.name ? chat.lineA : chat?.b === station.name ? chat.lineB : '';
               return (
                 <button
                   key={`walk-${key}`}
@@ -496,6 +555,7 @@ export function Office() {
                   aria-label={label}
                   onClick={() => agent && setSelected(agent.id)}
                 >
+                  {line && <span className="bubble">{line}</span>}
                   <Face src={station.portrait} crop={station.crop} alt={label} tint={station.mat} />
                   <em>{label}</em>
                 </button>
@@ -524,6 +584,17 @@ export function Office() {
               <button type="button" className={ask === 'result' ? 'is-on' : ''} onClick={() => setAsk('result')}>成效怎麼樣</button>
               {manuscriptHref(chosen) && <Link to={manuscriptHref(chosen)!}>打開原稿</Link>}
             </div>
+            {remembered && <p className="hint">上次交代：{remembered.body}</p>}
+            <form className="advice" onSubmit={(event) => { event.preventDefault(); void sendNote(); }}>
+              <input
+                value={note}
+                maxLength={400}
+                placeholder="交代這位小編下一班要注意什麼"
+                onChange={(event) => setNote(event.target.value)}
+              />
+              <button type="submit" disabled={noteBusy || note.trim().length < 2}>記下</button>
+            </form>
+            {noteSaved && <p className="hint">{noteSaved}</p>}
           </div>
         </aside>
       )}

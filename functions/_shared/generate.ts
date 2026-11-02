@@ -2,6 +2,8 @@ import type { Env } from './env';
 import { getSql } from './db';
 import { generateImage } from './openai';
 import { seoChatJson, socialChatJson } from './social-llm';
+import { loadOfficePack, type OfficePack } from './office-directive';
+import { factProblem } from './office-facts';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
@@ -91,6 +93,8 @@ export interface GenerationResult {
   posterScene?: string | null;
   offtopicCategory?: string;
   loveAngle?: string;
+  /** 晨會方向有生效時，blocked 有字代表這則作廢、不進待審。 */
+  office?: { active: boolean; blocked: string | null; theme: string };
 }
 
 export type { BrandAssetPick, PickBrandAssetQuery };
@@ -393,6 +397,8 @@ export async function generatePlatformPost(
     skipImage?: boolean;
     /** 工作台產稿省掉互動評估的額外 LLM,降低 Worker subrequest */
     skipPrediction?: boolean;
+    /** 排程產稿才吃晨會方向。人工工作台不跟著改題。 */
+    applyOffice?: boolean;
   },
 ): Promise<GenerationResult> {
   const { brandCtx, platform } = params;
@@ -456,10 +462,14 @@ export async function generatePlatformPost(
     ? 'design' as const
     : pickImageStyle({ platform, lane, brandSlug: brandCtx.slug, recentStyles });
 
+  const officePack = params.applyOffice
+    ? await loadOfficePack(env, brandCtx.brandId, brandCtx.slug)
+    : null;
   const userPrompt = buildPostUserPrompt({
     platform, topic: params.topic, topicSummary: params.topicSummary,
     extraInstruction: [
       params.extraInstruction ?? '',
+      officePack?.active ? officePack.line : '',
       fromShort ? systemShortPrompt(fromShort) : '',
       screenshotPoster || convertPhotoPoster
         ? `本篇會把品牌上傳的原圖鋪滿,底部只疊 4-10 字痛點,不重繪。${reusedAsset ? describeAssetForPrompt(reusedAsset, brandCtx.slug) : ''}文案要對得上這張真實畫面,不要幻想不存在的細節。`
@@ -519,6 +529,45 @@ export async function generatePlatformPost(
   post.cta = SHARED_BRAND_CTA;
   post.hashtags = clampHashtags(post.hashtags, platform);
 
+  const officeState = {
+    active: !!officePack?.active,
+    blocked: null as string | null,
+    theme: officePack?.theme ?? '',
+  };
+  if (officePack?.active) {
+    let problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
+    if (problem) {
+      post = await socialChatJson<GeneratedPost>(env, {
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+          { role: 'assistant', content: JSON.stringify(post) },
+          { role: 'user', content: `上一則作廢：${problem}。換成不碰這句的寫法，仍打「${officePack.theme}」。不要寫媒體露出、客戶數、排名。回傳同格式 JSON。` },
+        ],
+        temperature: 0.4,
+      });
+      post.body = normalizeMultilineText(post.body);
+      post.hashtags = clampHashtags(post.hashtags, platform);
+      post.cta = SHARED_BRAND_CTA;
+      problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
+    }
+    officeState.blocked = problem;
+    if (problem) {
+      return {
+        post,
+        prediction: { score: 0, analysis: '', suggestions: [] },
+        imageUrl: null,
+        imageError: null,
+        audienceLane: lane,
+        audienceName: audience.name,
+        imageSource: null,
+        imageStyle,
+        assetId: reusedAsset?.id ?? null,
+        office: officeState,
+      };
+    }
+  }
+
   const prediction = params.skipPrediction
     ? { score: 0, analysis: '', suggestions: [] }
     : await socialChatJson<EngagementPrediction>(env, {
@@ -534,6 +583,7 @@ export async function generatePlatformPost(
       post, prediction, imageUrl: null, imageError: null,
       audienceLane: lane, audienceName: audience.name,
       imageSource: null, imageStyle, assetId: reusedAsset?.id ?? null,
+      office: officeState,
     };
   }
 
@@ -554,6 +604,7 @@ export async function generatePlatformPost(
         post, prediction, imageUrl: posterUrl, imageError: null,
         audienceLane: lane, audienceName: audience.name,
         imageSource: 'asset', imageStyle: 'design', assetId: reusedAsset.id,
+        office: officeState,
       };
     }
     const fallbackUrl = platform === 'instagram' || platform === 'threads'
@@ -563,6 +614,7 @@ export async function generatePlatformPost(
       post, prediction, imageUrl: fallbackUrl, imageError: '素材海報合成失敗,沿用原圖',
       audienceLane: lane, audienceName: audience.name,
       imageSource: 'asset', imageStyle: null, assetId: reusedAsset.id,
+      office: officeState,
     };
   }
 
@@ -583,6 +635,7 @@ export async function generatePlatformPost(
         post, prediction, imageUrl: posterUrl, imageError: null,
         audienceLane: lane, audienceName: audience.name,
         imageSource: 'asset', imageStyle: 'design', assetId: reusedAsset.id,
+        office: officeState,
       };
     }
     const fallbackUrl = platform === 'instagram'
@@ -592,6 +645,7 @@ export async function generatePlatformPost(
       post, prediction, imageUrl: fallbackUrl, imageError: '素材海報合成失敗,沿用原圖',
       audienceLane: lane, audienceName: audience.name,
       imageSource: 'asset', imageStyle: null, assetId: reusedAsset.id,
+      office: officeState,
     };
   }
 
@@ -666,6 +720,7 @@ export async function generatePlatformPost(
     audienceLane: lane, audienceName: audience.name,
     imageSource: imageUrl ? 'generated' : null, imageStyle, assetId: null,
     posterScene: posterScene?.id ?? null,
+    office: officeState,
   };
 }
 
@@ -755,6 +810,7 @@ export async function generateTrafficPost(
     hourTw?: number;
     now?: number;
     skipPrediction?: boolean;
+    office?: OfficePack | null;
   },
 ): Promise<GenerationResult> {
   const spec = composeTrafficPrompt(params);
@@ -763,7 +819,7 @@ export async function generateTrafficPost(
   const taskgo = params.brandSlug === 'taskgo';
   const anchor = spec.anchor.trim();
   const systemPrompt = trafficSystemPrompt(params.brandSlug);
-  const userPrompt = spec.prompt;
+  const userPrompt = [spec.prompt, params.office?.active ? params.office.line : ''].filter(Boolean).join('\n\n');
   let post = await socialChatJson<GeneratedPost>(env, {
     messages: [
       { role: 'system', content: systemPrompt },
@@ -855,7 +911,31 @@ export async function generateTrafficPost(
     if (namedSide.test(post.body)) throw new Error('這一檔寫到站隊，先不發');
   }
 
-  const prediction = params.skipPrediction
+  const officePack = params.office?.active ? params.office : null;
+  const officeState = {
+    active: !!officePack,
+    blocked: null as string | null,
+    theme: officePack?.theme ?? '',
+  };
+  if (officePack) {
+    let problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
+    if (problem) {
+      post = await socialChatJson<GeneratedPost>(env, {
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+          { role: 'assistant', content: JSON.stringify(post) },
+          { role: 'user', content: `上一則作廢：${problem}。換成不碰這句的寫法，仍打「${officePack.theme}」。不要寫媒體露出、客戶數、排名。至少三行，最後一行是問句。回傳同格式 JSON。` },
+        ],
+        temperature: 0.4,
+      });
+      post = finishTrafficPost(post, params.brandSlug);
+      problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
+    }
+    officeState.blocked = problem;
+  }
+
+  const prediction = params.skipPrediction || officeState.blocked
     ? { score: 0, analysis: '', suggestions: [] }
     : await socialChatJson<EngagementPrediction>(env, {
       messages: [
@@ -868,6 +948,7 @@ export async function generateTrafficPost(
   return {
     post, prediction, imageUrl: null, imageError: null,
     offtopicCategory: spec.category,
+    office: officeState,
   };
 }
 

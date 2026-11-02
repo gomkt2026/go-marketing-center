@@ -25,6 +25,7 @@ interface OtherGroup {
 }
 
 const mainItems: MainItem[] = [
+  { label: '行銷中心', path: '/office', end: true },
   { label: '儀表板', path: '/workspace', brandScoped: true, end: true },
   { label: '簡報專區', path: '/briefings' },
   {

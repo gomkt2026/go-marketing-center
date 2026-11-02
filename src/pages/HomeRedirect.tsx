@@ -2,12 +2,9 @@ import { Navigate } from 'react-router-dom';
 import { useBrand } from '@/context/BrandContext';
 import { LoadingState } from '@/hooks/useAsyncData';
 
-/** 有品牌時進該品牌儀表板；沒有品牌才去跨品牌總覽。 */
+/** 登入後進會自己開會的行銷辦公室。 */
 export function HomeRedirect() {
-  const { currentBrand, brands, brandsLoading } = useBrand();
-  const brand = currentBrand ?? brands[0];
-
+  const { brandsLoading } = useBrand();
   if (brandsLoading) return <LoadingState />;
-  if (brand) return <Navigate to={`/${brand.slug}/workspace`} replace />;
-  return <Navigate to="/overview" replace />;
+  return <Navigate to="/office" replace />;
 }

@@ -582,6 +582,7 @@ CREATE TABLE ai_agents (
   role_id           UUID NOT NULL REFERENCES agent_roles(id),
   display_name      TEXT NOT NULL,                    -- 'Homigo AI'
   avatar_color      TEXT,
+  persona           JSONB NOT NULL DEFAULT '{}',
   is_active         BOOLEAN NOT NULL DEFAULT true,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -1272,5 +1273,59 @@ INSERT INTO agent_roles (code, name, description) VALUES
   ('content_strategist', 'Content Strategist', '內容策略規劃與選題建議'),
   ('risk_advisor', 'Risk Advisor', '風險評估,檢查是否違反品牌規則與事實邊界'),
   ('devils_advocate', 'Devil''s Advocate', '刻意提出反對意見,避免團體迷思'),
-  ('moderator', 'Moderator', '會議主持,彙整討論並生成提案摘要')
+  ('moderator', 'Moderator', '會議主持,彙整討論並生成提案摘要'),
+  ('publisher', '發文小編', '把通過檢查的稿排進現有發布'),
+  ('podcast_producer', 'Podcast 小編', '提醒未上架集數，並帶晨會指定的討論題'),
+  ('art_director', '圖片小編', '沿用各品牌既有畫風，呈現這一班的圖'),
+  ('video_editor', '影片小編', '決定哪支成片可推；沒有素材就不假裝已剪完')
 ON CONFLICT (code) DO NOTHING;
+
+-- ============================================================================
+-- Go 行銷中心（晨會方向、名牌、採集筆記）
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS office_settings (
+  id            SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  auto_publish  BOOLEAN NOT NULL DEFAULT true,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO office_settings (id, auto_publish) VALUES (1, true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS office_standups (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  started_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  status               TEXT NOT NULL,
+  directive            JSONB NOT NULL DEFAULT '{}',
+  bubbles              JSONB NOT NULL DEFAULT '[]',
+  input_tokens         INTEGER NOT NULL DEFAULT 0,
+  output_tokens        INTEGER NOT NULL DEFAULT 0,
+  cost_usd             NUMERIC(12, 6) NOT NULL DEFAULT 0,
+  apply_to_generation  BOOLEAN NOT NULL DEFAULT false,
+  valid_until          TIMESTAMPTZ,
+  note                 TEXT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT office_standups_status_check CHECK (
+    status IN ('completed', 'budget_exhausted', 'failed')
+  )
+);
+
+CREATE TABLE IF NOT EXISTS agent_activity (
+  agent_id       UUID PRIMARY KEY REFERENCES ai_agents(id) ON DELETE CASCADE,
+  status         TEXT NOT NULL,
+  task_label     TEXT NOT NULL DEFAULT '',
+  artifact_type  TEXT,
+  artifact_id    TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT agent_activity_status_check CHECK (status IN ('working', 'done', 'blocked'))
+);
+
+CREATE TABLE IF NOT EXISTS agent_findings (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id    UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  agent_id    UUID REFERENCES ai_agents(id) ON DELETE SET NULL,
+  standup_id  UUID REFERENCES office_standups(id) ON DELETE CASCADE,
+  source_url  TEXT,
+  summary     TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -66,6 +66,7 @@ const CrewDirectory = lazyPage(() => import('@/pages/public/crews/Crews'), 'Crew
 const CrewProfile = lazyPage(() => import('@/pages/public/crews/Crews'), 'CrewProfile');
 const CrewLeads = lazyPage(() => import('@/pages/crews/CrewLeads'), 'CrewLeads');
 const CrewVideoRequests = lazyPage(() => import('@/pages/crews/CrewVideoRequests'), 'CrewVideoRequests');
+const Office = lazyPage(() => import('@/pages/office/Office'), 'Office');
 
 /** 未登入看公開首頁；已登入沿用原本的品牌工作台導向。 */
 function RootGate() {
@@ -89,6 +90,7 @@ function AppRoutes() {
     <Suspense fallback={<LoadingState />}>
       <Routes>
         <Route path="/home" element={<HomeRedirect />} />
+        <Route path="/office" element={<Office />} />
         <Route path="/overview" element={<Dashboard />} />
         <Route path="/trending" element={<Trending />} />
 

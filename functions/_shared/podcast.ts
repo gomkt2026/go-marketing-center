@@ -4,6 +4,7 @@ import { chatCompleteJson } from './openai';
 import { getBrandVoice, ANTI_AI_RULES } from './prompts';
 import { MEETING_EMOTIONS, type MeetingEmotion } from './meeting-ai';
 import { synthesizeDialogue, applyEmotionTag, cloneVoice, DIALOGUE_CHAR_LIMIT } from './elevenlabs';
+import { latestPodcastHint } from './office-directive';
 import { buildPodcastMediaKey, buildGuestVoiceKey, putMedia } from './media';
 
 // ============================================================================
@@ -290,6 +291,17 @@ export async function createPodcastEpisode(env: Env): Promise<CreatedEpisode> {
   const sql = getSql(env);
   const hosts = await getPodcastHosts(env);
   const topics = await pickTopicsForEpisode(env);
+  const officeTopic = await latestPodcastHint(env);
+  if (officeTopic) {
+    topics.unshift({
+      signalId: 'office-standup',
+      title: officeTopic,
+      summary: '行銷晨會指定的這一集題目',
+      brandSlug: 'taskgo',
+      brandName: 'Go',
+    });
+    topics.splice(3);
+  }
   if (!topics.length) throw new Error('近 3 天沒有可用的熱門話題(market_signals 為空)');
 
   const { title, topicSummary, lines } = await generatePodcastScript(env, hosts, topics);

@@ -18,6 +18,7 @@ import {
   type PostingSlotKind,
 } from './posting-slots';
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from './auto-post-brands';
+import { finishOfficeDraft, loadOfficePack } from './office-directive';
 
 /** 品牌相關跟風文時段(台灣時間)。0 點、6 點先留著，這三天一起觀察。 */
 export const THREADS_POST_HOURS_TW: readonly number[] = [0, 6, 12, 18];
@@ -187,6 +188,7 @@ async function writeTrafficDraft(
   const agentId = await findBrandAgent(env, brand.id);
   const anchor = formula === 'hook' && theme ? trendAnchor(theme) : '';
   if (await brandHasHourContent(env, brand.id, slotAt)) return null;
+  const office = await loadOfficePack(env, brand.id, brand.slug);
   const post = await generateTrafficPost(env, {
     brandSlug: brand.slug,
     formula,
@@ -196,6 +198,7 @@ async function writeTrafficDraft(
     hourTw: hourTW,
     now: slotMs,
     skipPrediction: true,
+    office,
   });
   if (theme?.includes('洋流')) {
     const scrollStop: Record<string, string> = {
@@ -206,7 +209,7 @@ async function writeTrafficDraft(
     post.imageUrl = scrollStop[brand.slug] ?? post.imageUrl;
   }
   if (await brandHasHourContent(env, brand.id, slotAt)) return null;
-  const { contentId } = await saveGeneratedContent(env, {
+  const { contentId, versionId } = await saveGeneratedContent(env, {
     brandCtx: { brandId: brand.id, slug: brand.slug, name: brand.name, systemPrompt: '' },
     platform: 'threads',
     result: post,
@@ -222,6 +225,18 @@ async function writeTrafficDraft(
       audienceLane: 'b2c',
     },
   });
+  const placed = await finishOfficeDraft(env, {
+    brandId: brand.id,
+    brandSlug: brand.slug,
+    contentId,
+    versionId,
+    platform: 'threads',
+    slotAt: slotAt.toISOString(),
+    active: !!post.office?.active,
+    blocked: post.office?.blocked ?? null,
+    theme: post.office?.theme || theme || formula,
+    imageUrl: post.imageUrl,
+  });
   await logActivity(env, {
     brandId: brand.id,
     actorType: 'ai_agent',
@@ -231,6 +246,7 @@ async function writeTrafficDraft(
     entityId: contentId,
     afterState: { platform: 'threads', source: slotKind, category: formula, trafficTheme: theme, trendAnchor: anchor, scheduled: false, slotAt: slotAt.toISOString() },
   });
+  if (placed !== 'left') console.log(`[office] ${brand.slug} threads ${placed}`);
   return { contentId, category: formula };
 }
 

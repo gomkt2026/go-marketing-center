@@ -1461,6 +1461,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  office: () => request<import('@/pages/office/types').OfficeSnapshot>('/api/office'),
+
+  setOfficePublish: (autoPublish: boolean) =>
+    request<{ ok: boolean; autoPublish: boolean }>('/api/office', {
+      method: 'POST',
+      body: JSON.stringify({ autoPublish }),
+    }),
 };
 
 // -- 活動報名(公開端,無需登入) ----------------------------------------------

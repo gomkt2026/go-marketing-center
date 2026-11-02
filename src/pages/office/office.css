@@ -1,0 +1,296 @@
+.office-page {
+  margin: -24px -28px;
+  min-height: calc(100dvh - 64px);
+  background:
+    radial-gradient(900px 420px at 50% 0%, rgba(62, 196, 214, 0.16), transparent 60%),
+    linear-gradient(180deg, #071018 0%, #0b1c28 42%, #102433 100%);
+  color: #e7f7fb;
+  position: relative;
+  overflow: hidden;
+}
+
+.office-hud {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px 22px 0;
+  position: relative;
+  z-index: 3;
+}
+
+.office-title {
+  font-size: 22px;
+  letter-spacing: 0.04em;
+}
+
+.office-title small {
+  display: block;
+  margin-top: 4px;
+  color: #9ec4ce;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.office-counts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.office-counts span,
+.office-switch {
+  border: 1px solid rgba(170, 230, 240, 0.28);
+  background: rgba(6, 18, 28, 0.72);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #d7f4fb;
+}
+
+.office-switch {
+  cursor: pointer;
+  font: inherit;
+}
+
+.office-switch.is-off {
+  color: #f0c7a2;
+  border-color: rgba(240, 170, 110, 0.5);
+}
+
+.office-stage {
+  position: relative;
+  height: min(760px, calc(100dvh - 150px));
+  margin: 8px 12px 20px;
+}
+
+.office-floor {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: 6%;
+  height: 68%;
+  transform: perspective(900px) rotateX(58deg);
+  transform-origin: center bottom;
+  background:
+    linear-gradient(rgba(120, 220, 230, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 220, 230, 0.16) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(18, 52, 68, 0.2), rgba(8, 24, 34, 0.85));
+  background-size: 48px 48px, 48px 48px, auto;
+  border: 1px solid rgba(140, 220, 230, 0.25);
+  box-shadow: 0 0 80px rgba(40, 180, 200, 0.15) inset;
+}
+
+.office-wing {
+  position: absolute;
+  z-index: 2;
+  color: #9ecad4;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+}
+
+.office-wing.left { left: 8%; top: 16%; }
+.office-wing.right { right: 8%; top: 16%; }
+
+.office-table {
+  position: absolute;
+  left: 42%;
+  top: 46%;
+  width: 16%;
+  height: 18%;
+  z-index: 1;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #1b3c4c, #102833);
+  border: 1px solid rgba(160, 230, 240, 0.35);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+.office-table::after {
+  content: '';
+  position: absolute;
+  inset: 18%;
+  border-radius: 12px;
+  background: radial-gradient(circle, rgba(120, 230, 220, 0.45), transparent 70%);
+}
+
+.office-person {
+  position: absolute;
+  z-index: 4;
+  width: 148px;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.office-figure {
+  width: 54px;
+  height: 78px;
+  margin: 0 auto 6px;
+  position: relative;
+}
+
+.office-figure i,
+.office-figure b {
+  display: block;
+  margin: 0 auto;
+}
+
+.office-figure i {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f3d2b8;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25);
+}
+
+.office-figure b {
+  width: 36px;
+  height: 42px;
+  margin-top: 4px;
+  border-radius: 14px 14px 8px 8px;
+  background: var(--tint);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.28);
+}
+
+.office-person.is-working .office-figure b {
+  animation: office-bob 1.6s ease-in-out infinite;
+}
+
+.office-name {
+  display: inline-block;
+  max-width: 146px;
+  padding: 6px 8px 7px;
+  border-radius: 10px;
+  background: rgba(5, 16, 24, 0.82);
+  border: 1px solid rgba(170, 230, 240, 0.28);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.office-name strong {
+  display: block;
+  font-size: 13px;
+}
+
+.office-name em {
+  font-style: normal;
+  color: #b7dbe3;
+}
+
+.office-page.is-meeting .office-floor {
+  filter: brightness(0.72);
+}
+
+.office-page.is-meeting .office-table {
+  box-shadow: 0 0 36px rgba(120, 230, 220, 0.45);
+}
+
+.office-bubbles {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  z-index: 5;
+  width: min(420px, 70%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.office-bubbles p {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(236, 251, 255, 0.94);
+  color: #14303a;
+  font-size: 13px;
+}
+
+.office-bubbles b {
+  margin-right: 6px;
+}
+
+.office-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(380px, 100%);
+  height: 100%;
+  z-index: 6;
+  background: rgba(7, 18, 26, 0.94);
+  border-left: 1px solid rgba(160, 220, 230, 0.3);
+  padding: 22px 20px;
+  overflow: auto;
+}
+
+.office-panel h2 {
+  color: #f4fcff;
+  font-size: 22px;
+}
+
+.office-panel .role {
+  color: #8fd0dc;
+  margin: 4px 0 12px;
+}
+
+.office-panel .task {
+  color: #f7fbfc;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.office-panel .quote,
+.office-panel .meta,
+.office-panel li {
+  color: #c5e4ea;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.office-panel img {
+  width: 100%;
+  border-radius: 12px;
+  margin-top: 12px;
+}
+
+.office-panel a,
+.office-close {
+  color: #9be7ff;
+}
+
+.office-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.office-note {
+  margin: 12px 22px 0;
+  color: #f0c7a2;
+  font-size: 13px;
+}
+
+@keyframes office-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@media (max-width: 960px) {
+  .office-page { margin: -16px; min-height: calc(100dvh - 56px); }
+  .office-stage { height: auto; min-height: 720px; }
+  .office-person { width: 132px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .office-person.is-working .office-figure b { animation: none; }
+}

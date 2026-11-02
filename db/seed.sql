@@ -15,6 +15,7 @@
 BEGIN;
 
 TRUNCATE TABLE
+  agent_findings, agent_activity, office_standups,
   activity_logs, learning_records, performance_reports, publishing_logs,
   publishing_jobs, content_reviews, content_assets, content_versions, contents,
   event_registrations, event_referrers, event_sessions, events,
@@ -58,6 +59,10 @@ DECLARE
   r_risk         UUID;
   r_devil        UUID;
   r_moderator    UUID;
+  r_publisher    UUID;
+  r_podcast      UUID;
+  r_art          UUID;
+  r_video        UUID;
 
   -- AI Agents
   a_homigo_ai    UUID := gen_random_uuid();
@@ -68,6 +73,10 @@ DECLARE
   a_risk         UUID := gen_random_uuid();
   a_devil        UUID := gen_random_uuid();
   a_moderator    UUID := gen_random_uuid();
+  a_publisher    UUID := gen_random_uuid();
+  a_podcast      UUID := gen_random_uuid();
+  a_art          UUID := gen_random_uuid();
+  a_video        UUID := gen_random_uuid();
 
   -- Collaboration
   collab_1       UUID := gen_random_uuid();
@@ -135,6 +144,10 @@ BEGIN
   SELECT id INTO r_risk      FROM agent_roles WHERE code = 'risk_advisor';
   SELECT id INTO r_devil     FROM agent_roles WHERE code = 'devils_advocate';
   SELECT id INTO r_moderator FROM agent_roles WHERE code = 'moderator';
+  SELECT id INTO r_publisher FROM agent_roles WHERE code = 'publisher';
+  SELECT id INTO r_podcast   FROM agent_roles WHERE code = 'podcast_producer';
+  SELECT id INTO r_art       FROM agent_roles WHERE code = 'art_director';
+  SELECT id INTO r_video     FROM agent_roles WHERE code = 'video_editor';
 
   -- ==========================================================================
   -- 使用者
@@ -590,7 +603,53 @@ Service@inforcraft.com.tw
     (a_content,   NULL,     r_content,   'Content Strategist', '#8AA6C2'),
     (a_risk,      NULL,     r_risk,      'Risk Advisor', '#D97B7B'),
     (a_devil,     NULL,     r_devil,     'Devil''s Advocate', '#B26FB2'),
-    (a_moderator, NULL,     r_moderator, 'Moderator', '#7C9C7C');
+    (a_moderator, NULL,     r_moderator, 'Moderator', '#7C9C7C'),
+    (a_publisher, NULL,     r_publisher, '發文小編', '#1677A8'),
+    (a_podcast,   NULL,     r_podcast,   'Podcast 小編', '#C4892A'),
+    (a_art,       NULL,     r_art,       '圖片小編', '#C45C86'),
+    (a_video,     NULL,     r_video,     '影片小編', '#6B5BD0');
+
+  UPDATE ai_agents SET persona = persona || jsonb_build_object(
+    'nickname', '新聞收集', 'characterTitle', '情報',
+    'temperament', '只報有出處的題，不添細節。',
+    'catchphrase', '這則是現在在熱的', 'focus', '熱門關鍵字與話題'
+  ) WHERE id = a_market AND coalesce(persona->>'nickname', '') = '';
+  UPDATE ai_agents SET persona = persona || jsonb_build_object(
+    'nickname', '行銷小編', 'characterTitle', '策略',
+    'temperament', '把這一班收成三個發文方向，不改品牌定位。',
+    'catchphrase', '這一班就打這三題', 'focus', '三品牌接下來六小時的方向'
+  ) WHERE id = a_content AND coalesce(persona->>'nickname', '') = '';
+  UPDATE ai_agents SET persona = jsonb_build_object(
+    'nickname', '發文小編', 'characterTitle', '排程',
+    'temperament', '準時，不把沒查過的事送出去。',
+    'catchphrase', '這一檔我排了', 'focus', '三個品牌的發文時段'
+  ) WHERE id = a_publisher;
+  UPDATE ai_agents SET persona = jsonb_build_object(
+    'nickname', 'Podcast小編', 'characterTitle', '錄音室',
+    'temperament', '會提醒還沒上架的集數，也會丟一個聊得下去的題。',
+    'catchphrase', '這集還在架子上', 'focus', '三小編熱聊的選題與上架'
+  ) WHERE id = a_podcast;
+  UPDATE ai_agents SET persona = jsonb_build_object(
+    'nickname', '圖片小編', 'characterTitle', '畫桌',
+    'temperament', '不換品牌畫風，圖要對得上這一則貼文。',
+    'catchphrase', '這張跟這則是一起的', 'focus', '三品牌既有視覺'
+  ) WHERE id = a_art;
+  UPDATE ai_agents SET persona = jsonb_build_object(
+    'nickname', '影片小編', 'characterTitle', '剪接台',
+    'temperament', '沒有成片就直說在等素材。',
+    'catchphrase', '這支先維持', 'focus', '已入庫的短片，不在這裡新剪一段錄影'
+  ) WHERE id = a_video;
+
+  INSERT INTO agent_activity (agent_id, status, task_label) VALUES
+    (a_homigo_ai, 'done', '等下一班晨會'),
+    (a_taskgo_ai, 'done', '等下一班晨會'),
+    (a_washgo_ai, 'done', '等下一班晨會'),
+    (a_market, 'done', '等下一班晨會'),
+    (a_content, 'done', '等下一班晨會'),
+    (a_publisher, 'done', '等下一班晨會'),
+    (a_podcast, 'done', '等下一班晨會'),
+    (a_art, 'done', '等下一班晨會'),
+    (a_video, 'done', '等下一班晨會');
 
   INSERT INTO agent_permissions (agent_id, brand_id, scope) VALUES
     (a_homigo_ai, b_homigo, 'read_brand_knowledge'), (a_homigo_ai, b_homigo, 'participate_meeting'),

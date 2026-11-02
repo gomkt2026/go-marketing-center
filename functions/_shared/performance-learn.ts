@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { chatCompleteJson } from './openai';
+import { factProblem } from './office-facts';
 
 const MIN_SYNCED_POSTS = 3;
 const LOOKBACK_DAYS = 28;
@@ -123,9 +124,17 @@ export async function analyzeBrandPerformance(env: Env, brandId: string): Promis
   const recent = await sql`
     SELECT record_type FROM learning_records
     WHERE brand_id = ${brandId}::uuid
-      AND status = 'pending_review'
+      AND status IN ('pending_review', 'approved')
       AND created_at >= now() - interval '7 days'
   `;
+  const claimRows = await sql`
+    SELECT statement FROM brand_rules
+    WHERE brand_id = ${brandId}::uuid
+      AND rule_type IN ('cannot_claim', 'negative_rule')
+    ORDER BY sort_order
+    LIMIT 12
+  `;
+  const cannotClaims = (claimRows as { statement: string }[]).map((row) => row.statement);
   const blocked = new Set((recent as { record_type: string }[]).map((r) => r.record_type));
 
   const brandRows = await sql`SELECT name, slug FROM brands WHERE id = ${brandId}::uuid LIMIT 1`;
@@ -162,6 +171,7 @@ export async function analyzeBrandPerformance(env: Env, brandId: string): Promis
     if (blocked.has(recordType)) continue;
     const insight = item.insight?.trim();
     if (!insight) continue;
+    if (factProblem(insight, cannotClaims, [compactPosts(posts)])) continue;
 
     const related = item.relatedContentId && contentIds.has(item.relatedContentId) ? item.relatedContentId : posts[0]?.contentId ?? null;
     const supporting = {
@@ -179,14 +189,14 @@ export async function analyzeBrandPerformance(env: Env, brandId: string): Promis
         brand_id, record_type, insight, supporting_data, related_content_id, generated_by_agent_id, status
       ) VALUES (
         ${brandId}::uuid, ${recordType}, ${insight},
-        ${JSON.stringify(supporting)}::jsonb, ${related}::uuid, ${agentId}, 'pending_review'
+        ${JSON.stringify(supporting)}::jsonb, ${related}::uuid, ${agentId}, 'approved'
       )
     `;
     blocked.add(recordType);
     created += 1;
   }
 
-  return { brandId, created, skipped: created ? null : '本週已有待核准建議或模型未產出可用洞察' };
+  return { brandId, created, skipped: created ? null : '本週已有採用中的建議，或這次回來的洞察碰了不可宣稱' };
 }
 
 export async function analyzeAllBrandPerformance(env: Env): Promise<AnalyzeBrandResult[]> {

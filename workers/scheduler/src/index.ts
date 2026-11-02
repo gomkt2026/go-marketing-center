@@ -37,6 +37,8 @@ import { syncPerformanceInsights, syncRecentPerformanceInsights } from '../../..
 import { analyzeAllBrandPerformance } from '../../../functions/_shared/performance-learn';
 import { notifyPendingReviewDigest, notifyPublishFailed } from '../../../functions/_shared/line-ops';
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from '../../../functions/_shared/auto-post-brands';
+import { finishOfficeDraft, notePublisherBlocked } from '../../../functions/_shared/office-directive';
+import { runOfficeStandup } from '../../../functions/_shared/office-standup';
 import { runSeoAutoPublish } from '../../../functions/_shared/seo-autopublish';
 import {
   SYSTEM_SHORT_SLOTS, catchupSystemShortSlot, generateSystemShortSlot, hasSystemShorts, isSystemShortDay,
@@ -178,13 +180,25 @@ async function generateSignalDrafts(env: Env): Promise<void> {
         topicSummary: signal.summary ?? undefined,
         skipImage: true,
         skipPrediction: true,
+        applyOffice: true,
       });
-      const { contentId } = await saveGeneratedContent(env, {
+      const { contentId, versionId } = await saveGeneratedContent(env, {
         brandCtx, platform, result,
         sourceMarketSignalId: signal.id,
         generatedByAgentId: agentId,
         status: 'draft',
         promptMeta: { source: 'auto_signal', signalId: signal.id, audienceLane: result.audienceLane, audienceName: result.audienceName },
+      });
+      await finishOfficeDraft(env, {
+        brandId: signal.brand_id,
+        brandSlug: signal.slug,
+        contentId,
+        versionId,
+        platform,
+        active: !!result.office?.active,
+        blocked: result.office?.blocked ?? null,
+        theme: result.office?.theme || signal.title,
+        imageUrl: result.imageUrl,
       });
       await logActivity(env, {
         brandId: signal.brand_id,
@@ -519,6 +533,7 @@ async function generateDailyThemePlatforms(
         brandCtx, platform,
         topic: theme.theme,
         topicSummary: theme.summary,
+        applyOffice: true,
           extraInstruction: platform === 'instagram'
             ? `切入角度:${theme.angle}。這是今天的每日主題貼文。IG:第一句=顧客搜得到的痛點,整篇只打一個標籤主題。配圖做成痛點海報(現場煩惱+主標+系統重點卡),不要整頁截圖直發。${brand.slug === 'taskgo' ? '禁止使用匠城出任務遊戲畫面,每篇換成不同的工地場面。' : ''}文案結尾要有明確匠管 CTA。主受眾:${audience.name}。`
             : `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。配圖做成痛點海報,系統畫面當解法卡。${brand.slug === 'taskgo' ? '禁止使用匠城出任務遊戲畫面,每篇換成不同的工地場面。' : ''}主受眾:${audience.name}。`,
@@ -543,7 +558,20 @@ async function generateDailyThemePlatforms(
         },
       });
 
-      if (willAutoPublish) {
+      const placed = await finishOfficeDraft(env, {
+        brandId: brand.id,
+        brandSlug: brand.slug,
+        contentId,
+        versionId,
+        platform,
+        slotAt: slotAt.toISOString(),
+        active: !!result.office?.active,
+        blocked: result.office?.blocked ?? null,
+        theme: result.office?.theme || theme.theme,
+        imageUrl: result.imageUrl,
+      });
+      const scheduled = placed === 'scheduled' || (placed === 'left' && willAutoPublish);
+      if (placed === 'left' && willAutoPublish) {
         await sql`
           INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
           VALUES (${contentId}::uuid, ${versionId}::uuid, ${platform}, 'scheduled', ${slotAt.toISOString()}::timestamptz)
@@ -557,9 +585,9 @@ async function generateDailyThemePlatforms(
         action: 'content.generated',
         entityType: 'content',
         entityId: contentId,
-        afterState: { platform, auto: true, dailyTheme: theme.theme, scheduled: willAutoPublish, slotAt: slotAt.toISOString() },
+        afterState: { platform, auto: true, dailyTheme: theme.theme, scheduled, slotAt: slotAt.toISOString() },
       });
-      console.log(`[themes] ${brand.slug}/${platform} 已排定 ${slotAt.toISOString()} 發布(${willAutoPublish ? '自動' : '待審核'})`);
+      console.log(`[themes] ${brand.slug}/${platform} 已排定 ${slotAt.toISOString()} 發布(${scheduled ? '自動' : '待審核'})`);
     } catch (e) {
       console.error(`[themes] ${brand.slug}/${platform} 主題貼文生成失敗`, e);
     }
@@ -1524,6 +1552,7 @@ async function publishDueJobs(env: Env): Promise<void> {
           `;
         }
         console.error(`[publish] ${label} Threads API access blocked,已暫停自動發文`);
+        await notePublisherBlocked(env, `${label} Threads 權杖失效，先停發`);
       }
       if ((row.platform === 'facebook' || row.platform === 'instagram') && row.brand_id && isMetaTokenInvalid(msg)) {
         const note = metaTokenInvalidNoteFromMessage(msg);
@@ -1533,6 +1562,7 @@ async function publishDueJobs(env: Env): Promise<void> {
           WHERE brand_id = ${row.brand_id}::uuid AND platform IN ('facebook', 'instagram')
         `;
         console.error(`[publish] ${label} FB/IG 權杖失效,已暫停自動發文`);
+        await notePublisherBlocked(env, `${label} ${row.platform} 權杖失效，先停發`);
       }
       console.error(`[publish] ${label}/${row.platform} 發布失敗`, e);
       await notifyPublishFailed(env, {
@@ -1641,6 +1671,9 @@ export default {
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     switch (controller.cron) {
+      case '0 0,6,12,18 * * *':
+        ctx.waitUntil(runOfficeStandup(env).catch((e) => console.error('[office] 晨會失敗', e)));
+        break;
       case '15 */3 * * *':
         ctx.waitUntil(collectSignals(env));
         ctx.waitUntil(collectPressMentions(env));
@@ -1678,7 +1711,7 @@ export default {
     }
   },
 
-  // 手動觸發除錯用:GET /?task=collect|drafts|threads|offtopic|replies|themes|catchup|ecosystem|ecosystem-x|publish|cleanup|podcast|refresh-tokens|refresh-x-tokens|insights|learn(需帶 secret)
+  // 手動觸發除錯用:GET /?task=collect|drafts|threads|offtopic|replies|themes|catchup|ecosystem|ecosystem-x|publish|cleanup|podcast|refresh-tokens|refresh-x-tokens|insights|learn|office(需帶 secret)
   // threads/offtopic/themes 可帶 &slotAt=ISO時間 指定要排定發布的時段(預設現在,方便測試)
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -1707,6 +1740,7 @@ export default {
       if (task === 'learn') return analyzeAllBrandPerformance(env);
       if (task === 'podcast') return createPodcastEpisode(env);
       if (task === 'seo') return runSeoAutoPublish(env);
+      if (task === 'office') return runOfficeStandup(env);
       if (task === 'shorts') {
         const slugs = (await listAutoPostSlugs(env)).filter(hasSystemShorts);
         for (const slug of slugs) {
@@ -1716,12 +1750,12 @@ export default {
       }
       return null;
     };
-    const known = ['collect', 'press', 'drafts', 'threads', 'offtopic', 'replies', 'themes', 'catchup', 'ecosystem', 'ecosystem-x', 'publish', 'cleanup', 'podcast', 'refresh-tokens', 'refresh-x-tokens', 'insights', 'learn', 'seo', 'shorts'];
+    const known = ['collect', 'press', 'drafts', 'threads', 'offtopic', 'replies', 'themes', 'catchup', 'ecosystem', 'ecosystem-x', 'publish', 'cleanup', 'podcast', 'refresh-tokens', 'refresh-x-tokens', 'insights', 'learn', 'seo', 'shorts', 'office'];
     if (!task || !known.includes(task)) {
       return new Response(`task 必須為 ${known.join(' / ')}`, { status: 400 });
     }
     // catchup / 生成必須等做完:waitUntil 在 HTTP 回應後約 30 秒就會被取消,補檔會做到一半被砍
-    const awaitTasks = ['catchup', 'threads', 'offtopic', 'themes', 'publish', 'seo', 'shorts'];
+    const awaitTasks = ['catchup', 'threads', 'offtopic', 'themes', 'publish', 'seo', 'shorts', 'office'];
     if (awaitTasks.includes(task)) {
       try {
         await run();

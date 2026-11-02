@@ -34,11 +34,25 @@ function extractJson(raw: string): string {
   return body;
 }
 
+export interface ClaudeUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 /** 發文文案。失敗拋 OpenAIError，讓呼叫端可以改走 OpenAI。 */
 export async function claudeChatJson<T>(
   env: Env,
   params: { messages: ChatMessage[]; temperature?: number; maxTokens?: number; timeoutMs?: number },
 ): Promise<T> {
+  const { data } = await claudeChatJsonWithUsage<T>(env, params);
+  return data;
+}
+
+/** 晨會計費用。模型仍是 Haiku，不改走更貴的模型。 */
+export async function claudeChatJsonWithUsage<T>(
+  env: Env,
+  params: { messages: ChatMessage[]; temperature?: number; maxTokens?: number; timeoutMs?: number },
+): Promise<{ data: T; usage: ClaudeUsage }> {
   if (!env.ANTHROPIC_API_KEY) {
     throw new OpenAIError(500, 'ANTHROPIC_API_KEY 尚未設定');
   }
@@ -71,11 +85,20 @@ export async function claudeChatJson<T>(
     const text = await res.text().catch(() => '');
     throw new OpenAIError(res.status, `Claude chat 失敗 (${res.status}): ${text.slice(0, 300)}`);
   }
-  const data = await res.json() as { content?: Array<{ type?: string; text?: string }> };
+  const data = await res.json() as {
+    content?: Array<{ type?: string; text?: string }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
+  };
   const raw = (data.content ?? []).filter((b) => b.type === 'text').map((b) => b.text ?? '').join('\n').trim();
   if (!raw) throw new OpenAIError(502, 'Claude 回傳空內容');
   try {
-    return JSON.parse(extractJson(raw)) as T;
+    return {
+      data: JSON.parse(extractJson(raw)) as T,
+      usage: {
+        inputTokens: data.usage?.input_tokens ?? 0,
+        outputTokens: data.usage?.output_tokens ?? 0,
+      },
+    };
   } catch {
     throw new OpenAIError(502, `Claude 回傳非合法 JSON: ${raw.slice(0, 200)}`);
   }

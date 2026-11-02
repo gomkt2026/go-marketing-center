@@ -203,14 +203,73 @@
 .office-scaler { position: relative; }
 
 .office-room {
+  --tilt: 22deg;
   position: absolute;
   left: 0;
   top: 0;
   transform-origin: top left;
   border-radius: 28px;
   overflow: hidden;
+  perspective: 1500px;
+  perspective-origin: 50% 18%;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-  background: #10283a;
+  background:
+    radial-gradient(120% 80% at 50% 100%, rgba(0, 0, 0, 0.28), transparent 55%),
+    #10283a;
+}
+
+.diorama,
+.back-wall,
+.floor-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.floor-stage {
+  pointer-events: none;
+  transform: rotateX(var(--tilt));
+  transform-origin: 50% 220px;
+}
+
+.floor-stage .station,
+.floor-stage .walker,
+.floor-stage .plant,
+.floor-stage .shelf,
+.floor-stage .sofa,
+.floor-stage .coffee,
+.floor-stage .office-bubbles {
+  transform: rotateX(calc(var(--tilt) * -1));
+}
+
+.floor-stage .station,
+.floor-stage .plant,
+.floor-stage .shelf,
+.floor-stage .sofa,
+.floor-stage .coffee {
+  transform-origin: 50% 100%;
+}
+
+.floor-stage .station { transform-origin: 50% 70px; }
+.floor-stage .walker {
+  transform: rotateX(calc(var(--tilt) * -1)) translateY(-34px);
+  transform-origin: 50% 100px;
+}
+.floor-stage .walker.is-dancing {
+  transform: rotateX(calc(var(--tilt) * -1));
+  transform-origin: 50% 112px;
+}
+.floor-stage .office-bubbles { transform-origin: 50% 0; }
+
+.floor-stage .station,
+.floor-stage .walker { pointer-events: auto; }
+
+.floor-stage .dance-flag {
+  transform: translateX(-50%) rotateX(calc(var(--tilt) * -1));
+}
+
+.floor-stage .meet-flag {
+  transform: translateX(-50%) rotateX(calc(var(--tilt) * -1));
+  transform-origin: 50% 100%;
 }
 
 .wall {
@@ -224,29 +283,32 @@
 
 .floor {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 258px;
+  left: -40px;
+  right: -40px;
+  top: 248px;
   bottom: 0;
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.22), transparent 48px),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.34), transparent 70px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent 7%, transparent 93%, rgba(0, 0, 0, 0.22)),
     repeating-linear-gradient(
       90deg,
-      #d7b27a 0 22px,
-      #c49658 22px 24px,
-      #e4c48e 24px 46px,
-      #c9a066 46px 48px
+      #e2c08a 0 26px,
+      #c49658 26px 29px,
+      #f0d2a0 29px 54px,
+      #c9a066 54px 57px
     );
+  box-shadow: inset 0 18px 24px rgba(0, 0, 0, 0.18);
 }
 
 .baseboard {
   position: absolute;
   left: 0;
   right: 0;
-  top: 252px;
-  height: 14px;
+  top: 246px;
+  height: 18px;
   z-index: 2;
-  background: linear-gradient(#f4ecdf, #cbb89a);
+  background: linear-gradient(#fff8ee, #d9c4a4 55%, #a88b68);
+  box-shadow: 0 12px 0 #7d6248, 0 18px 16px rgba(0, 0, 0, 0.28);
 }
 
 .windows {
@@ -488,18 +550,22 @@
 
 .carpet.brand {
   left: 24px;
-  top: 286px;
+  top: 300px;
   width: 230px;
-  height: 520px;
-  background: rgba(196, 122, 46, 0.28);
+  height: 500px;
+  border-radius: 46% / 18%;
+  background: rgba(196, 122, 46, 0.34);
+  box-shadow: 0 16px 0 rgba(90, 48, 16, 0.18);
 }
 
 .carpet.market {
   right: 20px;
-  top: 278px;
+  top: 292px;
   width: 470px;
-  height: 530px;
-  background: rgba(36, 92, 112, 0.28);
+  height: 510px;
+  border-radius: 46% / 16%;
+  background: rgba(36, 92, 112, 0.34);
+  box-shadow: 0 16px 0 rgba(8, 28, 36, 0.2);
 }
 
 .shelf {
@@ -565,8 +631,10 @@
   width: 330px;
   height: 200px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(52, 122, 86, 0.92), rgba(32, 86, 60, 0.88) 72%);
-  box-shadow: inset 0 0 0 8px rgba(255, 255, 255, 0.05);
+  background: radial-gradient(ellipse at 50% 42%, rgba(72, 150, 108, 0.95), rgba(24, 72, 50, 0.9) 74%);
+  box-shadow:
+    0 22px 0 rgba(12, 40, 28, 0.28),
+    inset 0 0 0 10px rgba(255, 255, 255, 0.06);
 }
 
 .sofa {
@@ -715,13 +783,15 @@
 .monitor {
   position: relative;
   z-index: 3;
-  width: 118px;
-  margin: -22px auto 0;
+  width: 128px;
+  margin: -18px auto 0;
+  transform: perspective(320px) rotateX(16deg);
+  transform-origin: 50% 100%;
 }
 
 .bezel {
   position: relative;
-  height: 64px;
+  height: 72px;
   padding: 5px;
   border-radius: 7px;
   background: #1b242c;
@@ -813,28 +883,46 @@
   position: relative;
   z-index: 4;
   display: block;
-  width: 138px;
+  width: 150px;
   height: 34px;
-  margin: -2px auto 0;
-  border-radius: 5px 5px 8px 8px;
-  background: linear-gradient(#efd3a0, #d2aa6c);
-  box-shadow: 0 11px 0 #8d6240, 0 16px 12px rgba(0, 0, 0, 0.22);
+  margin: 12px auto 0;
+  border-radius: 2px 2px 7px 7px;
+  background: linear-gradient(#e7c48a, #c48a4c);
+  box-shadow: 0 16px 0 #7a4e2e, 0 22px 14px rgba(0, 0, 0, 0.28);
+}
+
+.desk::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% - 2px);
+  height: 28px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(#fff1d4, #e4c48a);
+  transform: perspective(220px) rotateX(54deg);
+  transform-origin: bottom center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .desk strong {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 3px;
-  font-size: 11px;
+  bottom: 4px;
+  font-size: 13px;
   color: #3b2918;
 }
 
 .keys {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -14px;
+  z-index: 2;
   display: flex;
   justify-content: center;
   gap: 3px;
-  padding-top: 6px;
 }
 
 .keys b {
@@ -858,13 +946,25 @@
 .chair {
   position: absolute;
   left: 50%;
-  top: 74px;
-  width: 62px;
-  height: 14px;
+  top: 86px;
+  width: 70px;
+  height: 16px;
   transform: translateX(-50%);
-  border-radius: 8px 8px 3px 3px;
+  border-radius: 8px 8px 4px 4px;
   background: var(--mat);
+  box-shadow: 0 12px 0 color-mix(in srgb, var(--mat) 55%, #1a120c);
   z-index: 1;
+}
+
+.chair::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 12px;
+  height: 28px;
+  border-radius: 8px 8px 3px 3px;
+  background: linear-gradient(var(--mat), color-mix(in srgb, var(--mat) 70%, #1a120c));
 }
 
 .tip,

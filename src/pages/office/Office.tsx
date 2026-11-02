@@ -561,8 +561,9 @@ export function Office() {
       <div className="office-fit" ref={fitRef}>
         <div className="office-scaler" style={{ width: ROOM_W * scale, height: ROOM_H * scale }}>
           <div className={`office-room${dance ? ' is-dancing' : ''}`} style={{ width: ROOM_W, height: ROOM_H, transform: `scale(${scale})` }}>
+            <div className="diorama">
+            <div className="back-wall">
             <div className="wall" />
-            <div className="floor" />
             <div className="baseboard" />
             <div className="whiteboard">
               <strong>{board.title}</strong>
@@ -602,7 +603,10 @@ export function Office() {
               ))}
             </div>
             <div className="rack" aria-hidden>{Array.from({ length: 5 }, (_, i) => <b key={i} />)}</div>
+            </div>
 
+            <div className="floor-stage">
+            <div className="floor" />
             <div className="carpet brand" />
             <div className="carpet market" />
             <div className="shelf" aria-hidden><i /><i /><i /><i /></div>
@@ -638,7 +642,7 @@ export function Office() {
                   key={key}
                   type="button"
                   className={`station is-${status}${selected && agent?.id === selected ? ' is-picked' : ''}${roster && status === roster ? ' is-roster' : ''}${saying ? ' is-speaking' : ''}${away ? ' is-away' : ''}`}
-                  style={{ left: station.x, top: station.y, zIndex: 10 + index, ['--mat' as string]: station.mat, animationDelay: `${index * 0.35}s` }}
+                  style={{ left: station.x, top: station.y, zIndex: 10 + Math.round(station.y / 8), ['--mat' as string]: station.mat, animationDelay: `${index * 0.35}s` }}
                   aria-label={`${label}，${agent?.task ?? '等下一班晨會'}`}
                   onClick={() => { if (!agent) return; setSpoken(null); setSelected(agent.id); }}
                 >
@@ -667,7 +671,7 @@ export function Office() {
                   key={`walk-${key}`}
                   type="button"
                   className={`walker${walk ? ' is-away' : ''}${dance ? ` is-dancing is-${dance}` : ''}${selected && agent?.id === selected ? ' is-picked' : ''}`}
-                  style={{ left: walk ? walk.x : station.x + 50, top: walk ? walk.y : station.y, zIndex: dance ? 50 + index : walk ? 40 : 20 + index }}
+                  style={{ left: walk ? walk.x : station.x + 50, top: walk ? walk.y : station.y, zIndex: dance ? 80 + index : 30 + Math.round((walk ? walk.y : station.y) / 8) }}
                   aria-label={label}
                   onClick={() => { if (!agent) return; setSpoken(null); setSelected(agent.id); }}
                 >
@@ -684,6 +688,8 @@ export function Office() {
                 </button>
               );
             })}
+            </div>
+            </div>
           </div>
         </div>
       </div>

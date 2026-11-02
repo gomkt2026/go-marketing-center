@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { createOfficeAmbience } from './office-audio';
+import { compactNumber, nextLine, officeReply, type Ask } from './talk';
 import type { OfficeAgent, OfficeSnapshot } from './types';
 import './office.css';
 
@@ -22,6 +23,19 @@ const STATIONS = [
 
 type Station = (typeof STATIONS)[number];
 type ScreenKind = Station['screen'];
+
+const LOUNGE_SPOTS = [
+  { x: 348, y: 508 },
+  { x: 456, y: 572 },
+  { x: 524, y: 496 },
+];
+
+const BRAND_ORDER = ['taskgo', 'homigo', 'washgo'] as const;
+const BRAND_LABEL: Record<string, string> = { taskgo: 'TaskGo', homigo: 'Homigo', washgo: 'Washgo' };
+
+function stationKey(station: Station) {
+  return `${station.role}-${station.slug ?? 'x'}`;
+}
 
 const WINDOW_LIGHTS = [
   { l: '22%', t: '36%', d: '0s' },
@@ -134,6 +148,22 @@ function Monitor({ kind, title, line }: { kind: ScreenKind; title: string; line:
   );
 }
 
+function TypedText({ text }: { text: string }) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    setCount(0);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setCount(text.length);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setCount((value) => (value >= text.length ? value : value + 1));
+    }, 22);
+    return () => window.clearInterval(timer);
+  }, [text]);
+  return <>{text.slice(0, count)}</>;
+}
+
 function WindowPane({ moon }: { moon?: boolean }) {
   return (
     <div className="window">
@@ -161,7 +191,11 @@ export function Office() {
   const [scale, setScale] = useState(1);
   const [now, setNow] = useState(() => new Date());
   const [musicOn, setMusicOn] = useState(false);
+  const [demo, setDemo] = useState(false);
+  const [ask, setAsk] = useState<Ask>('now');
+  const [walks, setWalks] = useState<Record<string, { x: number; y: number }>>({});
   const fitRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const ambience = useRef<ReturnType<typeof createOfficeAmbience> | null>(null);
 
   useEffect(() => {
@@ -229,12 +263,52 @@ export function Office() {
 
   useEffect(() => {
     if (!selected) return;
+    setAsk('now');
+  }, [selected]);
+
+  useEffect(() => {
+    if (!selected) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setSelected(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selected]);
+
+  useEffect(() => {
+    const onFull = () => {
+      if (!document.fullscreenElement) setDemo(false);
+    };
+    document.addEventListener('fullscreenchange', onFull);
+    return () => document.removeEventListener('fullscreenchange', onFull);
+  }, []);
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let cursor = 0;
+    const timer = window.setInterval(() => {
+      const idle = STATIONS.filter((station) => {
+        const agent = data ? matchAgent(data.agents, station) : undefined;
+        if (agent?.id && agent.id === selected) return false;
+        return (agent?.status ?? 'done') !== 'working';
+      });
+      if (idle.length === 0) return;
+      const station = idle[cursor % idle.length];
+      const key = stationKey(station);
+      const spot = LOUNGE_SPOTS[cursor % LOUNGE_SPOTS.length];
+      cursor += 1;
+      setWalks((prev) => ({ ...prev, [key]: spot }));
+      window.setTimeout(() => {
+        setWalks((prev) => {
+          if (!prev[key]) return prev;
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      }, 9000);
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, [data, selected]);
 
   const counts = useMemo(() => {
     const agents = data?.agents ?? [];
@@ -247,10 +321,11 @@ export function Office() {
   const chosen = data?.agents.find((agent) => agent.id === selected) ?? null;
   const visibleBubbles = meeting ? bubbles.slice(bubbleAt % Math.max(bubbles.length, 1)).slice(0, 3) : [];
   const clock = taipeiParts(now);
-  const brands = data?.standup?.directive?.brands ?? [];
-  const spend = data?.monthSpendUsd ?? 0;
-  const budget = data?.budgetUsd || 40;
-  const spendPct = Math.max(4, Math.min(100, (spend / budget) * 100));
+  const upcoming = nextLine(data);
+  const reply = chosen && data ? officeReply(chosen, ask, data) : null;
+  const stats = BRAND_ORDER.map((slug) => data?.brandStats?.find((row) => row.slug === slug) ?? {
+    slug, posts: 0, views: 0, reach: 0, interactions: 0,
+  });
 
   async function toggle() {
     if (!data || switchBusy) return;
@@ -275,12 +350,30 @@ export function Office() {
     setMusicOn(true);
   }
 
+  async function enterDemo() {
+    setDemo(true);
+    ambience.current?.start();
+    setMusicOn(true);
+    try {
+      await pageRef.current?.requestFullscreen();
+    } catch {
+      /* 全螢幕被瀏覽器擋住時，仍用蓋住整個畫面的展示層 */
+    }
+  }
+
+  async function leaveDemo() {
+    setDemo(false);
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch { /* 已經退出 */ }
+    }
+  }
+
   return (
-    <div className={`office-page${meeting ? ' is-meeting' : ''}`}>
+    <div ref={pageRef} className={`office-page${meeting ? ' is-meeting' : ''}${demo ? ' is-demo' : ''}`}>
       <header className="office-hud">
         <div className="office-title">
           Go 行銷辦公室
-          <small>{data?.quiet ? '凌晨這一班只留方向，八點才發' : '點一個人，看他現在坐在哪一台電腦'}</small>
+          <small>{data?.quiet ? '凌晨這一班只留方向，八點才發' : '點一個人，他會回答現在在做什麼'}</small>
         </div>
         <div className="office-counts">
           <span>閒置 {counts.idle}</span>
@@ -290,6 +383,9 @@ export function Office() {
           <button type="button" className={`office-music${musicOn ? ' is-on' : ''}`} aria-pressed={musicOn} onClick={toggleMusic}>
             <span className="eq" aria-hidden><i /><i /><i /></span>
             {musicOn ? '音樂開著' : '播放音樂'}
+          </button>
+          <button type="button" className="office-music" onClick={() => void (demo ? leaveDemo() : enterDemo())}>
+            {demo ? '結束展示' : '全螢幕展示'}
           </button>
           <button type="button" className={`office-switch${data?.autoPublish === false ? ' is-off' : ''}`} onClick={() => void toggle()} disabled={!data || switchBusy}>
             {data?.autoPublish === false ? '自動發文關著' : '自動發文開著'}
@@ -310,11 +406,8 @@ export function Office() {
             <i className="pendant right" />
 
             <div className="whiteboard">
-              <strong>這一班</strong>
-              {brands.length === 0 && <p>等人來開會</p>}
-              {brands.map((brand) => (
-                <p key={brand.slug}><b>{brand.slug === 'taskgo' ? '阿豪' : brand.slug === 'homigo' ? '小咪' : '阿樂'}</b>{brand.theme}</p>
-              ))}
+              <strong>{upcoming.title}</strong>
+              <p className="next-detail">{upcoming.detail}</p>
             </div>
             <div className="windows">
               <WindowPane />
@@ -326,11 +419,16 @@ export function Office() {
               <i className="hand min" style={{ transform: `rotate(${clock.m * 6}deg)` }} />
               <i className="hand sec" style={{ transform: `rotate(${clock.s * 6}deg)` }} />
             </div>
-            <div className="usage">
-              <span>晨會額度</span>
-              <strong>${spend.toFixed(2)}</strong>
-              <small> / ${budget}</small>
-              <i style={{ width: `${spendPct}%` }} />
+            <div className="scoreboard">
+              <strong>近 28 天</strong>
+              {stats.map((row) => (
+                <p key={row.slug}>
+                  <b>{BRAND_LABEL[row.slug]}</b>
+                  <span>瀏覽 {compactNumber(row.views)}</span>
+                  <span>觸及 {row.reach > 0 ? compactNumber(row.reach) : '—'}</span>
+                  <span>互動 {row.views > 0 ? `${((row.interactions / row.views) * 100).toFixed(1)}%` : '—'}</span>
+                </p>
+              ))}
             </div>
             <div className="rack" aria-hidden>{Array.from({ length: 5 }, (_, i) => <b key={i} />)}</div>
 
@@ -361,21 +459,21 @@ export function Office() {
               const copy = screenCopy(station, agent, data);
               const saying = visibleBubbles.find((bubble) => bubble.who === label);
               const status = agent?.status ?? 'done';
+              const key = stationKey(station);
+              const away = Boolean(walks[key]);
               return (
                 <button
-                  key={`${station.role}-${station.slug ?? 'x'}`}
+                  key={key}
                   type="button"
-                  className={`station is-${status}${selected && agent?.id === selected ? ' is-picked' : ''}${saying ? ' is-speaking' : ''}`}
+                  className={`station is-${status}${selected && agent?.id === selected ? ' is-picked' : ''}${saying ? ' is-speaking' : ''}${away ? ' is-away' : ''}`}
                   style={{ left: station.x, top: station.y, zIndex: 10 + index, ['--mat' as string]: station.mat, animationDelay: `${index * 0.35}s` }}
                   aria-label={`${label}，${agent?.task ?? '等下一班晨會'}`}
                   onClick={() => agent && setSelected(agent.id)}
                 >
                   <span className="tip">{agent?.task ?? '等下一班晨會'}</span>
                   {saying && <span className="say">{saying.text}</span>}
+                  <span className="who-space" />
                   <span className="chair" />
-                  <span className="who" style={{ animationDelay: `${index * 0.4}s` }}>
-                    <Face src={station.portrait} crop={station.crop} alt={label} tint={station.mat} />
-                  </span>
                   <Monitor kind={station.screen} title={copy.title} line={copy.line} />
                   <span className="desk">
                     <span className="keys" aria-hidden><b /><b /><b /><b /><b /></span>
@@ -384,53 +482,49 @@ export function Office() {
                 </button>
               );
             })}
+            {STATIONS.map((station, index) => {
+              const key = stationKey(station);
+              const walk = walks[key];
+              const agent = data ? matchAgent(data.agents, station) : undefined;
+              const label = nickname(agent, station.name);
+              return (
+                <button
+                  key={`walk-${key}`}
+                  type="button"
+                  className={`walker${walk ? ' is-away' : ''}${selected && agent?.id === selected ? ' is-picked' : ''}`}
+                  style={{ left: walk ? walk.x : station.x + 50, top: walk ? walk.y : station.y, zIndex: walk ? 40 : 20 + index }}
+                  aria-label={label}
+                  onClick={() => agent && setSelected(agent.id)}
+                >
+                  <Face src={station.portrait} crop={station.crop} alt={label} tint={station.mat} />
+                  <em>{label}</em>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {chosen && (
-        <aside className="office-panel">
+      {chosen && reply && (
+        <aside className="talkbox">
           <button type="button" className="office-close" onClick={() => setSelected(null)} aria-label="關閉">×</button>
-          <h2>{nickname(chosen, chosen.displayName)}</h2>
-          <div className="role">{chosen.persona.characterTitle}</div>
-          <p className="task">{chosen.task}</p>
-          {chosen.persona.catchphrase && <p className="quote">「{chosen.persona.catchphrase}」</p>}
-          {chosen.persona.focus && <p className="meta">{chosen.persona.focus}</p>}
-          {chosen.roleCode === 'content_strategist' && (
-            <ul>
-              {(data?.standup?.directive?.brands ?? []).map((brand) => (
-                <li key={brand.slug}>{brand.slug}：{brand.theme}</li>
-              ))}
-            </ul>
-          )}
-          {chosen.roleCode === 'market_analyst' && (
-            <ul>
-              {(data?.signals ?? []).map((signal) => <li key={signal.id}>{signal.title}</li>)}
-            </ul>
-          )}
-          {chosen.roleCode === 'podcast_producer' && (
-            <ul>
-              {(data?.podcasts ?? []).map((episode) => <li key={episode.id}>{episode.title}（{episode.status}）</li>)}
-              {data?.standup?.directive?.podcastTopic && <li>下一題：{data.standup.directive.podcastTopic}</li>}
-            </ul>
-          )}
-          {chosen.roleCode === 'video_editor' && (
-            <ul>
-              {(data?.videos ?? []).length
-                ? data!.videos.map((video) => <li key={video.id}>{video.title}（{video.status}）</li>)
-                : <li>在等素材，這班不剪新片</li>}
-            </ul>
-          )}
-          {chosen.roleCode === 'brand_ai' && (
-            <ul>
-              {(data?.findings ?? []).filter((finding) => finding.slug === chosen.brandSlug).map((finding) => (
-                <li key={finding.summary}>{finding.summary}</li>
-              ))}
-            </ul>
-          )}
-          {chosen.preview?.body && <p className="meta">{chosen.preview.body}</p>}
-          {chosen.preview?.file_url && <img src={chosen.preview.file_url} alt="" />}
-          {manuscriptHref(chosen) && <p><Link to={manuscriptHref(chosen)!}>打開原稿</Link></p>}
+          <img className="talk-face" src={STATIONS.find((station) => matchAgent([chosen], station))?.portrait ?? ''} alt="" />
+          <div className="talk-body">
+            <h2>{nickname(chosen, chosen.displayName)} <small>{chosen.persona.characterTitle}</small></h2>
+            <p className="ask">{reply.question}</p>
+            <p className="reply"><TypedText text={reply.answer} /></p>
+            {reply.details.length > 0 && (
+              <ul>
+                {reply.details.map((line) => <li key={line}>{line}</li>)}
+              </ul>
+            )}
+            <div className="asks">
+              <button type="button" className={ask === 'now' ? 'is-on' : ''} onClick={() => setAsk('now')}>你現在在做什麼</button>
+              <button type="button" className={ask === 'next' ? 'is-on' : ''} onClick={() => setAsk('next')}>下一件是什麼</button>
+              <button type="button" className={ask === 'result' ? 'is-on' : ''} onClick={() => setAsk('result')}>成效怎麼樣</button>
+              {manuscriptHref(chosen) && <Link to={manuscriptHref(chosen)!}>打開原稿</Link>}
+            </div>
+          </div>
         </aside>
       )}
     </div>

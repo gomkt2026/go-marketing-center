@@ -21,7 +21,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
   try {
     const sql = getSql(context.env);
-    const [settings, standups, agents, signals, podcasts, videos, spentRows, findings] = await Promise.all([
+    const [settings, standups, agents, signals, podcasts, videos, spentRows, findings, statRows, nextRows] = await Promise.all([
       sql`SELECT auto_publish FROM office_settings WHERE id = 1`,
       sql`
         SELECT id, started_at, status, directive, bubbles, cost_usd, apply_to_generation, valid_until, note
@@ -79,6 +79,58 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         JOIN brands b ON b.id = f.brand_id
         ORDER BY f.brand_id, f.created_at DESC
       `,
+      sql`
+        SELECT b.slug,
+          count(pj.id) FILTER (
+            WHERE pj.status = 'published' AND pj.published_at >= now() - interval '28 days'
+          )::int AS posts,
+          coalesce(sum(pr.impressions) FILTER (
+            WHERE pj.status = 'published' AND pj.published_at >= now() - interval '28 days'
+          ), 0)::bigint AS views,
+          coalesce(sum(
+            CASE
+              WHEN pj.status = 'published'
+                AND pj.published_at >= now() - interval '28 days'
+                AND coalesce(pr.raw_metrics->>'reach', '') ~ '^[0-9]+$'
+              THEN (pr.raw_metrics->>'reach')::bigint
+              ELSE 0
+            END
+          ), 0)::bigint AS reach,
+          coalesce(sum(
+            CASE
+              WHEN pj.status = 'published' AND pj.published_at >= now() - interval '28 days'
+              THEN coalesce(pr.comments, 0) + coalesce(pr.shares, 0) + coalesce(pr.saves, 0)
+                + CASE
+                    WHEN coalesce(pr.raw_metrics->>'likes', '') ~ '^[0-9]+$'
+                    THEN (pr.raw_metrics->>'likes')::bigint
+                    ELSE 0
+                  END
+              ELSE 0
+            END
+          ), 0)::bigint AS interactions
+        FROM brands b
+        LEFT JOIN contents c ON c.brand_id = b.id
+        LEFT JOIN publishing_jobs pj ON pj.content_id = c.id AND pj.status = 'published'
+        LEFT JOIN LATERAL (
+          SELECT impressions, comments, shares, saves, raw_metrics
+          FROM performance_reports
+          WHERE publishing_job_id = pj.id
+          ORDER BY captured_at DESC NULLS LAST
+          LIMIT 1
+        ) pr ON true
+        WHERE b.slug IN ('taskgo', 'homigo', 'washgo')
+        GROUP BY b.slug
+      `,
+      sql`
+        SELECT b.slug, coalesce(c.title, '未命名') AS title, pj.platform::text AS platform, pj.scheduled_at
+        FROM publishing_jobs pj
+        JOIN contents c ON c.id = pj.content_id
+        JOIN brands b ON b.id = c.brand_id
+        WHERE pj.status IN ('queued', 'scheduled', 'publishing')
+          AND b.slug IN ('taskgo', 'homigo', 'washgo')
+        ORDER BY pj.scheduled_at ASC NULLS LAST
+        LIMIT 1
+      `,
     ]);
 
     const agentRows = agents as {
@@ -126,6 +178,18 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       podcasts,
       videos,
       findings,
+      brandStats: (statRows as { slug: string; posts: number; views: number; reach: number; interactions: number }[]).map((row) => ({
+        slug: row.slug,
+        posts: Number(row.posts ?? 0),
+        views: Number(row.views ?? 0),
+        reach: Number(row.reach ?? 0),
+        interactions: Number(row.interactions ?? 0),
+      })),
+      nextJob: (() => {
+        const row = nextRows[0] as { slug: string; title: string; platform: string; scheduled_at: string | null } | undefined;
+        if (!row) return null;
+        return { slug: row.slug, title: row.title, platform: row.platform, scheduledAt: row.scheduled_at };
+      })(),
       agents: agentRows.map((agent) => ({
         id: agent.id,
         roleCode: agent.role_code,

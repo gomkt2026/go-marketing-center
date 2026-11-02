@@ -55,4 +55,21 @@ export interface OfficeSnapshot {
   videos: { id: string; title: string; status: string; final_url: string | null; preview_url: string | null }[];
   findings: { slug: string; summary: string; source_url: string | null }[];
   agents: OfficeAgent[];
+  brandStats?: OfficeBrandStat[];
+  nextJob?: OfficeNextJob | null;
+}
+
+export interface OfficeBrandStat {
+  slug: string;
+  posts: number;
+  views: number;
+  reach: number;
+  interactions: number;
+}
+
+export interface OfficeNextJob {
+  slug: string;
+  title: string;
+  platform: string;
+  scheduledAt: string | null;
 }

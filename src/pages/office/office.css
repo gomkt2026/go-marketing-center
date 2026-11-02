@@ -943,7 +943,6 @@
   width: 72px;
   height: 118px;
   margin: 0 auto;
-  animation-delay: var(--lag);
 }
 
 .walker.is-dancing .portrait,
@@ -1022,17 +1021,28 @@
   background: #1b2430;
 }
 
-.walker.is-sidestep .doll { animation: sidestep 0.72s ease-in-out infinite; animation-delay: var(--lag); }
-.walker.is-sidestep .arm.left { animation: arm-swing 0.72s ease-in-out infinite; animation-delay: var(--lag); }
-.walker.is-sidestep .arm.right { animation: arm-swing 0.72s ease-in-out infinite reverse; animation-delay: var(--lag); }
-.walker.is-sidestep .leg.left { animation: step-l 0.72s ease-in-out infinite; animation-delay: var(--lag); }
-.walker.is-sidestep .leg.right { animation: step-r 0.72s ease-in-out infinite; animation-delay: var(--lag); }
+.walker.is-dancing .doll,
+.walker.is-dancing .arm,
+.walker.is-dancing .leg,
+.walker.is-dancing .torso {
+  animation-duration: 3.2s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-delay: 0s;
+}
 
-.walker.is-naughty .doll { animation: naughty-bounce 0.46s ease-in-out infinite; animation-delay: var(--lag); }
-.walker.is-naughty .arm { top: 20px; height: 26px; }
-.walker.is-naughty .arm.left { animation: cheek-l 0.46s ease-in-out infinite; animation-delay: var(--lag); }
-.walker.is-naughty .arm.right { animation: cheek-r 0.46s ease-in-out infinite; animation-delay: var(--lag); }
-.walker.is-naughty .leg { animation: knee 0.46s ease-in-out infinite; animation-delay: var(--lag); }
+.walker.is-naughty .doll { animation-name: bad-body; }
+.walker.is-naughty .arm.left { animation-name: bad-arm-l; }
+.walker.is-naughty .arm.right { animation-name: bad-arm-r; }
+.walker.is-naughty .leg.left { animation-name: bad-leg-l; }
+.walker.is-naughty .leg.right { animation-name: bad-leg-r; }
+.walker.is-naughty .torso { animation-name: bad-chest; }
+
+.walker.is-sidestep .doll { animation-name: flash-body; }
+.walker.is-sidestep .arm.left { animation-name: flash-arm-l; }
+.walker.is-sidestep .arm.right { animation-name: flash-arm-r; }
+.walker.is-sidestep .leg.left { animation-name: flash-leg-l; }
+.walker.is-sidestep .leg.right { animation-name: flash-leg-r; }
 
 .dance-flag {
   position: absolute;
@@ -1211,37 +1221,102 @@
 @keyframes eq {
   to { height: 10px; }
 }
-@keyframes sidestep {
-  0%, 100% { transform: translateX(-12px) rotate(-7deg); }
-  50% { transform: translateX(12px) rotate(7deg); }
+@keyframes bad-body {
+  0%, 11% { transform: translateX(-18px) rotate(-16deg); }
+  12.5%, 23% { transform: translateX(18px) rotate(16deg); }
+  25%, 36% { transform: translateY(10px); }
+  37.5%, 49% { transform: none; }
+  50%, 53% { transform: translateY(-12px); }
+  56%, 61% { transform: none; }
+  62%, 65% { transform: translateY(-12px); }
+  68%, 73% { transform: none; }
+  74%, 77% { transform: translateY(-14px); }
+  80%, 86% { transform: none; }
+  87.5%, 100% { transform: none; }
 }
-@keyframes arm-swing {
-  0%, 100% { transform: rotate(32deg); }
-  50% { transform: rotate(-32deg); }
+@keyframes bad-arm-l {
+  0%, 11% { transform: rotate(16deg); }
+  12.5%, 23% { transform: rotate(-96deg); }
+  25%, 36% { transform: rotate(-58deg); }
+  37.5%, 49% { transform: rotate(-36deg); }
+  50%, 53% { transform: rotate(-70deg); }
+  56%, 61% { transform: rotate(-36deg); }
+  62%, 65% { transform: rotate(-70deg); }
+  68%, 73% { transform: rotate(-36deg); }
+  74%, 77% { transform: rotate(-78deg); }
+  80%, 86% { transform: rotate(-36deg); }
+  87.5%, 100% { transform: rotate(86deg); }
 }
-@keyframes step-l {
-  0%, 100% { transform: translateX(-7px) rotate(10deg); }
-  50% { transform: translateX(3px) rotate(-6deg); }
+@keyframes bad-arm-r {
+  0%, 11% { transform: rotate(96deg); }
+  12.5%, 23% { transform: rotate(-16deg); }
+  25%, 36% { transform: rotate(58deg); }
+  37.5%, 49% { transform: rotate(36deg); }
+  50%, 53% { transform: rotate(70deg); }
+  56%, 61% { transform: rotate(36deg); }
+  62%, 65% { transform: rotate(70deg); }
+  68%, 73% { transform: rotate(36deg); }
+  74%, 77% { transform: rotate(78deg); }
+  80%, 86% { transform: rotate(36deg); }
+  87.5%, 100% { transform: rotate(-86deg); }
 }
-@keyframes step-r {
-  0%, 100% { transform: translateX(3px) rotate(-6deg); }
-  50% { transform: translateX(7px) rotate(10deg); }
+@keyframes bad-leg-l {
+  0%, 11% { transform: translateX(-8px) rotate(-14deg); }
+  12.5%, 23% { transform: none; }
+  25%, 36% { transform: scaleY(0.82); }
+  50%, 53%, 62%, 65%, 74%, 77% { transform: scaleY(0.78); }
+  87.5%, 100% { transform: translateX(-6px) rotate(-8deg); }
 }
-@keyframes naughty-bounce {
-  0%, 100% { transform: translateY(0) rotate(-6deg); }
-  50% { transform: translateY(-14px) rotate(6deg); }
+@keyframes bad-leg-r {
+  0%, 11% { transform: none; }
+  12.5%, 23% { transform: translateX(8px) rotate(14deg); }
+  25%, 36% { transform: scaleY(0.82); }
+  50%, 53%, 62%, 65%, 74%, 77% { transform: scaleY(0.78); }
+  87.5%, 100% { transform: translateX(6px) rotate(8deg); }
 }
-@keyframes cheek-l {
-  0%, 100% { transform: rotate(-72deg); }
-  50% { transform: rotate(-28deg); }
+@keyframes bad-chest {
+  0%, 49% { transform: none; }
+  50%, 53% { transform: scale(1.16, 0.9); }
+  56%, 61% { transform: none; }
+  62%, 65% { transform: scale(1.16, 0.9); }
+  68%, 73% { transform: none; }
+  74%, 77% { transform: scale(1.2, 0.88); }
+  80%, 100% { transform: none; }
 }
-@keyframes cheek-r {
-  0%, 100% { transform: rotate(72deg); }
-  50% { transform: rotate(28deg); }
+@keyframes flash-body {
+  0%, 24% { transform: none; }
+  27%, 48% { transform: translateX(-36px) rotate(-18deg) translateY(8px); }
+  52%, 64% { transform: none; }
+  67%, 88% { transform: translateX(36px) rotate(18deg) translateY(8px); }
+  92%, 100% { transform: none; }
 }
-@keyframes knee {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: scaleY(0.86); }
+@keyframes flash-arm-l {
+  0%, 24% { transform: rotate(8deg); }
+  27%, 48% { transform: rotate(70deg); }
+  52%, 64% { transform: rotate(8deg); }
+  67%, 88% { transform: rotate(-24deg); }
+  92%, 100% { transform: rotate(8deg); }
+}
+@keyframes flash-arm-r {
+  0%, 24% { transform: rotate(-8deg); }
+  27%, 48% { transform: rotate(24deg); }
+  52%, 64% { transform: rotate(-8deg); }
+  67%, 88% { transform: rotate(-70deg); }
+  92%, 100% { transform: rotate(-8deg); }
+}
+@keyframes flash-leg-l {
+  0%, 24% { transform: none; }
+  27%, 48% { transform: none; }
+  52%, 64% { transform: none; }
+  67%, 88% { transform: translateY(-10px) rotate(-24deg); }
+  92%, 100% { transform: none; }
+}
+@keyframes flash-leg-r {
+  0%, 24% { transform: none; }
+  27%, 48% { transform: translateY(-10px) rotate(24deg); }
+  52%, 64% { transform: none; }
+  67%, 88% { transform: none; }
+  92%, 100% { transform: none; }
 }
 @keyframes walk-bob {
   0%, 100% { transform: translateY(0); }

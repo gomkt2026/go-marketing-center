@@ -157,20 +157,15 @@ export function createOfficeAmbience(): Ambience {
 
   function danceLoop() {
     if (!ctx || !beat || !danceOn) return;
-    const naughty = danceKind === 'naughty';
-    const beatLen = naughty ? 0.42 : 0.56;
+    const beatLen = 0.4;
     const start = ctx.currentTime + 0.04;
+    const accents = danceKind === 'naughty' ? [0, 1, 2, 4, 5, 6] : [2, 6];
     for (let i = 0; i < 8; i++) {
       const at = start + i * beatLen;
-      thump(at, i % 2 === 0 ? 120 : 90, i % 2 === 0 ? 0.22 : 0.12);
-      if (naughty) {
-        tick(at + beatLen * 0.5, i % 2 === 0 ? 784 : 988, 0.05);
-      } else if (i % 2 === 1) {
-        tick(at, 523, 0.04);
-      }
-      tick(at, naughty ? (i % 4 === 0 ? 196 : 247) : (i % 2 === 0 ? 131 : 196), 0.06);
+      tick(at, 880, 0.02);
+      if (accents.includes(i)) thump(at, danceKind === 'naughty' && i >= 4 ? 150 : 110, i >= 4 ? 0.28 : 0.2);
     }
-    danceTimer = window.setTimeout(danceLoop, beatLen * 8 * 1000 - 60);
+    danceTimer = window.setTimeout(danceLoop, beatLen * 8 * 1000);
   }
 
   function close() {

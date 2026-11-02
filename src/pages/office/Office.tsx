@@ -535,7 +535,7 @@ export function Office() {
             <div className="shelf" aria-hidden><i /><i /><i /><i /></div>
             <div className="plant" aria-hidden><i className="leaf a" /><i className="leaf b" /><i className="leaf c" /><i className="pot" /></div>
 
-            {dance && <div className="dance-flag">{dance === 'naughty' ? '全體小編：你好壞' : '全體小編：閃身步'}</div>}
+            {dance && <div className="dance-flag">{dance === 'naughty' ? '她 · 很 · 壞 · 嘟嘟嘟' : '站好 · 左閃 · 右閃'}</div>}
             <div className="lounge">
               <div className="sofa" />
               <div className="coffee">
@@ -597,7 +597,7 @@ export function Office() {
                   onClick={() => agent && setSelected(agent.id)}
                 >
                   {line && !dance && <span className="bubble">{line}</span>}
-                  <span className="doll" style={{ ['--mat' as string]: station.mat, ['--lag' as string]: `${index * 0.07}s` }}>
+                  <span className="doll" style={{ ['--mat' as string]: station.mat }}>
                     <Face src={station.portrait} crop={station.crop} alt={label} tint={station.mat} />
                     <i className="arm left" />
                     <i className="arm right" />

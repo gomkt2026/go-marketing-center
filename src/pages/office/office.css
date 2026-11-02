@@ -1091,7 +1091,7 @@
 .talk-body h2 { margin: 0; font-size: 18px; color: #f4fcff; }
 .talk-body h2 small { margin-left: 8px; color: #8fd0dc; font-size: 13px; font-weight: 500; }
 .talkbox .ask { margin: 6px 0 0; color: #9ec4ce; font-size: 13px; }
-.talkbox .reply { margin: 4px 0 0; color: #f7fbfc; font-size: 15px; line-height: 1.55; }
+.talkbox .reply { margin: 4px 0 0; color: #f7fbfc; font-size: 15px; line-height: 1.55; white-space: pre-wrap; }
 .talkbox ul { margin: 6px 0 0; padding-left: 18px; max-height: 64px; overflow: auto; }
 .talkbox li { color: #c5e4ea; font-size: 13px; line-height: 1.4; }
 .asks { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }

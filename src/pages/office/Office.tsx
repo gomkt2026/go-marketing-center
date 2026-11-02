@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { createOfficeAmbience, type DanceKind } from './office-audio';
-import { compactNumber, nextBoard, officeReply, pairLines, type Ask } from './talk';
+import { compactNumber, liveAsk, nextBoard, officeReply, pairLines, type Ask, type LiveReply } from './talk';
 import type { OfficeAgent, OfficeSnapshot, OfficeStatPeriod } from './types';
 import './office.css';
 
@@ -208,6 +208,8 @@ export function Office() {
   const [note, setNote] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
   const [noteSaved, setNoteSaved] = useState('');
+  const [spoken, setSpoken] = useState<LiveReply | null>(null);
+  const [said, setSaid] = useState<{ agentId: string; line: string } | null>(null);
   const fitRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const ambience = useRef<ReturnType<typeof createOfficeAmbience> | null>(null);
@@ -364,7 +366,8 @@ export function Office() {
   const clock = taipeiParts(now);
   const phase = skyPhase(clock.h);
   const board = nextBoard(data);
-  const reply = chosen && data ? officeReply(chosen, ask, data, period) : null;
+  const preset = chosen && data ? officeReply(chosen, ask, data, period) : null;
+  const reply = spoken ?? preset;
   const stats = BRAND_ORDER.map((slug) => data?.brandStats?.[period]?.find((row) => row.slug === slug) ?? {
     slug, posts: 0, views: 0, reach: 0, interactions: 0,
   });
@@ -429,13 +432,24 @@ export function Office() {
     }
   }
 
-  async function sendNote() {
-    if (!chosen || note.trim().length < 2 || noteBusy) return;
+  async function askEditor() {
+    if (!chosen || !data || note.trim().length < 2 || noteBusy) return;
+    const text = note.trim();
+    const reply = liveAsk(chosen, text, data, period);
+    if (reply.mode === 'answer') {
+      setSpoken(reply);
+      setSaid({ agentId: chosen.id, line: reply.bubble });
+      setNote('');
+      setNoteSaved('');
+      return;
+    }
     setNoteBusy(true);
     try {
-      await api.addOfficeSuggestion(chosen.id, note.trim());
+      await api.addOfficeSuggestion(chosen.id, text);
+      setSpoken(reply);
+      setSaid({ agentId: chosen.id, line: reply.bubble });
       setNote('');
-      setNoteSaved('已記下，下一班晨會會拿來當方向');
+      setNoteSaved('');
       setTick((n) => n + 1);
     } catch (e) {
       setNoteSaved(e instanceof Error ? e.message : '沒記下');
@@ -456,7 +470,7 @@ export function Office() {
       <header className="office-hud">
         <div className="office-title">
           Go 行銷辦公室
-          <small>{data?.quiet ? '凌晨這一班只留方向，八點才發' : '點一個人，他會回答現在在做什麼'}</small>
+          <small>{data?.quiet ? '凌晨這一班只留方向，八點才發' : '點一個人，直接問，他用手上的資料回答'}</small>
         </div>
         <div className="office-counts">
           <span>閒置 {counts.idle}</span>
@@ -567,7 +581,7 @@ export function Office() {
                   className={`station is-${status}${selected && agent?.id === selected ? ' is-picked' : ''}${saying ? ' is-speaking' : ''}${away ? ' is-away' : ''}`}
                   style={{ left: station.x, top: station.y, zIndex: 10 + index, ['--mat' as string]: station.mat, animationDelay: `${index * 0.35}s` }}
                   aria-label={`${label}，${agent?.task ?? '等下一班晨會'}`}
-                  onClick={() => agent && setSelected(agent.id)}
+                  onClick={() => { if (!agent) return; setSpoken(null); setSelected(agent.id); }}
                 >
                   <span className="tip">{agent?.task ?? '等下一班晨會'}</span>
                   {saying && <span className="say">{saying.text}</span>}
@@ -586,7 +600,9 @@ export function Office() {
               const walk = walks[key];
               const agent = data ? matchAgent(data.agents, station) : undefined;
               const label = nickname(agent, station.name);
-              const line = chat?.a === station.name ? chat.lineA : chat?.b === station.name ? chat.lineB : '';
+              const line = said && agent?.id === said.agentId
+                ? said.line
+                : chat?.a === station.name ? chat.lineA : chat?.b === station.name ? chat.lineB : '';
               return (
                 <button
                   key={`walk-${key}`}
@@ -594,7 +610,7 @@ export function Office() {
                   className={`walker${walk ? ' is-away' : ''}${dance ? ` is-dancing is-${dance}` : ''}${selected && agent?.id === selected ? ' is-picked' : ''}`}
                   style={{ left: walk ? walk.x : station.x + 50, top: walk ? walk.y : station.y, zIndex: dance ? 50 + index : walk ? 40 : 20 + index }}
                   aria-label={label}
-                  onClick={() => agent && setSelected(agent.id)}
+                  onClick={() => { if (!agent) return; setSpoken(null); setSelected(agent.id); }}
                 >
                   {line && !dance && <span className="bubble">{line}</span>}
                   <span className="doll" style={{ ['--mat' as string]: station.mat }}>
@@ -627,20 +643,20 @@ export function Office() {
               </ul>
             )}
             <div className="asks">
-              <button type="button" className={ask === 'now' ? 'is-on' : ''} onClick={() => setAsk('now')}>你現在在做什麼</button>
-              <button type="button" className={ask === 'next' ? 'is-on' : ''} onClick={() => setAsk('next')}>下一件是什麼</button>
-              <button type="button" className={ask === 'result' ? 'is-on' : ''} onClick={() => setAsk('result')}>成效怎麼樣</button>
+              <button type="button" className={ask === 'now' && !spoken ? 'is-on' : ''} onClick={() => { setSpoken(null); setAsk('now'); }}>你現在在做什麼</button>
+              <button type="button" className={ask === 'next' && !spoken ? 'is-on' : ''} onClick={() => { setSpoken(null); setAsk('next'); }}>下一件是什麼</button>
+              <button type="button" className={ask === 'result' && !spoken ? 'is-on' : ''} onClick={() => { setSpoken(null); setAsk('result'); }}>成效怎麼樣</button>
               {manuscriptHref(chosen) && <Link to={manuscriptHref(chosen)!}>打開原稿</Link>}
             </div>
             {remembered && <p className="hint">上次交代：{remembered.body}</p>}
-            <form className="advice" onSubmit={(event) => { event.preventDefault(); void sendNote(); }}>
+            <form className="advice" onSubmit={(event) => { event.preventDefault(); void askEditor(); }}>
               <input
                 value={note}
                 maxLength={400}
-                placeholder="交代這位小編下一班要注意什麼"
+                placeholder="直接問他，或交代下一班要注意什麼"
                 onChange={(event) => setNote(event.target.value)}
               />
-              <button type="submit" disabled={noteBusy || note.trim().length < 2}>記下</button>
+              <button type="submit" disabled={noteBusy || note.trim().length < 2}>問他</button>
             </form>
             {noteSaved && <p className="hint">{noteSaved}</p>}
           </div>

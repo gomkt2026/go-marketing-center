@@ -185,3 +185,86 @@ export function officeReply(
 
   return { question: `${name}，你現在在做什麼？`, answer: bits.join(''), details };
 }
+
+export interface LiveReply {
+  mode: 'answer' | 'note';
+  question: string;
+  answer: string;
+  details: string[];
+  bubble: string;
+}
+
+function wantsDirection(text: string) {
+  return /不要|記得|記住|注意|下一班|交代|避開|改成|先別|以後|幫我記/.test(text) && !/[？?]/.test(text);
+}
+
+function topicOf(text: string): Ask | 'hot' | 'show' | 'film' | 'picture' | null {
+  if (/成效|瀏覽|觸及|互動/.test(text)) return 'result';
+  if (/下一|排程|幾點|今晚|什麼時候|何時|要發/.test(text)) return 'next';
+  if (/熱門|新聞|關鍵字|時事|頭條/.test(text)) return 'hot';
+  if (/podcast|播客|這一集|錄音/.test(text)) return 'show';
+  if (/影片|短片|剪接|剪片/.test(text)) return 'film';
+  if (/配圖|圖片|海報/.test(text)) return 'picture';
+  if (/現在|在做|在忙|手上|誰/.test(text)) return 'now';
+  return null;
+}
+
+export function liveAsk(
+  agent: OfficeAgent,
+  text: string,
+  data: OfficeSnapshot,
+  period: OfficeStatPeriod = '28',
+): LiveReply {
+  const name = nickname(agent);
+  const question = text.trim();
+  if (wantsDirection(question)) {
+    return {
+      mode: 'note',
+      question,
+      answer: `${name}記下了。下一班晨會只拿這句當方向，不會把它寫成已經發生的新聞或數字。`,
+      details: [],
+      bubble: '下一班我照這個方向',
+    };
+  }
+
+  const topic = topicOf(question);
+  if (topic === 'result' || topic === 'next' || topic === 'now') {
+    const reply = officeReply(agent, topic, data, period);
+    return { mode: 'answer', question, answer: reply.answer, details: reply.details, bubble: clip(reply.answer, 42) };
+  }
+  if (topic === 'hot') {
+    const words = data.keywords ?? [];
+    const answer = words.length
+      ? `新聞收集這輪抓到的是：${words.slice(0, 8).join('、')}。`
+      : '這一輪熱門關鍵字還沒抓到，我不會現編。';
+    return { mode: 'answer', question, answer, details: words.slice(0, 8), bubble: clip(answer, 42) };
+  }
+  if (topic === 'show') {
+    const lines = data.podcasts.map((episode) => `${episode.title}（${episode.status}）`);
+    const next = data.standup?.directive?.podcastTopic;
+    const answer = [
+      lines.length ? `還沒上架的是：${lines.join('、')}。` : '現在沒有待上架的 Podcast。',
+      next ? `下一題方向是：${next}。` : '',
+    ].join('');
+    return { mode: 'answer', question, answer, details: lines, bubble: clip(answer, 42) };
+  }
+  if (topic === 'film') {
+    const lines = data.videos.map((video) => `${video.title}（${video.status}）`);
+    const answer = lines.length ? `片子目前是：${lines.join('、')}。` : '片子還在等素材，這一班不剪新片。';
+    return { mode: 'answer', question, answer, details: lines, bubble: clip(answer, 42) };
+  }
+  if (topic === 'picture') {
+    const brief = data.standup?.directive?.imageBrief;
+    const answer = brief ? `這一班配圖要這樣：${brief}` : '這一班還沒有留下配圖方向。';
+    return { mode: 'answer', question, answer, details: brief ? [brief] : [], bubble: clip(answer, 42) };
+  }
+
+  const known = officeReply(agent, 'now', data, period);
+  return {
+    mode: 'answer',
+    question,
+    answer: `${known.answer}\n你這句我沒有另外一筆資料，不能現編。可以問現在在做什麼、下一件、成效，或這一輪熱門。`,
+    details: known.details,
+    bubble: '這句我沒有資料，不現編',
+  };
+}

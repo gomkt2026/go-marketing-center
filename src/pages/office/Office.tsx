@@ -866,7 +866,7 @@ export function Office({ view = false, room = 'go' }: { view?: boolean; room?: '
                   <span className="tip">{agent?.task ?? '等下一班晨會'}</span>
                   <span className="who-space" />
                   <span className="chair" />
-                  <Monitor kind={station.screen as ScreenKind} title={copy.title} line={copy.line} marks={room === 'bbbox' ? ['盒', '勘', '圖'] : undefined} />
+                  <Monitor kind={station.screen as ScreenKind} title={copy.title} line={copy.line} marks={room === 'bbbox' ? ['盒'] : undefined} />
                   <span className="desk">
                     <span className="keys" aria-hidden><b /><b /><b /><b /><b /></span>
                     <strong>{label}</strong>

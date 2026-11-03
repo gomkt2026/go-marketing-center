@@ -4,27 +4,23 @@ import type { Ask, OfficeMoment } from './talk';
 import type { OfficeAgent, OfficeSnapshot } from './types';
 
 export const BBBOX_STATIONS = [
-  { role: 'brand_ai', slug: 'bbbox', name: '小盒', x: 40, y: 292, mat: '#5B949A', screen: 'cabin', portrait: '/brands/bbbox-logo.png', crop: 'center center' },
-  { role: 'content_strategist', slug: 'bbbox', name: '企劃', x: 52, y: 430, mat: '#f2c14e', screen: 'plan', portrait: '/office/cast-strategy.jpg', crop: 'center 16%' },
-  { role: 'publisher', slug: 'bbbox', name: '草稿', x: 36, y: 624, mat: '#7ee0ff', screen: 'queue', portrait: '/office/cast-publisher.jpg', crop: 'center 20%' },
-  { role: 'market_analyst', slug: 'bbbox', name: '情報', x: 640, y: 300, mat: '#b7ddd4', screen: 'ticker', portrait: '/office/cast-news.jpg', crop: 'center 18%' },
-  { role: 'site_survey', slug: 'bbbox', name: '場勘', x: 872, y: 308, mat: '#F0D93D', screen: 'jobs', portrait: '', crop: 'center' },
-  { role: 'showroom', slug: 'bbbox', name: '賞屋', x: 656, y: 424, mat: '#8A6A12', screen: 'homes', portrait: '', crop: 'center' },
-  { role: 'script', slug: 'bbbox', name: '對稿', x: 860, y: 436, mat: '#f0b429', screen: 'wave', portrait: '/office/cast-podcast.jpg', crop: 'center 14%' },
-  { role: 'art_director', slug: 'bbbox', name: '配圖', x: 644, y: 616, mat: '#f4a6c4', screen: 'swatch', portrait: '/office/cast-art.jpg', crop: 'center 10%' },
-  { role: 'video_editor', slug: 'bbbox', name: '剪片', x: 876, y: 628, mat: '#b9a6ff', screen: 'timeline', portrait: '/office/cast-video.jpg', crop: 'center 12%' },
+  { role: 'brand_ai', slug: 'bbbox', name: '小盒', x: 46, y: 430, mat: '#5B949A', screen: 'cabin', portrait: '/brands/bbbox-xiaohe.jpg', crop: 'center 22%' },
+  { role: 'market_analyst', slug: 'bbbox', name: '新聞收集', x: 640, y: 300, mat: '#b7ddd4', screen: 'ticker', portrait: '/office/cast-news.jpg', crop: 'center 18%' },
+  { role: 'content_strategist', slug: 'bbbox', name: '行銷小編', x: 872, y: 308, mat: '#f2c14e', screen: 'plan', portrait: '/office/cast-strategy.jpg', crop: 'center 16%' },
+  { role: 'publisher', slug: 'bbbox', name: '發文小編', x: 656, y: 424, mat: '#7ee0ff', screen: 'queue', portrait: '/office/cast-publisher.jpg', crop: 'center 20%' },
+  { role: 'podcast_producer', slug: 'bbbox', name: 'Podcast小編', x: 860, y: 436, mat: '#f0b429', screen: 'wave', portrait: '/office/cast-podcast.jpg', crop: 'center 14%' },
+  { role: 'art_director', slug: 'bbbox', name: '圖片小編', x: 644, y: 616, mat: '#f4a6c4', screen: 'swatch', portrait: '/office/cast-art.jpg', crop: 'center 10%' },
+  { role: 'video_editor', slug: 'bbbox', name: '影片小編', x: 876, y: 628, mat: '#b9a6ff', screen: 'timeline', portrait: '/office/cast-video.jpg', crop: 'center 12%' },
 ] as const;
 
 const TASKS: Record<string, string> = {
   小盒: '在對賞屋草稿，等人看過再發',
-  企劃: '在收和居家居這一題',
-  草稿: '稿先留在這一層',
-  情報: '熱門接不上賞屋就不寫',
-  場勘: '先問這塊地能做什麼',
-  賞屋: '電話 04-2355-0256，LINE @BBBOX',
-  對稿: '在對這一則的場面',
-  配圖: '青綠底、黃標，這張不做成語錄卡',
-  剪片: '素材不夠就不假裝剪完',
+  新聞收集: '熱門接不上賞屋就不寫',
+  行銷小編: '這一題只寫和居家居',
+  發文小編: '稿先留在這一層',
+  Podcast小編: '在對這一則的場面',
+  圖片小編: '青綠底、黃標，這張不做成語錄卡',
+  影片小編: '素材不夠就不假裝剪完',
 };
 
 const DESK: Record<string, { title: string; line: string }[]> = {
@@ -32,35 +28,27 @@ const DESK: Record<string, { title: string; line: string }[]> = {
     { title: '賞屋', line: '在對這塊地能做什麼' },
     { title: '賞屋', line: '草稿先留著，等人看過' },
   ],
-  企劃: [
-    { title: '題目', line: '這一題只寫和居家居' },
-    { title: '題目', line: '硬跟熱門的那則先拿掉' },
+  新聞收集: [
+    { title: '熱門', line: '接不上賞屋就先放著' },
+    { title: '熱門', line: '這一輪只看和居家居用得上的' },
   ],
-  草稿: [
+  行銷小編: [
+    { title: '策略', line: '這一題只寫和居家居' },
+    { title: '策略', line: '硬跟熱門的那則先拿掉' },
+  ],
+  發文小編: [
     { title: '草稿', line: 'FB、IG、Threads 各留一則' },
     { title: '草稿', line: '看過的那則才送出去' },
   ],
-  情報: [
-    { title: '熱門', line: '接不上賞屋就先放著' },
-    { title: '熱門', line: '不把別的牌子的題拿過來' },
-  ],
-  場勘: [
-    { title: '場地', line: '先問這塊地進不進得去' },
-    { title: '場地', line: '路進不去就看能不能現場組' },
-  ],
-  賞屋: [
-    { title: '賞屋', line: '04-2355-0256' },
-    { title: '賞屋', line: 'LINE @BBBOX' },
-  ],
-  對稿: [
+  Podcast小編: [
     { title: '對稿', line: '前兩行要是一個場面' },
     { title: '對稿', line: '價格、合法、回本這則不寫' },
   ],
-  配圖: [
+  圖片小編: [
     { title: '配圖', line: '青綠底，黃標四到十字' },
     { title: '配圖', line: '這張不做成語錄卡' },
   ],
-  剪片: [
+  影片小編: [
     { title: '剪片', line: '在等賞屋或進場的素材' },
     { title: '剪片', line: '素材不夠就不假裝剪完' },
   ],
@@ -68,14 +56,12 @@ const DESK: Record<string, { title: string; line: string }[]> = {
 
 const TITLES: Record<string, string> = {
   小盒: '和居家居小編',
-  企劃: '這一牌的題',
-  草稿: '草稿台',
-  情報: '熱門',
-  場勘: '場地',
-  賞屋: '展間',
-  對稿: '對稿',
-  配圖: '配圖',
-  剪片: '剪片',
+  新聞收集: '熱門',
+  行銷小編: '這一牌的題',
+  發文小編: '草稿台',
+  Podcast小編: '對稿',
+  圖片小編: '配圖',
+  影片小編: '剪片',
 };
 
 function desk(name: string, beat: number) {
@@ -109,8 +95,8 @@ function buildSnapshot(drafts: Content[]): OfficeSnapshot {
   const byPlatform = (platform: string) => drafts.find((item) => item.targetPlatform === platform);
   const previewFor = (name: string) => {
     if (name === '小盒') return previewOf(byPlatform('facebook') ?? drafts[0]);
-    if (name === '配圖') return previewOf(byPlatform('instagram'));
-    if (name === '草稿') return previewOf(byPlatform('threads') ?? drafts[0]);
+    if (name === '圖片小編') return previewOf(byPlatform('instagram'));
+    if (name === '發文小編') return previewOf(byPlatform('threads') ?? drafts[0]);
     return null;
   };
   return {
@@ -144,7 +130,7 @@ function buildSnapshot(drafts: Content[]): OfficeSnapshot {
         characterTitle: TITLES[station.name] ?? '和居家居',
         focus: TASKS[station.name] ?? '',
       },
-      status: station.name === '小盒' || station.name === '配圖' ? 'working' : 'done',
+      status: station.name === '小盒' || station.name === '圖片小編' ? 'working' : 'done',
       task: TASKS[station.name] ?? '在看和居家居這一則',
       artifactType: previewFor(station.name) ? 'content' : null,
       artifactId: previewFor(station.name)?.id ?? null,
@@ -165,7 +151,7 @@ export async function loadBbboxOffice(): Promise<OfficeSnapshot> {
 }
 
 export function bbboxScreenCopy(name: string, task: string, beat: number, keywords: string[]) {
-  if (name === '情報') {
+  if (name === '新聞收集') {
     const line = keywords.filter(Boolean).slice(0, 6).join('  ·  ');
     return { title: '熱門', line: line || '在看能不能接到賞屋' };
   }
@@ -194,11 +180,10 @@ export function bbboxDraftCounts(data: OfficeSnapshot | null) {
 }
 
 const EXCHANGES: { a: string; b: string; lineA: string; lineB: string }[] = [
-  { a: '場勘', b: '小盒', lineA: '這塊地的路要先問', lineB: '結論：文案先寫進不進得去，價格不寫' },
-  { a: '企劃', b: '情報', lineA: '熱門接不上賞屋就別硬寫', lineB: '結論：這一則仍寫這塊地能做什麼' },
-  { a: '配圖', b: '小盒', lineA: '這張用青綠底、黃標，不做成語錄卡', lineB: '結論：圖跟現場組或賞屋那個場面一起出' },
-  { a: '草稿', b: '賞屋', lineA: '這三則先留在草稿', lineB: '結論：看過再發。電話跟 LINE 留在文末' },
-  { a: '對稿', b: '剪片', lineA: '前兩行要是一個場面', lineB: '結論：片子等素材，字卡不蓋重點' },
+  { a: '行銷小編', b: '新聞收集', lineA: '熱門接不上賞屋就先拿掉', lineB: '結論：這一則仍寫這塊地能做什麼' },
+  { a: '圖片小編', b: '小盒', lineA: '這張用青綠底、黃標，不做成語錄卡', lineB: '結論：圖跟現場組或賞屋那個場面一起出' },
+  { a: '發文小編', b: '小盒', lineA: '這三則先留在草稿', lineB: '結論：看過再發。電話跟 LINE 留在文末' },
+  { a: 'Podcast小編', b: '影片小編', lineA: '前兩行要是一個場面', lineB: '結論：片子等素材，字卡不蓋重點' },
 ];
 
 export function bbboxMoment(names: string[], salt: number): OfficeMoment {
@@ -286,7 +271,7 @@ export function bbboxAsk(agent: OfficeAgent, text: string, data: OfficeSnapshot)
 
 export function bbboxHref(role: string) {
   if (role === 'brand_ai') return '/bbbox/editor';
-  if (role === 'content_strategist' || role === 'market_analyst' || role === 'site_survey') return '/bbbox/intelligence';
+  if (role === 'content_strategist' || role === 'market_analyst') return '/bbbox/intelligence';
   if (role === 'video_editor') return '/bbbox/shorts';
   return '/bbbox/contents';
 }

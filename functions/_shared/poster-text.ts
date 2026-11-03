@@ -97,11 +97,8 @@ async function initResvg(source: ArrayBuffer | Response): Promise<void> {
   try {
     await initWasm(source);
   } catch (error) {
-    if (/already/i.test(error instanceof Error ? error.message : String(error))) return;
-    if (source instanceof ArrayBuffer) {
-      await initWasm(await WebAssembly.compile(source));
-      return;
-    }
+    const message = error instanceof Error ? error.message : String(error);
+    if (/already/i.test(message)) return;
     throw error;
   }
 }

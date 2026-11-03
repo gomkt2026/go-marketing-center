@@ -208,6 +208,7 @@ export async function ensurePostingOpsTables(env: Env): Promise<void> {
       ${seedKinds}::text[]
     ) AS t(platform, hour_tw, slot_kind)
     WHERE b.is_active = true
+      AND b.slug <> 'bbbox'
       AND NOT EXISTS (
         SELECT 1 FROM brand_posting_slots s WHERE s.brand_id = b.id
       )
@@ -311,7 +312,7 @@ function fallbackSlots(brands: Array<{ id: string; slug: string }>): PostingSlot
         platform: def.platform,
         hourTw: def.hourTw,
         slotKind: def.slotKind,
-        enabled: true,
+        enabled: brand.slug !== 'bbbox',
       });
     }
   }

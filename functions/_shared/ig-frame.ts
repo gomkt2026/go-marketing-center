@@ -15,6 +15,7 @@ const BRAND_BG: Record<string, [number, number, number]> = {
   washgo: [0x1d, 0x4f, 0x8c],
   homigo: [0xf5, 0xf1, 0xea],
   taskgo: [0x0b, 0x2d, 0x5c],
+  bbbox: [0x5b, 0x94, 0x9a],
 };
 
 function fillCanvas(
@@ -90,6 +91,7 @@ const POSTER_BG: Record<string, [number, number, number]> = {
   homigo: [0xf5, 0xf1, 0xea],
   washgo: [0xe6, 0xf2, 0xff],
   taskgo: [0x0b, 0x2d, 0x5c],
+  bbbox: [0xe8, 0xf4, 0xf4],
 };
 
 /** 從放大後的圖裁出置中區塊。Photon 這層沒有穩定的 crop,改切 RGBA。 */

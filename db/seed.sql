@@ -45,12 +45,14 @@ DECLARE
   b_taskgo       UUID := gen_random_uuid();
   b_washgo       UUID := gen_random_uuid();
   b_fixer        UUID := gen_random_uuid();
+  b_bbbox        UUID := gen_random_uuid();
 
   -- 品牌版本
   v_homigo_1     UUID := gen_random_uuid();
   v_taskgo_1     UUID := gen_random_uuid();
   v_washgo_1     UUID := gen_random_uuid();
   v_fixer_1      UUID := gen_random_uuid();
+  v_bbbox_1      UUID := gen_random_uuid();
 
   -- AI Agent 角色 id(對應 schema.sql 已種入的 agent_roles)
   r_brand_ai     UUID;
@@ -166,7 +168,8 @@ BEGIN
     (b_homigo, 'homigo', 'Homigo', '不是管理房子,而是讓房子自己運作。', '#A7C18D', true),
     (b_taskgo, 'taskgo', 'TaskGo', '讓工程專案管理更簡單、更智能', '#ED9121', true),
     (b_washgo, 'washgo', 'Washgo', '衣物送洗,交給 Washgo', '#A87C64', true),
-    (b_fixer,  'fixercowork', 'FIXERCOWORK', 'REPAIR & MAINTAIN SOLUTIONS', '#1A2F4B', true);
+    (b_fixer,  'fixercowork', 'FIXERCOWORK', 'REPAIR & MAINTAIN SOLUTIONS', '#1A2F4B', true),
+    (b_bbbox,  'bbbox', '和居家居', '更多空間，更好生活', '#5B949A', true);
 
   UPDATE brands SET
     logo_url = '/api/media/brand-assets/homigo/logo.png',
@@ -190,12 +193,20 @@ BEGIN
     ingest_base_url = 'https://washgo-api.washgotaskgo.workers.dev'
     WHERE id = b_washgo;
   UPDATE brands SET logo_url = '/brands/fixercowork-logo.png' WHERE id = b_fixer;
+  -- 完整品牌智慧、關閉的發文時段與體驗草稿在 db/migrations/072_bbbox_brand.sql
+  UPDATE brands SET
+    logo_url = '/brands/bbbox-logo.png',
+    website_url = 'https://bbbox-shop.com/zh/',
+    website_note = '和居家居股份有限公司；BB BOX 伊格模組移動屋。展示中心：臺中市北屯區環中路一段1111號之1',
+    blog_base_url = 'https://www.bbbox-shop.com/zh/info'
+    WHERE id = b_bbbox;
 
   INSERT INTO brand_members (brand_id, user_id, role) VALUES
     (b_homigo, u_admin, 'super_admin'),
     (b_taskgo, u_admin, 'super_admin'),
     (b_washgo, u_admin, 'super_admin'),
     (b_fixer,  u_admin, 'super_admin'),
+    (b_bbbox,  u_admin, 'super_admin'),
     (b_homigo, u_homigo_mgr, 'brand_manager'),
     (b_taskgo, u_taskgo_mgr, 'brand_manager'),
     (b_washgo, u_washgo_mgr, 'brand_manager'),
@@ -205,12 +216,14 @@ BEGIN
     (v_homigo_1, b_homigo, 1, 'published', '首版發布:依 HOMIGO_BRAND_PROFILE.md v1.0 拆解建立', 0.93, u_homigo_mgr, now() - interval '20 days'),
     (v_taskgo_1, b_taskgo, 1, 'published', '首版發布:依 TaskGo_品牌行銷資料.md 拆解建立',      0.90, u_taskgo_mgr, now() - interval '18 days'),
     (v_washgo_1, b_washgo, 1, 'published', '首版發布:依 WASHGO_BRAND_MARKETING.md 拆解建立',    0.88, u_washgo_mgr, now() - interval '15 days'),
-    (v_fixer_1,  b_fixer,  1, 'published', '首版:FIXERCOWORK 修繕共創品牌',                   0.90, u_fixer_mgr,  now());
+    (v_fixer_1,  b_fixer,  1, 'published', '首版:FIXERCOWORK 修繕共創品牌',                   0.90, u_fixer_mgr,  now()),
+    (v_bbbox_1,  b_bbbox,  1, 'published', '首版：和居家居／BB BOX，完整條目見 migration 072', 0.86, u_admin, now());
 
   UPDATE brands SET current_version_id = v_homigo_1 WHERE id = b_homigo;
   UPDATE brands SET current_version_id = v_taskgo_1 WHERE id = b_taskgo;
   UPDATE brands SET current_version_id = v_washgo_1 WHERE id = b_washgo;
   UPDATE brands SET current_version_id = v_fixer_1  WHERE id = b_fixer;
+  UPDATE brands SET current_version_id = v_bbbox_1  WHERE id = b_bbbox;
 
   -- ==========================================================================
   -- Brand Documents(原始資料索引,永久保留)

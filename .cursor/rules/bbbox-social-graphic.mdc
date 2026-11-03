@@ -1,0 +1,17 @@
+---
+description: 和居家居／BB BOX 的 FB、IG 圖文用青綠與黃標，不要海軍藍斜切，也不要米白租屋海報
+alwaysApply: false
+---
+
+# 和居家居／BB BOX 社群圖文
+
+產生和居家居、BB BOX、蘋果艙、歐寓、第二空間的 FB／IG／Threads 圖，或改產圖 prompt 時：
+
+1. 主色青綠 `#5B949A`，黃標 `#F0D93D`，留白底 `#E8F4F4`，深字 `#245E64`
+2. 畫面是模組艙、基地、進場，不是工地派工，也不是租屋代管
+3. 有上傳素材時原圖鋪滿，底部青綠條只印 4–10 字痛點（白字、黃字強調）。沒有素材才生圖，主標留白給系統後製
+4. 官方 logo 由系統後製。不要叫模型畫 BB BOX、和居家居或任何中英數字
+5. 禁止海軍藍斜切工地語錄卡、米白深藍租屋海報、洗衣可愛插畫
+6. 不報價、不寫保證合法、不寫回本
+
+程式規格：`functions/_shared/prompts.ts` 的 `BBBOX_CORE`，`functions/_shared/poster-text.ts` 的 `bbbox`

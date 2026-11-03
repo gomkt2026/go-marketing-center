@@ -188,6 +188,41 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       'cream / sky / mint, Washgo blues and a gold chip. Lively, clean, Instagram-native. Never pencil sketch, never watercolor art-book, never Ghibli cinematic.',
     imageRendering: 'illustration',
   },
+  bbbox: {
+    frontlinePersona:
+      '你是 BB BOX 的帶看規劃人員，服務和居家居。寫文時先問這塊地進不進得了車、要做旅宿、書房、茶亭還是工務基地，再講產品。' +
+      '你講話像帶人看基地，句子清楚，不報價，不保證合法。產品對外名稱是 BB BOX 伊格模組移動屋。',
+    dailyConcerns: '土地怎麼用、路寬與轉彎、移動屋與組合屋差異、蘋果艙尺寸、庭院第二空間、營地與工務臨時空間',
+    replyCraft:
+      '回覆像帶看的人在留言。先接進場或用途，再補一個產品頁上有的尺寸。' +
+      '不要報價、不要保證合法或回本、不要教人規避建照。不放匠管電話。',
+    operatorConcerns: '基地進不去、整屋運不進、庭院想加一間、營地要分期加房間、工務要臨時宿舍',
+    contentCraft:
+      '寫深度文時：' +
+      '1. 開頭是一個基地場面（路進不去、地放著、院子想多一間），禁止先報品牌全名。' +
+      '2. 規格只寫品牌規則裡有的尺寸與材料，不可把鋼鋁、全鋁、彩鋼板混成同一句。' +
+      '3. 拓旅艙只寫工寮、宿舍、辦公與臨時支援，不寫成住宅替代。' +
+      '4. 法規只寫依這塊地的用途與縣市確認。' +
+      '5. 結尾才是預約賞屋，不寫匠管信箱。',
+    instagramCraft:
+      'BB BOX IG 專屬規則:' +
+      '1. 80-180 字，不超過 220 字。第一句就是進場或用途。' +
+      '2. 視覺是青綠 #5B949A、黃標 #F0D93D、霧底 #E8F4F4。禁止海軍藍斜切，禁止米白租屋海報。' +
+      '3. 不報價、不寫保證合法。Hashtag 8-12 個，含 #BBBOX 與一個產品詞。' +
+      '4. 結尾是預約賞屋：04-2355-0256 或 LINE @BBBOX。',
+    instagramMaxChars: 220,
+    igSearchQueries: ['移動屋', '蘋果艙', '模組屋', '組合屋', '土地活化'],
+    imageStyle:
+      'BB BOX modular cabin poster: mist #E8F4F4, teal #5B949A, yellow #F0D93D as a small accent. ' +
+      'A cabin, a narrow access road, or a yard. Empty top for later type. No text, no navy construction poster, no rental flyer.',
+    imageStyleB2b:
+      'BB BOX site-planning poster: Taiwan land access, modular cabin set in place, teal and mist, one yellow module. No hard-hat quote card.',
+    threadsCraft:
+      'BB BOX 的 Threads：一個土地場面，2-4 行。不報價，不教法規漏洞，不寫匠管。' +
+      '進不去才談現場組裝；要臨時大空間才談拓旅艙。',
+    threadsMaxChars: 220,
+    imageRendering: 'photo',
+  },
 };
 
 export function getBrandVoice(slug: string): BrandVoice {
@@ -209,6 +244,22 @@ export const SHARED_BRAND_CTA_RULE =
   '主 CTA 一律導向匠管:Email Service@inforcraft.com.tw、電話 0972-395-117。' +
   '禁止導向各品牌 LINE(@washgo、@933pdush)、官網註冊、hello@washgo.com.tw、加 LINE 免費開始、免費試用 14 天。' +
   `cta 欄位請寫「${SHARED_BRAND_CTA}」。`;
+
+/** 和居家居／BB BOX 不走匠管窗口。三品牌仍用 SHARED_BRAND_CTA。 */
+export const BBBOX_CTA = '預約賞屋：04-2355-0256，或 LINE @BBBOX';
+export const BBBOX_CTA_RULE =
+  '主 CTA 是預約賞屋：電話 04-2355-0256、手機 0906-102-200、LINE @BBBOX。' +
+  '禁止導向匠管信箱、匠管電話、Homigo、TaskGo、Washgo。' +
+  '不可報價，不可保證合法、獲利或回本。' +
+  `cta 欄位請寫「${BBBOX_CTA}」。`;
+
+export function ctaForBrand(slug: string): string {
+  return slug === 'bbbox' ? BBBOX_CTA : SHARED_BRAND_CTA;
+}
+
+export function ctaRuleForBrand(slug: string): string {
+  return slug === 'bbbox' ? BBBOX_CTA_RULE : SHARED_BRAND_CTA_RULE;
+}
 
 const B2B_LANE_INSTRUCTIONS: Record<string, string> = {
   washgo:
@@ -232,6 +283,10 @@ const B2B_LANE_INSTRUCTIONS: Record<string, string> = {
     '場景放在派工排程、成本、LINE 現場回報、月底才知賠錢。' +
     '用後台/系統畫面感說話,少寫純工地風景抒情。立場站在做工的人這邊。' +
     SHARED_BRAND_CTA_RULE,
+  bbbox:
+    '【本篇受眾車道:B 端】寫給基地不好進車的業主，或營地、工務需要臨時空間的人。' +
+    '先問進場與用途。拓旅艙不是住宅替代。不報價。' +
+    BBBOX_CTA_RULE,
 };
 
 const B2C_LANE_INSTRUCTIONS: Record<string, string> = {
@@ -244,6 +299,10 @@ const B2C_LANE_INSTRUCTIONS: Record<string, string> = {
   taskgo:
     '【本篇受眾車道:C 端】若要寫現場師傅日常,仍要讓人感覺這是工班在用的工具,不是消費生活帳號。' +
     SHARED_BRAND_CTA_RULE,
+  bbbox:
+    '【本篇受眾車道:C 端】寫給有地、想做旅宿、第二住宅或庭院加一間的人。' +
+    '先問這塊地能做什麼。不報價，不保證合法。' +
+    BBBOX_CTA_RULE,
 };
 
 const FALLBACK_AUDIENCES: Record<string, Record<AudienceLane, AudiencePick>> = {
@@ -258,6 +317,10 @@ const FALLBACK_AUDIENCES: Record<string, Record<AudienceLane, AudiencePick>> = {
   taskgo: {
     b2b: { name: '工程行老闆 / 工班頭', lane: 'b2b', painPoints: ['排班燒腦', '月底才知道案子賠錢'], appealAngle: '省時間、看得到錢、掌控感' },
     b2c: { name: '現場師傅 / 工班成員', lane: 'b2c', painPoints: ['怕學新東西', '請款單沒下文'], appealAngle: '不用裝 APP、會傳早安圖就會用' },
+  },
+  bbbox: {
+    b2b: { name: '基地不好進車的業主', lane: 'b2b', painPoints: ['整間成屋運不進去'], appealAngle: '現場組裝，先看路再選尺寸' },
+    b2c: { name: '有地想做旅宿或第二住宅的人', lane: 'b2c', painPoints: ['地在，不知道先做什麼'], appealAngle: '先問用途，再選艙' },
   },
 };
 
@@ -311,6 +374,7 @@ export function pickImageStyle(params: {
   if (params.brandSlug === 'washgo' && params.platform === 'threads' && params.lane === 'b2c') {
     return 'illustration';
   }
+  if (params.brandSlug === 'bbbox') return 'design';
   // TaskGo / Homigo / Washgo 的 FB、IG 以海報設計圖為主,寫實照只當輪替
   const weights: Record<ImageStyleId, number> = params.platform === 'threads'
     ? (params.brandSlug === 'washgo' && params.lane === 'b2c'
@@ -464,7 +528,7 @@ export async function buildBrandContext(env: Env, brandId: string): Promise<Bran
     collateralPrompt(collaterals),
     officialWebsitePrompt(website.websiteUrl, website.websiteNote),
     '',
-    SHARED_BRAND_CTA_RULE,
+    ctaRuleForBrand(brand.slug),
     ANTI_AI_RULES,
   ].filter(Boolean).join('\n');
 
@@ -645,7 +709,25 @@ export const HOMIGO_IG_IMAGE_STYLE = [
 export const HOMIGO_TEXT_MARK_RULE =
   '【品牌標】不要在圖上畫任何 logo 或品牌字樣;角落留乾淨,官方標與繁中主標由系統後製。';
 
-/** 各品牌 B 端「社群設計圖」規格;Homigo 米白深藍社群海報、Washgo 可愛洗衣插畫、TaskGo 匠管平面海報 */
+const BBBOX_CORE = [
+  'BB BOX modular-cabin social poster for 和居家居. Mist field, teal structure, one yellow module.',
+  'LOCKED palette: mist #E8F4F4, teal #5B949A, yellow #F0D93D only as a small accent, dark text areas #245E64. Never navy construction blocks, never cream rental-flyer field, never laundry pastels.',
+  'Subject: a modular cabin, a narrow Taiwan access road, a yard about to gain one room, or a site where a whole house cannot be delivered. No hard-hat crew, no landlord paperwork, no washing machine.',
+  'Portrait: top 25% empty mist, no people, no objects, no text. Landscape: left 38% empty mist. Subject stays in the remaining field, about 35–50%.',
+  'Do not draw letters, numbers, prices, or any logo. The official mark is composited later.',
+].join(' ');
+
+const BBBOX_DESIGN_IMAGE_PROMPT_SPEC =
+  '"imagePrompt": "必填:這張圖是 BB BOX 模組屋社群海報（霧底 #E8F4F4、青綠 #5B949A、黃標 #F0D93D 只做小色塊）。只描述畫面，不要描述任何要印在圖上的文字:' +
+  '1) 構圖:上方 25% 完全留空給後製主標（只有霧底，沒有人、沒有物件、沒有文字）;' +
+  '2) 情境:台灣基地的進場或用途（路進不去、院子多一間、艙體準備落地）;' +
+  '3) 禁止:海軍藍斜切工地海報、米白租屋海報、洗衣插畫、報價、任何中英數字、自己畫 logo"';
+
+const BBBOX_PHOTO_IMAGE_PROMPT_SPEC =
+  '"imagePrompt": "必填:給圖片生成模型的英文描述，走 BB BOX 霧底青綠海報，不是工地攝影、不是租屋海報。' +
+  '一個艙體、一條進不去的路，或一塊準備加房間的院子。上方 25% 留空。不含文字"';
+
+/** 各品牌 B 端「社群設計圖」規格;Homigo 米白深藍社群海報、Washgo 可愛洗衣插畫、TaskGo 匠管平面海報、BB BOX 青綠艙體 */
 export const BRAND_DESIGN_IMAGE_STYLE: Record<string, string> = {
   homigo: HOMIGO_IG_IMAGE_STYLE,
   washgo: [
@@ -661,6 +743,11 @@ export const BRAND_DESIGN_IMAGE_STYLE: Record<string, string> = {
     '台灣工班:白或黃安全帽、反光背心、深藍工作服;工地主任看圖、師傅打卡、後勤看報表皆可。不要歐美模特、不要棚拍假笑。',
     '可在下三分之一放很小的平板/白卡,UI 用抽象灰線與青藍色塊,禁止文字數字。不要整頁後台置中。',
     'Every element has meaning: workwear = craft philosophy, cyan = digital clarity, navy = trust, empty block = the future overlay, honeycomb = copyable standard.',
+  ].join('\n'),
+  bbbox: [
+    BBBOX_CORE,
+    '直式上方 25% 或橫式左側 38% 是空的霧底 #E8F4F4，不要人物、不要任何文字。',
+    '艙體用圓角與一個黃標模組塊表示可組裝。不要安全帽、不要租約資料夾。',
   ].join('\n'),
 };
 
@@ -680,6 +767,10 @@ export const BRAND_PHOTO_IMAGE_STYLE: Record<string, string> = {
     'More cinematic figure, slightly more site texture as stylized graphic marks. No full photoreal site. No device UI card.',
     '直式上方 25% 或橫式左側 38% 空的海軍藍/青藍色塊給後製字。',
   ].join('\n'),
+  bbbox: [
+    BBBOX_CORE,
+    'One Taiwan site moment only. No device UI card. Empty mist block stays clear for later type.',
+  ].join('\n'),
 };
 
 export const PHOTO_EDITORIAL_CONVERT_RULE = `${EDITORIAL_PAPER_CONVERT} ${EDITORIAL_PAPER_CORE}`;
@@ -694,6 +785,7 @@ export function defaultCopyImageSpec(slug: string): string {
   if (slug === 'homigo') return HOMIGO_IG_IMAGE_PROMPT_SPEC;
   if (slug === 'taskgo') return TASKGO_DESIGN_IMAGE_PROMPT_SPEC;
   if (slug === 'washgo') return WASHGO_DESIGN_IMAGE_PROMPT_SPEC;
+  if (slug === 'bbbox') return BBBOX_DESIGN_IMAGE_PROMPT_SPEC;
   return DESIGN_IMAGE_PROMPT_SPEC;
 }
 
@@ -870,10 +962,15 @@ function resolveImagePromptSpec(params: {
   if (params.screenshotPoster) return B2B_SCREENSHOT_POSTER_PROMPT_SPEC;
   const slug = params.brandSlug;
   const style = params.imageStyle;
-  if (style === 'design' || (slug === 'homigo' && (params.platform === 'instagram' || params.platform === 'facebook') && !style)) {
+  if (
+    style === 'design'
+    || (slug === 'bbbox' && !style)
+    || (slug === 'homigo' && (params.platform === 'instagram' || params.platform === 'facebook') && !style)
+  ) {
     if (slug === 'homigo') return HOMIGO_IG_IMAGE_PROMPT_SPEC;
     if (slug === 'taskgo') return TASKGO_DESIGN_IMAGE_PROMPT_SPEC;
     if (slug === 'washgo') return WASHGO_DESIGN_IMAGE_PROMPT_SPEC;
+    if (slug === 'bbbox') return BBBOX_DESIGN_IMAGE_PROMPT_SPEC;
     return DESIGN_IMAGE_PROMPT_SPEC;
   }
   if (slug === 'washgo' && params.platform === 'threads' && (params.lane ?? 'b2c') === 'b2c') {
@@ -886,6 +983,10 @@ function resolveImagePromptSpec(params: {
   }
   if (slug === 'taskgo' && (style === 'photo' || params.platform === 'facebook' || params.platform === 'instagram')) {
     return TASKGO_PHOTO_IMAGE_PROMPT_SPEC;
+  }
+  if (style === 'photo' && slug === 'bbbox') return BBBOX_PHOTO_IMAGE_PROMPT_SPEC;
+  if (slug === 'bbbox' && (params.platform === 'facebook' || params.platform === 'instagram')) {
+    return BBBOX_DESIGN_IMAGE_PROMPT_SPEC;
   }
   if (style === 'photo' && slug === 'homigo') return HOMIGO_PHOTO_IMAGE_PROMPT_SPEC;
   if (style === 'photo' && slug === 'washgo') return WASHGO_THREADS_IMAGE_PROMPT_SPEC;
@@ -1623,6 +1724,12 @@ const JOKE_SEEDS: Record<string, string[]> = {
     '老車站那排店面若有一間洗衣店，路翻掉之後它還在不在',
     '客人說這件不能縮，結果它自己先縮成回憶',
   ],
+  bbbox: [
+    '路寬寫得下，轉彎那一下寫不下',
+    '先問能做什麼，對方先問一坪多少',
+    '吊車進得來，鄰居的樹沒有一起答應',
+    '院子想多一間，先被問要不要蓋一棟',
+  ],
 };
 
 export function trafficFormulaFor(slug: string, hourTw: number, now = Date.now()): TrafficFormulaId {
@@ -1817,12 +1924,21 @@ export const TRAFFIC_SYSTEM_PROMPT =
   TAIWAN_LOCAL_VOICE +
   '這一則不要寫婆媳、婆婆、媳婦。';
 
+const BBBOX_TRAFFIC_SYSTEM_PROMPT =
+  '你是會在 Threads 上講一塊地怎麼用的台灣人，不是任何品牌的小編。' +
+  '這篇只寫一件進場或用途：路進不去、轉彎不夠、院子想多一間、地放著不知道做旅宿還是先放著。' +
+  '不要報價，不要寫保證合法、回本、門牌、貸款。不要寫成租屋代管，也不要寫成工班派工。' +
+  '不要寫品牌名、產品型號、連結、hashtag。' +
+  TAIWAN_LOCAL_VOICE;
+
 export function trafficSystemPrompt(slug: string): string {
   const base = slug === 'washgo'
     ? WASHGO_TRAFFIC_SYSTEM_PROMPT
     : slug === 'taskgo'
       ? TASKGO_TRAFFIC_SYSTEM_PROMPT
-      : TRAFFIC_SYSTEM_PROMPT;
+      : slug === 'bbbox'
+        ? BBBOX_TRAFFIC_SYSTEM_PROMPT
+        : TRAFFIC_SYSTEM_PROMPT;
   return `${base}前兩行就要有畫面。最後一行問做過的人遇過哪一種，讓人想留言講自己的那一次。不要寫你們覺得呢。`;
 }
 
@@ -1848,6 +1964,9 @@ function brandHookCut(slug: string): string {
   }
   if (slug === 'washgo') {
     return '把這則時事接到街角店面、衣服或在地回憶。可以問那排店裡有沒有洗衣店，或這種天氣衣服怎麼辦。不要寫客人問洗好了沒，不要教洗法。';
+  }
+  if (slug === 'bbbox') {
+    return '把這則時事接到一塊地的進場或用途。不要報價，不要寫保證合法。接不上就寫路進不去，不要硬蹭。';
   }
   return '把這則時事接到「人還在租屋、生活突然轉彎」。離職、薪水、房租、搬家、一個人住都可以。不要寫婆媳，不要寫家庭對罵。';
 }
@@ -2180,6 +2299,14 @@ export function brandSeoFacts(slug: string): string {
       taskgoProductFilmFacts(),
       systemShortFacts('taskgo'),
     ].filter(Boolean).join('\n');
+  }
+  if (slug === 'bbbox') {
+    return [
+      '定位:和居家居的 BB BOX 伊格模組移動屋。先問土地與進場，再選艙。',
+      '可寫官網尺寸:標準蘋果艙 23.1／33.7／46.3 平方公尺；模組蘋果艙 3.6／5.4／7.7／11 坪；歐寓約 5.5／6.5／7.5 坪；旅居 ADU 9.2／11.6／14.2 坪；拓旅艙 11／22 坪；星穹艙 Core 約 5.4 坪。',
+      '拓旅艙不是住宅替代。材料不可跨產品線混寫。',
+      '不可報價、不可保證合法或回本、不可發明客戶數。CTA 是預約賞屋 04-2355-0256 或 LINE @BBBOX。',
+    ].join('\n');
   }
   return '只寫可核實的產品能力與流程。不可發明客戶數、市佔、營收、滿意度或保證成效。';
 }

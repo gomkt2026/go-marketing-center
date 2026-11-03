@@ -3,7 +3,7 @@ import type { AuthUser } from './auth';
 import { getSql } from './db';
 import { rowToCamel } from './case';
 import { chatCompleteJson } from './openai';
-import { ANTI_AI_RULES, SHARED_BRAND_CTA_RULE, getBrandVoice, type BrandContext } from './prompts';
+import { ANTI_AI_RULES, ctaRuleForBrand, getBrandVoice, type BrandContext } from './prompts';
 import {
   generatePlatformPost, saveGeneratedContent,
   SUPPORTED_PLATFORMS, type SocialPlatform,
@@ -233,7 +233,7 @@ async function buildEditorBrandContext(
     editorGroundingRules(brandName, slug),
     rules ? `品牌規則:\n${rules}` : '',
     publishedCoveragePrompt(coverages),
-    SHARED_BRAND_CTA_RULE,
+    ctaRuleForBrand(slug),
     ANTI_AI_RULES,
   ].filter(Boolean).join('\n');
   return { brandId, slug, name: brandName, systemPrompt };

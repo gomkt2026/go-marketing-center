@@ -47,6 +47,9 @@ interface PosterTheme {
   slant: boolean;
   /** editorial = 紙本留白; homigo = 大字情緒主標; graphic = 斜切色塊; lively = 可愛圓潤主標 */
   mode: 'editorial' | 'homigo' | 'graphic' | 'lively';
+  /** 素材底部色條的字色。沒填就沿用 main／accent */
+  painMain?: string;
+  painAccent?: string;
 }
 
 const THEME: Record<string, PosterTheme> = {
@@ -65,12 +68,19 @@ const THEME: Record<string, PosterTheme> = {
     advantage: '#3A8DDE', kicker: '#3A8DDE',
     bannerOpacity: 0.0, slant: false, mode: 'lively',
   },
+  bbbox: {
+    banner: '#5B949A', main: '#245E64', accent: '#8A6A12', stripe: '#F0D93D',
+    advantage: '#3E7278', kicker: '#5B949A',
+    bannerOpacity: 0, slant: false, mode: 'homigo',
+    painMain: '#FFFFFF', painAccent: '#F0D93D',
+  },
 };
 
 export const POSTER_ADVANTAGE_FALLBACK: Record<string, string> = {
   homigo: '把散落的事整理回同一個地方',
   washgo: '每件衣服都有送洗履歷',
   taskgo: '讓職人經驗變成可複製的標準',
+  bbbox: '先問這塊地能做什麼',
 };
 
 let fontBytesCache: Uint8Array | null = null;
@@ -354,6 +364,8 @@ export async function burnPainBar(
     const landscape = params.landscape ?? width > height;
     const theme = THEME[params.brandSlug] ?? THEME.homigo;
     const split = splitPosterAccent(headline, params.accent);
+    const painMain = theme.painMain ?? theme.main;
+    const painAccent = theme.painAccent ?? theme.accent;
     const barH = Math.round(height * (landscape ? 0.16 : 0.125));
     const y0 = height - barH;
     const skew = theme.slant ? Math.round(width * 0.045) : 0;
@@ -368,8 +380,8 @@ export async function burnPainBar(
     const textY = y0 + Math.round(barH * 0.66);
     const cx = Math.round(width / 2);
     const text = split.accent
-      ? `<text x="${cx}" y="${textY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700"><tspan fill="${theme.main}">${escapeXml(split.main)}</tspan><tspan fill="${theme.accent}">${escapeXml(split.accent)}</tspan></text>`
-      : `<text x="${cx}" y="${textY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700" fill="${theme.main}">${escapeXml(split.main)}</text>`;
+      ? `<text x="${cx}" y="${textY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700"><tspan fill="${painMain}">${escapeXml(split.main)}</tspan><tspan fill="${painAccent}">${escapeXml(split.accent)}</tspan></text>`
+      : `<text x="${cx}" y="${textY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700" fill="${painMain}">${escapeXml(split.main)}</text>`;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${bar}${text}</svg>`;
     const resvg = new Resvg(svg, {
       fitTo: { mode: 'original' },

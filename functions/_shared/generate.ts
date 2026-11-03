@@ -11,7 +11,7 @@ import {
   buildImageInspiredPostPrompt, buildGamePromoPrompt, GAME_PROMO_URL,
   type GamePromoAngle,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
-  defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, SHARED_BRAND_CTA,
+  defaultAudienceLane, pickAudience, pickImageStyle, audienceLaneInstruction, ctaForBrand,
   SEO_TOPIC_BANK, brandSeoFacts, type SeoTopicSeed,
   buildSocialImagePrompt, defaultDesignImageStyle, pickTaskgoPosterScene,
   type BrandContext, type GeneratedPost, type EngagementPrediction,
@@ -500,7 +500,7 @@ export async function generatePlatformPost(
   // 修正模型偶發輸出的字面 \n(否則會原樣出現在貼文上)
   post.body = normalizeMultilineText(post.body);
   post.hashtags = clampHashtags(post.hashtags, platform);
-  post.cta = SHARED_BRAND_CTA;
+  post.cta = ctaForBrand(brandCtx.slug);
 
   // 字數硬限制:FB 1000 字;IG 依品牌(預設 220);Threads 依品牌設定(如 Washgo 150 字短文策略)
   const brandVoice = getBrandVoice(brandCtx.slug);
@@ -526,7 +526,7 @@ export async function generatePlatformPost(
     post.body = normalizeMultilineText(post.body);
     post.hashtags = clampHashtags(post.hashtags, platform);
   }
-  post.cta = SHARED_BRAND_CTA;
+  post.cta = ctaForBrand(brandCtx.slug);
   post.hashtags = clampHashtags(post.hashtags, platform);
 
   const officeState = {
@@ -548,7 +548,7 @@ export async function generatePlatformPost(
       });
       post.body = normalizeMultilineText(post.body);
       post.hashtags = clampHashtags(post.hashtags, platform);
-      post.cta = SHARED_BRAND_CTA;
+      post.cta = ctaForBrand(brandCtx.slug);
       problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
     }
     officeState.blocked = problem;
@@ -817,6 +817,7 @@ export async function generateTrafficPost(
   const limit = spec.maxChars + 40;
   const washgo = params.brandSlug === 'washgo';
   const taskgo = params.brandSlug === 'taskgo';
+  const bbbox = params.brandSlug === 'bbbox';
   const anchor = spec.anchor.trim();
   const systemPrompt = trafficSystemPrompt(params.brandSlug);
   const userPrompt = [spec.prompt, params.office?.active ? params.office.line : ''].filter(Boolean).join('\n\n');
@@ -832,7 +833,9 @@ export async function generateTrafficPost(
     ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|洗楽|HappyWash|happy415|https?:\/\/|工地|業主|房東/
     : taskgo
       ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|電鍋|房東/
-      : /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|工地|電鍋/
+      : bbbox
+        ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|保證合法|回本/
+        : /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|工地|電鍋/
   ).test(post.body);
   const missed = Boolean(anchor) && !post.body.includes(anchor);
   const trafficVoice = taiwanVoiceIssue(post.body);
@@ -858,7 +861,9 @@ export async function generateTrafficPost(
               ? '可以寫洗衣店和衣服。不要寫洗好了沒，不要列功能，不要提別的店，不要寫婆媳。禁止簡體、大陸用語。回傳同格式 JSON。'
               : taskgo
                 ? '寫一個現場判斷，或一則工地習慣的笑話。不要取名字，不要寫假對話，不要寫送醫、急診、受傷。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
-                : '換成這七天沒寫過的租屋小事：水電、管理員、續約、押金、網路、看房話術。不要再寫離職發薪、房東催租、冷氣室外機、近捷運、這也叫清潔。不要寫婆媳、家庭對罵。禁止簡體、大陸用語、「男生都」「女生都」。回傳同格式 JSON。'),
+                : bbbox
+                  ? '換成一塊地的進場或用途：路進不去、轉彎不夠、院子想多一間。不要報價，不要寫保證合法或回本，不要寫成租屋或派工。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
+                  : '換成這七天沒寫過的租屋小事：水電、管理員、續約、押金、網路、看房話術。不要再寫離職發薪、房東催租、冷氣室外機、近捷運、這也叫清潔。不要寫婆媳、家庭對罵。禁止簡體、大陸用語、「男生都」「女生都」。回傳同格式 JSON。'),
         },
       ],
       temperature: 0.7,
@@ -1019,7 +1024,7 @@ export async function generatePostFromImage(
   post.body = normalizeMultilineText(post.body);
   post.imagePrompt = undefined;
   post.hashtags = clampHashtags(post.hashtags, platform);
-  post.cta = SHARED_BRAND_CTA;
+  post.cta = ctaForBrand(brandCtx.slug);
 
   const brandVoice = getBrandVoice(brandCtx.slug);
   const hardLimit = platform === 'facebook' ? 1000
@@ -1040,7 +1045,7 @@ export async function generatePostFromImage(
     post.imagePrompt = undefined;
     post.hashtags = clampHashtags(post.hashtags, platform);
   }
-  post.cta = SHARED_BRAND_CTA;
+  post.cta = ctaForBrand(brandCtx.slug);
   post.hashtags = clampHashtags(post.hashtags, platform);
 
   const prediction = params.skipPrediction

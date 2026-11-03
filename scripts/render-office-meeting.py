@@ -44,9 +44,35 @@ RINGS = {
     '圖片小編': (244, 166, 196),
     '影片小編': (185, 166, 255),
 }
-BRANDS = {'taskgo': 'TaskGo', 'homigo': 'Homigo', 'washgo': 'Washgo'}
+BRANDS = {'taskgo': 'TaskGo', 'homigo': 'Homigo', 'washgo': 'Washgo', 'bbbox': '和居家居'}
 CAST = ['阿豪', '小咪', '阿樂', '新聞收集', '行銷小編', '發文小編', 'Podcast小編', '圖片小編', '影片小編']
-BRAND_FACE = {'taskgo': '阿豪', 'homigo': '小咪', 'washgo': '阿樂'}
+BRAND_FACE = {'taskgo': '阿豪', 'homigo': '小咪', 'washgo': '阿樂', 'bbbox': '小盒'}
+BRAND_KEY = ''
+FOOTER = 'Go 行銷辦公室'
+OPEN_NOTE = '九個人，沒有主持人'
+NAME_FILL = WHITE
+DIM_SHADE = (7, 28, 58, 150)
+FACE_FOCUS: dict[str, tuple[float, float]] = {}
+
+
+def use_brand(script: dict) -> None:
+    """和居家居用霧底、青綠與一小塊黃標。三品牌晨會維持原本的海軍藍。"""
+    global BRAND_KEY, NAVY, NAVY_DEEP, CYAN, INK, CAST, FOOTER, OPEN_NOTE, NAME_FILL, DIM_SHADE
+    if script.get('brand') != 'bbbox':
+        return
+    BRAND_KEY = 'bbbox'
+    NAVY = (91, 148, 154)
+    NAVY_DEEP = (232, 244, 244)
+    CYAN = (91, 148, 154)
+    INK = (36, 94, 100)
+    NAME_FILL = (36, 94, 100)
+    DIM_SHADE = (36, 94, 100, 150)
+    FOOTER = '和居家居'
+    OPEN_NOTE = '這一層自己開了'
+    CAST = ['小盒', '新聞收集', '行銷小編', '發文小編', 'Podcast小編', '圖片小編', '影片小編']
+    FACES['小盒'] = ROOT / 'public/brands/bbbox-xiaohe-show.jpg'
+    RINGS['小盒'] = (240, 217, 61)
+    FACE_FOCUS['小盒'] = (0.5, 0.16)
 
 
 def find_font() -> Path:
@@ -99,6 +125,13 @@ def wrap(text: str, font: ImageFont.FreeTypeFont, width: int, limit: int) -> lis
 
 
 def background() -> Image.Image:
+    if BRAND_KEY == 'bbbox':
+        image = Image.new('RGB', (W, H), (232, 244, 244))
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((0, 0, W, 240), fill=(91, 148, 154))
+        draw.rounded_rectangle((72, 72, 156, 156), radius=28, fill=(240, 217, 61))
+        draw.rectangle((0, H - 160, W, H), fill=(36, 94, 100))
+        return image
     image = Image.new('RGB', (W, H), NAVY_DEEP)
     draw = ImageDraw.Draw(image)
     draw.polygon([(0, 0), (W, 0), (W, 280), (0, 620)], fill=NAVY)
@@ -116,7 +149,7 @@ def paste_face(canvas: Image.Image, who: str, center: tuple[int, int], size: int
     face = Image.new('RGBA', (size, size), (255, 255, 255, 255))
     if path and path.exists():
         photo = Image.open(path).convert('RGB')
-        fitted = ImageOps.fit(photo, (size, size), Image.Resampling.LANCZOS, centering=(0.5, 0.18))
+        fitted = ImageOps.fit(photo, (size, size), Image.Resampling.LANCZOS, centering=FACE_FOCUS.get(who, (0.5, 0.18)))
         face.paste(fitted, (0, 0))
     else:
         glyph = ImageDraw.Draw(face)
@@ -140,14 +173,14 @@ def face_chip(who: str, size: int, dim: bool) -> Image.Image:
     photo = Image.new('RGBA', (size - 10, size - 10), (232, 244, 248, 255))
     path = FACES.get(who)
     if path and path.exists():
-        fitted = ImageOps.fit(Image.open(path).convert('RGB'), (size - 10, size - 10), Image.Resampling.LANCZOS, centering=(0.5, 0.18))
+        fitted = ImageOps.fit(Image.open(path).convert('RGB'), (size - 10, size - 10), Image.Resampling.LANCZOS, centering=FACE_FOCUS.get(who, (0.5, 0.18)))
         photo.paste(fitted, (0, 0))
     mask = Image.new('L', photo.size, 0)
     ImageDraw.Draw(mask).ellipse((0, 0, photo.size[0] - 1, photo.size[1] - 1), fill=255)
     photo.putalpha(mask)
     plate.paste(photo, (5, 5), photo)
     if dim:
-        shade = Image.new('RGBA', plate.size, (7, 28, 58, 150))
+        shade = Image.new('RGBA', plate.size, DIM_SHADE)
         plate = Image.alpha_composite(plate, shade)
     chip.paste(plate, (0, 0), plate)
     return chip
@@ -168,22 +201,28 @@ def scene_open(font_path: Path, label: str, hook: str) -> Image.Image:
     draw = ImageDraw.Draw(image)
     small = load_font(font_path, 40)
     hook_font = load_font(font_path, 68)
-    draw_center(draw, f'晨會  {label}', 150, small, CYAN)
-    size = 210
-    gap = 36
-    origin_x = (W - (size * 3 + gap * 2)) // 2
-    origin_y = 280
-    for index, name in enumerate(CAST):
-        chip = face_chip(name, size, False)
-        col, row = index % 3, index // 3
-        image.paste(chip, (origin_x + col * (size + gap), origin_y + row * (size + gap)), chip)
+    label_fill = WHITE if BRAND_KEY == 'bbbox' else CYAN
+    draw_center(draw, f'晨會  {label}', 150, small, label_fill)
+    cols = 4 if len(CAST) > 6 else 3
+    size = 168 if cols == 4 else 210
+    gap = 28 if cols == 4 else 36
+    origin_y = 300
+    row_counts = [cols, len(CAST) - cols] if len(CAST) > cols else [len(CAST)]
+    index = 0
+    for row, count in enumerate(row_counts):
+        origin_x = (W - (size * count + gap * (count - 1))) // 2
+        for col in range(count):
+            name = CAST[index]
+            chip = face_chip(name, size, False)
+            image.paste(chip, (origin_x + col * (size + gap), origin_y + row * (size + gap)), chip)
+            index += 1
     lines = wrap(hook, hook_font, 860, 2)
-    y = 1180
+    y = 1120 if cols == 4 else 1180
     for line in lines:
         width = hook_font.getlength(line)
-        draw.text(((W - width) / 2, y), line, font=hook_font, fill=WHITE)
+        draw.text(((W - width) / 2, y), line, font=hook_font, fill=NAME_FILL if BRAND_KEY == 'bbbox' else WHITE)
         y += 96
-    draw_center(draw, '九個人，沒有主持人', 1560, small, CYAN)
+    draw_center(draw, OPEN_NOTE, 1560, small, CYAN)
     return image
 
 
@@ -194,11 +233,11 @@ def scene_line(font_path: Path, who: str, text: str, label: str, reply: str) -> 
     body = load_font(font_path, 48)
     reply_font = load_font(font_path, 34)
     draw = ImageDraw.Draw(image)
-    draw_center(draw, label, 70, small, CYAN)
+    draw_center(draw, label, 70, small, WHITE if BRAND_KEY == 'bbbox' else CYAN)
     paint_dock(image, who, 140, 86)
     paste_face(image, who, (W // 2, 620), 360)
     draw = ImageDraw.Draw(image)
-    draw_center(draw, who, 830, name_font, WHITE)
+    draw_center(draw, who, 830, name_font, NAME_FILL if BRAND_KEY == 'bbbox' else WHITE)
     if reply:
         draw_center(draw, f'接過{reply}', 910, reply_font, CYAN)
     lines = wrap(text, body, 820, 3)
@@ -209,7 +248,7 @@ def scene_line(font_path: Path, who: str, text: str, label: str, reply: str) -> 
     for index, line in enumerate(lines):
         width = body.getlength(line)
         draw.text(((W - width) / 2, bubble_top + 32 + index * 74), line, font=body, fill=INK)
-    draw_center(draw, 'Go 行銷辦公室', 1780, small, CYAN)
+    draw_center(draw, FOOTER, 1780, small, WHITE if BRAND_KEY == 'bbbox' else CYAN)
     return image
 
 
@@ -219,19 +258,20 @@ def scene_end(font_path: Path, themes: list[dict], label: str, close: str) -> Im
     small = load_font(font_path, 40)
     title = load_font(font_path, 64)
     body = load_font(font_path, 40)
-    draw_center(draw, label, 120, small, CYAN)
+    draw_center(draw, label, 120, small, WHITE if BRAND_KEY == 'bbbox' else CYAN)
     lines = wrap(close or '人不在，這班也開完了', title, 880, 2)
-    y = 220
+    y = 300 if BRAND_KEY == 'bbbox' else 220
+    close_fill = INK if BRAND_KEY == 'bbbox' else WHITE
     for line in lines:
         width = title.getlength(line)
-        draw.text(((W - width) / 2, y), line, font=title, fill=WHITE)
+        draw.text(((W - width) / 2, y), line, font=title, fill=close_fill)
         y += 88
     seats = themes[:3] or [
         {'slug': 'taskgo', 'theme': ''},
         {'slug': 'homigo', 'theme': ''},
         {'slug': 'washgo', 'theme': ''},
     ]
-    x = 120
+    x = (W - 260) // 2 if len(seats) == 1 else 120
     for theme in seats:
         slug = str(theme.get('slug') or '')
         who = BRAND_FACE.get(slug, '')
@@ -247,7 +287,7 @@ def scene_end(font_path: Path, themes: list[dict], label: str, close: str) -> Im
         text_y = 880
         for line in said:
             line_w = said_font.getlength(line)
-            draw.text((x + 130 - line_w / 2, text_y), line, font=said_font, fill=WHITE)
+            draw.text((x + 130 - line_w / 2, text_y), line, font=said_font, fill=INK if BRAND_KEY == 'bbbox' else WHITE)
             text_y += 48
         x += 300
     draw_center(draw, '這一班自己做完', 1680, small, CYAN)
@@ -307,11 +347,15 @@ def write_bed(path: Path, duration: float, starts: list[float]) -> None:
 def light_sweep(path: Path) -> None:
     image = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    draw.polygon([(40, 0), (250, 0), (520, H), (300, H)], fill=(43, 163, 214, 56))
+    if BRAND_KEY == 'bbbox':
+        draw.rounded_rectangle((860, 280, 1000, 420), radius=36, fill=(240, 217, 61, 70))
+    else:
+        draw.polygon([(40, 0), (250, 0), (520, H), (300, H)], fill=(43, 163, 214, 56))
     image.save(path)
 
 
 def render(script: dict, out: Path) -> None:
+    use_brand(script)
     font_path = find_font()
     label = str(script.get('label') or '').strip() or '晨會'
     hook = str(script.get('hook') or '').strip() or '沒有人主持，這班自己開了'

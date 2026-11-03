@@ -110,6 +110,9 @@ const FEATURES_BY_SLUG: Record<string, string[]> = {
   washgo: [
     '收送', '洗程', '點數', '報價', '門市', '司機', '顧客', '進件', ...SHARED_FEATURES,
   ],
+  bbbox: [
+    '賞屋', '蘋果艙', '第二空間', '官方IG', '晨會紀錄', ...SHARED_FEATURES,
+  ],
 };
 
 export function featuresForBrand(slug: string): string[] {

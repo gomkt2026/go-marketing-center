@@ -312,7 +312,11 @@ function fallbackSlots(brands: Array<{ id: string; slug: string }>): PostingSlot
         platform: def.platform,
         hourTw: def.hourTw,
         slotKind: def.slotKind,
-        enabled: brand.slug !== 'bbbox',
+        enabled: brand.slug === 'bbbox'
+          ? (def.platform !== 'threads' && def.hourTw === 19)
+            || (def.slotKind === 'threads_hourly' && [0, 6, 12, 18].includes(def.hourTw))
+            || (def.slotKind === 'threads_offtopic' && [9, 21].includes(def.hourTw))
+          : true,
       });
     }
   }

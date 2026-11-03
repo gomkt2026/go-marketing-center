@@ -1,10 +1,10 @@
 -- ============================================================================
 -- Migration 072: 和居家居（BB BOX）
---   獨立品牌。不加入三品牌自動發文，發文時段全部關閉。
+--   獨立品牌。不加入三品牌自動發文。時段跟 TaskGo、Washgo 一樣，但沒有粉專就不會送出。
 --   體驗稿是草稿，不排程、不發送。
 -- ----------------------------------------------------------------------------
 -- 可安全重複執行。已存在的受眾、規則、草稿不會重覆插入。
--- 重跑會把這個品牌的發文時段維持關閉。
+-- 重跑會把發文時段維持在跟 TaskGo、Washgo 一樣的那一組。
 -- 執行方式: psql "$DATABASE_URL" -f db/migrations/072_bbbox_brand.sql
 -- ============================================================================
 
@@ -219,9 +219,9 @@ $md$
       hashtag_count_min, hashtag_count_max, posting_frequency
     )
     VALUES
-      (b_id, v_id, 'facebook', '像帶看的規劃人員，先問土地再講產品', '150-400字', '一個基地場面 → 一個產品怎麼選 → 預約賞屋', 2, 3, '手動，不自動排程'),
-      (b_id, v_id, 'instagram', '短句，第一句就是進場或用途', '80-180字', '4:5，青綠底與黃標，底部只留痛點', 8, 12, '手動，不自動排程'),
-      (b_id, v_id, 'threads', '一個場面，口語，不報價', '1-3 段', '先問這塊地，不教法規漏洞', 0, 4, '手動，不自動排程'),
+      (b_id, v_id, 'facebook', '像帶看的規劃人員，先問土地再講產品', '150-400字', '一個基地場面 → 一個產品怎麼選 → 預約賞屋', 2, 3, '每天台灣 19:00 一則'),
+      (b_id, v_id, 'instagram', '短句，第一句就是進場或用途', '80-180字', '4:5，做好的艙，天空上放主標', 8, 12, '每天台灣 19:00 一則，與 FB 同一主題'),
+      (b_id, v_id, 'threads', '一個場面，口語，不報價', '1-3 段', '先問這塊地，不教法規漏洞', 0, 4, '每天 6 檔：00/06/12/18 流量文 + 09/21 生活文'),
       (b_id, v_id, 'website', '答案先行，規格只寫產品頁有的', '500-1800字', '不接官網 ingest，不發到 bbbox-shop.com', 0, 3, '只種題，不發布');
   END IF;
 
@@ -302,9 +302,9 @@ $md$
 
   INSERT INTO brand_image_prompts (brand_id, slot, prompt)
   VALUES
-    (b_id, 'design_style', $p$BB BOX modular-cabin social poster. Mist field #E8F4F4, teal #5B949A, yellow #F0D93D only as a small module accent. Dark text #245E64. Subject is a modular cabin, site access, or a Taiwan land parcel. Top 25% of a portrait (or left 38% of a landscape) stays empty mist for later type. No letters, no logo, no navy diagonal construction poster, no cream rental flyer, no cute laundry illustration.$p$),
-    (b_id, 'photo_style', $p$A single BB BOX site moment: a narrow access road, a modular cabin being set in place, or a yard about to gain one room. Mist #E8F4F4, teal #5B949A, one yellow accent. No text, no price, no hard-hat construction poster.$p$),
-    (b_id, 'copy_spec', $p$"imagePrompt": "必填:這張圖是 BB BOX 模組屋社群海報（青綠 #5B949A、黃標 #F0D93D、霧底 #E8F4F4）。只描述畫面，不要描述任何要印在圖上的文字。上方 25% 留空。場景是進場、基地或艙體。禁止海軍藍斜切、米白租屋海報、報價、自己畫 logo。"$p$)
+    (b_id, 'design_style', $p$BB BOX homepage photograph for 和居家居. One finished cabin already in use: rounded light shell, floor-to-ceiling glass, warm interior, wood deck or lawn, Taiwan mountain coast garden or quiet yard. Top third of a portrait or left third of a landscape is open sky. Yellow #F0D93D only as one small rounded tile. No letters, no logo, no flat color banner, no exploded wall panels, no navy diagonal, no cream rental flyer.$p$),
+    (b_id, 'photo_style', $p$Photograph, not an illustration. One finished BB BOX cabin, glass, warm light, wood deck or lawn, open sky for later type. No text, no price, no scaffolding.$p$),
+    (b_id, 'copy_spec', $p$"imagePrompt": "必填:這張圖要像 BB BOX 官網首頁的生活照片。一個已經能住的圓角艙，落地玻璃，室內暖光，木平台或草地。直式上方三分之一或橫式左側三分之一是開闊的天空。黃色只做一塊小圓角。禁止拆開的牆板、鷹架、安全帽、海軍藍斜切、米白租屋海報、任何文字與 logo。"$p$)
   ON CONFLICT (brand_id, slot) DO NOTHING;
 
   INSERT INTO ai_agents (brand_id, role_id, display_name, avatar_color, persona, is_active)
@@ -324,24 +324,32 @@ $md$
     );
 
   INSERT INTO brand_posting_slots (brand_id, platform, hour_tw, slot_kind, enabled)
-  SELECT b_id, t.platform::publishing_platform, t.hour_tw, t.slot_kind, false
+  SELECT b_id, t.platform::publishing_platform, t.hour_tw, t.slot_kind, true
   FROM (VALUES
     ('facebook', 19, 'daily_theme'),
     ('instagram', 19, 'daily_theme'),
     ('threads', 0, 'threads_hourly'),
     ('threads', 6, 'threads_hourly'),
     ('threads', 12, 'threads_hourly'),
-    ('threads', 15, 'threads_hourly'),
     ('threads', 18, 'threads_hourly'),
-    ('threads', 20, 'threads_hourly'),
     ('threads', 9, 'threads_offtopic'),
     ('threads', 21, 'threads_offtopic')
   ) AS t(platform, hour_tw, slot_kind)
   ON CONFLICT (brand_id, platform, hour_tw, slot_kind) DO NOTHING;
 
   UPDATE brand_posting_slots
-  SET enabled = false, updated_at = now()
-  WHERE brand_id = b_id;
+  SET enabled = true, updated_at = now()
+  WHERE brand_id = b_id
+    AND (
+      (platform IN ('facebook', 'instagram') AND hour_tw = 19 AND slot_kind = 'daily_theme')
+      OR (platform = 'threads' AND hour_tw IN (0, 6, 12, 18) AND slot_kind = 'threads_hourly')
+      OR (platform = 'threads' AND hour_tw IN (9, 21) AND slot_kind = 'threads_offtopic')
+    );
+
+  DELETE FROM brand_posting_slots
+  WHERE brand_id = b_id
+    AND platform = 'threads'
+    AND hour_tw IN (15, 20);
 
   IF NOT EXISTS (
     SELECT 1 FROM campaigns WHERE primary_brand_id = b_id AND title = '和居家居體驗稿'

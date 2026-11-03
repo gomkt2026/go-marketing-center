@@ -37,8 +37,8 @@ const DESK: Record<string, { title: string; line: string }[]> = {
     { title: '策略', line: '硬跟熱門的那則先拿掉' },
   ],
   發文小編: [
-    { title: '草稿', line: 'FB、IG、Threads 各留一則' },
-    { title: '草稿', line: '看過的那則才送出去' },
+    { title: '草稿', line: '晚上七點 FB、IG 各一則' },
+    { title: '草稿', line: 'Threads 一天六則，看過才送' },
   ],
   Podcast小編: [
     { title: '對稿', line: '前兩行要是一個場面' },

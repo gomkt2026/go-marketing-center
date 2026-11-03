@@ -327,6 +327,37 @@ export function BrandAssetLibrary({
         />
       </div>
 
+      {slug === 'bbbox' && (
+        <div style={{ ...cardBoxStyle, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>會議短片</div>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
+            小盒和這一層小編對過的那一班，53 秒。放在素材庫，不另外排程，也不會自己發出去。
+          </p>
+          <video
+            src="/brands/bbbox/meeting-yard.mp4"
+            poster="/brands/bbbox/meeting-yard.jpg"
+            controls
+            playsInline
+            preload="metadata"
+            style={{ width: '100%', maxWidth: 280, aspectRatio: '9 / 16', objectFit: 'cover', background: '#E8F4F4', display: 'block', borderRadius: 10 }}
+          />
+          <div style={{ fontSize: 13, fontWeight: 700, margin: '16px 0 4px' }}>官方 Instagram</div>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 12px' }}>
+            @hogea_bbbox。自介是 MIT 在地組裝、輕住宅移動屋。下面兩張已有字，只留參考，不拿去生圖。粉絲數不寫進文案。
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 240px))', gap: 12 }}>
+            <figure style={{ margin: 0 }}>
+              <img src="/brands/bbbox/ig/2026-10-30-halloween.jpg" alt="2026-10-30 萬聖節海報" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+              <figcaption style={{ fontSize: 12, marginTop: 6 }}>2026-10-30 節慶海報。A 字玻璃屋，不是產品規格。</figcaption>
+            </figure>
+            <figure style={{ margin: 0 }}>
+              <img src="/brands/bbbox/ig/2025-07-12-reel.jpg" alt="2025-07-12 官方短片畫面" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+              <figcaption style={{ fontSize: 12, marginTop: 6 }}>2025-07-12 短片。人站在玻璃前，字幕已燒進畫面。</figcaption>
+            </figure>
+          </div>
+        </div>
+      )}
+
       {slug === 'taskgo' && (
         <div style={{ ...cardBoxStyle, marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>產品短片</div>

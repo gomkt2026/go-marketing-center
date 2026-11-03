@@ -93,19 +93,37 @@ let fontBytesCache: Uint8Array | null = null;
 let fontLoading: Promise<Uint8Array | null> | null = null;
 let resvgReady: Promise<void> | null = null;
 
-async function ensureResvg(env: Env): Promise<void> {
-  resvgReady ??= (async () => {
-    if (env.MEDIA) {
-      const obj = await env.MEDIA.get(RESVG_WASM_KEY);
-      if (obj) {
-        await initWasm(await obj.arrayBuffer());
-        return;
-      }
+async function initResvg(source: ArrayBuffer | Response): Promise<void> {
+  try {
+    await initWasm(source);
+  } catch (error) {
+    if (/already/i.test(error instanceof Error ? error.message : String(error))) return;
+    if (source instanceof ArrayBuffer) {
+      await initWasm(await WebAssembly.compile(source));
+      return;
     }
-    const res = await fetch('https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.6.2/index_bg.wasm');
-    if (!res.ok) throw new Error(`resvg wasm 下載失敗 (${res.status})`);
-    await initWasm(res);
-  })();
+    throw error;
+  }
+}
+
+async function ensureResvg(env: Env): Promise<void> {
+  if (!resvgReady) {
+    resvgReady = (async () => {
+      if (env.MEDIA) {
+        const obj = await env.MEDIA.get(RESVG_WASM_KEY);
+        if (obj) {
+          await initResvg(await obj.arrayBuffer());
+          return;
+        }
+      }
+      const res = await fetch('https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.6.2/index_bg.wasm');
+      if (!res.ok) throw new Error(`resvg wasm 下載失敗 (${res.status})`);
+      await initResvg(res);
+    })().catch((error) => {
+      resvgReady = null;
+      throw error;
+    });
+  }
   return resvgReady;
 }
 
@@ -115,6 +133,7 @@ export async function loadPosterFontBytes(env: Env): Promise<Uint8Array | null> 
     if (!env.MEDIA) return null;
     const obj = await env.MEDIA.get(POSTER_FONT_KEY);
     if (!obj) {
+      fontLoading = null;
       console.warn(`[poster] R2 沒有 ${POSTER_FONT_KEY},略過主標後製`);
       return null;
     }

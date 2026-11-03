@@ -339,7 +339,7 @@ function buildEditorialSvg(params: {
   return { svg, x: 0, y: 0 };
 }
 
-/** 主標與副標都放在上方（或橫式左側）的品牌色帶，不壓到艙體 */
+/** 官網首頁邏輯:字壓在照片的天空上，左對齊，旁邊一顆黃圓角，不蓋死色帶 */
 function buildHeaderStackSvg(params: {
   width: number;
   height: number;
@@ -349,57 +349,45 @@ function buildHeaderStackSvg(params: {
   advantage: string;
   landscape: boolean;
 }): { svg: string; x: number; y: number } {
-  const { width, height, theme, main, accent, advantage, landscape } = params;
+  const { width, height, theme, main, advantage, landscape } = params;
   const field = theme.field ?? '#E8F4F4';
-  const bandW = landscape ? Math.round(width * 0.40) : width;
-  const bandH = landscape ? height : Math.round(height * 0.30);
-  const pad = Math.round(bandW * 0.08);
-  const cx = Math.round(bandW / 2);
+  const bandW = landscape ? Math.round(width * 0.46) : width;
+  const pad = Math.round((landscape ? bandW : width) * 0.08);
+  const textX = pad;
   const maxTextW = bandW - pad * 2;
-  const lines = accent ? [main, accent] : [main];
-  const longest = lines.reduce((a, b) => (a.length >= b.length ? a : b));
-  let fontSize = Math.round(bandW * (landscape ? 0.12 : 0.105));
-  while (spacedWidth(longest, fontSize, letterSpacingPx(fontSize, theme.mode)) > maxTextW && fontSize > 36) {
+  const title = main.length > 6 ? [main.slice(0, Math.ceil(main.length / 2)), main.slice(Math.ceil(main.length / 2))] : [main];
+  const longest = title.reduce((a, b) => (a.length >= b.length ? a : b));
+  let fontSize = Math.round(bandW * (landscape ? 0.16 : 0.12));
+  while (spacedWidth(longest, fontSize, letterSpacingPx(fontSize, theme.mode)) > maxTextW && fontSize > 40) {
     fontSize -= 2;
   }
   const tracking = letterSpacingPx(fontSize, theme.mode);
-  const lineGap = Math.round(fontSize * 1.18);
-  let advSize = Math.round(fontSize * 0.40);
+  const lineGap = Math.round(fontSize * 1.12);
+  let advSize = Math.round(fontSize * 0.38);
   const advTrack = letterSpacingPx(advSize, theme.mode);
-  while (advantage && spacedWidth(advantage, advSize, advTrack) > maxTextW && advSize > 20) advSize -= 2;
-  const stripeH = Math.max(7, Math.round(fontSize * 0.09));
-  const titleH = lines.length === 1 ? fontSize : fontSize + lineGap;
-  const gapAfterTitle = Math.round(fontSize * 0.28);
-  const advGap = advantage ? Math.round(advSize * 1.2) : 0;
-  const blockH = titleH + gapAfterTitle + stripeH + advGap;
-  let headY = Math.round((bandH - blockH) / 2 + fontSize * 0.82);
-  if (headY < Math.round(fontSize * 0.95)) headY = Math.round(fontSize * 0.95);
-
-  const plate = `<rect x="0" y="0" width="${bandW}" height="${bandH}" fill="${field}"/>`;
-  const texts = lines.map((line, i) => {
+  while (advantage && spacedWidth(advantage, advSize, advTrack) > maxTextW && advSize > 22) advSize -= 2;
+  const tile = Math.round(fontSize * 0.42);
+  const headY = landscape
+    ? Math.round(height * 0.16 + fontSize)
+    : Math.round(height * 0.07 + tile + fontSize);
+  const texts = title.map((line, i) => {
     const y = headY + i * lineGap;
-    if (i > 0 && theme.accentChip) {
-      const chipW = Math.round(spacedWidth(line, fontSize, tracking) + fontSize * 0.7);
-      const chipH = Math.round(fontSize * 1.22);
-      const chipX = cx - Math.round(chipW / 2);
-      const chipY = y - Math.round(fontSize * 0.92);
-      return [
-        `<rect x="${chipX}" y="${chipY}" width="${chipW}" height="${chipH}" rx="${Math.round(fontSize * 0.2)}" fill="${theme.accentChip}"/>`,
-        `<text x="${cx}" y="${y}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700" fill="${theme.main}" letter-spacing="${tracking}">${escapeXml(line)}</text>`,
-      ].join('');
-    }
-    const fill = i === 0 ? theme.main : theme.accent;
-    return `<text x="${cx}" y="${y}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700" fill="${fill}" letter-spacing="${tracking}">${escapeXml(line)}</text>`;
+    return `<text x="${textX}" y="${y}" text-anchor="start" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700" fill="${theme.main}" letter-spacing="${tracking}">${escapeXml(line)}</text>`;
   }).join('');
-  const lastTitleY = headY + (lines.length - 1) * lineGap;
-  const stripeY = lastTitleY + gapAfterTitle;
-  const stripeW = Math.round(Math.min(maxTextW * 0.18, fontSize * 1.35));
-  const stripe = `<rect x="${cx - Math.round(stripeW / 2)}" y="${stripeY}" width="${stripeW}" height="${stripeH}" rx="${Math.round(stripeH / 2)}" fill="${theme.stripe}"/>`;
-  const advY = stripeY + stripeH + advGap;
+  const lastTitleY = headY + (title.length - 1) * lineGap;
+  const advY = lastTitleY + Math.round(advSize * 1.45);
+  const tileY = headY - Math.round(fontSize * 1.15);
+  const tileEl = `<rect x="${textX}" y="${tileY}" width="${tile}" height="${tile}" rx="${Math.round(tile * 0.28)}" fill="${theme.accentChip ?? theme.stripe}"/>`;
+  const scrimH = landscape ? height : Math.round(height * 0.42);
+  const scrimW = landscape ? Math.round(width * 0.5) : width;
+  const gradient = landscape
+    ? `<linearGradient id="bbboxSky" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${field}" stop-opacity="0.88"/><stop offset="0.72" stop-color="${field}" stop-opacity="0.35"/><stop offset="1" stop-color="${field}" stop-opacity="0"/></linearGradient>`
+    : `<linearGradient id="bbboxSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${field}" stop-opacity="0.9"/><stop offset="0.62" stop-color="${field}" stop-opacity="0.4"/><stop offset="1" stop-color="${field}" stop-opacity="0"/></linearGradient>`;
+  const scrim = `<rect x="0" y="0" width="${scrimW}" height="${scrimH}" fill="url(#bbboxSky)"/>`;
   const advEl = advantage
-    ? `<text x="${cx}" y="${advY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${advSize}" font-weight="700" fill="${theme.advantage}" letter-spacing="${advTrack}">${escapeXml(advantage)}</text>`
+    ? `<text x="${textX}" y="${advY}" text-anchor="start" font-family="${POSTER_FONT_FAMILY}" font-size="${advSize}" font-weight="700" fill="${theme.kicker}" letter-spacing="${advTrack}">${escapeXml(advantage)}</text>`
     : '';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${plate}${texts}${stripe}${advEl}</svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs>${gradient}</defs>${scrim}${tileEl}${texts}${advEl}</svg>`;
   return { svg, x: 0, y: 0 };
 }
 
@@ -496,7 +484,9 @@ export async function burnPosterHeadline(
     const height = base.get_height();
     const landscape = params.landscape ?? width > height;
     const theme = THEME[params.brandSlug] ?? THEME.homigo;
-    const split = splitPosterAccent(headline, params.accent);
+    const split = theme.stackInHeader
+      ? { main: headline, accent: '' }
+      : splitPosterAccent(headline, params.accent);
     const advantage = sanitizePosterAdvantage(params.advantage, params.brandSlug);
     const kicker = sanitizePosterKicker(params.kicker, params.brandSlug);
     const overlay = theme.stackInHeader

@@ -710,22 +710,22 @@ export const HOMIGO_TEXT_MARK_RULE =
   '【品牌標】不要在圖上畫任何 logo 或品牌字樣;角落留乾淨,官方標與繁中主標由系統後製。';
 
 const BBBOX_CORE = [
-  'BB BOX modular-cabin social poster for 和居家居. Mist field, teal structure, one yellow module.',
-  'LOCKED palette: mist #E8F4F4, teal #5B949A, yellow #F0D93D only as a small accent, dark text areas #245E64. Never navy construction blocks, never cream rental-flyer field, never laundry pastels.',
-  'Subject: a modular cabin, a narrow Taiwan access road, a yard about to gain one room, or a site where a whole house cannot be delivered. No hard-hat crew, no landlord paperwork, no washing machine.',
-  'Portrait: top 25% empty mist, no people, no objects, no text. Landscape: left 38% empty mist. Subject stays in the remaining field, about 35–50%.',
-  'Do not draw letters, numbers, prices, or any logo. The official mark is composited later.',
+  'BB BOX homepage photograph for 和居家居. Same logic as bbbox-shop.com: one finished space people want to stay in, not a construction diagram.',
+  'Show ONE completed cabin already in use. Rounded light shell, floor-to-ceiling glass, warm interior light, wood deck or lawn. Setting is a real Taiwan place: mountain, coast, garden, or a quiet yard. A person may sit on the deck, small in the frame.',
+  'Top third (portrait) or left third (landscape) is open sky or soft daylight, like the homepage headline sitting on the mountain sky. No flat color banner, no paper block, no exploded wall panels, no scaffolding, no hard hats.',
+  'Yellow #F0D93D only as one small rounded module tile. Teal #5B949A only as a window frame or a small accent. Never navy construction blocks, never a cream rental flyer, never laundry pastels.',
+  'One product language only. Do not mix a steel apple cabin, an all-aluminum room, and an EPS site hut in the same frame.',
+  'Do not draw letters, numbers, prices, logos, “200+”, week counts, or percent signs. Type is composited later.',
 ].join(' ');
 
 const BBBOX_DESIGN_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:這張圖是 BB BOX 模組屋社群海報（霧底 #E8F4F4、青綠 #5B949A、黃標 #F0D93D 只做小色塊）。只描述畫面，不要描述任何要印在圖上的文字:' +
-  '1) 構圖:上方 25% 完全留空給後製主標（只有霧底，沒有人、沒有物件、沒有文字）;' +
-  '2) 情境:台灣基地的進場或用途（路進不去、院子多一間、艙體準備落地）;' +
-  '3) 禁止:海軍藍斜切工地海報、米白租屋海報、洗衣插畫、報價、任何中英數字、自己畫 logo"';
+  '"imagePrompt": "必填:這張圖要像 BB BOX 官網首頁的生活照片，不是霧底海報、也不是工地拆件。只描述畫面，不要描述任何要印在圖上的文字:' +
+  '1) 一個已經能住的圓角艙，落地玻璃，室內暖光，木平台或草地；背景是台灣的山、海岸、庭院或安靜院子;' +
+  '2) 直式上方三分之一、或橫式左側三分之一是開闊的天空或柔光，給後製主標，不要平塗色塊;' +
+  '3) 黃色只做一塊小圓角模組，青綠只做窗框或小強調;' +
+  '4) 禁止:拆開的牆板、鷹架、安全帽、海軍藍斜切、米白租屋海報、洗衣插畫、報價、百分比、任何中英數字、自己畫 logo"';
 
-const BBBOX_PHOTO_IMAGE_PROMPT_SPEC =
-  '"imagePrompt": "必填:給圖片生成模型的英文描述，走 BB BOX 霧底青綠海報，不是工地攝影、不是租屋海報。' +
-  '一個艙體、一條進不去的路，或一塊準備加房間的院子。上方 25% 留空。不含文字"';
+const BBBOX_PHOTO_IMAGE_PROMPT_SPEC = BBBOX_DESIGN_IMAGE_PROMPT_SPEC;
 
 /** 各品牌 B 端「社群設計圖」規格;Homigo 米白深藍社群海報、Washgo 可愛洗衣插畫、TaskGo 匠管平面海報、BB BOX 青綠艙體 */
 export const BRAND_DESIGN_IMAGE_STYLE: Record<string, string> = {
@@ -746,8 +746,7 @@ export const BRAND_DESIGN_IMAGE_STYLE: Record<string, string> = {
   ].join('\n'),
   bbbox: [
     BBBOX_CORE,
-    '直式上方 25% 或橫式左側 38% 是空的霧底 #E8F4F4，不要人物、不要任何文字。',
-    '艙體用圓角與一個黃標模組塊表示可組裝。不要安全帽、不要租約資料夾。',
+    'Match the official site: finished lifestyle photograph, open sky for the headline, one cabin, one small yellow rounded tile.',
   ].join('\n'),
 };
 
@@ -769,7 +768,7 @@ export const BRAND_PHOTO_IMAGE_STYLE: Record<string, string> = {
   ].join('\n'),
   bbbox: [
     BBBOX_CORE,
-    'One Taiwan site moment only. No device UI card. Empty mist block stays clear for later type.',
+    'Photograph, not an illustration. The cabin is finished and lived-in. Sky stays clear for later type.',
   ].join('\n'),
 };
 
@@ -842,7 +841,12 @@ export function buildSocialImagePrompt(params: {
   const styleBlock = params.imageStyle === 'photo' ? photoSpec : designSpec;
   const emptyBanner = params.emptyBanner ?? true;
   const washgoCute = params.brandSlug === 'washgo';
-  const frameRule = !emptyBanner
+  const bbboxSite = params.brandSlug === 'bbbox';
+  const frameRule = bbboxSite
+    ? (params.landscape
+      ? 'LANDSCAPE 3:2. Full-bleed lifestyle photo, same logic as the BB BOX homepage. Left third is open sky or soft daylight. The finished cabin stays on the right. No paper banner and no flat color block.'
+      : 'PORTRAIT. Full-bleed lifestyle photo, same logic as the BB BOX homepage. Top third is open sky or soft daylight for later type. The finished cabin fills the lower two-thirds. No paper banner and no flat color block.')
+    : !emptyBanner
     ? (washgoCute
       ? 'SQUARE 1:1. Fill the frame with the cute laundry scene. Subject occupies 45–65%. No empty paper banner, no tiny lonely figure.'
       : 'SQUARE 1:1. Fill the frame with the scene. No empty typography banner.')

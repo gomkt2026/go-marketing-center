@@ -26,7 +26,7 @@ for (const s of SCENES) {
   const res = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: 'gpt-image-1', prompt: s.prompt, size: '1536x1024', quality: 'medium', n: 1 }),
+    body: JSON.stringify({ model: 'gpt-image-2.5-sunburst', prompt: s.prompt, size: '1536x1024', quality: 'high', output_format: 'png', n: 1 }),
   });
   if (!res.ok) throw new Error(`${s.key} 失敗: ${res.status} ${await res.text()}`);
   const data = await res.json();

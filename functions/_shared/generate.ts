@@ -352,12 +352,7 @@ async function recentImageStyles(env: Env, brandId: string): Promise<ImageStyleI
     .filter((s): s is ImageStyleId => s === 'photo' || s === 'design' || s === 'illustration');
 }
 
-/**
- * 圖片成本:三品牌各 30 美金/月。
- * FB/IG 海報用 gpt-image-1-mini(約 $0.015–0.05/張),Threads 每天最多 1 張。
- * 不再用 gpt-image-1 high(直式一張約 $0.25)。
- */
-const POSTER_IMAGE_MODEL = 'gpt-image-1-mini';
+/** Threads 每天最多 1 張生成圖。模型走 ChatGPT 圖像 API 的預設(gpt-image-2.5-sunburst) */
 const THREADS_IMAGE_DAILY_CAP = 1;
 
 async function threadsImageCountToday(env: Env, brandId: string): Promise<number> {
@@ -686,8 +681,7 @@ export async function generatePlatformPost(
           : undefined,
       });
       const size = isFb ? '1536x1024' as const : isIg ? '1024x1536' as const : '1024x1024' as const;
-      const quality = platform === 'threads' ? 'medium' as const : 'high' as const;
-      let bytes = await generateImage(env, { prompt, size, quality, model: POSTER_IMAGE_MODEL });
+      let bytes = await generateImage(env, { prompt, size, quality: 'high' });
       const shouldOverlay = isFb || isIg || !!post.posterHeadline;
       if (shouldOverlay) {
         bytes = await finishPosterImage(env, bytes, {
@@ -1339,7 +1333,7 @@ export async function generateEcosystemXPost(
       const bytes = await generateImage(env, {
         prompt: `${scene} ${ECOSYSTEM_X_IMAGE_STYLE}`,
         size: '1536x1024',
-        quality: 'medium',
+        quality: 'high',
       });
       const key = buildMediaKey('go-ecosystem', 'jpg');
       imageUrl = await putMedia(env, key, bytes, 'image/jpeg');

@@ -22,10 +22,12 @@ export interface Env {
   SESSION_SECRET?: string;
   /** OpenAI API key(文案與圖片生成) */
   OPENAI_API_KEY?: string;
-  /** 選填:覆寫文字模型,預設 gpt-4o-mini */
+  /** 選填:覆寫一般文字模型,預設 gpt-4o-mini。發文文案不走這裡 */
   OPENAI_TEXT_MODEL?: string;
-  /** 選填:覆寫圖片模型,預設 gpt-image-1-mini(發文配圖成本) */
+  /** 選填:覆寫圖片模型,預設 gpt-image-2.5-sunburst */
   OPENAI_IMAGE_MODEL?: string;
+  /** 選填:寫圖片提示詞的模型,預設 gpt-6.1-sol。只用於產圖前改寫畫面,不改文案 */
+  OPENAI_IMAGE_PROMPT_MODEL?: string;
   /** Claude API key。三品牌發文文案走 Haiku;未設定則退回 OpenAI 文字模型 */
   ANTHROPIC_API_KEY?: string;
   /** 選填:覆寫發文文案模型,預設 claude-haiku-4-5 */

@@ -30,7 +30,7 @@ for (const c of CHARACTERS) {
   const res = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: 'gpt-image-1', prompt: c.prompt, size: '1024x1024', quality: 'medium', n: 1 }),
+    body: JSON.stringify({ model: 'gpt-image-2.5-sunburst', prompt: c.prompt, size: '1024x1024', quality: 'high', output_format: 'png', n: 1 }),
   });
   if (!res.ok) throw new Error(`${c.slug} 失敗: ${res.status} ${await res.text()}`);
   const data = await res.json();

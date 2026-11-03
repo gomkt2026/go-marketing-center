@@ -76,6 +76,19 @@ function requireApiKey(env: Env): string {
   return env.OPENAI_API_KEY;
 }
 
+/** 社群配圖、頭像、參考圖編修。gpt-image-1 已停用,mini 將於 2026-12-01 下線 */
+const DEFAULT_IMAGE_MODEL = 'gpt-image-2.5-sunburst';
+/** 產圖前把場面寫具體。比發文用的小模型穩,失敗就沿用原提示 */
+const DEFAULT_IMAGE_PROMPT_MODEL = 'gpt-6.1-sol';
+
+export function imageModel(env: Env): string {
+  return env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL;
+}
+
+export function imagePromptModel(env: Env): string {
+  return env.OPENAI_IMAGE_PROMPT_MODEL?.trim() || DEFAULT_IMAGE_PROMPT_MODEL;
+}
+
 /** 呼叫 Chat Completions;jsonMode 開啟時強制回傳合法 JSON 物件 */
 export async function chatComplete(
   env: Env,
@@ -118,7 +131,55 @@ export async function chatCompleteJson<T>(
 }
 
 type ImageSize = '1024x1024' | '1024x1536' | '1536x1024';
-type ImageQuality = 'medium' | 'high';
+type ImageQuality = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+const IMAGE_PROMPT_POLISH =
+  'You rewrite prompts for OpenAI image generation. Return only the final English prompt. ' +
+  'Keep every constraint already present: composition, empty areas for later type, brand colors, materials, and bans on letters, numbers, captions, watermarks, and logos. ' +
+  'Make the subject, pose, camera, lighting, and materials concrete enough to render once. ' +
+  'Do not add slogans or any written characters. Do not explain.';
+
+function unwrapImagePrompt(text: string): string {
+  const fenced = text.match(/```(?:\w+)?\s*([\s\S]*?)```/);
+  return (fenced?.[1] ?? text).trim().replace(/^["']|["']$/g, '').trim();
+}
+
+/**
+ * 產圖前用較強的 ChatGPT 文字模型把場面寫清楚。
+ * 改寫失敗、太短、或把原提示砍掉時,沿用呼叫端已組好的提示。
+ */
+export async function polishImagePrompt(env: Env, prompt: string): Promise<string> {
+  const trimmed = prompt.trim();
+  if (trimmed.length < 24) return trimmed;
+  try {
+    const apiKey = requireApiKey(env);
+    const res = await fetch(`${OPENAI_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: imagePromptModel(env),
+        reasoning_effort: 'low',
+        max_completion_tokens: 4000,
+        messages: [
+          { role: 'system', content: IMAGE_PROMPT_POLISH },
+          { role: 'user', content: trimmed },
+        ],
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new OpenAIError(res.status, text.slice(0, 300));
+    }
+    const data = await res.json() as { choices?: { message?: { content?: string | null } }[] };
+    const next = unwrapImagePrompt(data.choices?.[0]?.message?.content ?? '');
+    if (next.length < 80 || next.length < trimmed.length * 0.45) return trimmed;
+    return next.slice(0, 6000);
+  } catch (e) {
+    console.error('[image] 提示詞改寫失敗,沿用原提示', e instanceof Error ? e.message : e);
+    return trimmed;
+  }
+}
 
 async function parseImageResponse(res: Response): Promise<Uint8Array> {
   if (!res.ok) {
@@ -141,22 +202,22 @@ async function parseImageResponse(res: Response): Promise<Uint8Array> {
   throw new OpenAIError(502, 'OpenAI 未回傳圖片資料');
 }
 
-/** 產生圖片,回傳 JPEG bytes */
+/** 產生圖片,回傳 JPEG bytes。提示詞先經較強文字模型改寫,再交給圖像模型 */
 export async function generateImage(
   env: Env,
-  params: { prompt: string; size?: ImageSize; quality?: ImageQuality; model?: string },
+  params: { prompt: string; size?: ImageSize; quality?: ImageQuality; model?: string; polish?: boolean },
 ): Promise<Uint8Array> {
   const apiKey = requireApiKey(env);
+  const model = params.model ?? imageModel(env);
+  const prompt = params.polish === false ? params.prompt : await polishImagePrompt(env, params.prompt);
   const res = await fetch(`${OPENAI_BASE}/images/generations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: params.model ?? env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1-mini',
-      prompt: params.prompt,
+      model,
+      prompt,
       size: params.size ?? '1024x1024',
-      // 預設 medium。中文主標由後製疊上,不再靠模型畫字,也不再用 gpt-image-1 high
-      quality: params.quality ?? 'medium',
-      // IG Graph API 的 image_url 只接受 JPEG,統一輸出 JPEG(檔案也較小)
+      quality: params.quality ?? 'high',
       output_format: 'jpeg',
       n: 1,
     }),
@@ -186,20 +247,22 @@ export async function generateImageWithReference(
     size?: ImageSize;
     quality?: ImageQuality;
     model?: string;
-    /** high=保留參考圖細節(logo/系統 UI);low=允許重構圖。mini 不送這個欄位 */
+    /** high=保留參考圖細節(logo/系統 UI);low=允許重構圖。2.5 圖像模型已內建高保真,不送這個欄位 */
     inputFidelity?: 'high' | 'low';
+    polish?: boolean;
   },
 ): Promise<Uint8Array> {
   const apiKey = requireApiKey(env);
   const { mime, filename } = referenceImageMime(params.reference);
-  const model = params.model ?? env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1-mini';
+  const model = params.model ?? imageModel(env);
+  const prompt = params.polish === false ? params.prompt : await polishImagePrompt(env, params.prompt);
   const form = new FormData();
   form.append('model', model);
-  form.append('prompt', params.prompt);
+  form.append('prompt', prompt);
   form.append('size', params.size ?? '1024x1024');
-  form.append('quality', params.quality ?? 'medium');
+  form.append('quality', params.quality ?? 'high');
   form.append('output_format', 'jpeg');
-  if (!model.includes('mini')) form.append('input_fidelity', params.inputFidelity ?? 'low');
+  if (/^gpt-image-1(\.|$)/.test(model)) form.append('input_fidelity', params.inputFidelity ?? 'low');
   form.append('image[]', new Blob([params.reference as unknown as ArrayBuffer], { type: mime }), filename);
   const res = await fetch(`${OPENAI_BASE}/images/edits`, {
     method: 'POST',

@@ -326,6 +326,204 @@ export async function createPodcastEpisode(env: Env): Promise<CreatedEpisode> {
   return { episodeId, title, topicCount: topics.length, lineCount: lines.length, totalChars };
 }
 
+const BBBOX_GUEST_SLUGS = ['taskgo', 'homigo', 'washgo'] as const;
+export type BbboxGuestSlug = (typeof BBBOX_GUEST_SLUGS)[number];
+
+const BBBOX_FALLBACK_TOPICS: PodcastTopic[] = [
+  {
+    signalId: 'bbbox-yard',
+    title: '院子想再加一間',
+    summary: '書房或茶亭。先問車進不進得去，不報價。',
+    brandSlug: 'bbbox',
+    brandName: '和居家居',
+  },
+  {
+    signalId: 'bbbox-access',
+    title: '路進不去就先看現場組',
+    summary: '整屋運不進時才談模組蘋果艙。拓旅艙是工務基地，不是住宅替代。',
+    brandSlug: 'bbbox',
+    brandName: '和居家居',
+  },
+];
+
+const BBBOX_TOPIC_WORDS = ['模組', '移動屋', '蘋果', '組合屋', '貨櫃', '農地', '民宿', '庭院', '賞屋', '艙', '土地', '進場', '工寮'];
+
+function isBbboxGuestSlug(value: string): value is BbboxGuestSlug {
+  return (BBBOX_GUEST_SLUGS as readonly string[]).includes(value);
+}
+
+async function getHostBySlug(env: Env, slug: string): Promise<PodcastHost> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT a.id, a.display_name, a.persona, b.slug AS brand_slug, b.name AS brand_name
+    FROM ai_agents a
+    JOIN agent_roles r ON r.id = a.role_id
+    JOIN brands b ON b.id = a.brand_id
+    WHERE r.code = 'brand_ai' AND a.is_active = true AND b.slug = ${slug}
+    LIMIT 1
+  `;
+  const row = rows[0] as { id: string; display_name: string; persona: Record<string, unknown>; brand_slug: string; brand_name: string } | undefined;
+  if (!row) throw new Error(`找不到 ${slug} 的品牌小編`);
+  const persona = row.persona ?? {};
+  const voiceId = (persona.voiceId as string) ?? '';
+  if (!voiceId) throw new Error(`${persona.nickname ?? row.display_name} 還沒有聲音`);
+  return {
+    agentId: row.id,
+    brandSlug: row.brand_slug,
+    brandName: row.brand_name,
+    nickname: (persona.nickname as string) ?? row.display_name,
+    characterTitle: (persona.characterTitle as string) ?? '',
+    temperament: (persona.temperament as string) ?? '',
+    catchphrase: (persona.catchphrase as string) ?? '',
+    focus: (persona.focus as string) ?? '',
+    canInterrupt: !!persona.canInterrupt || row.brand_slug === 'taskgo',
+    voiceId,
+  };
+}
+
+async function pickBbboxTopics(env: Env): Promise<PodcastTopic[]> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT ms.id, ms.title, ms.summary
+    FROM market_signals ms
+    JOIN brands b ON b.id = ms.brand_id
+    WHERE b.slug = 'bbbox'
+      AND ms.discovered_at > now() - interval '14 days'
+    ORDER BY ms.relevance_score DESC NULLS LAST, ms.discovered_at DESC
+    LIMIT 20
+  `;
+  const picked: PodcastTopic[] = [];
+  const seen = new Set<string>();
+  for (const row of rows as { id: string; title: string; summary: string | null }[]) {
+    if (seen.has(row.title)) continue;
+    if (!BBBOX_TOPIC_WORDS.some((word) => `${row.title}${row.summary ?? ''}`.includes(word))) continue;
+    seen.add(row.title);
+    picked.push({
+      signalId: row.id,
+      title: row.title,
+      summary: row.summary,
+      brandSlug: 'bbbox',
+      brandName: '和居家居',
+    });
+    if (picked.length >= 2) break;
+  }
+  return picked.length ? picked : BBBOX_FALLBACK_TOPICS;
+}
+
+function bbboxIntroLines(host: PodcastHost, guest: PodcastHost): ScriptLine[] {
+  const guestIntro = FIXED_SELF_INTROS[guest.brandSlug] ?? `大家好，我是 ${guest.brandName} 的 ${guest.nickname}。`;
+  return [
+    {
+      order: 0,
+      segmentLabel: 'intro',
+      agentId: host.agentId,
+      nickname: host.nickname,
+      text: '哈囉，歡迎收聽《和居對談》。我是和居家居的小盒。今天請一位朋友來，聊一間房子怎麼進場、院子能不能多一間。看過再約，電話留在最後。',
+      emotion: 'excited',
+    },
+    {
+      order: 1,
+      segmentLabel: 'intro',
+      agentId: guest.agentId,
+      nickname: guest.nickname,
+      text: `小盒找我來串門子。${guestIntro}今天我是來賓，這一集是和居的節目。`,
+      emotion: 'happy',
+    },
+  ];
+}
+
+async function generateBbboxPodcastScript(
+  env: Env,
+  host: PodcastHost,
+  guest: PodcastHost,
+  topics: PodcastTopic[],
+): Promise<{ title: string; topicSummary: string; lines: ScriptLine[] }> {
+  const byName = new Map([[host.nickname, host], [guest.nickname, guest]]);
+  const topicList = topics.map((topic, index) => `${index + 1}. 【${topic.title}】${topic.summary ? ` ${topic.summary}` : ''}`).join('\n');
+  const segmentLabels = ['intro', ...topics.map((_, index) => `topic${index + 1}`), 'outro'];
+  const systemPrompt = [
+    '你是台灣 Podcast「和居對談」的編劇。主持人是和居家居的小盒，這一集只再請一位來賓。',
+    '這不是《三小編熱聊》。不要出現另外兩位沒被邀請的小編，也不要把節目說成三個品牌一起主持。',
+    '',
+    hostIntroBlock(host),
+    '',
+    hostIntroBlock(guest),
+    '',
+    '鐵則:',
+    '- 小盒主持。先問土地、進場、用途，再講 BB BOX。不報價，不保證合法，不寫回本，不寫 7 到 12 週，不寫 200 棟，不寫百分之百。',
+    '- 來賓可以用自己品牌的日常接話，但只能輕點一次自己的服務，接著要把話交回和居。結尾的聯絡方式只有預約賞屋：04-2355-0256，或 LINE @BBBOX。禁止匠管信箱和匠管電話。',
+    '- 拓旅艙只當工務基地、宿舍、辦公，不是拿來住人的替代。',
+    '- 展示中心在臺中市北屯區環中路一段1111號之1，可以約看，不寫成已經成交。',
+    '- 每句 30 到 80 字，台灣口語。兩人名字要寫對。',
+    '- 開場的自我介紹系統會自己加，intro 不要再自我介紹，直接暖場。',
+    '- 結尾由小盒說預約賞屋，來賓跟聽眾說下次見。',
+    LAUGHTER_RULE,
+    ANTI_AI_RULES,
+  ].join('\n');
+  const userPrompt = [
+    `本集話題：`,
+    topicList,
+    '',
+    `來賓是 ${guest.nickname}（${guest.brandName}）。主持人是小盒。`,
+    `段落：${segmentLabels.join(' → ')}。總長度 1200 到 2000 字。`,
+    '回傳 JSON:',
+    `{"title":"10到18字的單集標題","topicSummary":"一句話","script":[{"segment":"${segmentLabels.join('|')}","speaker":"${host.nickname}|${guest.nickname}","text":"台詞","emotion":"${MEETING_EMOTIONS.join('|')}"}]}`,
+  ].join('\n');
+
+  const result = await chatCompleteJson<GeneratedScript>(env, {
+    temperature: 0.9,
+    maxTokens: 4000,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  });
+
+  const lines = bbboxIntroLines(host, guest);
+  for (const raw of result.script ?? []) {
+    const speaker = byName.get(raw.speaker?.trim());
+    const text = raw.text?.trim();
+    if (!speaker || !text) continue;
+    const segment = segmentLabels.includes(raw.segment) ? raw.segment : (lines[lines.length - 1]?.segmentLabel ?? 'intro');
+    const emotion = (MEETING_EMOTIONS as readonly string[]).includes(raw.emotion) ? raw.emotion as MeetingEmotion : 'happy';
+    lines.push({ order: lines.length, segmentLabel: segment, agentId: speaker.agentId, nickname: speaker.nickname, text, emotion });
+  }
+  if (lines.length < 8) throw new Error(`和居對談腳本太短：只有 ${lines.length} 句`);
+  return {
+    title: result.title?.trim() || '和居對談',
+    topicSummary: result.topicSummary?.trim() || '',
+    lines,
+  };
+}
+
+/** 和居對談：小盒主持，再請三個品牌其中一位來錄音。不進三小編熱聊的清單。 */
+export async function createBbboxPodcastEpisode(env: Env, guestSlug: string): Promise<CreatedEpisode> {
+  if (!isBbboxGuestSlug(guestSlug)) throw new Error('請選阿豪、小咪或阿樂其中一位');
+  const sql = getSql(env);
+  const host = await getHostBySlug(env, 'bbbox');
+  const guest = await getHostBySlug(env, guestSlug);
+  const topics = await pickBbboxTopics(env);
+  const { title, topicSummary, lines } = await generateBbboxPodcastScript(env, host, guest, topics);
+  const weekOf = taipeiWeekMonday();
+  const seqRows = await sql`
+    SELECT count(*)::int AS n FROM podcast_episodes
+    WHERE week_of = ${weekOf}::date AND show_slug = 'bbbox'
+  `;
+  const episodeSeq = ((seqRows[0] as { n: number })?.n ?? 0) + 1;
+  const inserted = await sql`
+    INSERT INTO podcast_episodes (
+      week_of, episode_seq, title, topic_summary, source_signal_ids, script, status, show_slug, guest_host_slug
+    ) VALUES (
+      ${weekOf}::date, ${episodeSeq}, ${title}, ${topicSummary},
+      ${JSON.stringify(topics.map((topic) => topic.signalId))},
+      ${JSON.stringify(lines)}, 'script_draft', 'bbbox', ${guestSlug}
+    ) RETURNING id
+  `;
+  const episodeId = (inserted[0] as { id: string }).id;
+  const totalChars = lines.reduce((sum, line) => sum + line.text.length, 0);
+  return { episodeId, title, topicCount: topics.length, lineCount: lines.length, totalChars };
+}
+
 // ============================================================================
 // 訪談來賓:Instant Voice Clone + 三小編訪談集
 // ============================================================================
@@ -623,6 +821,18 @@ export async function synthesizeNextSegment(env: Env, episodeId: string): Promis
 
   const hosts = await getPodcastHosts(env);
   const voiceByAgentId = new Map(hosts.map((h) => [h.agentId, h.voiceId]));
+  const brandVoices = await sql`
+    SELECT a.id::text AS id, a.persona->>'voiceId' AS voice_id
+    FROM ai_agents a
+    JOIN brands b ON b.id = a.brand_id
+    JOIN agent_roles r ON r.id = a.role_id
+    WHERE r.code = 'brand_ai'
+      AND b.slug IN ('taskgo', 'homigo', 'washgo', 'bbbox')
+      AND a.is_active = true
+  `;
+  for (const row of brandVoices as { id: string; voice_id: string | null }[]) {
+    if (row.voice_id) voiceByAgentId.set(row.id, row.voice_id);
+  }
 
   // 訪談集:把來賓的 cloned voice 併入
   if (episode.guest_id) {

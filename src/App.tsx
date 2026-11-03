@@ -25,6 +25,7 @@ const EcosystemSchedule = lazyPage(() => import('@/pages/collaboration/Ecosystem
 const Campaigns = lazyPage(() => import('@/pages/campaign/Campaigns'), 'Campaigns');
 const ContentCenter = lazyPage(() => import('@/pages/content/ContentCenter'), 'ContentCenter');
 const Podcast = lazyPage(() => import('@/pages/podcast/Podcast'), 'Podcast');
+const BrandPodcast = lazyPage(() => import('@/pages/podcast/Podcast'), 'BrandPodcast');
 const Shorts = lazyPage(() => import('@/pages/shorts/Shorts'), 'Shorts');
 const HomigoTutorials = lazyPage(() => import('@/pages/shorts/HomigoTutorials'), 'HomigoTutorials');
 const Publishing = lazyPage(() => import('@/pages/publishing/Publishing'), 'Publishing');
@@ -52,6 +53,7 @@ const BrandEditorDesk = lazyPage(() => import('@/pages/editor/BrandEditorDesk'),
 const BrandGeo = lazyPage(() => import('@/pages/geo/BrandGeo'), 'BrandGeo');
 const BrandSeo = lazyPage(() => import('@/pages/seo/BrandSeo'), 'BrandSeo');
 const PostingTimes = lazyPage(() => import('@/pages/brand/PostingTimes'), 'PostingTimes');
+const BrandBriefings = lazyPage(() => import('@/pages/brand/BrandBriefings'), 'BrandBriefings');
 const Landing = lazyPage(() => import('@/pages/public/Landing'), 'Landing');
 const GoPosting = lazyPage(() => import('@/pages/public/site/GoPosting'), 'GoPosting');
 const Proof = lazyPage(() => import('@/pages/public/site/Proof'), 'Proof');
@@ -95,6 +97,7 @@ function AppRoutes() {
         <Route path="/office" element={<Office />} />
         <Route path="/overview" element={<Dashboard />} />
         <Route path="/trending" element={<Trending />} />
+        <Route path="/:brand/trending" element={<Trending />} />
 
         <Route path="/:brand/workspace" element={<BrandWorkspace />} />
         <Route path="/:brand/center" element={<BbboxCenter />} />
@@ -117,11 +120,13 @@ function AppRoutes() {
         <Route path="/:brand/thread-replies" element={<ThreadsReplies />} />
         <Route path="/:brand/social" element={<SocialAccounts />} />
         <Route path="/:brand/posting-times" element={<PostingTimes />} />
+        <Route path="/:brand/briefings" element={<BrandBriefings />} />
         <Route path="/personas" element={<AgentPersonas />} />
         <Route path="/:brand/analytics" element={<Analytics />} />
         <Route path="/:brand/learning" element={<Learning />} />
 
         <Route path="/podcast" element={<Podcast />} />
+        <Route path="/:brand/podcast" element={<BrandPodcast />} />
         <Route path="/meetings" element={<MeetingList />} />
         <Route path="/meetings/:meetingId" element={<MeetingList />} />
         <Route path="/decisions" element={<DecisionCenter />} />

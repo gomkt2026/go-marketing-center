@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Navigate, useParams } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -40,6 +41,16 @@ function segmentTitle(label: string): string {
   return `${base}${suffix}`;
 }
 
+const GUEST_HOSTS = [
+  { slug: 'taskgo', name: '阿豪', brand: 'TaskGo' },
+  { slug: 'homigo', name: '小咪', brand: 'Homigo' },
+  { slug: 'washgo', name: '阿樂', brand: 'Washgo' },
+] as const;
+
+function guestHostName(slug?: string | null): string {
+  return GUEST_HOSTS.find((host) => host.slug === slug)?.name ?? '';
+}
+
 /** 三位小編的頭像色票(沒有 avatarUrl 時用) */
 const FALLBACK_COLORS = ['#C97B4A', '#7C9A6B', '#6B8CAE'];
 
@@ -60,7 +71,13 @@ function HostAvatar({ agent, size = 30, colorIndex = 0 }: { agent?: PodcastAgent
   );
 }
 
-export function Podcast() {
+export function BrandPodcast() {
+  const { brand } = useParams();
+  if (brand !== 'bbbox') return <Navigate to="/podcast" replace />;
+  return <Podcast show="bbbox" />;
+}
+
+export function Podcast({ show = 'trio' }: { show?: 'trio' | 'bbbox' }) {
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<{
@@ -68,6 +85,7 @@ export function Podcast() {
     agents: PodcastAgentInfo[]; progress: { total: number; completed: number };
   } | null>(null);
   const [creating, setCreating] = useState(false);
+  const [guestHost, setGuestHost] = useState<(typeof GUEST_HOSTS)[number]['slug']>('taskgo');
   const [synthesizing, setSynthesizing] = useState(false);
   const [synthProgress, setSynthProgress] = useState<{ completed: number; total: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -95,10 +113,10 @@ export function Podcast() {
   const BGM_VOLUME = 0.07;
 
   const loadEpisodes = useCallback(async () => {
-    const { episodes } = await api.podcastEpisodes();
+    const { episodes } = await api.podcastEpisodes(undefined, show);
     setEpisodes(episodes);
     return episodes;
-  }, []);
+  }, [show]);
 
   const loadDetail = useCallback(async (id: string) => {
     const data = await api.podcastEpisode(id);
@@ -109,8 +127,8 @@ export function Podcast() {
     loadEpisodes().then((eps) => {
       if (eps.length) setSelectedId((prev) => prev ?? eps[0].id);
     }).catch((e) => setErrorMsg(e instanceof Error ? e.message : '載入失敗'));
-    api.podcastTheme().then(({ url }) => setThemeUrl(url)).catch(() => {});
-  }, [loadEpisodes]);
+    if (show === 'trio') api.podcastTheme().then(({ url }) => setThemeUrl(url)).catch(() => {});
+  }, [loadEpisodes, show]);
 
   const loadClipJobs = useCallback(async (episodeId: string) => {
     const { jobs } = await api.videoJobs({ episodeId });
@@ -144,7 +162,9 @@ export function Podcast() {
     setCreating(true);
     setErrorMsg(null);
     try {
-      const result = await api.createPodcastEpisode();
+      const result = show === 'bbbox'
+        ? await api.createPodcastEpisode({ show: 'bbbox', guestHost })
+        : await api.createPodcastEpisode();
       await loadEpisodes();
       setSelectedId(result.episodeId);
     } catch (e) {
@@ -311,15 +331,28 @@ export function Podcast() {
   return (
     <div>
       <PageHeader
-        title="Podcast 節目"
-        subtitle="三位小編聊近三天熱門話題,每週二、五自動出逐字稿;人工確認後合成語音、試聽審核"
+        title={show === 'bbbox' ? '和居對談' : 'Podcast 節目'}
+        subtitle={show === 'bbbox'
+          ? '小盒主持。再請 TaskGo、Homigo、Washgo 其中一位來對談。稿先留著，看過再合成聲音，不會自動發出。'
+          : '三位小編聊近三天熱門話題,每週二、五自動出逐字稿;人工確認後合成語音、試聽審核'}
         actions={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button variant="secondary" onClick={() => setGuestsOpen((v) => !v)}>
-              {guestsOpen ? '收合來賓管理' : '🎙 訪談來賓'}
-            </Button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {show === 'bbbox' && GUEST_HOSTS.map((host) => (
+              <Button
+                key={host.slug}
+                variant={guestHost === host.slug ? 'primary' : 'ghost'}
+                onClick={() => setGuestHost(host.slug)}
+              >
+                {host.name}
+              </Button>
+            ))}
+            {show === 'trio' && (
+              <Button variant="secondary" onClick={() => setGuestsOpen((v) => !v)}>
+                {guestsOpen ? '收合來賓管理' : '🎙 訪談來賓'}
+              </Button>
+            )}
             <Button onClick={handleCreate} disabled={creating}>
-              {creating ? '生成中(約 1 分鐘)…' : '+ 立刻生成一集'}
+              {creating ? '生成中(約 1 分鐘)…' : show === 'bbbox' ? `和小盒、${guestHostName(guestHost)}生成一集` : '+ 立刻生成一集'}
             </Button>
           </div>
         }
@@ -331,7 +364,7 @@ export function Podcast() {
         </Card>
       )}
 
-      {guestsOpen && (
+      {show === 'trio' && guestsOpen && (
         <Card style={{ marginBottom: 16 }}>
           <h3 style={{ fontSize: 14, marginBottom: 4 }}>訪談來賓管理</h3>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14 }}>
@@ -422,12 +455,14 @@ export function Podcast() {
         </Card>
       )}
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* 左側:集數列表 */}
-        <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ width: 'min(300px, 100%)', flex: '1 1 280px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {episodes.length === 0 && (
             <Card style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-              還沒有任何一集。點右上角「立刻生成一集」,或等每週二、五早上 7 點自動生成。
+              {show === 'bbbox'
+                ? '還沒有和居對談。選一位小編，再按生成。這一頁不會列出三小編熱聊。'
+                : '還沒有任何一集。點右上角「立刻生成一集」,或等每週二、五早上 7 點自動生成。'}
             </Card>
           )}
           {episodes.map((e, i) => {
@@ -450,6 +485,11 @@ export function Podcast() {
                   </span>
                   <Badge tone={meta.tone}>{meta.label}</Badge>
                 </div>
+                {e.guestHostSlug && (
+                  <div style={{ marginBottom: 4 }}>
+                    <Badge tone="accent">小盒 × {guestHostName(e.guestHostSlug)}</Badge>
+                  </div>
+                )}
                 {e.episodeType === 'interview' && (
                   <div style={{ marginBottom: 4 }}>
                     <Badge tone="accent">🎙 訪談集{e.guestName ? `・來賓:${e.guestName}` : ''}</Badge>
@@ -465,7 +505,7 @@ export function Podcast() {
         </div>
 
         {/* 右側:單集詳情 */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: '2 1 420px', minWidth: 0 }}>
           {!selectedId && <Card style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>選一集查看逐字稿與音檔</Card>}
           {selectedId && !detail && <Card style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>載入中…</Card>}
 
@@ -555,12 +595,14 @@ export function Podcast() {
                         e.target.value = '';
                       }}
                     />
-                    <Button variant="ghost" onClick={() => themeInputRef.current?.click()} disabled={uploadingTheme}>
-                      {uploadingTheme ? '上傳中…' : themeUrl ? '更換片頭音樂' : '上傳片頭音樂'}
-                    </Button>
+                    {show === 'trio' && (
+                      <Button variant="ghost" onClick={() => themeInputRef.current?.click()} disabled={uploadingTheme}>
+                        {uploadingTheme ? '上傳中…' : themeUrl ? '更換片頭音樂' : '上傳片頭音樂'}
+                      </Button>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {themeUrl && (
+                    {show === 'trio' && themeUrl && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: 12, fontWeight: 600, width: 90, flexShrink: 0 }}>🎵 片頭音樂</span>
                         <audio

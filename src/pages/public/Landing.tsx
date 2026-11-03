@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ProofTrend, type TrendWeek } from '@/pages/public/site/ProofTrend';
 import { LanguageSwitch, LocalLink, useCopy, useFormat, useLocale } from '@/pages/public/locale';
+import { EditorIntroButton, useEditorIntro } from '@/components/editor/EditorIntroButton';
 
 export const CONTACT_EMAIL = 'service@inforcraft.com.tw';
 
@@ -144,6 +145,26 @@ interface ShowcaseEpisode {
   url: string | null;
 }
 
+function EditorRow({
+  slug, color, image, title, subtitle,
+}: {
+  slug: string; color: string; image: string; title: string; subtitle: string;
+}) {
+  const copy = useCopy();
+  const intro = useEditorIntro(slug);
+  return (
+    <div className={`lp-editor-row${intro?.playing ? ' is-speaking' : ''}`} style={{ ['--c' as string]: color }}>
+      <img src={image} alt="" className={intro?.playing ? 'is-speaking' : ''} />
+      <div>
+        <b style={{ color }}>{title}</b>
+        <small>{subtitle}</small>
+        {intro?.playing && <em>{intro.line}</em>}
+      </div>
+      <EditorIntroButton slug={slug} hearLabel={copy.common.hearEditor} stopLabel={copy.common.stopEditor} />
+    </div>
+  );
+}
+
 function useJson<T>(url: string): T | null {
   const [data, setData] = useState<T | null>(null);
   useEffect(() => {
@@ -168,11 +189,13 @@ export function BrandPosts() {
         return (
           <article key={b.slug} className="lp-post" style={{ ['--c' as string]: b.color }}>
             <header>
-              <img src={b.editor} alt={b.editorName} />
-              <div>
-                <b>{b.name}</b>
-                <small>{copy.common.aiEditor(b.editorName)}</small>
-              </div>
+              <EditorRow
+                slug={b.slug}
+                color={b.color}
+                image={b.editor}
+                title={b.name}
+                subtitle={copy.common.aiEditor(b.editorName)}
+              />
             </header>
             {post ? (
               <>
@@ -550,11 +573,13 @@ export function Landing() {
           <div className="lp-hero-art">
             {brands.map((b) => (
               <div key={b.slug} className="lp-hero-chip" style={{ borderColor: b.color }}>
-                <img src={b.editor} alt={b.editorName} />
-                <div>
-                  <b style={{ color: b.color }}>{b.name}</b>
-                  <small>{copy.common.aiEditor(b.editorName)}</small>
-                </div>
+                <EditorRow
+                  slug={b.slug}
+                  color={b.color}
+                  image={b.editor}
+                  title={b.name}
+                  subtitle={copy.common.aiEditor(b.editorName)}
+                />
               </div>
             ))}
           </div>
@@ -671,9 +696,13 @@ export const LANDING_CSS = `
 .lp-hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
 .lp-hero-art{display:grid;gap:14px}
 .lp-hero-chip{display:flex;align-items:center;gap:14px;background:#fff;border:2px solid;border-radius:18px;padding:12px 16px;box-shadow:0 8px 24px rgba(0,0,0,.05)}
-.lp-hero-chip img{width:56px;height:56px;border-radius:50%;object-fit:cover;background:#f4f4f4}
-.lp-hero-chip b{display:block;font-size:16px}
-.lp-hero-chip small{color:var(--muted)}
+.lp-hero-chip img,.lp-editor-row img{width:56px;height:56px;border-radius:50%;object-fit:cover;background:#f4f4f4}
+.lp-editor-row{display:flex;align-items:center;gap:14px;width:100%}
+.lp-editor-row b{display:block;font-size:16px}
+.lp-editor-row small{color:var(--muted);display:block}
+.lp-editor-row em{display:block;margin-top:4px;font-style:normal;font-weight:800;font-size:15px;color:var(--ink)}
+.lp-editor-row img.is-speaking{box-shadow:0 0 0 4px var(--c, #5B949A);animation:editor-pulse 1.1s ease-in-out infinite}
+@keyframes editor-pulse{50%{transform:scale(1.08)}}
 .lp-section{padding:72px 0}
 .lp-section.soft{background:#F7F9F5}
 .lp-brands{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}

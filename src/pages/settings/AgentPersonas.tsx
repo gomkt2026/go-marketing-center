@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import type { AgentWithPersona } from '@/types';
+import { EditorIntroButton, useEditorIntro } from '@/components/editor/EditorIntroButton';
 
 interface PersonaForm {
   nickname: string;
@@ -78,7 +79,7 @@ export function AgentPersonas() {
     <div>
       <PageHeader
         title="品牌小編人設"
-        subtitle="三位品牌 AI 小編的性格與頭像;人設會影響直播會議的發言風格與立場"
+        subtitle="每位小編有自己的性格、口頭禪和聲音。點播放，聽他用自己的聲音自我介紹。"
       />
 
       {message && (
@@ -88,79 +89,117 @@ export function AgentPersonas() {
       )}
 
       <div className="grid-auto" style={{ gap: 14, alignItems: 'start' }}>
-        {editors.map((agent) => {
-          const p = agent.persona;
-          const isEditing = editing === agent.id;
-          return (
-            <Card key={agent.id}>
-              <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 12 }}>
-                {p.avatarUrl ? (
-                  <img
-                    src={p.avatarUrl}
-                    alt={p.nickname ?? agent.displayName}
-                    style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--color-border)' }}
-                  />
-                ) : (
-                  <div style={{
-                    width: 72, height: 72, borderRadius: '50%', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontSize: 28, background: 'var(--color-bg-soft)', border: '2px dashed var(--color-border)',
-                  }}>
-                    {p.characterTitle === '工班師傅' ? '👷' : p.characterTitle === '包租管家' ? '🏠' : '🧺'}
-                  </div>
-                )}
-                <div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <strong style={{ fontSize: 16 }}>{p.nickname ?? agent.displayName}</strong>
-                    <Badge tone="secondary">{agent.brandName}</Badge>
-                  </div>
-                  <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.characterTitle}</div>
-                </div>
-              </div>
+        {editors.map((agent) => (
+          <PersonaCard
+            key={agent.id}
+            agent={agent}
+            isEditing={editing === agent.id}
+            busy={busy}
+            avatarBusy={avatarBusy === agent.id}
+            form={form}
+            inputStyle={inputStyle}
+            onForm={setForm}
+            onEdit={() => startEdit(agent)}
+            onCancel={() => setEditing(null)}
+            onSave={() => void save(agent.id)}
+            onAvatar={() => void regenAvatar(agent.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PersonaCard({
+  agent, isEditing, busy, avatarBusy, form, inputStyle, onForm, onEdit, onCancel, onSave, onAvatar,
+}: {
+  agent: AgentWithPersona;
+  isEditing: boolean;
+  busy: boolean;
+  avatarBusy: boolean;
+  form: PersonaForm;
+  inputStyle: React.CSSProperties;
+  onForm: (form: PersonaForm) => void;
+  onEdit: () => void;
+  onCancel: () => void;
+  onSave: () => void;
+  onAvatar: () => void;
+}) {
+  const p = agent.persona;
+  const intro = useEditorIntro(agent.brandSlug);
+  return (
+    <Card>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: intro?.playing ? 8 : 12 }}>
+        {p.avatarUrl ? (
+          <img
+            src={p.avatarUrl}
+            alt={p.nickname ?? agent.displayName}
+            style={{
+              width: 72, height: 72, borderRadius: '50%', objectFit: 'cover',
+              border: '2px solid var(--color-border)',
+              boxShadow: intro?.playing ? '0 0 0 4px #5B949A55' : undefined,
+              transform: intro?.playing ? 'scale(1.04)' : undefined,
+            }}
+          />
+        ) : (
+          <div style={{
+            width: 72, height: 72, borderRadius: '50%', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 28, background: 'var(--color-bg-soft)', border: '2px dashed var(--color-border)',
+          }}>
+            {p.characterTitle === '工班師傅' ? '👷' : p.characterTitle === '包租管家' ? '🏠' : p.characterTitle === '賞屋規劃' ? '🏡' : '🧺'}
+          </div>
+        )}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <strong style={{ fontSize: 16 }}>{p.nickname ?? agent.displayName}</strong>
+            <Badge tone="secondary">{agent.brandName}</Badge>
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.characterTitle}</div>
+          {intro?.playing && <div style={{ marginTop: 6, fontWeight: 800, fontSize: 16 }}>{intro.line}</div>}
+        </div>
+        <EditorIntroButton slug={agent.brandSlug} hearLabel="聽他自我介紹" stopLabel="暫停" />
+      </div>
 
               {!isEditing ? (
                 <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
                   {p.catchphrase && <div>💬 口頭禪:「{p.catchphrase}」</div>}
                   {p.temperament && <div style={{ lineHeight: 1.7 }}>🎭 性格:{p.temperament}</div>}
                   {p.focus && <div style={{ lineHeight: 1.7, color: 'var(--color-text-muted)' }}>🎯 關注:{p.focus}</div>}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    <Button variant="secondary" disabled={avatarBusy === agent.id} onClick={() => void regenAvatar(agent.id)}>
-                      {avatarBusy === agent.id ? '生成中...' : p.avatarUrl ? '重新生成頭像' : '生成頭像'}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                    <Button variant="secondary" disabled={avatarBusy} onClick={onAvatar}>
+                      {avatarBusy ? '生成中...' : p.avatarUrl ? '重新生成頭像' : '生成頭像'}
                     </Button>
-                    <Button variant="ghost" onClick={() => startEdit(agent)}>編輯人設</Button>
+                    <Button variant="ghost" onClick={onEdit}>編輯人設</Button>
                   </div>
                 </div>
               ) : (
                 <div style={{ display: 'grid', gap: 10 }}>
                   <label style={{ fontSize: 12.5 }}>
                     暱稱
-                    <input style={inputStyle} value={form.nickname} onChange={(e) => setForm((f) => ({ ...f, nickname: e.target.value }))} />
+                    <input style={inputStyle} value={form.nickname} onChange={(e) => onForm({ ...form, nickname: e.target.value })} />
                   </label>
                   <label style={{ fontSize: 12.5 }}>
                     角色(影響頭像造型)
-                    <input style={inputStyle} value={form.characterTitle} onChange={(e) => setForm((f) => ({ ...f, characterTitle: e.target.value }))} />
+                    <input style={inputStyle} value={form.characterTitle} onChange={(e) => onForm({ ...form, characterTitle: e.target.value })} />
                   </label>
                   <label style={{ fontSize: 12.5 }}>
                     性格描述(可情緒化程度、講話風格)
-                    <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} value={form.temperament} onChange={(e) => setForm((f) => ({ ...f, temperament: e.target.value }))} />
+                    <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} value={form.temperament} onChange={(e) => onForm({ ...form, temperament: e.target.value })} />
                   </label>
                   <label style={{ fontSize: 12.5 }}>
                     口頭禪
-                    <input style={inputStyle} value={form.catchphrase} onChange={(e) => setForm((f) => ({ ...f, catchphrase: e.target.value }))} />
+                    <input style={inputStyle} value={form.catchphrase} onChange={(e) => onForm({ ...form, catchphrase: e.target.value })} />
                   </label>
                   <label style={{ fontSize: 12.5 }}>
                     立場關注點
-                    <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.focus} onChange={(e) => setForm((f) => ({ ...f, focus: e.target.value }))} />
+                    <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.focus} onChange={(e) => onForm({ ...form, focus: e.target.value })} />
                   </label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <Button variant="primary" disabled={busy} onClick={() => void save(agent.id)}>{busy ? '儲存中...' : '儲存'}</Button>
-                    <Button variant="ghost" onClick={() => setEditing(null)}>取消</Button>
+                    <Button variant="primary" disabled={busy} onClick={onSave}>{busy ? '儲存中...' : '儲存'}</Button>
+                    <Button variant="ghost" onClick={onCancel}>取消</Button>
                   </div>
                 </div>
               )}
-            </Card>
-          );
-        })}
-      </div>
-    </div>
+    </Card>
   );
 }

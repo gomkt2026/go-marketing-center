@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useBrand } from '@/context/BrandContext';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -85,7 +87,17 @@ function HotItemRow({ item, platforms, platformLabel }: {
 }
 
 export function Trending() {
-  const query = useAsyncData(() => api.trending(), []);
+  const { brand: routeSlug } = useParams();
+  const { currentBrand, brandsLoading } = useBrand();
+  const brandSlug = routeSlug || currentBrand?.slug || '';
+  const brandName = currentBrand?.slug === brandSlug ? currentBrand.name : brandSlug;
+  const query = useAsyncData(
+    () => brandSlug ? api.trending(brandSlug) : Promise.reject(new Error('請先選擇品牌')),
+    [brandSlug],
+  );
+
+  if (brandsLoading && !brandSlug) return <LoadingState />;
+  if (!brandSlug) return <ErrorState message="請先選擇一個品牌" onRetry={query.reload} />;
 
   if (query.loading) return <LoadingState />;
   if (query.error) return <ErrorState message={query.error} onRetry={query.reload} />;
@@ -97,9 +109,9 @@ export function Trending() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>即時熱門</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>{brandName} 的即時熱門</h1>
           <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 4 }}>
-            自動抓取 Google 趨勢、台灣新聞、PTT、Dcard;讓小編知道現在大家在聊什麼、下一篇該寫什麼
+            只看這個品牌近兩天判定相關的題。別的品牌的情報不會出現在這裡。
           </p>
         </div>
         <Button variant="secondary" onClick={query.reload}>↻ 重新整理</Button>
@@ -127,7 +139,7 @@ export function Trending() {
             })}
           </div>
         ) : (
-          <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>資料累積中,稍後再來看看。</p>
+          <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>這個品牌近兩天還沒有相關關鍵字。</p>
         )}
       </Card>
 
@@ -136,47 +148,23 @@ export function Trending() {
         <Card>
           <strong style={{ display: 'block', marginBottom: 4 }}>📰 FB / IG 題材:熱門新聞</strong>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-            有標品牌的是 AI 已判定跟品牌相關的精選情報,可以一鍵生成圖文
+            只列出判定跟 {brandName} 有關的新聞，可以一鍵生成圖文
           </p>
           {data.news.length ? data.news.map((item, i) => (
             <HotItemRow key={`${item.signalId ?? item.title}-${i}`} item={item} platforms={['facebook', 'instagram']} platformLabel="圖文" />
-          )) : <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>目前沒有新聞資料。</p>}
+          )) : <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>這個品牌近兩天沒有相關新聞。</p>}
         </Card>
 
         <Card>
           <strong style={{ display: 'block', marginBottom: 4 }}>🧵 Threads 題材:即時熱搜與社群風向</strong>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-            Google 即時熱搜 + PTT/Dcard 上大家正在討論的行業話題
+            只列出判定跟 {brandName} 有關的 PTT、Dcard 話題
           </p>
-
-          {data.trends.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 6 }}>Google 即時熱搜</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {data.trends.map((t, i) => (
-                  <a
-                    key={i}
-                    href={t.url ?? undefined}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      fontSize: 12.5, padding: '4px 12px', borderRadius: 999,
-                      background: i < 5 ? 'var(--color-primary-soft)' : 'var(--color-bg-soft)',
-                      color: 'var(--color-text)', textDecoration: 'none',
-                      fontWeight: i < 5 ? 700 : 500,
-                    }}
-                  >
-                    {i + 1}. {t.title}
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 2 }}>社群熱議(PTT / Dcard)</div>
           {data.community.length ? data.community.map((item, i) => (
             <HotItemRow key={`${item.signalId ?? item.title}-${i}`} item={item} platforms={['threads']} platformLabel=" Threads 文" />
-          )) : <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6 }}>近兩天沒有抓到社群熱議,情報蒐集每 3 小時跑一次。</p>}
+          )) : <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6 }}>這個品牌近兩天沒有相關的社群熱議。</p>}
         </Card>
       </div>
     </div>

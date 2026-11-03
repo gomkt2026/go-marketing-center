@@ -468,6 +468,7 @@ async function generateDailyTheme(env: Env, slotAt: Date): Promise<boolean> {
 
   if (dueSlots.length) {
     for (const slot of dueSlots) {
+      if (!isAutoPostBrand(slot.brandSlug)) continue;
       if (slot.platform !== 'facebook' && slot.platform !== 'instagram') continue;
       let brand = byBrand.get(slot.brandId);
       if (!brand) {
@@ -536,7 +537,7 @@ async function generateDailyThemePlatforms(
         topicSummary: theme.summary,
         applyOffice: true,
           extraInstruction: platform === 'instagram'
-            ? `切入角度:${theme.angle}。這是今天的每日主題貼文。IG:第一句=顧客搜得到的痛點,整篇只打一個標籤主題。配圖做成痛點海報(現場煩惱+主標+系統重點卡),不要整頁截圖直發。${brand.slug === 'taskgo' ? '禁止使用匠城出任務遊戲畫面,每篇換成不同的工地場面。' : ''}文案結尾要有明確匠管 CTA。主受眾:${audience.name}。`
+            ? `切入角度:${theme.angle}。這是今天的每日主題貼文。IG:第一句=顧客搜得到的痛點,整篇只打一個標籤主題。配圖做成痛點海報(現場煩惱+主標+系統重點卡),不要整頁截圖直發。${brand.slug === 'taskgo' ? '禁止使用匠城出任務遊戲畫面,每篇換成不同的工地場面。' : ''}${brand.slug === 'bbbox' ? '文案結尾用預約賞屋：04-2355-0256 或 LINE @BBBOX。不要寫匠管。' : '文案結尾要有明確匠管 CTA。'}主受眾:${audience.name}。`
             : `切入角度:${theme.angle}。這是今天的每日主題貼文,FB 與 IG 共用主題但要用各自平台的表達方式。配圖做成痛點海報,系統畫面當解法卡。${brand.slug === 'taskgo' ? '禁止使用匠城出任務遊戲畫面,每篇換成不同的工地場面。' : ''}主受眾:${audience.name}。`,
         audienceLane: 'b2b',
         audienceName: audience.name,
@@ -1130,6 +1131,14 @@ function slotDateFor(hourTW: number): Date {
 }
 
 async function handleBrandJob(env: Env, job: BrandJobMessage): Promise<void> {
+  if (
+    (job.kind === 'generate_threads'
+      || job.kind === 'generate_offtopic'
+      || job.kind === 'generate_game'
+      || job.kind === 'generate_theme'
+      || job.kind === 'generate_short')
+    && !isAutoPostBrand(job.slug)
+  ) return;
   switch (job.kind) {
     case 'generate_threads':
       await generateThreadsSlot(env, new Date(job.slotAt), {

@@ -2,11 +2,11 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../_shared/env';
 import { requireAuth, isSuperAdmin } from '../_shared/auth';
 import { getSql } from '../_shared/db';
-import { json } from '../_shared/response';
-import { fetchGoogleTrendsTW, fetchTaiwanNews, type TrendItem } from '../_shared/sources';
+import { json, error } from '../_shared/response';
+import { BRAND_SOURCES } from '../_shared/market-collect';
 
-// 即時熱門看板:自行抓取 Google Trends / 台灣新聞 RSS + 資料庫已蒐集的品牌情報(PTT/Dcard/新聞)
-// 並做詞頻統計產出文字雲資料(免付費 API,全部自抓)
+// 即時熱門看板:只回傳網址指定的那一個品牌。
+// 關鍵字、新聞、社群都從這個品牌近 48 小時、且對得上品牌題的情報來。
 
 interface HotNewsItem {
   title: string;
@@ -100,49 +100,86 @@ export function extractKeywords(titles: string[], limit = 28): KeywordItem[] {
     .map(([text, weight]) => ({ text, weight }));
 }
 
+const FOREIGN_BRAND_WORDS: Record<string, string[]> = {
+  homigo: ['taskgo', 'washgo', 'bbbox', '和居', '蘋果艙'],
+  taskgo: ['homigo', 'washgo', 'bbbox', '和居', '蘋果艙'],
+  washgo: ['homigo', 'taskgo', 'bbbox', '和居', '蘋果艙'],
+  bbbox: ['homigo', 'taskgo', 'washgo', '匠管'],
+};
+
+function isForeignBrandWord(text: string, slug: string): boolean {
+  const lower = text.toLowerCase();
+  return (FOREIGN_BRAND_WORDS[slug] ?? ['homigo', 'taskgo', 'washgo', 'bbbox', '匠管', '和居']).some((word) => lower.includes(word.toLowerCase()));
+}
+
+function signalMatchesBrand(slug: string, brandName: string, title: string, summary: string | null): boolean {
+  const config = BRAND_SOURCES[slug];
+  const keys = config ? [...config.filterKeywords, ...config.brandNames] : [brandName];
+  const hay = `${title}\n${summary ?? ''}`;
+  return keys.some((key) => key && hay.includes(key));
+}
+
+/** 單一品牌的關鍵字只從這個品牌的情報標題來，不混全國熱搜，也不留別的品牌名字。 */
+export function keywordsForBrand(slug: string, titles: string[], limit = 28): KeywordItem[] {
+  const own = titles.filter((title) => !isForeignBrandWord(title, slug));
+  const repeated = extractKeywords(own, limit).filter((item) => !isForeignBrandWord(item.text, slug));
+  if (repeated.length >= 8) return repeated;
+  const extra = new Map<string, number>();
+  for (const title of own) {
+    for (const run of title.match(/[\u4e00-\u9fff]{4,8}/g) ?? []) {
+      const gram = run.slice(0, Math.min(6, run.length));
+      if ([...STOPWORDS].some((word) => gram.includes(word))) continue;
+      if (isForeignBrandWord(gram, slug)) continue;
+      if (repeated.some((item) => item.text.includes(gram) || gram.includes(item.text))) continue;
+      extra.set(gram, (extra.get(gram) ?? 0) + 1);
+    }
+  }
+  const added = [...extra.entries()]
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .filter(([text]) => ![...extra.keys()].some((other) => other.length > text.length && other.includes(text)))
+    .slice(0, limit - repeated.length)
+    .map(([text, weight]) => ({ text, weight }));
+  return [...repeated, ...added].slice(0, limit);
+}
+
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
 
+  const brandSlug = new URL(context.request.url).searchParams.get('brand')?.trim() ?? '';
+  if (!brandSlug) return error('請指定品牌', 400);
+  if (!isSuperAdmin(auth) && !auth.brandSlugs.includes(brandSlug)) return error('沒有這個品牌的權限', 403);
+
   const sql = getSql(context.env);
-  const [trends, freshNews, signalRows] = await Promise.all([
-    fetchGoogleTrendsTW(15),
-    fetchTaiwanNews(10),
-    sql`
+  const signalRows = await sql`
       SELECT ms.id, ms.title, ms.summary, ms.source_url, ms.source_platform,
              ms.relevance_score, ms.discovered_at, b.slug AS brand_slug, b.name AS brand_name
       FROM market_signals ms
       JOIN brands b ON b.id = ms.brand_id
-      WHERE ms.discovered_at > now() - interval '48 hours'
+      WHERE b.slug = ${brandSlug}
+        AND b.is_active = true
+        AND ms.discovered_at > now() - interval '48 hours'
       ORDER BY ms.relevance_score DESC, ms.discovered_at DESC
       LIMIT 40
-    `,
-  ]);
+    `;
 
   const allSignals = signalRows as {
     id: string; title: string; summary: string | null; source_url: string | null;
     source_platform: string | null; relevance_score: number | null; discovered_at: string;
     brand_slug: string; brand_name: string;
   }[];
-  const signals = isSuperAdmin(auth)
-    ? allSignals
-    : allSignals.filter((s) => auth.brandSlugs.includes(s.brand_slug));
+  const signals = allSignals.filter((s) =>
+    s.brand_slug === brandSlug
+    && !isForeignBrandWord(s.title, brandSlug)
+    && signalMatchesBrand(brandSlug, s.brand_name, s.title, s.summary),
+  );
 
-  // FB/IG 面向:品牌精選情報(新聞/RSS 類)+ 即時台灣新聞
   const curatedNews: HotNewsItem[] = signals
     .filter((s) => !['ptt', 'dcard'].includes(s.source_platform ?? ''))
     .map((s) => ({
       title: s.title, url: s.source_url, source: s.source_platform ?? 'news',
       summary: s.summary, brandSlug: s.brand_slug, brandName: s.brand_name,
       relevance: s.relevance_score, signalId: s.id, discoveredAt: s.discovered_at,
-    }));
-  const curatedTitles = new Set(curatedNews.map((n) => n.title));
-  const liveNews: HotNewsItem[] = (freshNews as TrendItem[])
-    .filter((n) => !curatedTitles.has(n.title))
-    .slice(0, 15)
-    .map((n) => ({
-      title: n.title, url: n.url ?? null, source: '即時新聞', summary: n.snippet ?? null,
-      brandSlug: null, brandName: null, relevance: null, signalId: null, discoveredAt: null,
     }));
 
   // Threads 面向:社群熱議(PTT/Dcard 情報)
@@ -154,17 +191,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       relevance: s.relevance_score, signalId: s.id, discoveredAt: s.discovered_at,
     }));
 
-  // 文字雲:全部標題做詞頻統計
-  const allTitles = [
-    ...trends.map((t) => t.title),
-    ...(freshNews as TrendItem[]).map((n) => n.title),
-    ...signals.map((s) => s.title),
-  ];
-  const keywords = extractKeywords(allTitles);
+  const keywords = keywordsForBrand(brandSlug, signals.map((s) => s.title));
 
   return json({
-    trends: trends.map((t) => ({ title: t.title, url: t.url ?? null, snippet: t.snippet ?? null })),
-    news: [...curatedNews, ...liveNews],
+    trends: [],
+    news: curatedNews,
     community,
     keywords,
     generatedAt: new Date().toISOString(),

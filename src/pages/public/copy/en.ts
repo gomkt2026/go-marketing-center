@@ -33,6 +33,8 @@ export const en: PublicCopy = {
     aiEditor: (name: string) => `AI editor ${name}`,
     viewPost: 'View this post',
     postSoon: 'The latest post is being prepared.',
+    hearEditor: 'Play the intro',
+    stopEditor: 'Pause',
   },
   brands: [
     {

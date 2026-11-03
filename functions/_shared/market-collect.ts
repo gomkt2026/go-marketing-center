@@ -34,6 +34,12 @@ export const BRAND_SOURCES: Record<string, {
     brandNames: ['Washgo', 'WashGo'],
     dcardForum: 'life',
   },
+  bbbox: {
+    newsQuery: '模組屋 OR 組合屋 OR 移動屋 OR 貨櫃屋 OR 農地 民宿',
+    filterKeywords: ['模組屋', '組合屋', '移動屋', '貨櫃屋', '蘋果艙', '民宿', '農地', '工寮', '露營', '小宅', '基地'],
+    brandQueries: ['BB BOX', '和居家居', 'Hogea'],
+    brandNames: ['BB BOX', '和居家居', 'Hogea'],
+  },
 };
 
 const MIN_RELEVANCE = 0.6;
@@ -77,10 +83,13 @@ export async function collectSignalsForBrand(
     config.pttBoard ? fetchPttBoard(config.pttBoard) : Promise.resolve([]),
     config.dcardForum ? fetchDcard(config.dcardForum) : Promise.resolve([]),
   ]);
-  const keywordNews = generalNews.filter((n) => config.filterKeywords.some((k) => n.title.includes(k) || n.snippet?.includes(k)));
-  const otherNews = generalNews.filter((n) => !keywordNews.includes(n)).slice(0, 8);
+  const matchesBrand = (item: TrendItem) =>
+    config.filterKeywords.some((k) => item.title.includes(k) || item.snippet?.includes(k))
+    || config.brandNames.some((name) => item.title.includes(name) || item.snippet?.includes(name));
+  const keywordNews = generalNews.filter(matchesBrand);
+  const keywordTrends = trends.filter(matchesBrand);
   const seen = new Set<string>();
-  const candidates: TrendItem[] = [...news, ...keywordNews, ...ptt, ...dcard, ...trends, ...otherNews]
+  const candidates: TrendItem[] = [...news, ...keywordNews, ...keywordTrends, ...ptt, ...dcard]
     .filter((c) => { if (seen.has(c.title)) return false; seen.add(c.title); return true; })
     .slice(0, 40);
   const recentRows = await sql`

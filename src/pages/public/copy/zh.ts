@@ -29,6 +29,8 @@ export const zh = {
     aiEditor: (name: string) => `AI 小編 ${name}`,
     viewPost: '看這則貼文',
     postSoon: '最近一則貼文準備中。',
+    hearEditor: '聽他自我介紹',
+    stopEditor: '暫停',
   },
   brands: [
     {

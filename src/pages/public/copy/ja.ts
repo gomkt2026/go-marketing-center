@@ -31,6 +31,8 @@ export const ja: PublicCopy = {
     aiEditor: (name: string) => `AI 編集 ${name}`,
     viewPost: 'この投稿を見る',
     postSoon: '最新の投稿を準備しています。',
+    hearEditor: '自己紹介を聞く',
+    stopEditor: '停止',
   },
   brands: [
     {

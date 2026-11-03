@@ -1092,6 +1092,7 @@ export interface PodcastEpisode {
   episodeType?: PodcastEpisodeType;
   guestId?: string | null;
   guestName?: string | null;
+  guestHostSlug?: string | null;
   lineCount?: number;
   segmentsReady?: number;
   sourceSignalIds?: string[];

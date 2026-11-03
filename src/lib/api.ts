@@ -382,6 +382,20 @@ export const api = {
       notes: Record<string, string>;
     }>('/api/admin/perf-status'),
 
+  companyProfile: (slug: string) =>
+    request<{ profile: {
+      companyName: string; showroom: string; phone: string; mobile: string;
+      line: string; website: string; note: string;
+    } }>(`/api/brands/${slug}/company-profile`),
+
+  saveCompanyProfile: (slug: string, profile: {
+    companyName: string; showroom: string; phone: string; mobile: string;
+    line: string; website: string; note: string;
+  }) =>
+    request<{ profile: typeof profile }>(`/api/brands/${slug}/company-profile`, {
+      method: 'PUT', body: JSON.stringify(profile),
+    }),
+
   listBrandDocuments: (slug: string) =>
     request<{ documents: import('@/types').BrandDocument[] }>(`/api/brands/${slug}/documents`),
 
@@ -835,14 +849,14 @@ export const api = {
   }) =>
     request<{ user: User }>(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 
-  trending: () =>
+  trending: (brand: string) =>
     request<{
       trends: { title: string; url: string | null; snippet: string | null }[];
       news: import('@/types').TrendingItem[];
       community: import('@/types').TrendingItem[];
       keywords: { text: string; weight: number }[];
       generatedAt: string;
-    }>('/api/trending'),
+    }>(`/api/trending?brand=${encodeURIComponent(brand)}`),
 
   updateMarketSignal: (id: string, status: string) =>
     request<{ signal: import('@/types').MarketSignal }>(`/api/market-signals/${id}`, {
@@ -1200,15 +1214,20 @@ export const api = {
   eventExportUrl: (eventId: string) => `/api/events/${eventId}/export`,
 
   // -- Podcast(三小編熱門話題節目) ------------------------------------------
-  podcastEpisodes: (status?: string) =>
-    request<{ episodes: import('@/types').PodcastEpisode[] }>(
-      `/api/podcast${status ? `?status=${status}` : ''}`,
-    ),
+  podcastEpisodes: (status?: string, show?: 'trio' | 'bbbox') => {
+    const query = new URLSearchParams();
+    if (status) query.set('status', status);
+    if (show) query.set('show', show);
+    const qs = query.toString();
+    return request<{ episodes: import('@/types').PodcastEpisode[] }>(
+      `/api/podcast${qs ? `?${qs}` : ''}`,
+    );
+  },
 
-  createPodcastEpisode: () =>
+  createPodcastEpisode: (body?: { show?: 'bbbox'; guestHost?: string }) =>
     request<{ episodeId: string; title: string; topicCount: number; lineCount: number; totalChars: number }>(
       '/api/podcast',
-      { method: 'POST' },
+      { method: 'POST', body: JSON.stringify(body ?? {}) },
     ),
 
   podcastEpisode: (id: string) =>

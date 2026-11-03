@@ -26,9 +26,18 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   const title = (persona.characterTitle as string) ?? '社群小編';
   const temperament = (persona.temperament as string) ?? '';
+  const look = agent.brand_slug === 'bbbox' || title === '帶看'
+    ? 'showroom host with a short dark bob, a teal cardigan, a small blank yellow pin, holding a tiny white modular cabin that has a door and a window'
+    : title === '工班師傅'
+      ? 'construction worker foreman with a yellow hard hat and tool belt'
+      : title === '包租管家'
+        ? 'friendly female property manager holding a clipboard and house keys'
+        : title === '洗衣店店員'
+          ? 'cheerful laundry shop clerk holding a laundry basket with folded clothes'
+          : title;
 
   const prompt = [
-    `Cute chibi 3D mascot character figurine of a Taiwanese ${title === '工班師傅' ? 'construction worker foreman with a yellow hard hat and tool belt' : title === '包租管家' ? 'friendly female property manager holding a clipboard and house keys' : title === '洗衣店店員' ? 'cheerful laundry shop clerk holding a laundry basket with folded clothes' : title}`,
+    `Cute chibi 3D mascot character figurine of a Taiwanese ${look}`,
     'big head small body, kawaii toy style, soft studio lighting, pastel colored simple background,',
     'friendly smiling expression, high quality render, centered portrait, no text.',
     temperament ? `Personality vibe: ${temperament.slice(0, 100)}` : '',

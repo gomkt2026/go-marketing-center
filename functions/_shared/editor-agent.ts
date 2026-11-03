@@ -17,6 +17,7 @@ export const EDITOR_FALLBACK_AVATAR: Record<string, string> = {
   washgo: '/brands/washgo-ale.png',
   homigo: '/brands/homigo-xiaomi.png',
   taskgo: '/brands/taskgo-ahao.png',
+  bbbox: '/brands/bbbox-xiaohe-show.jpg',
 };
 
 function toDayLabel(value: unknown): string | null {
@@ -33,6 +34,7 @@ export const EDITOR_COLOR: Record<string, string> = {
   washgo: '#A87C64',
   homigo: '#2F5D50',
   taskgo: '#0B2D5C',
+  bbbox: '#5B949A',
 };
 
 export type EditorToolName = 'list_context' | 'draft_post' | 'schedule_post' | 'list_schedule';
@@ -118,7 +120,7 @@ export async function loadBrandEditor(env: Env, brandId: string, slug: string): 
     LIMIT 1
   `;
   const persona = (rows[0] as { persona?: Record<string, unknown> } | undefined)?.persona ?? {};
-  const nickname = String(persona.nickname ?? (slug === 'washgo' ? '阿樂' : slug === 'homigo' ? '小咪' : '阿豪'));
+  const nickname = String(persona.nickname ?? (slug === 'washgo' ? '阿樂' : slug === 'homigo' ? '小咪' : slug === 'bbbox' ? '小盒' : '阿豪'));
   return {
     agentId: (rows[0] as { id?: string } | undefined)?.id ?? null,
     nickname,

@@ -4,7 +4,7 @@ import type { Ask, OfficeMoment } from './talk';
 import type { OfficeAgent, OfficeSnapshot } from './types';
 
 export const BBBOX_STATIONS = [
-  { role: 'brand_ai', slug: 'bbbox', name: '小盒', x: 46, y: 430, mat: '#5B949A', screen: 'cabin', portrait: '/brands/bbbox-xiaohe.jpg', crop: 'center 22%' },
+  { role: 'brand_ai', slug: 'bbbox', name: '小盒', x: 46, y: 430, mat: '#5B949A', screen: 'cabin', portrait: '/brands/bbbox-xiaohe-show.jpg', crop: 'center 16%' },
   { role: 'market_analyst', slug: 'bbbox', name: '新聞收集', x: 640, y: 300, mat: '#b7ddd4', screen: 'ticker', portrait: '/office/cast-news.jpg', crop: 'center 18%' },
   { role: 'content_strategist', slug: 'bbbox', name: '行銷小編', x: 872, y: 308, mat: '#f2c14e', screen: 'plan', portrait: '/office/cast-strategy.jpg', crop: 'center 16%' },
   { role: 'publisher', slug: 'bbbox', name: '發文小編', x: 656, y: 424, mat: '#7ee0ff', screen: 'queue', portrait: '/office/cast-publisher.jpg', crop: 'center 20%' },

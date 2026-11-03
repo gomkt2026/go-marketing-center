@@ -24,7 +24,7 @@ import { composeAssetOnBrandCard, frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
 import { taiwanVoiceIssue } from './taiwan-voice';
 import { X_TWEET_MAX_CHARS } from './x';
-import { burnPainBar, burnPosterHeadline } from './poster-text';
+import { burnPainBar, burnPosterHeadline, sanitizePosterAdvantage, sanitizePosterHeadline } from './poster-text';
 import { loadBrandImagePromptPack } from './image-prompts';
 import { attachSystemShortVideo, systemShortFromAssetName, systemShortPrompt } from './system-shorts';
 import {
@@ -684,6 +684,8 @@ export async function generatePlatformPost(
       let bytes = await generateImage(env, { prompt, size, quality: 'high' });
       const shouldOverlay = isFb || isIg || !!post.posterHeadline;
       if (shouldOverlay) {
+        post.posterHeadline = sanitizePosterHeadline(post.posterHeadline, post.body);
+        post.posterAdvantage = sanitizePosterAdvantage(post.posterAdvantage, brandCtx.slug);
         bytes = await finishPosterImage(env, bytes, {
           brandSlug: brandCtx.slug,
           landscape: isFb,

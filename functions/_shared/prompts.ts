@@ -616,9 +616,9 @@ export const ASSET_PAIN_HEADLINE_JSON_SPEC =
 
 /** 海報主標 JSON:後製印字,禁止寫進 imagePrompt 叫模型去畫 */
 export const POSTER_HEADLINE_JSON_SPEC =
-  '"posterHeadline": "必填:4-10 字台灣繁體中文痛點主標,必須與文案第一句同義,禁止簡體。Homigo 要有情緒(例如「講不清楚」「根本管不動」「大家都在自保」「房子越多越焦慮」);其他品牌例如「手寫單對不攏」「今天做到哪」", ' +
-  '"posterAccent": "主標裡要用品牌強調色的 2-6 字(例如「不理？」「對不攏」);沒有就空字串", ' +
-  '"posterAdvantage": "必填:8-16 字台灣繁中品牌優勢,印在留白區讓觀眾看見這套系統解決什麼(Homigo 如「把散落的事整理回同一個地方」;Washgo 如「每件衣服都有送洗履歷」;TaskGo 如「讓職人經驗變成可複製的標準」)", ' +
+  '"posterHeadline": "必填:4-10 字台灣繁體中文痛點主標,必須與文案第一句同義,禁止簡體。Homigo 要有情緒(例如「講不清楚」「根本管不動」「大家都在自保」「房子越多越焦慮」);BB BOX 例如「車進不去」「院子多一間」;其他品牌例如「手寫單對不攏」「今天做到哪」", ' +
+  '"posterAccent": "主標裡要用品牌強調色的 2-6 字(例如「不去」「不理？」「對不攏」);沒有就空字串", ' +
+  '"posterAdvantage": "必填:8-16 字台灣繁中副標,印在主標下方留白(Homigo 如「把散落的事整理回同一個地方」;BB BOX 如「改在現場組裝」;Washgo 如「每件衣服都有送洗履歷」;TaskGo 如「讓職人經驗變成可複製的標準」)", ' +
   '"posterKicker": "選填:僅 TaskGo 給一個全大寫英文使命詞(STANDARD / TRACE / CREW / CONTROL 擇一);其他品牌空字串"';
 
 const EDITORIAL_PAPER_CORE = [

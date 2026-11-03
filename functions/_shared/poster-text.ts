@@ -50,6 +50,11 @@ interface PosterTheme {
   /** 素材底部色條的字色。沒填就沿用 main／accent */
   painMain?: string;
   painAccent?: string;
+  /** 生圖海報的留白底。有填時主標與副標都疊在這塊色帶上 */
+  field?: string;
+  stackInHeader?: boolean;
+  /** 強調字背後的色塊。字本身仍用 main，避免黃字在霧底上看不見 */
+  accentChip?: string;
 }
 
 const THEME: Record<string, PosterTheme> = {
@@ -69,10 +74,11 @@ const THEME: Record<string, PosterTheme> = {
     bannerOpacity: 0.0, slant: false, mode: 'lively',
   },
   bbbox: {
-    banner: '#5B949A', main: '#245E64', accent: '#8A6A12', stripe: '#F0D93D',
-    advantage: '#3E7278', kicker: '#5B949A',
+    banner: '#5B949A', main: '#245E64', accent: '#245E64', stripe: '#F0D93D',
+    advantage: '#245E64', kicker: '#5B949A',
     bannerOpacity: 0, slant: false, mode: 'homigo',
     painMain: '#FFFFFF', painAccent: '#F0D93D',
+    field: '#E8F4F4', stackInHeader: true, accentChip: '#F0D93D',
   },
 };
 
@@ -333,6 +339,70 @@ function buildEditorialSvg(params: {
   return { svg, x: 0, y: 0 };
 }
 
+/** 主標與副標都放在上方（或橫式左側）的品牌色帶，不壓到艙體 */
+function buildHeaderStackSvg(params: {
+  width: number;
+  height: number;
+  theme: PosterTheme;
+  main: string;
+  accent: string;
+  advantage: string;
+  landscape: boolean;
+}): { svg: string; x: number; y: number } {
+  const { width, height, theme, main, accent, advantage, landscape } = params;
+  const field = theme.field ?? '#E8F4F4';
+  const bandW = landscape ? Math.round(width * 0.40) : width;
+  const bandH = landscape ? height : Math.round(height * 0.30);
+  const pad = Math.round(bandW * 0.08);
+  const cx = Math.round(bandW / 2);
+  const maxTextW = bandW - pad * 2;
+  const lines = accent ? [main, accent] : [main];
+  const longest = lines.reduce((a, b) => (a.length >= b.length ? a : b));
+  let fontSize = Math.round(bandW * (landscape ? 0.12 : 0.105));
+  while (spacedWidth(longest, fontSize, letterSpacingPx(fontSize, theme.mode)) > maxTextW && fontSize > 36) {
+    fontSize -= 2;
+  }
+  const tracking = letterSpacingPx(fontSize, theme.mode);
+  const lineGap = Math.round(fontSize * 1.18);
+  let advSize = Math.round(fontSize * 0.40);
+  const advTrack = letterSpacingPx(advSize, theme.mode);
+  while (advantage && spacedWidth(advantage, advSize, advTrack) > maxTextW && advSize > 20) advSize -= 2;
+  const stripeH = Math.max(7, Math.round(fontSize * 0.09));
+  const titleH = lines.length === 1 ? fontSize : fontSize + lineGap;
+  const gapAfterTitle = Math.round(fontSize * 0.28);
+  const advGap = advantage ? Math.round(advSize * 1.2) : 0;
+  const blockH = titleH + gapAfterTitle + stripeH + advGap;
+  let headY = Math.round((bandH - blockH) / 2 + fontSize * 0.82);
+  if (headY < Math.round(fontSize * 0.95)) headY = Math.round(fontSize * 0.95);
+
+  const plate = `<rect x="0" y="0" width="${bandW}" height="${bandH}" fill="${field}"/>`;
+  const texts = lines.map((line, i) => {
+    const y = headY + i * lineGap;
+    if (i > 0 && theme.accentChip) {
+      const chipW = Math.round(spacedWidth(line, fontSize, tracking) + fontSize * 0.7);
+      const chipH = Math.round(fontSize * 1.22);
+      const chipX = cx - Math.round(chipW / 2);
+      const chipY = y - Math.round(fontSize * 0.92);
+      return [
+        `<rect x="${chipX}" y="${chipY}" width="${chipW}" height="${chipH}" rx="${Math.round(fontSize * 0.2)}" fill="${theme.accentChip}"/>`,
+        `<text x="${cx}" y="${y}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700" fill="${theme.main}" letter-spacing="${tracking}">${escapeXml(line)}</text>`,
+      ].join('');
+    }
+    const fill = i === 0 ? theme.main : theme.accent;
+    return `<text x="${cx}" y="${y}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${fontSize}" font-weight="700" fill="${fill}" letter-spacing="${tracking}">${escapeXml(line)}</text>`;
+  }).join('');
+  const lastTitleY = headY + (lines.length - 1) * lineGap;
+  const stripeY = lastTitleY + gapAfterTitle;
+  const stripeW = Math.round(Math.min(maxTextW * 0.18, fontSize * 1.35));
+  const stripe = `<rect x="${cx - Math.round(stripeW / 2)}" y="${stripeY}" width="${stripeW}" height="${stripeH}" rx="${Math.round(stripeH / 2)}" fill="${theme.stripe}"/>`;
+  const advY = stripeY + stripeH + advGap;
+  const advEl = advantage
+    ? `<text x="${cx}" y="${advY}" text-anchor="middle" font-family="${POSTER_FONT_FAMILY}" font-size="${advSize}" font-weight="700" fill="${theme.advantage}" letter-spacing="${advTrack}">${escapeXml(advantage)}</text>`
+    : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${plate}${texts}${stripe}${advEl}</svg>`;
+  return { svg, x: 0, y: 0 };
+}
+
 /**
  * 素材鋪滿後的底部痛點條:只印 4–10 字主標。
  * 優勢小字與英文 kicker 留在文案,不印上圖。
@@ -429,7 +499,12 @@ export async function burnPosterHeadline(
     const split = splitPosterAccent(headline, params.accent);
     const advantage = sanitizePosterAdvantage(params.advantage, params.brandSlug);
     const kicker = sanitizePosterKicker(params.kicker, params.brandSlug);
-    const overlay = theme.mode === 'graphic'
+    const overlay = theme.stackInHeader
+      ? buildHeaderStackSvg({
+        width, height, theme,
+        main: split.main, accent: split.accent, advantage, landscape,
+      })
+      : theme.mode === 'graphic'
       ? buildGraphicBannerSvg({
         geo: bannerGeometry(width, height, landscape),
         theme, main: split.main, accent: split.accent,

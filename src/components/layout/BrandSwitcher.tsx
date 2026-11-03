@@ -34,9 +34,15 @@ export function BrandSwitcher() {
       && page
       && (BRAND_SCOPED_PREFIXES.includes(page) || !RESERVED_APP_PATHS.has(page)),
     );
-    if (slug) {
+    if (slug === 'bbbox' && location.pathname === '/office') {
+      navigate('/bbbox/center');
+    } else if (slug && page === 'center') {
+      navigate(slug === 'bbbox' ? '/bbbox/center' : '/office');
+    } else if (slug) {
       if (onBrandSubpage) {
         navigate(`/${slug}/${page}`);
+      } else if (slug === 'bbbox') {
+        navigate('/bbbox/center');
       } else {
         navigate(`/${slug}/workspace`);
       }

@@ -6,7 +6,7 @@ export const RESERVED_APP_PATHS = new Set([
 ]);
 
 export const BRAND_SCOPED_PREFIXES = [
-  'workspace', 'editor', 'intelligence', 'help', 'network', 'geo', 'seo', 'market', 'campaigns', 'events', 'contents',
+  'workspace', 'center', 'editor', 'intelligence', 'help', 'network', 'geo', 'seo', 'market', 'campaigns', 'events', 'contents',
   'shorts', 'tutorials', 'publishing', 'schedule', 'threads', 'thread-replies', 'social', 'posting-times', 'analytics', 'learning',
 ];
 

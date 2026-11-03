@@ -14,6 +14,7 @@ import { LocaleProvider, useCopy } from '@/pages/public/locale';
 
 const Dashboard = lazyPage(() => import('@/pages/Dashboard'), 'Dashboard');
 const BrandWorkspace = lazyPage(() => import('@/pages/brand/BrandWorkspace'), 'BrandWorkspace');
+const BbboxCenter = lazyPage(() => import('@/pages/brand/BbboxCenter'), 'BbboxCenter');
 const BrandIntelligence = lazyPage(() => import('@/pages/brand/BrandIntelligence'), 'BrandIntelligence');
 const MarketIntelligence = lazyPage(() => import('@/pages/brand/MarketIntelligence'), 'MarketIntelligence');
 const Trending = lazyPage(() => import('@/pages/trending/Trending'), 'Trending');
@@ -96,6 +97,7 @@ function AppRoutes() {
         <Route path="/trending" element={<Trending />} />
 
         <Route path="/:brand/workspace" element={<BrandWorkspace />} />
+        <Route path="/:brand/center" element={<BbboxCenter />} />
         <Route path="/:brand/editor" element={<BrandEditorDesk />} />
         <Route path="/:brand/intelligence" element={<BrandIntelligence />} />
         <Route path="/:brand/help" element={<BrandCsKnowledge />} />

@@ -203,10 +203,14 @@ export function Sidebar() {
 
         <nav style={{ flex: 1, padding: '4px 12px 20px' }}>
           <div style={{ marginBottom: 16 }}>
-            {mainItems.map((item) => (
-              <div key={item.path}>
-                <SidebarLink item={item} scopedSlug={scopedSlug} onNavigate={closeSidebar} />
-                {item.children?.map((child) => (
+            {mainItems.map((item) => {
+              const entry = item.path === '/office' && scopedSlug === 'bbbox'
+                ? { ...item, path: '/bbbox/center' }
+                : item;
+              return (
+              <div key={entry.path}>
+                <SidebarLink item={entry} scopedSlug={scopedSlug} onNavigate={closeSidebar} />
+                {entry.children?.map((child) => (
                   <SidebarLink
                     key={child.path}
                     item={child}
@@ -216,7 +220,8 @@ export function Sidebar() {
                   />
                 ))}
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="app-sidebar-more">

@@ -1328,6 +1328,37 @@
   border: 3px solid #fff8ef;
 }
 
+.talk-face.is-logo {
+  object-fit: contain;
+  padding: 8px;
+  background: #e8f4f4;
+}
+
+.talk-face.is-fallback {
+  display: grid;
+  place-items: center;
+  background: #5b949a;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.portrait.is-logo {
+  object-fit: contain;
+  padding: 8px;
+  background: #e8f4f4;
+}
+
+.kind-cabin .screen { background: #e8f4f4; color: #245e64; }
+
+.office-page.is-bbbox .carpet.brand {
+  background: rgba(91, 148, 154, 0.4);
+}
+
+.office-page.is-bbbox .office-film {
+  margin-right: 10px;
+}
+
 .talk-body { min-width: 0; flex: 1; }
 .talk-body h2 { margin: 0; font-size: 18px; color: #f4fcff; }
 .talk-body h2 small { margin-left: 8px; color: #8fd0dc; font-size: 13px; font-weight: 500; }

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject }
 import { Link } from 'react-router-dom';
 import { api, publicApi } from '@/lib/api';
 import { createOfficeAmbience, type DanceKind } from './office-audio';
+import { bbboxAsk, bbboxBoard, bbboxDraftCounts, bbboxHref, bbboxMoment, bbboxReply, bbboxScreenCopy, BBBOX_STATIONS, loadBbboxOffice } from './bbbox-room';
 import { compactNumber, deskWork, liveAsk, nextBoard, officeMoment, officeReply, type Ask, type LiveReply } from './talk';
 import type { OfficeAgent, OfficeSnapshot, OfficeStatPeriod } from './types';
 import './office.css';
@@ -22,7 +23,7 @@ const STATIONS = [
 ] as const;
 
 type Station = (typeof STATIONS)[number];
-type ScreenKind = Station['screen'];
+type ScreenKind = Station['screen'] | 'cabin';
 
 const DANCE_SPOTS = [0, 1, 2, 3, 4, 5, 6, 7, 8].map((index) => ({
   x: 168 + index * 88,
@@ -32,7 +33,7 @@ const DANCE_SPOTS = [0, 1, 2, 3, 4, 5, 6, 7, 8].map((index) => ({
 const BRAND_ORDER = ['taskgo', 'homigo', 'washgo'] as const;
 const BRAND_LABEL: Record<string, string> = { taskgo: 'TaskGo', homigo: 'Homigo', washgo: 'Washgo' };
 
-function stationKey(station: Station) {
+function stationKey(station: { role: string; slug: string | null }) {
   return `${station.role}-${station.slug ?? 'x'}`;
 }
 
@@ -45,7 +46,7 @@ const WINDOW_LIGHTS = [
   { l: '80%', t: '62%', d: '1.5s' },
 ];
 
-function matchAgent(agents: OfficeAgent[], station: Station) {
+function matchAgent(agents: OfficeAgent[], station: { role: string; slug: string | null }) {
   return agents.find((agent) => agent.roleCode === station.role && (agent.brandSlug ?? null) === station.slug);
 }
 
@@ -111,14 +112,22 @@ function taipeiParts(now: Date) {
 }
 
 function Face({ src, crop, alt, tint }: { src: string; crop: string; alt: string; tint: string }) {
-  const [ok, setOk] = useState(true);
-  if (!ok) {
+  const [ok, setOk] = useState(Boolean(src));
+  if (!ok || !src) {
     return <span className="face-fallback" style={{ background: tint }}>{alt.slice(0, 1)}</span>;
   }
-  return <img className="portrait" src={src} alt="" style={{ objectPosition: crop }} onError={() => setOk(false)} />;
+  return (
+    <img
+      className={`portrait${src.includes('bbbox-logo') ? ' is-logo' : ''}`}
+      src={src}
+      alt=""
+      style={{ objectPosition: crop }}
+      onError={() => setOk(false)}
+    />
+  );
 }
 
-function Monitor({ kind, title, line }: { kind: ScreenKind; title: string; line: string }) {
+function Monitor({ kind, title, line, marks }: { kind: ScreenKind; title: string; line: string; marks?: string[] }) {
   return (
     <div className={`monitor kind-${kind}`}>
       <div className="bezel">
@@ -139,7 +148,7 @@ function Monitor({ kind, title, line }: { kind: ScreenKind; title: string; line:
             <div className="queue" aria-hidden><em>FB</em><em>IG</em><em>Threads</em></div>
           )}
           {kind === 'plan' && (
-            <div className="chips" aria-hidden><b>豪</b><b>咪</b><b>樂</b></div>
+            <div className="chips" aria-hidden>{(marks ?? ['豪', '咪', '樂']).map((mark) => <b key={mark}>{mark}</b>)}</div>
           )}
           <strong>{title}</strong>
           {kind !== 'ticker' && <small>{line}</small>}
@@ -291,7 +300,8 @@ function FloatingTalk({
   );
 }
 
-export function Office({ view = false }: { view?: boolean }) {
+export function Office({ view = false, room = 'go' }: { view?: boolean; room?: 'go' | 'bbbox' }) {
+  const stations = room === 'bbbox' ? BBBOX_STATIONS : STATIONS;
   const [data, setData] = useState<OfficeSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -317,6 +327,7 @@ export function Office({ view = false }: { view?: boolean }) {
   const [said, setSaid] = useState<{ agentId: string; line: string } | null>(null);
   const [roster, setRoster] = useState<'done' | 'blocked' | null>(null);
   const [peek, setPeek] = useState<string | null>(null);
+  const [localNotes, setLocalNotes] = useState<Record<string, string>>({});
   const peekTimer = useRef(0);
   const fitRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -331,7 +342,9 @@ export function Office({ view = false }: { view?: boolean }) {
     const load = async () => {
       if (document.hidden) return;
       try {
-        const next = view ? await publicApi.officeLive() : await api.office();
+        const next = room === 'bbbox'
+          ? await loadBbboxOffice()
+          : view ? await publicApi.officeLive() : await api.office();
         if (!stop) {
           setData(next);
           setError(null);
@@ -351,7 +364,7 @@ export function Office({ view = false }: { view?: boolean }) {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onShow);
     };
-  }, [tick, view]);
+  }, [tick, view, room]);
 
   useEffect(() => {
     ambience.current = createOfficeAmbience();
@@ -435,7 +448,7 @@ export function Office({ view = false }: { view?: boolean }) {
       if (!alive) return;
       const snapshot = dataRef.current;
       const picked = selectedRef.current;
-      const idle = STATIONS.filter((station) => {
+      const idle = stations.filter((station) => {
         const agent = snapshot ? matchAgent(snapshot.agents, station) : undefined;
         if (agent?.id && agent.id === picked) return false;
         return (agent?.status ?? 'done') !== 'working';
@@ -444,13 +457,15 @@ export function Office({ view = false }: { view?: boolean }) {
         later(meet, 8000);
         return;
       }
-      const moment = officeMoment(idle.map((station) => station.name), snapshot, beatRef.current);
+      const moment = room === 'bbbox'
+        ? bbboxMoment(idle.map((station) => station.name), beatRef.current)
+        : officeMoment(idle.map((station) => station.name), snapshot, beatRef.current);
       beatRef.current += 1;
       setBeat(beatRef.current);
       if (moment.gather) {
         const spots: Record<string, { x: number; y: number }> = {};
         moment.who.forEach((name, index) => {
-          const station = STATIONS.find((item) => item.name === name);
+          const station = stations.find((item) => item.name === name);
           if (!station) return;
           spots[stationKey(station)] = index === 0 ? { x: 430, y: 530 } : { x: 536, y: 530 };
         });
@@ -476,7 +491,7 @@ export function Office({ view = false }: { view?: boolean }) {
       timers.forEach((id) => window.clearTimeout(id));
       setChat(null);
     };
-  }, [selected, meeting, dance]);
+  }, [selected, meeting, dance, room, stations]);
 
   const counts = useMemo(() => {
     const agents = data?.agents ?? [];
@@ -488,7 +503,7 @@ export function Office({ view = false }: { view?: boolean }) {
 
   const rosterRows = useMemo(() => {
     if (!roster || !data) return [];
-    return STATIONS.flatMap((station) => {
+    return stations.flatMap((station) => {
       const agent = matchAgent(data.agents, station);
       if (!agent || agent.status !== roster) return [];
       const task = agent.task?.trim() || (roster === 'blocked' ? '卡住了，原因沒寫下來' : '完成了，結果沒寫下來');
@@ -500,10 +515,10 @@ export function Office({ view = false }: { view?: boolean }) {
         task,
         piece,
         excerpt,
-        href: manuscriptHref(agent),
+        href: room === 'bbbox' ? bbboxHref(agent.roleCode) : manuscriptHref(agent),
       }];
     });
-  }, [roster, data]);
+  }, [roster, data, stations, room]);
 
   const chosen = data?.agents.find((agent) => agent.id === selected) ?? null;
   const visibleBubbles = meeting ? bubbles.slice(bubbleAt % Math.max(bubbles.length, 1)).slice(0, 3) : [];
@@ -519,31 +534,35 @@ export function Office({ view = false }: { view?: boolean }) {
     chat?.forEach((line, index) => add(`chat-${index}`, line.who, line.text));
     if (said) {
       const speaker = data?.agents.find((agent) => agent.id === said.agentId);
-      const station = STATIONS.find((item) => speaker && matchAgent([speaker], item));
+      const station = stations.find((item) => speaker && matchAgent([speaker], item));
       add('said', speaker ? nickname(speaker, station?.name ?? '') : station?.name ?? '', said.line);
     }
     visibleBubbles.forEach((bubble, index) => add(`meet-${index}`, bubble.who, bubble.text));
     if (selected) {
       const speaker = data?.agents.find((agent) => agent.id === selected);
-      const station = STATIONS.find((item) => speaker && matchAgent([speaker], item));
+      const station = stations.find((item) => speaker && matchAgent([speaker], item));
       if (station) {
-        const copy = screenCopy(station, speaker, data, beat);
+        const copy = room === 'bbbox'
+          ? bbboxScreenCopy(station.name, speaker?.task ?? '', beat, data?.keywords ?? [])
+          : screenCopy(station as Station, speaker, data, beat);
         add('selected', nickname(speaker, station.name), speaker?.task?.trim() || copy.line);
       }
     }
     if (peek) {
-      const station = STATIONS.find((item) => item.name === peek) ?? STATIONS.find((item) => {
+      const station = stations.find((item) => item.name === peek) ?? stations.find((item) => {
         const agent = data ? matchAgent(data.agents, item) : undefined;
         return nickname(agent, item.name) === peek;
       });
       if (station) {
         const agent = data ? matchAgent(data.agents, station) : undefined;
-        const copy = screenCopy(station, agent, data, beat);
+        const copy = room === 'bbbox'
+          ? bbboxScreenCopy(station.name, agent?.task ?? '', beat, data?.keywords ?? [])
+          : screenCopy(station as Station, agent, data, beat);
         add('peek', nickname(agent, station.name), agent?.task?.trim() || copy.line);
       }
     }
     return notes.slice(0, 4);
-  }, [chat, said, visibleBubbles, peek, data]);
+  }, [chat, said, visibleBubbles, peek, data, room, stations, beat]);
   const showPeek = (who: string) => {
     window.clearTimeout(peekTimer.current);
     setPeek(who);
@@ -552,13 +571,18 @@ export function Office({ view = false }: { view?: boolean }) {
     window.clearTimeout(peekTimer.current);
     peekTimer.current = window.setTimeout(() => setPeek(null), 140);
   };
-  const board = nextBoard(data);
-  const preset = chosen && data ? officeReply(chosen, ask, data, period) : null;
+  const board = room === 'bbbox' ? bbboxBoard(data) : nextBoard(data);
+  const preset = chosen && data
+    ? (room === 'bbbox' ? bbboxReply(chosen, ask, data) : officeReply(chosen, ask, data, period))
+    : null;
   const reply = spoken ?? preset;
   const stats = BRAND_ORDER.map((slug) => data?.brandStats?.[period]?.find((row) => row.slug === slug) ?? {
     slug, posts: 0, views: 0, reach: 0, interactions: 0,
   });
-  const remembered = chosen ? data?.suggestions?.find((item) => item.agentId === chosen.id) : undefined;
+  const rememberedBody = room === 'bbbox'
+    ? (chosen ? localNotes[chosen.id] : undefined)
+    : chosen ? data?.suggestions?.find((item) => item.agentId === chosen.id)?.body : undefined;
+  const draftRows = room === 'bbbox' ? bbboxDraftCounts(data) : [];
   const periodLabel = period === '1' ? '今天' : period === '7' ? '近 7 天' : '近 28 天';
 
   async function toggle() {
@@ -588,8 +612,9 @@ export function Office({ view = false }: { view?: boolean }) {
       return;
     }
     const spots: Record<string, { x: number; y: number }> = {};
-    STATIONS.forEach((station, index) => {
-      spots[stationKey(station)] = DANCE_SPOTS[index];
+    stations.forEach((station, index) => {
+      const spot = DANCE_SPOTS[index];
+      if (spot) spots[stationKey(station)] = spot;
     });
     setChat(null);
     setWalks(spots);
@@ -622,6 +647,15 @@ export function Office({ view = false }: { view?: boolean }) {
   async function askEditor() {
     if (!chosen || !data || note.trim().length < 2 || noteBusy) return;
     const text = note.trim();
+    if (room === 'bbbox') {
+      const reply = bbboxAsk(chosen, text, data);
+      setSpoken(reply);
+      setSaid({ agentId: chosen.id, line: reply.bubble });
+      if (reply.mode === 'note') setLocalNotes((current) => ({ ...current, [chosen.id]: text }));
+      setNote('');
+      setNoteSaved('');
+      return;
+    }
     const reply = liveAsk(chosen, text, data, period);
     if (reply.mode === 'answer') {
       setSpoken(reply);
@@ -653,12 +687,15 @@ export function Office({ view = false }: { view?: boolean }) {
   }
 
   return (
-    <div ref={pageRef} className={`office-page${meeting ? ' is-meeting' : ''}${demo ? ' is-demo' : ''}${view ? ' is-view' : ''}`}>
+    <div ref={pageRef} className={`office-page${room === 'bbbox' ? ' is-bbbox' : ''}${meeting ? ' is-meeting' : ''}${demo ? ' is-demo' : ''}${view ? ' is-view' : ''}`}>
       <header className="office-hud">
         <div className="office-title">
-          Go 行銷辦公室
-          <small>{view ? '展示畫面，只能看' : data?.quiet ? '凌晨這一班只留方向，八點才發' : '點一個人，直接問，他用手上的資料回答'}</small>
-          {!view && <a className="office-film" href="/watch/office" target="_blank" rel="noreferrer">手機展示連結</a>}
+          {room === 'bbbox' ? '和居家居行銷辦公室' : 'Go 行銷辦公室'}
+          <small>{view ? '展示畫面，只能看' : room === 'bbbox' ? '點一個人，問這一牌的草稿和賞屋' : data?.quiet ? '凌晨這一班只留方向，八點才發' : '點一個人，直接問，他用手上的資料回答'}</small>
+          {!view && room === 'bbbox' && <Link className="office-film" to="/bbbox/intelligence">品牌智慧</Link>}
+          {!view && room === 'bbbox' && <Link className="office-film" to="/bbbox/editor">跟小盒聊</Link>}
+          {!view && room === 'bbbox' && <Link className="office-film" to="/bbbox/contents">草稿工作台</Link>}
+          {!view && room !== 'bbbox' && <a className="office-film" href="/watch/office" target="_blank" rel="noreferrer">手機展示連結</a>}
           {data?.standup?.film_url && !view ? (
             <a className="office-film" href={data.standup.film_url} target="_blank" rel="noreferrer">看這一班的會議影片</a>
           ) : data?.standup?.film_status === 'script' && !view ? (
@@ -697,9 +734,11 @@ export function Office({ view = false }: { view?: boolean }) {
           <button type="button" className="office-music" onClick={() => void (demo ? leaveDemo() : enterDemo())}>
             {demo ? '結束展示' : '全螢幕展示'}
           </button>
-          <button type="button" className={`office-switch${data?.autoPublish === false ? ' is-off' : ''}`} onClick={() => void toggle()} disabled={!data || switchBusy}>
-            {data?.autoPublish === false ? '自動發文關著' : '自動發文開著'}
-          </button>
+          {room === 'bbbox' ? <span>草稿留著</span> : (
+            <button type="button" className={`office-switch${data?.autoPublish === false ? ' is-off' : ''}`} onClick={() => void toggle()} disabled={!data || switchBusy}>
+              {data?.autoPublish === false ? '自動發文關著' : '自動發文開著'}
+            </button>
+          )}
         </div>}
       </header>
       {!view && roster && (
@@ -743,28 +782,45 @@ export function Office({ view = false }: { view?: boolean }) {
               {board.lines.map((line) => <p key={line}>{line}</p>)}
             </div>
             <OfficeSky />
-            <div className="brand-wall" aria-label="TaskGo、Homigo、Washgo">
-              <img src="/brands/taskgo-logo.png" alt="TaskGo" />
-              <img src="/office/logo-homigo.png" alt="Homigo" />
-              <img src="/office/logo-washgo.png" alt="Washgo" />
-            </div>
-            <div className="scoreboard">
-              <div className="period">
-                <strong>{periodLabel}</strong>
-                {(['1', '7', '28'] as const).map((value) => (
-                  <button key={value} type="button" className={period === value ? 'is-on' : ''} disabled={view} onClick={() => { if (!view) setPeriod(value); }}>
-                    {value === '1' ? '1天' : value === '7' ? '7天' : '28天'}
-                  </button>
-                ))}
+            {room === 'bbbox' ? (
+              <div className="brand-wall" aria-label="和居家居">
+                <img src="/brands/bbbox-logo.png" alt="和居家居" />
               </div>
-              {stats.map((row) => (
-                <p key={row.slug}>
-                  <b>{BRAND_LABEL[row.slug]}</b>
-                  <span>瀏覽 {compactNumber(row.views)}</span>
-                  <span>觸及 {row.reach > 0 ? compactNumber(row.reach) : '—'}</span>
-                  <span>互動 {row.views > 0 ? `${((row.interactions / row.views) * 100).toFixed(1)}%` : '—'}</span>
-                </p>
-              ))}
+            ) : (
+              <div className="brand-wall" aria-label="TaskGo、Homigo、Washgo">
+                <img src="/brands/taskgo-logo.png" alt="TaskGo" />
+                <img src="/office/logo-homigo.png" alt="Homigo" />
+                <img src="/office/logo-washgo.png" alt="Washgo" />
+              </div>
+            )}
+            <div className="scoreboard">
+              {room === 'bbbox' ? (
+                <>
+                  <div className="period"><strong>和居家居</strong></div>
+                  {draftRows.map((row) => (
+                    <p key={row.label}><b>{row.label}</b><span>{row.value}</span></p>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="period">
+                    <strong>{periodLabel}</strong>
+                    {(['1', '7', '28'] as const).map((value) => (
+                      <button key={value} type="button" className={period === value ? 'is-on' : ''} disabled={view} onClick={() => { if (!view) setPeriod(value); }}>
+                        {value === '1' ? '1天' : value === '7' ? '7天' : '28天'}
+                      </button>
+                    ))}
+                  </div>
+                  {stats.map((row) => (
+                    <p key={row.slug}>
+                      <b>{BRAND_LABEL[row.slug]}</b>
+                      <span>瀏覽 {compactNumber(row.views)}</span>
+                      <span>觸及 {row.reach > 0 ? compactNumber(row.reach) : '—'}</span>
+                      <span>互動 {row.views > 0 ? `${((row.interactions / row.views) * 100).toFixed(1)}%` : '—'}</span>
+                    </p>
+                  ))}
+                </>
+              )}
             </div>
             <div className="rack" aria-hidden>{Array.from({ length: 5 }, (_, i) => <b key={i} />)}</div>
             </div>
@@ -786,10 +842,12 @@ export function Office({ view = false }: { view?: boolean }) {
               {meeting && <div className="meet-flag">晨會中</div>}
             </div>
 
-            {STATIONS.map((station, index) => {
+            {stations.map((station, index) => {
               const agent = data ? matchAgent(data.agents, station) : undefined;
               const label = nickname(agent, station.name);
-              const copy = screenCopy(station, agent, data, beat);
+              const copy = room === 'bbbox'
+                ? bbboxScreenCopy(station.name, agent?.task ?? '', beat, data?.keywords ?? [])
+                : screenCopy(station as Station, agent, data, beat);
               const saying = visibleBubbles.find((bubble) => bubble.who === label);
               const status = agent?.status ?? 'done';
               const key = stationKey(station);
@@ -808,7 +866,7 @@ export function Office({ view = false }: { view?: boolean }) {
                   <span className="tip">{agent?.task ?? '等下一班晨會'}</span>
                   <span className="who-space" />
                   <span className="chair" />
-                  <Monitor kind={station.screen} title={copy.title} line={copy.line} />
+                  <Monitor kind={station.screen as ScreenKind} title={copy.title} line={copy.line} marks={room === 'bbbox' ? ['盒', '勘', '圖'] : undefined} />
                   <span className="desk">
                     <span className="keys" aria-hidden><b /><b /><b /><b /><b /></span>
                     <strong>{label}</strong>
@@ -816,7 +874,7 @@ export function Office({ view = false }: { view?: boolean }) {
                 </button>
               );
             })}
-            {STATIONS.map((station, index) => {
+            {stations.map((station, index) => {
               const key = stationKey(station);
               const walk = walks[key];
               const agent = data ? matchAgent(data.agents, station) : undefined;
@@ -856,7 +914,11 @@ export function Office({ view = false }: { view?: boolean }) {
       {!view && chosen && reply && (
         <aside className="talkbox">
           <button type="button" className="office-close" onClick={() => setSelected(null)} aria-label="關閉">×</button>
-          <img className="talk-face" src={STATIONS.find((station) => matchAgent([chosen], station))?.portrait ?? ''} alt="" />
+          {(() => {
+            const face = stations.find((station) => matchAgent([chosen], station))?.portrait || '';
+            if (!face) return <span className="talk-face is-fallback">{nickname(chosen, chosen.displayName).slice(0, 1)}</span>;
+            return <img className={`talk-face${face.includes('bbbox-logo') ? ' is-logo' : ''}`} src={face} alt="" />;
+          })()}
           <div className="talk-body">
             <h2>{nickname(chosen, chosen.displayName)} <small>{chosen.persona.characterTitle}</small></h2>
             <p className="ask">{reply.question}</p>
@@ -870,9 +932,13 @@ export function Office({ view = false }: { view?: boolean }) {
               <button type="button" className={ask === 'now' && !spoken ? 'is-on' : ''} onClick={() => { setSpoken(null); setAsk('now'); }}>你現在在做什麼</button>
               <button type="button" className={ask === 'next' && !spoken ? 'is-on' : ''} onClick={() => { setSpoken(null); setAsk('next'); }}>下一件是什麼</button>
               <button type="button" className={ask === 'result' && !spoken ? 'is-on' : ''} onClick={() => { setSpoken(null); setAsk('result'); }}>成效怎麼樣</button>
-              {manuscriptHref(chosen) && <Link to={manuscriptHref(chosen)!}>打開原稿</Link>}
+              {(room === 'bbbox' ? bbboxHref(chosen.roleCode) : manuscriptHref(chosen)) && (
+                <Link to={(room === 'bbbox' ? bbboxHref(chosen.roleCode) : manuscriptHref(chosen))!}>
+                  {room === 'bbbox' ? '打開這一層' : '打開原稿'}
+                </Link>
+              )}
             </div>
-            {remembered && <p className="hint">上次交代：{remembered.body}</p>}
+            {rememberedBody && <p className="hint">上次交代：{rememberedBody}</p>}
             <form className="advice" onSubmit={(event) => { event.preventDefault(); void askEditor(); }}>
               <input
                 value={note}

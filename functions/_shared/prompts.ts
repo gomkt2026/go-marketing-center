@@ -7,6 +7,7 @@ import { isMissingLaneColumn } from './audience-lane';
 import { TAIWAN_LOCAL_VOICE } from './taiwan-voice';
 import { taskgoProductFilmFacts } from './taskgo-product-films';
 import { systemShortFacts } from './system-shorts';
+import { igReachBrief } from './ig-craft';
 
 // ============================================================================
 // 品牌第一線角色視角:讓 AI 用「行業最前端人員」的思維寫貼文,而不是 AI 腔
@@ -81,7 +82,7 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '2. 圖文一體:圖上主標與文案第一句同義,禁止圖寫痛點、文案開頭卻在暖場。' +
       '3. 搜尋導向:本篇只對準「一個」房東/代管會搜的問題,把該搜尋詞自然寫進第一句與 hashtag。' +
       '4. 只服務一個對象,不要同時講房客吐槽與房東報稅。' +
-      '5. Hashtag 8-12 個:1 品牌 + 2-3 利基搜尋詞 + 其餘發現用。禁止無關標、禁止重複堆疊。' +
+      '5. Hashtag 最多 5 個:1 個品牌 + 1-2 個搜尋詞。禁止 viral、fyp、爆款這類空標，也禁止堆超過 5 個。' +
       '6. 視覺必須看得出是 Homigo:米白 #F5F1EA 大面積留白、深藍 #0B2D5C 資訊色、黃 #F7B500 只做主標強調。閱讀順序=痛點主標 → 真實疲憊情境 → 最後才看到 Homigo 解法。不要房仲海報、不要保險 DM、不要電商廣告。' +
       '7. 禁止標題黨、禁止「留言才告訴你」、禁止假裝限時優惠——會傷害推薦資格。',
     instagramMaxChars: 220,
@@ -118,7 +119,7 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '1. 80-180 字,絕對不超過 220 字。前 125 字必須是完整一句工地痛點 hook(例如白板排班、LINE 考古、月底才知賠)。' +
       '2. 圖上主標與文案第一句同義;少字多圖,重點放在圖上的 4-10 字語錄。' +
       '3. 搜尋導向:對準工程行老闆/工班頭會搜的一個詞(派工、現場回報、工班管理、工程行系統),寫進第一句與 hashtag。' +
-      '4. Hashtag 8-12 個,混用大流量(#做工的人 #工地日常)與利基(#派工 #工程行 #現場回報)。' +
+      '4. Hashtag 最多 5 個,只留利基搜尋詞(派工、工程行、現場回報、工班管理)。不要再堆 #做工的人 #工地日常 充數。' +
       '5. 視覺必須看得出是匠管 TaskGo:海軍藍/青藍/白大色塊、斜切、蜂巢;橘或黃只做強調。人物是平面海報構圖元素(側臉、回望、邁步),不是寫實工地風景照。可放藍色圓頭機器人吉祥物。要有台灣工地文化(安全帽、反光背心、LINE、案場)。系統畫面做成痛點海報的解法卡,不要整頁後台直發。不要深灰語錄卡、不要歐美棚拍、不要洋紅珊瑚當主色。' +
       '6. 禁止標題黨與互動勒索,主題不要飄到跟工班無關的生活文。',
     instagramMaxChars: 220,
@@ -178,7 +179,7 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       '2. 配圖必須是 B 端痛點海報:店主現場畫成活潑可愛的洗衣店插畫 + 4-10 字主標 + 優勢小字 + Washgo 系統重點畫面卡(訂單/履歷/調撥擇一)。禁止只把整頁後台截圖置中鋪在色塊上。禁止鉛筆素描、禁止水彩藝廊靜物、禁止吉卜力電影感。' +
       '3. 文案要講畫面上看得見的事(欄位、狀態、對不攏的單),像店主在看自己後台,不要寫「邁向數位化的未來就是現在」「告別繁瑣」「輕鬆數位化」空心廣告句。' +
       '4. 搜尋導向:對準洗衣店主會搜的一個詞(洗衣店系統、送洗履歷、門市調撥、洗衣店數位轉型)。' +
-      '5. Hashtag 8-12 個:品牌 + 利基搜尋詞 + 發現用。不要塞 #換季 #羽絨被 這種 C 端生活標到 B 端圖文。' +
+      '5. Hashtag 最多 5 個:品牌 + 洗衣店會搜的詞。不要塞 #換季 #羽絨被 #日常 #分享。' +
       '6. 結尾必須出現匠管聯絡,讓店主知道下一步是寫信或打電話,不要只收在感嘆句。' +
       '7. 禁止標題黨與互動勒索。',
     instagramMaxChars: 220,
@@ -208,7 +209,7 @@ const BRAND_VOICES: Record<string, BrandVoice> = {
       'BB BOX IG 專屬規則:' +
       '1. 80-180 字，不超過 220 字。第一句就是進場或用途。' +
       '2. 視覺是青綠 #5B949A、黃標 #F0D93D、霧底 #E8F4F4。禁止海軍藍斜切，禁止米白租屋海報。' +
-      '3. 不報價、不寫保證合法。Hashtag 8-12 個，含 #BBBOX 與一個產品詞。' +
+      '3. 不報價、不寫保證合法。Hashtag 最多 5 個，含 #BBBOX 與一個產品詞。' +
       '4. 結尾是預約賞屋：04-2355-0256 或 LINE @BBBOX。',
     instagramMaxChars: 220,
     igSearchQueries: ['移動屋', '蘋果艙', '模組屋', '組合屋', '土地活化'],
@@ -424,7 +425,7 @@ export const PLATFORM_GUIDELINES: Record<string, string> = {
     '3. 帳號辨識 > 單篇爆款——視覺要看得出是這個品牌(色票、構圖、主標語氣一致)。寧可穩,不要為了爆款換成不像自己的風格;影片火了人沒火等於白做。' +
     '4. 收藏優先——讓人想截圖/收藏的一句話或對比,比堆 emoji 重要。' +
     '5. 推薦資格——不洗 hashtag、不標題黨、不誤導對比、不互動勒索(禁止「留言才告訴你」)。內容必須跟帳號主題一致。' +
-    '6. 80-200 字,語氣輕鬆但具體,可用少量 emoji。Hashtag 8-12 個放文末。' +
+    '6. 80-200 字,語氣輕鬆但具體。Hashtag 最多 5 個放文末;2025-12-18 起超過 5 個不會帶來觸及。搜尋詞寫進句子,不要只靠標籤。' +
     '7. B 端配圖做成痛點海報:業者現場煩惱 + 後製繁中主標 + 系統重點畫面卡。有真實截圖時把截圖做成解法卡,不要整頁後台置中鋪色塊。主標與文案第一句同義,由系統印上,不要叫圖片模型畫字。',
   threads:
     'Threads 貼文:用很年輕世代的語氣(像大學生/新鮮人發文的節奏),口語、有記憶點,500 字以內。' +
@@ -1032,8 +1033,8 @@ export function buildPostUserPrompt(params: {
         params.audienceName ? `本篇主受眾:${params.audienceName}。整篇只對這一個對象說話,不要同時討好 B 端與 C 端。` : '',
       ].filter(Boolean).join('\n')
     : '';
-  const searchBlock = params.platform === 'instagram' && voice?.igSearchQueries?.length
-    ? `本篇要能被顧客在 IG 搜尋欄找到。只選下面「一個」搜尋意圖寫進第一句與 hashtag:${voice.igSearchQueries.join('、')}。`
+  const searchBlock = params.platform === 'instagram'
+    ? igReachBrief({ topic: params.topic, searchQueries: voice?.igSearchQueries })
     : '';
   const assetPain = !!(params.screenshotPoster || params.convertPhotoPoster);
   const imageSpec = params.skipImagePrompt || assetPain
@@ -1120,8 +1121,8 @@ export function buildImageInspiredPostPrompt(params: {
         params.audienceName ? `本篇主受眾:${params.audienceName}。` : '',
       ].filter(Boolean).join('\n')
     : '';
-  const searchBlock = params.platform === 'instagram' && voice?.igSearchQueries?.length
-    ? `文案第一句要對準顧客會搜的一個詞:${voice.igSearchQueries.join('、')}。`
+  const searchBlock = params.platform === 'instagram'
+    ? igReachBrief({ topic: params.assetName || params.caption || params.feature || 'instagram', searchQueries: voice?.igSearchQueries })
     : '';
   return [
     `這是品牌上傳的一張${categoryLabel}${params.assetName ? `「${params.assetName}」` : ''}${params.caption ? `,說明:${params.caption}` : ''}。`,

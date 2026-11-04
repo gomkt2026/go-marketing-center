@@ -2,6 +2,7 @@ import type { Env } from './env';
 import { getSql } from './db';
 import { chatCompleteJson } from './openai';
 import { factProblem } from './office-facts';
+import { medianOf } from './ig-craft';
 
 const MIN_SYNCED_POSTS = 3;
 const LOOKBACK_DAYS = 28;
@@ -102,12 +103,22 @@ async function loadSyncedPosts(env: Env, brandId: string): Promise<PostSnapshot[
 }
 
 function compactPosts(posts: PostSnapshot[]): string {
+  const medians = new Map<string, number>();
+  for (const platform of new Set(posts.map((p) => p.platform))) {
+    const same = posts.filter((p) => p.platform === platform).map((p) => p.impressions);
+    const median = same.length >= 3 ? medianOf(same) : null;
+    if (median && median > 0) medians.set(platform, median);
+  }
   return posts.map((p, i) => {
     const rank = i === 0 ? 'TOP' : i >= posts.length - 2 ? 'BOTTOM' : 'MID';
+    const median = medians.get(p.platform);
+    const multiple = median ? Math.round((p.impressions / median) * 10) / 10 : null;
+    const signal = multiple == null ? '樣本不足，不看倍數' : multiple >= 3 ? '高出自己平常 3 倍' : multiple < 1.5 ? '平常的一天' : '有看頭，還不到 3 倍';
     return [
       `[${rank}] ${p.title || '(無標題)'}`,
       `id=${p.contentId} 平台=${p.platform} 來源=${p.genSource ?? '-'} 預測分=${p.predictedScore ?? '-'}`,
       `曝光=${p.impressions} 留言=${p.comments} 分享=${p.shares} 收藏=${p.saves} 按讚=${p.likes} 互動率=${(p.engagementRate * 100).toFixed(2)}%`,
+      median ? `相對這個平台自己的中位數 ${median}：${multiple} 倍（${signal}）` : '這個平台不足 3 篇，不用原始曝光判斷爆不爆',
       p.cta ? `CTA:${p.cta}` : '',
       p.bodyPreview ? `開頭:${p.bodyPreview}` : '',
     ].filter(Boolean).join('\n');
@@ -151,6 +162,7 @@ export async function analyzeBrandPerformance(env: Env, brandId: string): Promis
           '你是台灣社群操盤手,根據真實發文成效產出可執行的學習洞察。',
           '禁止空話(例如「加強互動」「優化內容」);每條必須指出具體模式,並告訴下次發文要多做或少做什麼。',
           '不可改寫品牌定位、不可發明沒出現在資料裡的數字。',
+          '看 IG 不要用原始曝光排名。用相對該平台自己中位數的倍數：3 倍以上才算找到東西，1.5 倍以下是平常的一天。不足 3 篇就不要下公式結論。',
           '回傳 JSON:{"insights":[{"recordType":"content_performance|cta_effectiveness|audience_engagement|channel_insight","insight":"繁中一句到三段可執行結論","relatedContentId":"對應貼文 id 或空","doMore":["..."],"doLess":["..."],"winningHooks":["..."],"weakCta":["..."],"platform":"threads|facebook|instagram|x","genSource":"來源字串"}]}',
           '最多 4 條,每種 recordType 最多 1 條。',
         ].join('\n'),

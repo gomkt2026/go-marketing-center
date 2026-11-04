@@ -256,7 +256,7 @@ export async function probeMetaPublishAccess(
   }
 }
 
-/** 貼文全文 = 內文 + hashtags(FB 建議少量、IG 可多) */
+/** 貼文全文 = 內文 + hashtags。IG 產稿時已壓到最多 5 個。 */
 export function composePostMessage(body: string, hashtags: string[] | null | undefined): string {
   const text = normalizeMultilineText(body);
   const tags = (hashtags ?? []).map((h) => `#${h.replace(/^#/, '')}`).join(' ');

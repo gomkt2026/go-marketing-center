@@ -22,6 +22,7 @@ import { buildMediaKey, decodeEmbeddedImage, getMediaBytes, isEmbeddedImageUrl, 
 import { compositeLogo } from './watermark';
 import { composeAssetOnBrandCard, frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
+import { clampIgHashtags, formatIgCraftNote, prepareInstagramCopy, type IgCraftReceipt } from './ig-craft';
 import { taiwanVoiceIssue } from './taiwan-voice';
 import { X_TWEET_MAX_CHARS } from './x';
 import { burnPainBar, burnPosterHeadline, sanitizePosterAdvantage, sanitizePosterHeadline } from './poster-text';
@@ -60,12 +61,30 @@ export async function runPlatformJobs<T>(
   return { created, failures };
 }
 
-/** IG 最多 12、FB 最多 3;Threads 只去 # 不硬切(品牌規則各自處理) */
+/** IG 最多 5（2025-12-18 上限）、FB 最多 3;Threads 只去 # 不硬切 */
 function clampHashtags(tags: string[] | undefined, platform: SocialPlatform): string[] {
   const cleaned = (tags ?? []).map((h) => h.replace(/^#/, '').trim()).filter(Boolean);
-  if (platform === 'instagram') return cleaned.slice(0, 12);
+  if (platform === 'instagram') return clampIgHashtags(cleaned);
   if (platform === 'facebook') return cleaned.slice(0, 3);
   return cleaned;
+}
+
+function refreshInstagramCopy(
+  post: GeneratedPost,
+  slug: string,
+  topic: string,
+): { post: GeneratedPost; igCraft: IgCraftReceipt } {
+  const voice = getBrandVoice(slug);
+  const prepared = prepareInstagramCopy({
+    body: post.body,
+    hashtags: post.hashtags,
+    topic,
+    searchQueries: voice.igSearchQueries,
+    slug,
+  });
+  post.body = prepared.body;
+  post.hashtags = prepared.hashtags;
+  return { post, igCraft: prepared.receipt };
 }
 
 /** 讀取品牌官方 logo(R2 brand-assets/{slug}/logo.png);沒有就回 null */
@@ -95,6 +114,8 @@ export interface GenerationResult {
   loveAngle?: string;
   /** 晨會方向有生效時，blocked 有字代表這則作廢、不進待審。 */
   office?: { active: boolean; blocked: string | null; theme: string };
+  /** IG 鉤子、人話、文案檢查。留言只寫在備註，不代發。 */
+  igCraft?: IgCraftReceipt;
 }
 
 export type { BrandAssetPick, PickBrandAssetQuery };
@@ -503,11 +524,15 @@ export async function generatePlatformPost(
     : platform === 'instagram' ? (brandVoice.instagramMaxChars ?? 220)
     : platform === 'threads' && brandVoice.threadsMaxChars ? brandVoice.threadsMaxChars
     : null;
+  let igCraft = platform === 'instagram'
+    ? refreshInstagramCopy(post, brandCtx.slug, params.topic).igCraft
+    : undefined;
   const voiceIssue = taiwanVoiceIssue([post.body, post.posterHeadline, post.posterAdvantage].filter(Boolean).join('\n'));
-  if ((hardLimit && post.body.length > hardLimit) || voiceIssue) {
+  if ((hardLimit && post.body.length > hardLimit) || voiceIssue || igCraft?.rewriteReason) {
     const reasons = [
       hardLimit && post.body.length > hardLimit ? `${post.body.length} 字,超過 ${hardLimit} 字上限` : '',
       voiceIssue ?? '',
+      igCraft?.rewriteReason ?? '',
     ].filter(Boolean).join('；');
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
@@ -520,9 +545,11 @@ export async function generatePlatformPost(
     });
     post.body = normalizeMultilineText(post.body);
     post.hashtags = clampHashtags(post.hashtags, platform);
+    if (platform === 'instagram') igCraft = refreshInstagramCopy(post, brandCtx.slug, params.topic).igCraft;
   }
   post.cta = ctaForBrand(brandCtx.slug);
   post.hashtags = clampHashtags(post.hashtags, platform);
+  if (platform === 'instagram') igCraft = refreshInstagramCopy(post, brandCtx.slug, params.topic).igCraft;
 
   const officeState = {
     active: !!officePack?.active,
@@ -544,6 +571,7 @@ export async function generatePlatformPost(
       post.body = normalizeMultilineText(post.body);
       post.hashtags = clampHashtags(post.hashtags, platform);
       post.cta = ctaForBrand(brandCtx.slug);
+      if (platform === 'instagram') igCraft = refreshInstagramCopy(post, brandCtx.slug, params.topic).igCraft;
       problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
     }
     officeState.blocked = problem;
@@ -1027,22 +1055,32 @@ export async function generatePostFromImage(
     : platform === 'instagram' ? (brandVoice.instagramMaxChars ?? 220)
     : platform === 'threads' && brandVoice.threadsMaxChars ? brandVoice.threadsMaxChars
     : null;
-  if (hardLimit && post.body.length > hardLimit) {
+  const imageTopic = params.assetName || params.caption || params.feature || 'instagram';
+  let igCraft = platform === 'instagram'
+    ? refreshInstagramCopy(post, brandCtx.slug, imageTopic).igCraft
+    : undefined;
+  if ((hardLimit && post.body.length > hardLimit) || igCraft?.rewriteReason) {
+    const reasons = [
+      hardLimit && post.body.length > hardLimit ? `${post.body.length} 字,超過 ${hardLimit} 字上限` : '',
+      igCraft?.rewriteReason ?? '',
+    ].filter(Boolean).join('；');
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
         { role: 'system', content: systemPrompt },
         visionUserMessage,
         { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇 ${post.body.length} 字,超過 ${hardLimit} 字上限。請只保留一個核心重點,縮短到 ${hardLimit} 字以內,回傳同格式 JSON。` },
+        { role: 'user', content: `這篇不合格：${reasons}。請只保留一個核心重點${hardLimit ? `，縮短到 ${hardLimit} 字以內` : ''}，回傳同格式 JSON。` },
       ],
       temperature: 0.5,
     });
     post.body = normalizeMultilineText(post.body);
     post.imagePrompt = undefined;
     post.hashtags = clampHashtags(post.hashtags, platform);
+    if (platform === 'instagram') igCraft = refreshInstagramCopy(post, brandCtx.slug, imageTopic).igCraft;
   }
   post.cta = ctaForBrand(brandCtx.slug);
   post.hashtags = clampHashtags(post.hashtags, platform);
+  if (platform === 'instagram') igCraft = refreshInstagramCopy(post, brandCtx.slug, imageTopic).igCraft;
 
   const prediction = params.skipPrediction
     ? { score: 0, analysis: '', suggestions: [] }
@@ -1201,6 +1239,16 @@ export async function saveGeneratedContent(
   const { result, platform, brandCtx } = params;
 
   const contentType = platform === 'instagram' ? 'image' : 'article';
+  const igCraft = platform === 'instagram'
+    ? refreshInstagramCopy(
+      result.post,
+      brandCtx.slug,
+      String(params.promptMeta?.topic ?? result.post.title ?? 'instagram'),
+    ).igCraft
+    : undefined;
+  const analysis = result.prediction.analysis
+    + (result.prediction.suggestions.length ? `\n改進建議:\n- ${result.prediction.suggestions.join('\n- ')}` : '')
+    + (igCraft ? `\n${formatIgCraftNote(igCraft)}` : '');
   const contentRows = await sql`
     INSERT INTO contents (
       campaign_id, brand_id, content_type, target_platform, title, status,
@@ -1211,7 +1259,7 @@ export async function saveGeneratedContent(
       ${result.post.title}, ${params.status ?? 'pending_review'},
       ${params.generatedByAgentId ?? null},
       ${Math.max(0, Math.min(100, result.prediction.score))},
-      ${result.prediction.analysis + (result.prediction.suggestions.length ? `\n改進建議:\n- ${result.prediction.suggestions.join('\n- ')}` : '')},
+      ${analysis},
       ${JSON.stringify({
         ...params.promptMeta,
         audienceLane: params.promptMeta?.audienceLane ?? result.audienceLane,
@@ -1226,6 +1274,7 @@ export async function saveGeneratedContent(
         posterAdvantage: result.post.posterAdvantage ?? undefined,
         posterKicker: result.post.posterKicker ?? undefined,
         posterScene: params.promptMeta?.posterScene ?? result.posterScene ?? undefined,
+        igCraft,
       })},
       ${params.sourceMarketSignalId ?? null}
     ) RETURNING id

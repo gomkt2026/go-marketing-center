@@ -7,7 +7,24 @@ import { Button } from '@/components/ui/Button';
 import { useBrand } from '@/context/BrandContext';
 import { api, ApiError } from '@/lib/api';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
-import type { MarketSignalStatus, MarketSignalType } from '@/types';
+import type { MarketSignal, MarketSignalStatus, MarketSignalType } from '@/types';
+
+type SocialPlatform = 'facebook' | 'instagram' | 'threads';
+
+/** 和居家居不一次生三平台。新聞走 FB／IG，熱搜與社群討論走 Threads。 */
+function platformsForSignal(slug: string | undefined, signal: MarketSignal): SocialPlatform[] | undefined {
+  if (slug !== 'bbbox') return undefined;
+  const source = (signal.sourcePlatform ?? '').toLowerCase();
+  if (source === 'ptt' || source === 'dcard' || source === 'google_trends') return ['threads'];
+  return ['facebook', 'instagram'];
+}
+
+function postButtonLabel(platforms: SocialPlatform[] | undefined, busy: boolean): string {
+  if (busy) return '⏳ AI 生成中...';
+  if (!platforms) return '✨ 生成三平台貼文';
+  if (platforms.length === 1 && platforms[0] === 'threads') return '發 Threads 貼文';
+  return '發 FB／IG 貼文';
+}
 
 const typeLabel: Record<MarketSignalType, string> = {
   news: '新聞', policy: '政策', current_event: '時事', trending_topic: '熱門話題',
@@ -58,16 +75,22 @@ export function MarketIntelligence() {
     reload();
   }
 
-  async function generatePosts(signalId: string) {
-    setGeneratingId(signalId);
-    setGenMessage('⏳ AI 正在依序為 FB / IG / Threads 生成貼文與配圖,請留在此頁等待完成…');
+  async function generatePosts(signal: MarketSignal) {
+    const platforms = platformsForSignal(slug, signal);
+    const where = !platforms
+      ? 'FB / IG / Threads'
+      : platforms[0] === 'threads'
+        ? 'Threads'
+        : 'FB / IG';
+    setGeneratingId(signal.id);
+    setGenMessage(`⏳ AI 正在為${where}生成貼文,請留在此頁等待完成…`);
     try {
-      const res = await api.generateFromSignal(signalId);
+      const res = await api.generateFromSignal(signal.id, platforms ? { platforms } : undefined);
       const okCount = res.created.length;
       const failNote = res.failures.length
         ? `;失敗:${res.failures.map((f) => f.platform).join('、')}`
         : '';
-      setGenMessage(`已生成 ${okCount} 篇貼文草稿(FB/IG/Threads 差異化)${failNote},請至內容中心審閱。`);
+      setGenMessage(`已生成 ${okCount} 篇${where}貼文草稿${failNote},請至內容中心審閱。`);
       reload();
     } catch (e) {
       setGenMessage(`生成失敗:${e instanceof Error ? e.message : '未知錯誤'}`);
@@ -95,7 +118,9 @@ export function MarketIntelligence() {
     <div>
       <PageHeader
         title={`${brand.name} 市場情報`}
-        subtitle="排程每 3 小時自動蒐集；也可立即更新。依品牌定位篩新聞／政策／時事，可一鍵生成 FB／IG／Threads 貼文"
+        subtitle={slug === 'bbbox'
+          ? '排程每 3 小時自動蒐集。新聞發 FB／IG；Google 趨勢、PTT、Dcard 發 Threads。不會一次生三個平台。'
+          : '排程每 3 小時自動蒐集；也可立即更新。依品牌定位篩新聞／政策／時事，可一鍵生成 FB／IG／Threads 貼文'}
         actions={
           <Button variant="primary" disabled={refreshing} onClick={() => void refreshNow()}>
             {refreshing ? '蒐集中…' : '立即更新情報'}
@@ -145,9 +170,9 @@ export function MarketIntelligence() {
                   variant="primary"
                   style={{ fontSize: 12, padding: '4px 12px' }}
                   disabled={generatingId !== null}
-                  onClick={() => void generatePosts(s.id)}
+                  onClick={() => void generatePosts(s)}
                 >
-                  {generatingId === s.id ? '⏳ AI 生成中(約 30 秒)...' : '✨ 生成三平台貼文'}
+                  {postButtonLabel(platformsForSignal(slug, s), generatingId === s.id)}
                 </Button>
                 {s.status === 'new' && (
                   <>

@@ -23,7 +23,7 @@ import { listAllPostingSlots, isHourlyFamily, isOfftopicFamily, isThreadsSlotKin
 import { getThreadsAccount, publishThreadsPost, isThreadsAccessBlocked, THREADS_ACCESS_BLOCKED_NOTE, THREADS_API, refreshThreadsAccountScopes } from '../../../functions/_shared/threads';
 import { isThreadsSafetyBlocked } from '../../../functions/_shared/social-safety';
 import { threadsFetch } from '../../../functions/_shared/threads-api-log';
-import { getMetaAccount, publishFacebookPost, publishFacebookVideo, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, metaTokenInvalidNoteFromMessage } from '../../../functions/_shared/meta';
+import { getMetaAccount, publishFacebookPost, publishFacebookVideo, publishInstagramPost, publishInstagramReel, composePostMessage, isMetaTokenInvalid, metaTokenInvalidNoteFromMessage, reelCoverSource } from '../../../functions/_shared/meta';
 import { getXAccount, publishTweet, publishTweetThread, refreshXToken } from '../../../functions/_shared/x';
 import { resolvePublishableMedia, toPublicMediaUrl } from '../../../functions/_shared/media';
 import { processBrandReplyRound } from '../../../functions/_shared/threads-reply-round';
@@ -1436,7 +1436,8 @@ async function publishDueJobs(env: Env): Promise<void> {
            cv.body, cv.hashtags,
            c.generation_prompt_meta,
            a.file_url AS image_url,
-           v.file_url AS video_url
+           v.file_url AS video_url,
+           v.metadata AS video_meta
     FROM publishing_jobs pj
     JOIN contents c ON c.id = pj.content_id
     LEFT JOIN brands b ON b.id = c.brand_id
@@ -1445,7 +1446,7 @@ async function publishDueJobs(env: Env): Promise<void> {
       SELECT file_url FROM content_assets WHERE content_version_id = cv.id AND asset_type = 'image' LIMIT 1
     ) a ON true
     LEFT JOIN LATERAL (
-      SELECT file_url FROM content_assets WHERE content_version_id = cv.id AND asset_type = 'video' LIMIT 1
+      SELECT file_url, metadata FROM content_assets WHERE content_version_id = cv.id AND asset_type = 'video' LIMIT 1
     ) v ON true
     WHERE pj.status = 'scheduled' AND pj.scheduled_at <= now()
     ORDER BY pj.scheduled_at ASC
@@ -1458,7 +1459,7 @@ async function publishDueJobs(env: Env): Promise<void> {
     social_account_id: string | null;
     brand_id: string | null; collaboration_id: string | null; brand_slug: string | null;
     body: string | null; hashtags: string[] | null; generation_prompt_meta: unknown;
-    image_url: string | null; video_url: string | null;
+    image_url: string | null; video_url: string | null; video_meta: unknown;
   }[]) {
     const label = row.brand_slug ?? 'go-ecosystem';
     let threadsAccountId: string | null = null;
@@ -1496,7 +1497,8 @@ async function publishDueJobs(env: Env): Promise<void> {
         if (!account) throw new Error('Instagram 帳號未連線或憑證失效');
         const message = composePostMessage(row.body, row.hashtags);
         if (publicVideo) {
-          published = await publishInstagramReel(account, { caption: message, videoUrl: publicVideo });
+          const coverUrl = toPublicMediaUrl(env, reelCoverSource(row.video_url, row.video_meta));
+          published = await publishInstagramReel(account, { caption: message, videoUrl: publicVideo, coverUrl });
         } else if (publicImage) {
           published = await publishInstagramPost(account, { caption: message, imageUrl: publicImage });
         } else {

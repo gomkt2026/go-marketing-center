@@ -3,7 +3,7 @@ import type { Env } from '../../../_shared/env';
 import { requireAuth } from '../../../_shared/auth';
 import { getSql } from '../../../_shared/db';
 import { getThreadsAccount, publishThreadsPost } from '../../../_shared/threads';
-import { getMetaAccount, publishFacebookPost, publishFacebookVideo, publishInstagramPost, publishInstagramReel, composePostMessage } from '../../../_shared/meta';
+import { getMetaAccount, publishFacebookPost, publishFacebookVideo, publishInstagramPost, publishInstagramReel, composePostMessage, reelCoverSource } from '../../../_shared/meta';
 import { resolvePublishableMedia, toPublicMediaUrl } from '../../../_shared/media';
 import { isThreadsSafetyBlocked } from '../../../_shared/social-safety';
 import { logActivity } from '../../../_shared/activity';
@@ -142,12 +142,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   // 最新版本配圖 / 短影音(轉成公開絕對網址,Meta 伺服器才抓得到)
   const assetRows = await sql`
-    SELECT file_url, asset_type FROM content_assets
+    SELECT file_url, asset_type, metadata FROM content_assets
     WHERE content_version_id = ${version.id}::uuid AND asset_type IN ('image', 'video')
     ORDER BY created_at DESC
   `;
-  const imageRow = (assetRows as { file_url: string; asset_type: string }[]).find((a) => a.asset_type === 'image');
-  const videoRow = (assetRows as { file_url: string; asset_type: string }[]).find((a) => a.asset_type === 'video');
+  const imageRow = (assetRows as { file_url: string; asset_type: string; metadata: unknown }[]).find((a) => a.asset_type === 'image');
+  const videoRow = (assetRows as { file_url: string; asset_type: string; metadata: unknown }[]).find((a) => a.asset_type === 'video');
   const preparedImage = await resolvePublishableMedia(context.env, imageRow?.file_url ?? null, 'shared');
   if (preparedImage.rehosted && preparedImage.storedPath && imageRow?.file_url) {
     await sql`
@@ -176,7 +176,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       const message = composePostMessage(version.body, version.hashtags);
       if (platform === 'instagram') {
         if (videoUrl) {
-          published = await publishInstagramReel(account, { caption: message, videoUrl });
+          const coverUrl = toPublicMediaUrl(context.env, reelCoverSource(videoRow?.file_url, videoRow?.metadata));
+          published = await publishInstagramReel(account, { caption: message, videoUrl, coverUrl });
         } else if (imageUrl) {
           published = await publishInstagramPost(account, { caption: message, imageUrl });
         } else {

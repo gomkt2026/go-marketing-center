@@ -343,10 +343,25 @@ export async function publishFacebookVideo(
   return { postId, permalink };
 }
 
-/** 發布 IG Reels;videoUrl 必須是 Meta 抓得到的公開 mp4 */
+/**
+ * 短片封面。系統短片的 poster 在 metadata；沒有就用同路徑的 jpg。
+ * IG 沒收到 cover_url 時會自己抓開頭幀，TaskGo 開頭是空白的 LINE 對話，格子裡就看不到畫面。
+ */
+export function reelCoverSource(videoUrl: string | null | undefined, metadata: unknown): string | null {
+  if (metadata && typeof metadata === 'object') {
+    const poster = (metadata as { poster?: unknown }).poster;
+    if (typeof poster === 'string' && poster.trim()) return poster.trim();
+  }
+  if (!videoUrl) return null;
+  const path = videoUrl.split('?')[0];
+  if (/\/shorts\/[^/]+\/[^/]+\.mp4$/i.test(path)) return path.replace(/\.mp4$/i, '.jpg');
+  return null;
+}
+
+/** 發布 IG Reels;videoUrl 必須是 Meta 抓得到的公開 mp4。coverUrl 是有畫面的封面。 */
 export async function publishInstagramReel(
   account: MetaAccount,
-  params: { caption: string; videoUrl: string },
+  params: { caption: string; videoUrl: string; coverUrl?: string | null },
 ): Promise<MetaPublishResult> {
   const container = await graphPost(`${GRAPH_API}/${account.externalId}/media`, {
     access_token: account.accessToken,
@@ -354,6 +369,7 @@ export async function publishInstagramReel(
     video_url: params.videoUrl,
     caption: params.caption,
     share_to_feed: 'true',
+    ...(params.coverUrl ? { cover_url: params.coverUrl } : {}),
   });
   const containerId = String(container.id ?? '');
   if (!containerId) throw new Error('IG Reels container 建立失敗:回應缺少 ID');

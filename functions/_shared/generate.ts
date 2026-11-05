@@ -18,7 +18,7 @@ import {
   type GeneratedXPost, type EcosystemXAngle,
   type AudienceLane, type ImageStyleId,
 } from './prompts';
-import { buildMediaKey, decodeEmbeddedImage, getMediaBytes, isEmbeddedImageUrl, mediaUrlToKey, putMedia, storeEmbeddedImage } from './media';
+import { buildBrandLibraryKey, buildMediaKey, decodeEmbeddedImage, getMediaBytes, isEmbeddedImageUrl, mediaUrlToKey, putMedia, storeEmbeddedImage } from './media';
 import { compositeLogo } from './watermark';
 import { composeAssetOnBrandCard, frameScreenshotForIg } from './ig-frame';
 import { normalizeMultilineText } from './text';
@@ -87,6 +87,20 @@ function refreshInstagramCopy(
   return { post, igCraft: prepared.receipt };
 }
 
+/** 把素材原圖貼上品牌 logo，另存一張給貼文用。素材庫裡的原圖保持不動。 */
+export async function stampBrandLogo(env: Env, brandSlug: string, fileUrl: string): Promise<string | null> {
+  if (!env.MEDIA) return null;
+  const [bytes, logo] = await Promise.all([
+    loadAssetBytes(env, fileUrl),
+    loadBrandLogo(env, brandSlug),
+  ]);
+  if (!bytes || !logo) return null;
+  const position = brandSlug === 'homigo' ? 'bottom-left' : 'bottom-right';
+  const stamped = await compositeLogo(bytes, logo, { position });
+  const key = buildBrandLibraryKey(brandSlug, 'jpg');
+  return putMedia(env, key, stamped, 'image/jpeg');
+}
+
 /** 讀取品牌官方 logo(R2 brand-assets/{slug}/logo.png);沒有就回 null */
 async function getBrandLogo(env: Env, brandSlug: string): Promise<Uint8Array | null> {
   if (!env.MEDIA) return null;
@@ -94,6 +108,22 @@ async function getBrandLogo(env: Env, brandSlug: string): Promise<Uint8Array | n
     const obj = await env.MEDIA.get(`brand-assets/${brandSlug}/logo.png`);
     if (!obj) return null;
     return new Uint8Array(await obj.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+async function loadBrandLogo(env: Env, brandSlug: string): Promise<Uint8Array | null> {
+  const stored = await getBrandLogo(env, brandSlug);
+  if (stored) return stored;
+  try {
+    const sql = getSql(env);
+    const rows = await sql`SELECT logo_url FROM brands WHERE slug = ${brandSlug} LIMIT 1`;
+    const logoUrl = (rows[0] as { logo_url?: string | null } | undefined)?.logo_url;
+    if (!logoUrl) return null;
+    if (logoUrl.startsWith('/api/media/') || /^https?:\/\//i.test(logoUrl)) return loadAssetBytes(env, logoUrl);
+    const base = (env.PUBLIC_BASE_URL || 'https://go-marketing-center.pages.dev').replace(/\/$/, '');
+    return loadAssetBytes(env, `${base}${logoUrl.startsWith('/') ? '' : '/'}${logoUrl}`);
   } catch {
     return null;
   }

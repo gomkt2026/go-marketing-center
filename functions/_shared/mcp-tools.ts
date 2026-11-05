@@ -14,6 +14,7 @@ import {
   type EditorDraftCard,
   type EditorToolResult,
 } from './editor-agent';
+import { stampBrandLogo } from './generate';
 
 const PORTFOLIO = ['taskgo', 'homigo', 'washgo'] as const;
 const PLATFORMS = ['threads', 'facebook', 'instagram'] as const;
@@ -678,19 +679,36 @@ async function resolveRequestedMedia(
   return { ok: true, assets };
 }
 
-async function writeContentMedia(env: Env, versionId: string, asset: StoredMedia) {
+async function writeContentMedia(
+  env: Env,
+  versionId: string,
+  asset: StoredMedia,
+  brandSlug: string,
+): Promise<{ fileUrl: string; logoApplied: boolean }> {
+  let fileUrl = asset.fileUrl;
+  let logoApplied = false;
+  if (asset.assetType === 'image') {
+    const stamped = await stampBrandLogo(env, brandSlug, asset.fileUrl).catch((error) => {
+      console.error('[mcp] logo 合成失敗', error);
+      return null;
+    });
+    if (stamped) {
+      fileUrl = stamped;
+      logoApplied = true;
+    }
+  }
   const sql = getSql(env);
-  const meta = JSON.stringify({ source: 'mcp', brandAssetId: asset.id, name: asset.name });
+  const meta = JSON.stringify({ source: 'mcp', brandAssetId: asset.id, name: asset.name, logo: logoApplied });
   const updated = asset.assetType === 'video'
     ? await sql`
         UPDATE content_assets
-        SET file_url = ${asset.fileUrl}, metadata = ${meta}::jsonb
+        SET file_url = ${fileUrl}, metadata = ${meta}::jsonb
         WHERE content_version_id = ${versionId}::uuid AND asset_type = 'video'
         RETURNING id
       `
     : await sql`
         UPDATE content_assets
-        SET file_url = ${asset.fileUrl}, metadata = ${meta}::jsonb
+        SET file_url = ${fileUrl}, metadata = ${meta}::jsonb
         WHERE content_version_id = ${versionId}::uuid AND asset_type = 'image'
         RETURNING id
       `;
@@ -698,16 +716,33 @@ async function writeContentMedia(env: Env, versionId: string, asset: StoredMedia
     if (asset.assetType === 'video') {
       await sql`
         INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
-        VALUES (${versionId}::uuid, 'video', ${asset.fileUrl}, ${meta}::jsonb)
+        VALUES (${versionId}::uuid, 'video', ${fileUrl}, ${meta}::jsonb)
       `;
     } else {
       await sql`
         INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
-        VALUES (${versionId}::uuid, 'image', ${asset.fileUrl}, ${meta}::jsonb)
+        VALUES (${versionId}::uuid, 'image', ${fileUrl}, ${meta}::jsonb)
       `;
     }
   }
   await markAssetUsed(env, asset.id);
+  return { fileUrl, logoApplied };
+}
+
+function withLogoNote(summary: string, assets: StoredMedia[], logoApplied: boolean): string {
+  if (!assets.some((asset) => asset.assetType === 'image')) return summary;
+  return `${summary}${logoApplied ? '角落已加上品牌 logo。' : '這次沒有加上品牌 logo。'}`;
+}
+
+async function placeMedia(env: Env, versionId: string, assets: StoredMedia[], brandSlug: string) {
+  const placed: StoredMedia[] = [];
+  let logoApplied = false;
+  for (const asset of assets) {
+    const written = await writeContentMedia(env, versionId, asset, brandSlug);
+    if (written.logoApplied) logoApplied = true;
+    placed.push({ ...asset, fileUrl: written.fileUrl });
+  }
+  return { placed, logoApplied };
 }
 
 async function postsNamedInText(env: Env, brandId: string, blob: string): Promise<PostRow[]> {
@@ -1072,16 +1107,16 @@ export async function callMcpTool(
         payload: { error: resolved.error, choices: resolved.choices, recent: resolved.recent, post: postPreview(post, null) },
       };
     }
-    for (const asset of resolved.assets) await writeContentMedia(env, versionId, asset);
-    const image = resolved.assets.find((asset) => asset.assetType === 'image');
-    const video = resolved.assets.find((asset) => asset.assetType === 'video');
+    const placed = await placeMedia(env, versionId, resolved.assets, brand.slug);
+    const image = placed.placed.find((asset) => asset.assetType === 'image');
+    const video = placed.placed.find((asset) => asset.assetType === 'video');
     return {
       ok: true,
       brandSlug: brand.slug,
       payload: {
-        summary: mediaSummary(post.title || '這篇貼文', resolved.assets, false),
+        summary: withLogoNote(mediaSummary(post.title || '這篇貼文', resolved.assets, false), resolved.assets, placed.logoApplied),
         post: postPreview(post, image?.fileUrl ?? null, video?.fileUrl ?? null),
-        assets: resolved.assets.map((asset) => ({ id: asset.id, name: asset.name, fileUrl: asset.fileUrl, assetType: asset.assetType })),
+        assets: placed.placed.map((asset) => ({ id: asset.id, name: asset.name, fileUrl: asset.fileUrl, assetType: asset.assetType })),
       },
     };
   }
@@ -1149,14 +1184,14 @@ export async function callMcpTool(
             },
           };
         }
-        for (const asset of resolved.assets) await writeContentMedia(env, versionId, asset);
-        const image = resolved.assets.find((asset) => asset.assetType === 'image');
-        const video = resolved.assets.find((asset) => asset.assetType === 'video');
+        const placed = await placeMedia(env, versionId, resolved.assets, brand.slug);
+        const image = placed.placed.find((asset) => asset.assetType === 'image');
+        const video = placed.placed.find((asset) => asset.assetType === 'video');
         return {
           ok: true,
           brandSlug: brand.slug,
           payload: {
-            summary: mediaSummary(post.title || '這篇貼文', resolved.assets, false),
+            summary: withLogoNote(mediaSummary(post.title || '這篇貼文', resolved.assets, false), resolved.assets, placed.logoApplied),
             created: false,
             post: postPreview(post, image?.fileUrl ?? null, video?.fileUrl ?? null),
           },
@@ -1176,10 +1211,10 @@ export async function callMcpTool(
     if (drafted.ok && versionId && (mediaArgsPresent(args) || MEDIA_HINT.test(instruction))) {
       const resolved = await resolveRequestedMedia(env, user, brand, args, blob);
       if (resolved.ok) {
-        for (const asset of resolved.assets) await writeContentMedia(env, versionId, asset);
-        const image = resolved.assets.find((asset) => asset.assetType === 'image');
+        const placed = await placeMedia(env, versionId, resolved.assets, brand.slug);
+        const image = placed.placed.find((asset) => asset.assetType === 'image');
         if (drafted.draft && image) drafted.draft.imageUrl = image.fileUrl;
-        summary = mediaSummary(drafted.draft?.title || topic, resolved.assets, true);
+        summary = withLogoNote(mediaSummary(drafted.draft?.title || topic, resolved.assets, true), resolved.assets, placed.logoApplied);
       } else {
         summary = `已產待審稿「${drafted.draft?.title || topic}」，contentId=${drafted.draft?.contentId}。${resolved.error} 請呼叫 attach_post_media。不要請使用者到行銷中心手動加，也不要再另開一篇。`;
       }
@@ -1250,10 +1285,10 @@ export async function callMcpTool(
       const blob = [topic, instruction, text(args.asset_name, 120), text(args.video_asset_name, 120)].filter(Boolean).join('\n');
       const resolved = await resolveRequestedMedia(env, user, brand, args, blob);
       if (resolved.ok) {
-        for (const asset of resolved.assets) await writeContentMedia(env, versionId, asset);
-        const image = resolved.assets.find((asset) => asset.assetType === 'image');
+        const placed = await placeMedia(env, versionId, resolved.assets, brand.slug);
+        const image = placed.placed.find((asset) => asset.assetType === 'image');
         if (scheduled.draft && image) scheduled.draft.imageUrl = image.fileUrl;
-        summary = `${scheduled.summary} ${mediaSummary(scheduled.draft?.title || topic || '這篇', resolved.assets, false)}`;
+        summary = withLogoNote(`${scheduled.summary} ${mediaSummary(scheduled.draft?.title || topic || '這篇', resolved.assets, false)}`, resolved.assets, placed.logoApplied);
       } else {
         summary = `${scheduled.summary} ${resolved.error} 請再呼叫 attach_post_media。不要說系統不能配圖。`;
       }

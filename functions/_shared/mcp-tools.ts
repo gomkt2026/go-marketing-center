@@ -5,7 +5,7 @@ import { getSql } from './db';
 import { getBrandBySlug, getBrandsForUser } from './queries';
 import { getBrandVoice } from './prompts';
 import { hashToken } from './mcp-auth';
-import { ensureBrandAssetLibrary } from './brand-assets';
+import { ensureBrandAssetLibrary, markAssetUsed } from './brand-assets';
 import { buildBrandLibraryKey, putMedia } from './media';
 import {
   executeEditorTool,
@@ -41,7 +41,7 @@ const VIDEO_MIME: Record<string, string> = {
   'video/quicktime': 'mov',
 };
 
-const WRITE_TOOLS = new Set(['save_image_asset', 'create_video_upload', 'draft_post', 'schedule_post']);
+const WRITE_TOOLS = new Set(['save_image_asset', 'create_video_upload', 'draft_post', 'schedule_post', 'attach_post_image']);
 
 export const MCP_TOOLS = [
   {
@@ -51,7 +51,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'get_brand_context',
-    description: '讀單一品牌的語氣、小編人設、待審稿、未來行程與近期素材。討論「接下來發什麼」時先呼叫這支。',
+    description: '讀單一品牌的語氣、小編人設、待審稿、未來行程與近期素材。行程列有 contentId、內文與 imageUrl。討論「接下來發什麼」時先呼叫這支。',
     inputSchema: {
       type: 'object',
       properties: {
@@ -104,6 +104,25 @@ export const MCP_TOOLS = [
         usage_context: { type: 'string', description: '這張圖適合用在什麼貼文' },
       },
       required: ['brand', 'name', 'image_base64'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'attach_post_image',
+    description: '把素材庫的圖，或使用者剛傳的圖，掛到一篇已經存在的貼文（含已排程）。不改內文、不改排程時間、不另開新稿。使用者說「用這張圖當配圖」時用這支。回傳全文與配圖網址。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        brand: { type: 'string' },
+        content_id: { type: 'string', description: '貼文 id。行程列的 contentId，或該則發布單 id。' },
+        title: { type: 'string', description: '貼文標題關鍵字，例如 101工班排程互動題。沒有 content_id 時用這個找。' },
+        asset_id: { type: 'string', description: '素材庫圖片 id' },
+        asset_name: { type: 'string', description: '素材名稱關鍵字，例如 台北101夜景仰拍' },
+        image_base64: { type: 'string', description: '使用者剛傳的圖。有這欄就先存進素材庫再掛上。' },
+        mime_type: { type: 'string' },
+        name: { type: 'string', description: '新圖片存進素材庫時的名稱' },
+      },
+      required: ['brand'],
       additionalProperties: false,
     },
   },
@@ -206,11 +225,13 @@ function compactContext(context: EditorDeskContext) {
   return {
     schedule: context.schedule.slice(0, 12).map((item) => ({
       id: item.id,
+      contentId: item.contentId,
       title: item.title,
       platform: item.platform,
       status: item.status,
       scheduledAt: item.scheduledAt,
-      body: clip(item.body, 180),
+      body: clip(item.body, 500),
+      imageUrl: safeUrl(item.imageUrl),
     })),
     queue: context.queue.slice(0, 12).map((item) => ({
       id: item.id,
@@ -221,6 +242,7 @@ function compactContext(context: EditorDeskContext) {
     })),
     assets: context.assets.slice(0, 12).map((item) => ({
       id: item.id,
+      name: item.name,
       caption: item.caption,
       fileUrl: safeUrl(item.fileUrl),
     })),
@@ -339,6 +361,146 @@ async function runEditor(
   });
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
+function likeQuery(value: string): string {
+  return `%${value.replace(/[%_\\]/g, '')}%`;
+}
+
+interface LibraryAsset {
+  id: string;
+  name: string;
+  fileUrl: string;
+}
+
+async function saveLibraryImage(
+  env: Env,
+  user: AuthUser,
+  brand: { id: string; slug: string; name: string },
+  args: Record<string, unknown>,
+): Promise<{ ok: true; asset: LibraryAsset } | { ok: false; error: string }> {
+  if (!env.MEDIA) return { ok: false, error: '素材庫儲存還沒接上' };
+  if (typeof args.image_base64 !== 'string' || args.image_base64.length > 12_000_000) {
+    return { ok: false, error: args.image_base64 ? '圖片請壓在 8MB 以內' : '缺少圖片內容' };
+  }
+  const encoded = args.image_base64.trim();
+  if (!encoded) return { ok: false, error: '缺少圖片內容' };
+  let bytes: Uint8Array;
+  try {
+    bytes = decodeBase64(encoded);
+  } catch {
+    return { ok: false, error: '圖片不是有效的 base64' };
+  }
+  if (!bytes.length) return { ok: false, error: '圖片是空的' };
+  if (bytes.length > IMAGE_MAX) return { ok: false, error: '圖片請壓在 8MB 以內' };
+  const sniffed = sniffImage(bytes, text(args.mime_type, 40).toLowerCase());
+  if (!sniffed) return { ok: false, error: '只收 jpg、png、webp、gif' };
+  const assetName = text(args.name, 80) || '素材圖片';
+  const caption = text(args.caption, 300) || null;
+  const usageContext = text(args.usage_context, 300) || null;
+  const key = buildBrandLibraryKey(brand.slug, sniffed.ext);
+  const fileUrl = await putMedia(env, key, bytes, sniffed.mime);
+  await ensureBrandAssetLibrary(env).catch(() => undefined);
+  const sql = getSql(env);
+  const rows = await sql`
+    INSERT INTO brand_assets (
+      brand_id, asset_type, name, file_url, caption, usage_context, asset_status, uploaded_by
+    )
+    VALUES (
+      ${brand.id}::uuid, 'image', ${assetName}, ${fileUrl}, ${caption}, ${usageContext},
+      'active', ${user.id}::uuid
+    )
+    RETURNING id, name, file_url
+  `;
+  const saved = rows[0] as { id: string; name: string; file_url: string };
+  return { ok: true, asset: { id: saved.id, name: saved.name, fileUrl: saved.file_url } };
+}
+
+interface PostRow {
+  content_id: string;
+  title: string | null;
+  status: string;
+  platform: string | null;
+  version_id: string | null;
+  body: string | null;
+  job_version_id: string | null;
+  scheduled_at: string | null;
+}
+
+async function findPostsForImage(
+  env: Env,
+  brandId: string,
+  contentId: string,
+  title: string,
+): Promise<PostRow[]> {
+  const sql = getSql(env);
+  if (contentId && isUuid(contentId)) {
+    return await sql`
+      SELECT c.id AS content_id, c.title, c.status::text AS status, c.target_platform::text AS platform,
+             cv.id AS version_id, cv.body,
+             pj.content_version_id AS job_version_id, pj.scheduled_at
+      FROM contents c
+      LEFT JOIN LATERAL (
+        SELECT id, body FROM content_versions WHERE content_id = c.id ORDER BY version_number DESC LIMIT 1
+      ) cv ON true
+      LEFT JOIN LATERAL (
+        SELECT content_version_id, scheduled_at
+        FROM publishing_jobs
+        WHERE content_id = c.id AND status IN ('queued', 'scheduled', 'publishing')
+        ORDER BY scheduled_at ASC NULLS LAST
+        LIMIT 1
+      ) pj ON true
+      WHERE c.brand_id = ${brandId}::uuid
+        AND (
+          c.id = ${contentId}::uuid
+          OR EXISTS (
+            SELECT 1 FROM publishing_jobs j
+            WHERE j.id = ${contentId}::uuid AND j.content_id = c.id
+          )
+        )
+      LIMIT 8
+    ` as PostRow[];
+  }
+  if (!title) return [];
+  return await sql`
+    SELECT c.id AS content_id, c.title, c.status::text AS status, c.target_platform::text AS platform,
+           cv.id AS version_id, cv.body,
+           pj.content_version_id AS job_version_id, pj.scheduled_at
+    FROM contents c
+    LEFT JOIN LATERAL (
+      SELECT id, body FROM content_versions WHERE content_id = c.id ORDER BY version_number DESC LIMIT 1
+    ) cv ON true
+    LEFT JOIN LATERAL (
+      SELECT content_version_id, scheduled_at
+      FROM publishing_jobs
+      WHERE content_id = c.id AND status IN ('queued', 'scheduled', 'publishing')
+      ORDER BY scheduled_at ASC NULLS LAST
+      LIMIT 1
+    ) pj ON true
+    WHERE c.brand_id = ${brandId}::uuid
+      AND c.status NOT IN ('archived', 'rejected', 'published')
+      AND c.title ILIKE ${likeQuery(title)}
+    ORDER BY CASE WHEN c.status = 'scheduled' THEN 0 ELSE 1 END, c.updated_at DESC
+    LIMIT 8
+  ` as PostRow[];
+}
+
+function postPreview(row: PostRow, imageUrl: string | null) {
+  return {
+    contentId: row.content_id,
+    title: row.title,
+    status: row.status,
+    platform: row.platform,
+    scheduledAt: row.scheduled_at,
+    body: clip(row.body, 2000),
+    imageUrl: safeUrl(imageUrl),
+  };
+}
+
 export async function callMcpTool(
   env: Env,
   user: AuthUser,
@@ -403,18 +565,32 @@ export async function callMcpTool(
         GROUP BY b.slug
       `,
       sql`
-        SELECT b.slug, c.title, c.target_platform::text AS platform
+        SELECT b.slug, c.id AS content_id, c.title, c.target_platform::text AS platform,
+               left(coalesce(v.body, ''), 220) AS body
         FROM contents c
         JOIN brands b ON b.id = c.brand_id
+        LEFT JOIN LATERAL (
+          SELECT body FROM content_versions WHERE content_id = c.id ORDER BY version_number DESC LIMIT 1
+        ) v ON true
         WHERE b.slug IN ('taskgo', 'homigo', 'washgo') AND c.status = 'pending_review'
         ORDER BY c.updated_at DESC
         LIMIT 40
       `,
       sql`
-        SELECT b.slug, coalesce(c.title, '未命名') AS title, pj.platform::text AS platform, pj.scheduled_at
+        SELECT b.slug, c.id AS content_id, coalesce(c.title, '未命名') AS title,
+               pj.platform::text AS platform, pj.scheduled_at,
+               left(coalesce(cv.body, ''), 220) AS body,
+               a.file_url AS image_url
         FROM publishing_jobs pj
         JOIN contents c ON c.id = pj.content_id
         JOIN brands b ON b.id = c.brand_id
+        LEFT JOIN content_versions cv ON cv.id = pj.content_version_id
+        LEFT JOIN LATERAL (
+          SELECT file_url FROM content_assets
+          WHERE content_version_id = cv.id AND asset_type = 'image'
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) a ON true
         WHERE pj.status IN ('queued', 'scheduled', 'publishing')
           AND b.slug IN ('taskgo', 'homigo', 'washgo')
         ORDER BY pj.scheduled_at ASC NULLS LAST
@@ -423,17 +599,24 @@ export async function callMcpTool(
     ]);
     const allowed = new Set(slugs);
     const stats = (statRows as Record<string, unknown>[]).filter((row) => allowed.has(String(row.slug) as typeof slugs[number]));
-    const pendingBySlug = new Map<string, { title: string | null; platform: string | null }[]>();
-    for (const row of pendingRows as { slug: string; title: string | null; platform: string | null }[]) {
+    const pendingBySlug = new Map<string, { contentId: string; title: string | null; platform: string | null; body: string | null }[]>();
+    for (const row of pendingRows as { slug: string; content_id: string; title: string | null; platform: string | null; body: string | null }[]) {
       if (!allowed.has(row.slug as typeof slugs[number])) continue;
       const list = pendingBySlug.get(row.slug) ?? [];
-      if (list.length < 5) list.push({ title: row.title, platform: row.platform });
+      if (list.length < 5) list.push({ contentId: row.content_id, title: row.title, platform: row.platform, body: row.body || null });
       pendingBySlug.set(row.slug, list);
     }
-    const nextBySlug = new Map<string, { title: string; platform: string; scheduledAt: string | null }>();
-    for (const row of nextRows as { slug: string; title: string; platform: string; scheduled_at: string | null }[]) {
+    const nextBySlug = new Map<string, { contentId: string; title: string; platform: string; scheduledAt: string | null; body: string | null; imageUrl: string | null }>();
+    for (const row of nextRows as { slug: string; content_id: string; title: string; platform: string; scheduled_at: string | null; body: string | null; image_url: string | null }[]) {
       if (!allowed.has(row.slug as typeof slugs[number]) || nextBySlug.has(row.slug)) continue;
-      nextBySlug.set(row.slug, { title: row.title, platform: row.platform, scheduledAt: row.scheduled_at });
+      nextBySlug.set(row.slug, {
+        contentId: row.content_id,
+        title: row.title,
+        platform: row.platform,
+        scheduledAt: row.scheduled_at,
+        body: row.body || null,
+        imageUrl: safeUrl(row.image_url),
+      });
     }
     return {
       ok: true,
@@ -581,46 +764,119 @@ export async function callMcpTool(
   }
 
   if (name === 'save_image_asset') {
-    if (!env.MEDIA) return { ok: false, brandSlug: brand.slug, payload: { error: '素材庫儲存還沒接上' } };
-    if (typeof args.image_base64 !== 'string' || args.image_base64.length > 12_000_000) {
-      return { ok: false, brandSlug: brand.slug, payload: { error: args.image_base64 ? '圖片請壓在 8MB 以內' : '缺少圖片內容' } };
-    }
-    const encoded = args.image_base64.trim();
-    if (!encoded) return { ok: false, brandSlug: brand.slug, payload: { error: '缺少圖片內容' } };
-    let bytes: Uint8Array;
-    try {
-      bytes = decodeBase64(encoded);
-    } catch {
-      return { ok: false, brandSlug: brand.slug, payload: { error: '圖片不是有效的 base64' } };
-    }
-    if (!bytes.length) return { ok: false, brandSlug: brand.slug, payload: { error: '圖片是空的' } };
-    if (bytes.length > IMAGE_MAX) return { ok: false, brandSlug: brand.slug, payload: { error: '圖片請壓在 8MB 以內' } };
-    const sniffed = sniffImage(bytes, text(args.mime_type, 40).toLowerCase());
-    if (!sniffed) return { ok: false, brandSlug: brand.slug, payload: { error: '只收 jpg、png、webp、gif' } };
-    const assetName = text(args.name, 80) || '素材圖片';
-    const caption = text(args.caption, 300) || null;
-    const usageContext = text(args.usage_context, 300) || null;
-    const key = buildBrandLibraryKey(brand.slug, sniffed.ext);
-    const fileUrl = await putMedia(env, key, bytes, sniffed.mime);
-    await ensureBrandAssetLibrary(env).catch(() => undefined);
-    const sql = getSql(env);
-    const rows = await sql`
-      INSERT INTO brand_assets (
-        brand_id, asset_type, name, file_url, caption, usage_context, asset_status, uploaded_by
-      )
-      VALUES (
-        ${brand.id}::uuid, 'image', ${assetName}, ${fileUrl}, ${caption}, ${usageContext},
-        'active', ${user.id}::uuid
-      )
-      RETURNING id, name, file_url
-    `;
-    const saved = rows[0] as { id: string; name: string; file_url: string };
+    const saved = await saveLibraryImage(env, user, brand, args);
+    if (!saved.ok) return { ok: false, brandSlug: brand.slug, payload: { error: saved.error } };
     return {
       ok: true,
       brandSlug: brand.slug,
       payload: {
-        summary: `已把「${saved.name}」存進 ${brand.name} 素材庫。`,
-        asset: { id: saved.id, name: saved.name, fileUrl: saved.file_url, assetType: 'image' },
+        summary: `已把「${saved.asset.name}」存進 ${brand.name} 素材庫。`,
+        asset: { ...saved.asset, assetType: 'image' },
+      },
+    };
+  }
+
+  if (name === 'attach_post_image') {
+    const contentId = text(args.content_id, 80);
+    const title = text(args.title, 120);
+    const assetId = text(args.asset_id, 80);
+    const assetName = text(args.asset_name, 120);
+    const hasUpload = typeof args.image_base64 === 'string' && args.image_base64.trim().length > 0;
+    if (!contentId && !title) {
+      return { ok: false, brandSlug: brand.slug, payload: { error: '要給 content_id 或貼文標題 title' } };
+    }
+    if (!hasUpload && !assetId && !assetName) {
+      return { ok: false, brandSlug: brand.slug, payload: { error: '要給素材 asset_id、asset_name，或 image_base64' } };
+    }
+    const posts = await findPostsForImage(env, brand.id, contentId, title);
+    if (!posts.length) {
+      return { ok: false, brandSlug: brand.slug, payload: { error: '找不到這篇貼文。請用行程裡的 contentId，或更完整的標題。' } };
+    }
+    if (posts.length > 1) {
+      return {
+        ok: false,
+        brandSlug: brand.slug,
+        payload: {
+          error: '找到不只一篇，請改用 contentId 再掛一次。內文都在下面，還沒有改配圖。',
+          posts: posts.map((row) => postPreview(row, null)),
+        },
+      };
+    }
+    const post = posts[0];
+    const versionId = post.job_version_id || post.version_id;
+    if (!versionId) {
+      return { ok: false, brandSlug: brand.slug, payload: { error: '這篇還沒有內文版本，沒有掛圖。', post: postPreview(post, null) } };
+    }
+
+    let asset: LibraryAsset;
+    if (hasUpload) {
+      const saved = await saveLibraryImage(env, user, brand, {
+        ...args,
+        name: text(args.name, 80) || assetName || title || '素材圖片',
+      });
+      if (!saved.ok) return { ok: false, brandSlug: brand.slug, payload: { error: saved.error } };
+      asset = saved.asset;
+    } else {
+      const sql = getSql(env);
+      const rows = assetId && isUuid(assetId)
+        ? await sql`
+            SELECT id, name, file_url FROM brand_assets
+            WHERE id = ${assetId}::uuid AND brand_id = ${brand.id}::uuid
+              AND asset_type = 'image' AND asset_status = 'active'
+            LIMIT 1
+          `
+        : await sql`
+            SELECT id, name, file_url FROM brand_assets
+            WHERE brand_id = ${brand.id}::uuid
+              AND asset_type = 'image' AND asset_status = 'active'
+              AND (name ILIKE ${likeQuery(assetName)} OR coalesce(caption, '') ILIKE ${likeQuery(assetName)})
+            ORDER BY created_at DESC
+            LIMIT 8
+          `;
+      const found = rows as { id: string; name: string; file_url: string | null }[];
+      if (!found.length) {
+        return { ok: false, brandSlug: brand.slug, payload: { error: '素材庫找不到這張圖。請用素材名稱，或直接傳 image_base64。' } };
+      }
+      if (found.length > 1) {
+        return {
+          ok: false,
+          brandSlug: brand.slug,
+          payload: {
+            error: '素材庫有多張符合，請改用 asset_id。',
+            assets: found.map((item) => ({ id: item.id, name: item.name, fileUrl: safeUrl(item.file_url) })),
+            post: postPreview(post, null),
+          },
+        };
+      }
+      if (!found[0].file_url || found[0].file_url.startsWith('data:')) {
+        return { ok: false, brandSlug: brand.slug, payload: { error: '這張素材沒有可發的圖片檔，請重新上傳。' } };
+      }
+      asset = { id: found[0].id, name: found[0].name, fileUrl: found[0].file_url };
+    }
+
+    const sql = getSql(env);
+    const meta = JSON.stringify({ source: 'mcp', brandAssetId: asset.id, name: asset.name });
+    const updated = await sql`
+      UPDATE content_assets
+      SET file_url = ${asset.fileUrl}, metadata = ${meta}::jsonb
+      WHERE content_version_id = ${versionId}::uuid AND asset_type = 'image'
+      RETURNING id
+    `;
+    if (!updated.length) {
+      await sql`
+        INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
+        VALUES (${versionId}::uuid, 'image', ${asset.fileUrl}, ${meta}::jsonb)
+      `;
+    }
+    await markAssetUsed(env, asset.id);
+    const titleLabel = post.title || '這篇貼文';
+    return {
+      ok: true,
+      brandSlug: brand.slug,
+      payload: {
+        summary: `已把「${asset.name}」掛到「${titleLabel}」。內文和排程時間都沒改。`,
+        post: postPreview(post, asset.fileUrl),
+        asset: { id: asset.id, name: asset.name, fileUrl: asset.fileUrl },
       },
     };
   }

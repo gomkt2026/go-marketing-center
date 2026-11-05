@@ -59,9 +59,9 @@ export interface EditorDeskContext {
   }>;
   pressReleases: Array<{ id: string; title: string; status: string; updatedAt?: string }>;
   documents: Array<{ id: string; title: string; sourceType: string }>;
-  assets: Array<{ id: string; caption: string | null; fileUrl: string | null }>;
+  assets: Array<{ id: string; name: string | null; caption: string | null; fileUrl: string | null }>;
   schedule: Array<{
-    id: string; title: string | null; platform: string; status: string;
+    id: string; contentId: string; title: string | null; platform: string; status: string;
     scheduledAt: string | null; body: string | null; imageUrl: string | null;
   }>;
   queue: Array<{
@@ -265,18 +265,19 @@ export async function loadEditorContext(env: Env, brandId: string): Promise<Edit
   ]);
   const [assets, schedule, queue] = await Promise.all([
     sql`
-      SELECT id, caption, file_url FROM brand_assets
+      SELECT id, name, caption, file_url FROM brand_assets
       WHERE brand_id = ${brandId}::uuid AND asset_type = 'image'
       ORDER BY created_at DESC LIMIT 8
     `.catch(() => []),
     sql`
-      SELECT pj.id, c.title, pj.platform, pj.status, pj.scheduled_at, v.body, a.file_url AS image_url
+      SELECT pj.id, c.id AS content_id, c.title, pj.platform, pj.status, pj.scheduled_at, v.body, a.file_url AS image_url
       FROM publishing_jobs pj
       JOIN contents c ON c.id = pj.content_id
       LEFT JOIN content_versions v ON v.id = pj.content_version_id
       LEFT JOIN LATERAL (
         SELECT file_url FROM content_assets
-        WHERE content_version_id = v.id AND asset_type = 'image' LIMIT 1
+        WHERE content_version_id = v.id AND asset_type = 'image'
+        ORDER BY created_at DESC LIMIT 1
       ) a ON true
       WHERE c.brand_id = ${brandId}::uuid
         AND coalesce(pj.scheduled_at, pj.published_at, pj.created_at) >= now() - interval '3 days'
@@ -322,11 +323,13 @@ export async function loadEditorContext(env: Env, brandId: string): Promise<Edit
     }),
     assets: (assets as Record<string, unknown>[]).map((r) => ({
       id: r.id as string,
+      name: (r.name as string | null) ?? null,
       caption: (r.caption as string | null) ?? null,
       fileUrl: (r.file_url as string | null) ?? null,
     })),
     schedule: (schedule as Record<string, unknown>[]).map((r) => ({
       id: r.id as string,
+      contentId: r.content_id as string,
       title: (r.title as string | null) ?? null,
       platform: r.platform as string,
       status: r.status as string,
@@ -602,10 +605,10 @@ export async function executeEditorTool(
       };
     }
 
-    let scheduledAt = args.scheduledAt ? new Date(args.scheduledAt) : suggestScheduleAt();
-    if (Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() < Date.now() + 15 * 60 * 1000) {
-      scheduledAt = suggestScheduleAt();
-    }
+    const requestedAt = args.scheduledAt ? new Date(args.scheduledAt) : null;
+    const requestedOk = Boolean(
+      requestedAt && !Number.isNaN(requestedAt.getTime()) && requestedAt.getTime() >= Date.now() + 15 * 60 * 1000,
+    );
 
     const existing = await sql`
       SELECT id FROM contents WHERE id = ${contentId}::uuid AND brand_id = ${brandId}::uuid LIMIT 1
@@ -613,17 +616,45 @@ export async function executeEditorTool(
     if (!existing.length) return { ok: false, tool: 'schedule_post', summary: '找不到這篇稿' };
 
     await sql`UPDATE contents SET status = 'scheduled', updated_at = now() WHERE id = ${contentId}::uuid`;
-    await sql`
-      INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
-      VALUES (
-        ${contentId}::uuid, ${contentVersionId}::uuid, ${platform}, 'scheduled', ${scheduledAt.toISOString()}
-      )
+    const openJob = await sql`
+      SELECT id, scheduled_at FROM publishing_jobs
+      WHERE content_id = ${contentId}::uuid
+        AND platform = ${platform}
+        AND status IN ('queued', 'scheduled')
+      ORDER BY created_at DESC
+      LIMIT 1
     `;
+    const keptAt = openJob.length ? new Date((openJob[0] as { scheduled_at: string }).scheduled_at) : null;
+    let scheduledAt = requestedOk && requestedAt
+      ? requestedAt
+      : (keptAt && !Number.isNaN(keptAt.getTime()) ? keptAt : suggestScheduleAt());
+    if (!openJob.length && scheduledAt.getTime() < Date.now() + 15 * 60 * 1000) {
+      scheduledAt = suggestScheduleAt();
+    }
+    if (openJob.length) {
+      await sql`
+        UPDATE publishing_jobs
+        SET content_version_id = ${contentVersionId}::uuid,
+            scheduled_at = ${scheduledAt.toISOString()},
+            status = 'scheduled'
+        WHERE id = ${(openJob[0] as { id: string }).id}::uuid
+      `;
+    } else {
+      await sql`
+        INSERT INTO publishing_jobs (content_id, content_version_id, platform, status, scheduled_at)
+        VALUES (
+          ${contentId}::uuid, ${contentVersionId}::uuid, ${platform}, 'scheduled', ${scheduledAt.toISOString()}
+        )
+      `;
+    }
     const when = scheduledAt.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const summary = openJob.length
+      ? `這篇本來就在行程上，時間是 ${platform} ${when}，沒有再開一張發布單。`
+      : `會注意時段～已排 ${platform} ${when} 發。到點會發出,要改時間跟我說。`;
     return {
       ok: true,
       tool: 'schedule_post',
-      summary: `會注意時段～已排 ${platform} ${when} 發。到點會發出,要改時間跟我說。`,
+      summary,
       draft: draft
         ? { ...draft, status: 'scheduled', scheduledAt: scheduledAt.toISOString() }
         : {

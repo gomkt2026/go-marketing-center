@@ -77,7 +77,7 @@ function singleBrandPrompt(brand: { name: string; slug: string } | null) {
     `加入這個 MCP 伺服器：${mcpUrl()}`,
     '請用標頭 x-api-key 帶我的 Go Marketing API Key。連線後用繁體中文，只根據 Go Marketing 資料回答，不要編造數字。',
     focus,
-    '可查接下來要發的行程、發文成效、市場情報，也可以討論想法。我傳圖片時，呼叫 save_image_asset 存進這個品牌的素材庫；影片先呼叫 create_video_upload 拿上傳網址。',
+    '可查接下來要發的行程、發文成效、市場情報，也可以討論想法。我傳圖片時，呼叫 save_image_asset 存進這個品牌的素材庫；要掛到已經排好的貼文，呼叫 attach_post_image。影片先呼叫 create_video_upload 拿上傳網址。',
     '只有我明確說要發或排程時，才可以呼叫 schedule_post 且 mode 設為 publish。沒說發之前，最多產待審草稿。',
   ].join('\n');
 }
@@ -87,7 +87,7 @@ function portfolioPrompt() {
     `加入這個 MCP 伺服器：${mcpUrl()}`,
     '請用標頭 x-api-key 帶我的 Go Marketing API Key。連線後用繁體中文，只根據 Go Marketing 資料回答，不要編造數字。',
     '你是 TaskGo、Homigo、Washgo 的總和助理。用 get_portfolio 看三個品牌的行程、待審、近 7 日成效與下一檔。和居家居不在這份總覽裡。',
-    '寫入、產稿、存素材時必須指名 brand，只能是 taskgo、homigo 或 washgo。',
+    '寫入、產稿、存素材時必須指名 brand，只能是 taskgo、homigo 或 washgo。把圖掛到已排好的貼文用 attach_post_image。',
     '只有我明確說要發或排程，而且指名品牌時，才可以呼叫 schedule_post 且 mode 設為 publish。',
   ].join('\n');
 }

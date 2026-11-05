@@ -597,11 +597,35 @@ export async function executeEditorTool(
     }
 
     if (mode === 'review') {
+      const owned = await sql`
+        SELECT id, title, status::text AS status FROM contents
+        WHERE id = ${contentId}::uuid AND brand_id = ${brandId}::uuid
+        LIMIT 1
+      `;
+      if (!owned.length) return { ok: false, tool: 'schedule_post', summary: '找不到這篇稿' };
+      const row = owned[0] as { id: string; title: string | null; status: string };
+      const cancelled = await sql`
+        UPDATE publishing_jobs
+        SET status = 'cancelled', updated_at = now()
+        WHERE content_id = ${contentId}::uuid AND status IN ('queued', 'scheduled')
+        RETURNING id
+      `;
+      if (row.status === 'scheduled' || cancelled.length) {
+        await sql`
+          UPDATE contents SET status = 'pending_review', updated_at = now()
+          WHERE id = ${contentId}::uuid AND status = 'scheduled'
+        `;
+      }
+      const summary = cancelled.length
+        ? `「${row.title || '這篇'}」已從行程拿下，改回待審，到點不會發。`
+        : '先放待審，沒有排發布。你想改或要我排進行程再說一聲。';
       return {
         ok: true,
         tool: 'schedule_post',
-        summary: '先放待審,沒有排發布。你想改或要我排進行程再說一聲。',
-        draft: draft ? { ...draft, status: 'pending_review' } : undefined,
+        summary,
+        draft: draft
+          ? { ...draft, title: row.title || draft.title, status: 'pending_review', scheduledAt: null }
+          : undefined,
       };
     }
 

@@ -177,6 +177,10 @@ export function requireBrandAccess(user: AuthUser, brandId: string): true | Resp
   return forbidden();
 }
 
+export function getAuthUserById(env: Env, userId: string): Promise<AuthUser | null> {
+  return loadUserRowById(env, userId);
+}
+
 export async function getAuthUser(request: Request, env: Env): Promise<AuthUser | null> {
   const token = getSessionTokenFromRequest(request);
   if (!token) return null;

@@ -79,6 +79,19 @@ export function Settings() {
           </Link>
         </div>
       </Card>
+      <Card style={{ marginBottom: 16, borderLeft: '4px solid var(--color-primary)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div>
+            <strong style={{ fontSize: 14 }}>AI 連接器</strong>
+            <p style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 6, lineHeight: 1.7 }}>
+              產生金鑰後，Claude、Grok、ChatGPT、Gemini 可以查行程、成效，把圖片存進素材庫，也可以在你明確說發的時候排程。
+            </p>
+          </div>
+          <Link to="/settings/mcp">
+            <Button variant="secondary">打開連接器</Button>
+          </Link>
+        </div>
+      </Card>
       <Card style={{ padding: 0, marginBottom: 16 }}>
         <div style={{ padding: '4px 16px 0' }}>
           <Tabs tabs={tabs} active={tab} onChange={setTab} />

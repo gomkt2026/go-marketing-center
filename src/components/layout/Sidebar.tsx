@@ -95,6 +95,7 @@ const otherGroups: OtherGroup[] = [
       { label: '小編人設', path: '/personas', hideFor: ['bbbox'] },
       { label: 'Threads 申請手冊', path: '/settings/meta-threads' },
       { label: '匠城遊戲', path: '/settings/game', hideFor: ['bbbox'] },
+      { label: 'AI 連接器', path: '/settings/mcp' },
       { label: '設定', path: '/settings', end: true },
     ],
   },

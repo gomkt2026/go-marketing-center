@@ -36,6 +36,7 @@ const Analytics = lazyPage(() => import('@/pages/analytics/Analytics'), 'Analyti
 const Learning = lazyPage(() => import('@/pages/learning/Learning'), 'Learning');
 const Timeline = lazyPage(() => import('@/pages/timeline/Timeline'), 'Timeline');
 const Settings = lazyPage(() => import('@/pages/settings/Settings'), 'Settings');
+const McpConnect = lazyPage(() => import('@/pages/settings/McpConnect'), 'McpConnect');
 const MetaThreadsPlaybook = lazyPage(() => import('@/pages/settings/MetaThreadsPlaybook'), 'MetaThreadsPlaybook');
 const SocialAccounts = lazyPage(() => import('@/pages/settings/SocialAccounts'), 'SocialAccounts');
 const AgentPersonas = lazyPage(() => import('@/pages/settings/AgentPersonas'), 'AgentPersonas');
@@ -135,6 +136,7 @@ function AppRoutes() {
 
         <Route path="/timeline" element={<Timeline />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/mcp" element={<McpConnect />} />
         <Route path="/settings/meta-threads" element={<MetaThreadsPlaybook />} />
         <Route path="/settings/game" element={<GameSeasons />} />
         <Route path="/inquiries" element={<Inquiries />} />

@@ -636,6 +636,18 @@ export const api = {
       body: JSON.stringify({ slots }),
     }),
 
+  mcpKeys: () =>
+    request<{ keys: { id: string; name: string; keyPrefix: string; lastUsedAt: string | null; revokedAt: string | null; createdAt: string }[] }>('/api/settings/mcp-keys'),
+
+  createMcpKey: (name: string) =>
+    request<{ token: string; key: { id: string; name: string; keyPrefix: string; lastUsedAt: string | null; revokedAt: string | null; createdAt: string } }>(
+      '/api/settings/mcp-keys',
+      { method: 'POST', body: JSON.stringify({ name }) },
+    ),
+
+  revokeMcpKey: (id: string) =>
+    request<{ ok: boolean }>(`/api/settings/mcp-keys/${id}`, { method: 'DELETE' }),
+
   lineBinding: () =>
     request<import('@/types').LineBindingStatus>('/api/settings/line-bind'),
 

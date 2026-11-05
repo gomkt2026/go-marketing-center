@@ -41,7 +41,7 @@ const VIDEO_MIME: Record<string, string> = {
   'video/quicktime': 'mov',
 };
 
-const WRITE_TOOLS = new Set(['save_image_asset', 'create_video_upload', 'draft_post', 'schedule_post', 'attach_post_image']);
+const WRITE_TOOLS = new Set(['save_image_asset', 'create_video_upload', 'draft_post', 'schedule_post', 'attach_post_image', 'attach_post_media']);
 
 export const MCP_TOOLS = [
   {
@@ -92,7 +92,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'save_image_asset',
-    description: '把使用者傳來的圖片存進該品牌素材庫。image_base64 可含 data URL 前綴。上限約 8MB。',
+    description: '把使用者傳來的圖片存進該品牌素材庫。存完若要出現在貼文裡，必須再呼叫 attach_post_media，不要停在這一步，也不要說系統不能配圖。',
     inputSchema: {
       type: 'object',
       properties: {
@@ -108,8 +108,29 @@ export const MCP_TOOLS = [
     },
   },
   {
+    name: 'attach_post_media',
+    description: '把照片或影片掛到一篇已經存在的貼文，包含已排程。不改內文、不改時間、不另開新稿。使用者說「把這篇加上圖片或影片」時用這支，不要改呼叫 draft_post。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        brand: { type: 'string' },
+        content_id: { type: 'string', description: '貼文 id。行程列的 contentId，或該則發布單 id。' },
+        title: { type: 'string', description: '貼文標題，例如 101工班排程互動題。' },
+        asset_id: { type: 'string', description: '素材庫圖片 id' },
+        asset_name: { type: 'string', description: '圖片名稱，例如 台北101夜景仰拍' },
+        image_base64: { type: 'string', description: '使用者剛傳的圖。有這欄就先存進素材庫再掛上。' },
+        mime_type: { type: 'string' },
+        name: { type: 'string', description: '新圖片存進素材庫時的名稱' },
+        video_asset_id: { type: 'string', description: '素材庫影片 id。影片要先用 create_video_upload 上傳。' },
+        video_asset_name: { type: 'string', description: '影片名稱' },
+      },
+      required: ['brand'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'attach_post_image',
-    description: '把素材庫的圖，或使用者剛傳的圖，掛到一篇已經存在的貼文（含已排程）。不改內文、不改排程時間、不另開新稿。使用者說「用這張圖當配圖」時用這支。回傳全文與配圖網址。',
+    description: '同 attach_post_media，掛照片到已存在的貼文。不要另開新稿。',
     inputSchema: {
       type: 'object',
       properties: {
@@ -117,10 +138,12 @@ export const MCP_TOOLS = [
         content_id: { type: 'string', description: '貼文 id。行程列的 contentId，或該則發布單 id。' },
         title: { type: 'string', description: '貼文標題關鍵字，例如 101工班排程互動題。沒有 content_id 時用這個找。' },
         asset_id: { type: 'string', description: '素材庫圖片 id' },
-        asset_name: { type: 'string', description: '素材名稱關鍵字，例如 台北101夜景仰拍' },
+        asset_name: { type: 'string', description: '圖片名稱，例如 台北101夜景仰拍' },
         image_base64: { type: 'string', description: '使用者剛傳的圖。有這欄就先存進素材庫再掛上。' },
         mime_type: { type: 'string' },
         name: { type: 'string', description: '新圖片存進素材庫時的名稱' },
+        video_asset_id: { type: 'string' },
+        video_asset_name: { type: 'string' },
       },
       required: ['brand'],
       additionalProperties: false,
@@ -128,7 +151,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'create_video_upload',
-    description: '影片不放在參數裡。回一個 15 分鐘、一次性的上傳網址，收到檔案後寫進該品牌素材庫。',
+    description: '影片不放在參數裡。回一個 15 分鐘、一次性的上傳網址。上傳成功會回 asset id，接著必須呼叫 attach_post_media 把影片掛到貼文，不要只停在素材庫。',
     inputSchema: {
       type: 'object',
       properties: {
@@ -142,14 +165,21 @@ export const MCP_TOOLS = [
   },
   {
     name: 'draft_post',
-    description: '用站內品牌語氣產一篇待審稿，不排程、不發到平台。使用者還沒明確說要發時用這支。',
+    description: '產一篇新的待審稿。使用者若是要把照片或影片加到已經有的貼文，改呼叫 attach_post_media，不要用這支另開一篇。',
     inputSchema: {
       type: 'object',
       properties: {
         brand: { type: 'string' },
         platform: { type: 'string', enum: ['threads', 'facebook', 'instagram'] },
         topic: { type: 'string', description: '貼文切角，必須落在品牌可講的範圍' },
-        instruction: { type: 'string', description: '補充條件，例如要引用哪張素材' },
+        instruction: { type: 'string', description: '補充條件。若要配圖，寫素材名稱，例如「配圖用台北101夜景仰拍」。' },
+        content_id: { type: 'string', description: '要掛媒體的既有貼文。有這欄就不會另開新稿。' },
+        asset_id: { type: 'string' },
+        asset_name: { type: 'string' },
+        image_base64: { type: 'string' },
+        mime_type: { type: 'string' },
+        video_asset_id: { type: 'string' },
+        video_asset_name: { type: 'string' },
       },
       required: ['brand', 'topic'],
       additionalProperties: false,
@@ -169,6 +199,12 @@ export const MCP_TOOLS = [
         content_id: { type: 'string' },
         content_version_id: { type: 'string' },
         scheduled_at: { type: 'string', description: 'ISO 時間。太近或空白時改用下一個合適檔期。' },
+        asset_id: { type: 'string', description: '要一起掛上的圖片素材 id' },
+        asset_name: { type: 'string', description: '要一起掛上的圖片名稱' },
+        image_base64: { type: 'string' },
+        mime_type: { type: 'string' },
+        video_asset_id: { type: 'string' },
+        video_asset_name: { type: 'string' },
       },
       required: ['brand'],
       additionalProperties: false,
@@ -489,7 +525,7 @@ async function findPostsForImage(
   ` as PostRow[];
 }
 
-function postPreview(row: PostRow, imageUrl: string | null) {
+function postPreview(row: PostRow, imageUrl: string | null, videoUrl?: string | null) {
   return {
     contentId: row.content_id,
     title: row.title,
@@ -498,7 +534,229 @@ function postPreview(row: PostRow, imageUrl: string | null) {
     scheduledAt: row.scheduled_at,
     body: clip(row.body, 2000),
     imageUrl: safeUrl(imageUrl),
+    videoUrl: safeUrl(videoUrl),
   };
+}
+
+const MEDIA_HINT = /圖|照片|影片|素材|配圖/;
+
+function mediaArgsPresent(args: Record<string, unknown>): boolean {
+  return Boolean(
+    text(args.asset_id, 80)
+    || text(args.asset_name, 120)
+    || (typeof args.image_base64 === 'string' && args.image_base64.trim())
+    || text(args.video_asset_id, 80)
+    || text(args.video_asset_name, 120),
+  );
+}
+
+interface StoredMedia {
+  id: string;
+  name: string;
+  fileUrl: string;
+  assetType: 'image' | 'video';
+}
+
+async function recentMedia(env: Env, brandId: string): Promise<StoredMedia[]> {
+  const sql = getSql(env);
+  const rows = await sql`
+    SELECT id, name, asset_type::text AS asset_type, file_url
+    FROM brand_assets
+    WHERE brand_id = ${brandId}::uuid
+      AND asset_status = 'active'
+      AND asset_type IN ('image', 'video')
+      AND file_url IS NOT NULL
+      AND file_url NOT LIKE 'data:%'
+    ORDER BY created_at DESC
+    LIMIT 40
+  `;
+  return (rows as { id: string; name: string; asset_type: string; file_url: string }[]).map((row) => ({
+    id: row.id,
+    name: row.name,
+    fileUrl: row.file_url,
+    assetType: row.asset_type === 'video' ? 'video' : 'image',
+  }));
+}
+
+async function lookupAsset(
+  env: Env,
+  brandId: string,
+  kind: 'image' | 'video',
+  id: string,
+  name: string,
+): Promise<{ asset: StoredMedia } | { error: string; choices?: { id: string; name: string; fileUrl: string | null }[] }> {
+  const sql = getSql(env);
+  const rows = id && isUuid(id)
+    ? await sql`
+        SELECT id, name, file_url FROM brand_assets
+        WHERE id = ${id}::uuid AND brand_id = ${brandId}::uuid
+          AND asset_type::text = ${kind} AND asset_status = 'active'
+        LIMIT 1
+      `
+    : await sql`
+        SELECT id, name, file_url FROM brand_assets
+        WHERE brand_id = ${brandId}::uuid
+          AND asset_type::text = ${kind} AND asset_status = 'active'
+          AND (name ILIKE ${likeQuery(name)} OR coalesce(caption, '') ILIKE ${likeQuery(name)})
+        ORDER BY created_at DESC
+        LIMIT 8
+      `;
+  const found = rows as { id: string; name: string; file_url: string | null }[];
+  if (!found.length) {
+    return { error: kind === 'video' ? '素材庫找不到這部影片。請先用 create_video_upload 上傳，再用回傳的 asset id 掛上。' : '素材庫找不到這張圖。請用素材名稱，或直接傳 image_base64。' };
+  }
+  if (found.length > 1) {
+    return {
+      error: '素材庫有多個符合，請改用 id。',
+      choices: found.map((item) => ({ id: item.id, name: item.name, fileUrl: safeUrl(item.file_url) })),
+    };
+  }
+  if (!found[0].file_url || found[0].file_url.startsWith('data:')) {
+    return { error: '這份素材沒有可發的檔案，請重新上傳。' };
+  }
+  return { asset: { id: found[0].id, name: found[0].name, fileUrl: found[0].file_url, assetType: kind } };
+}
+
+function pickFromText(assets: StoredMedia[], blob: string, kind: 'image' | 'video'): StoredMedia | 'ambiguous' | null {
+  const hits = assets
+    .filter((item) => item.assetType === kind && item.name.length >= 4 && blob.includes(item.name))
+    .sort((a, b) => b.name.length - a.name.length);
+  if (!hits.length) return null;
+  const best = hits[0];
+  const rivals = hits.filter((item) => item.id !== best.id && !best.name.includes(item.name) && !item.name.includes(best.name));
+  if (rivals.length) return 'ambiguous';
+  return best;
+}
+
+async function resolveRequestedMedia(
+  env: Env,
+  user: AuthUser,
+  brand: { id: string; slug: string; name: string },
+  args: Record<string, unknown>,
+  blob: string,
+): Promise<{ ok: true; assets: StoredMedia[] } | { ok: false; error: string; choices?: unknown; recent?: unknown }> {
+  const assets: StoredMedia[] = [];
+  const hasImageUpload = typeof args.image_base64 === 'string' && args.image_base64.trim().length > 0;
+  if (hasImageUpload) {
+    const saved = await saveLibraryImage(env, user, brand, {
+      ...args,
+      name: text(args.name, 80) || text(args.asset_name, 80) || '素材圖片',
+    });
+    if (!saved.ok) return { ok: false, error: saved.error };
+    assets.push({ ...saved.asset, assetType: 'image' });
+  } else if (text(args.asset_id, 80) || text(args.asset_name, 120)) {
+    const found = await lookupAsset(env, brand.id, 'image', text(args.asset_id, 80), text(args.asset_name, 120));
+    if ('error' in found) return { ok: false, error: found.error, choices: found.choices };
+    assets.push(found.asset);
+  }
+  if (text(args.video_asset_id, 80) || text(args.video_asset_name, 120)) {
+    const found = await lookupAsset(env, brand.id, 'video', text(args.video_asset_id, 80), text(args.video_asset_name, 120));
+    if ('error' in found) return { ok: false, error: found.error, choices: found.choices };
+    assets.push(found.asset);
+  }
+  if (!assets.length) {
+    const recent = await recentMedia(env, brand.id);
+    const image = pickFromText(recent, blob, 'image');
+    const video = pickFromText(recent, blob, 'video');
+    if (image === 'ambiguous' || video === 'ambiguous') {
+      return {
+        ok: false,
+        error: '素材庫有多個名稱對得上，請改用 asset_id 或 video_asset_id。',
+        recent: recent.slice(0, 8).map((item) => ({ id: item.id, name: item.name, assetType: item.assetType })),
+      };
+    }
+    if (image) assets.push(image);
+    if (video) assets.push(video);
+    if (!assets.length) {
+      return {
+        ok: false,
+        error: '還沒有對上照片或影片。請帶 asset_name、image_base64 或 video_asset_name。',
+        recent: recent.slice(0, 8).map((item) => ({ id: item.id, name: item.name, assetType: item.assetType })),
+      };
+    }
+  }
+  return { ok: true, assets };
+}
+
+async function writeContentMedia(env: Env, versionId: string, asset: StoredMedia) {
+  const sql = getSql(env);
+  const meta = JSON.stringify({ source: 'mcp', brandAssetId: asset.id, name: asset.name });
+  const updated = asset.assetType === 'video'
+    ? await sql`
+        UPDATE content_assets
+        SET file_url = ${asset.fileUrl}, metadata = ${meta}::jsonb
+        WHERE content_version_id = ${versionId}::uuid AND asset_type = 'video'
+        RETURNING id
+      `
+    : await sql`
+        UPDATE content_assets
+        SET file_url = ${asset.fileUrl}, metadata = ${meta}::jsonb
+        WHERE content_version_id = ${versionId}::uuid AND asset_type = 'image'
+        RETURNING id
+      `;
+  if (!updated.length) {
+    if (asset.assetType === 'video') {
+      await sql`
+        INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
+        VALUES (${versionId}::uuid, 'video', ${asset.fileUrl}, ${meta}::jsonb)
+      `;
+    } else {
+      await sql`
+        INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
+        VALUES (${versionId}::uuid, 'image', ${asset.fileUrl}, ${meta}::jsonb)
+      `;
+    }
+  }
+  await markAssetUsed(env, asset.id);
+}
+
+async function postsNamedInText(env: Env, brandId: string, blob: string): Promise<PostRow[]> {
+  if (blob.trim().length < 4) return [];
+  const sql = getSql(env);
+  const titles = await sql`
+    SELECT c.id
+    FROM contents c
+    WHERE c.brand_id = ${brandId}::uuid
+      AND c.status IN ('draft', 'pending_review', 'approved', 'scheduled', 'needs_revision')
+      AND c.updated_at > now() - interval '21 days'
+      AND char_length(c.title) >= 4
+      AND position(c.title in ${blob}) > 0
+    ORDER BY CASE WHEN c.status = 'scheduled' THEN 0 ELSE 1 END, c.updated_at DESC
+    LIMIT 8
+  `;
+  const posts: PostRow[] = [];
+  for (const row of titles as { id: string }[]) {
+    const found = await findPostsForImage(env, brandId, row.id, '');
+    if (found[0]) posts.push(found[0]);
+  }
+  return posts;
+}
+
+async function widenPosts(env: Env, brandId: string, posts: PostRow[]): Promise<PostRow[]> {
+  if (posts.length !== 1 || posts[0].status === 'scheduled') return posts;
+  const head = (posts[0].title || '').slice(0, 6);
+  if (head.length < 6) return posts;
+  const more = await findPostsForImage(env, brandId, '', head);
+  return more.length > 1 ? more : posts;
+}
+
+function mediaSummary(title: string, assets: StoredMedia[], created: boolean): string {
+  const names = assets.map((asset) => `「${asset.name}」`).join('、');
+  return created
+    ? `已建立貼文「${title}」，並掛上${names}。`
+    : `已把${names}掛到「${title}」。沒有另開新稿，內文和排程時間都沒改。`;
+}
+
+async function candidatePosts(env: Env, brandId: string, contentId: string, blob: string, topic: string): Promise<PostRow[]> {
+  if (contentId) return findPostsForImage(env, brandId, contentId, '');
+  const named = await postsNamedInText(env, brandId, blob);
+  if (named.length) return widenPosts(env, brandId, named);
+  if (topic.length >= 4 && topic.length <= 80) {
+    const exact = await widenPosts(env, brandId, await findPostsForImage(env, brandId, '', topic));
+    if (exact.length) return exact;
+  }
+  if (topic.length >= 6) return findPostsForImage(env, brandId, '', topic.slice(0, 6));
+  return [];
 }
 
 export async function callMcpTool(
@@ -770,25 +1028,23 @@ export async function callMcpTool(
       ok: true,
       brandSlug: brand.slug,
       payload: {
-        summary: `已把「${saved.asset.name}」存進 ${brand.name} 素材庫。`,
+        summary: `已把「${saved.asset.name}」存進 ${brand.name} 素材庫，asset id 是 ${saved.asset.id}。若要出現在貼文裡，立刻呼叫 attach_post_media，帶這個 asset_id 和貼文的 title 或 content_id。不要說系統不能配圖。`,
         asset: { ...saved.asset, assetType: 'image' },
       },
     };
   }
 
-  if (name === 'attach_post_image') {
+  if (name === 'attach_post_image' || name === 'attach_post_media') {
     const contentId = text(args.content_id, 80);
     const title = text(args.title, 120);
-    const assetId = text(args.asset_id, 80);
-    const assetName = text(args.asset_name, 120);
-    const hasUpload = typeof args.image_base64 === 'string' && args.image_base64.trim().length > 0;
+    const blob = [title, text(args.asset_name, 120), text(args.video_asset_name, 120)].join('\n');
     if (!contentId && !title) {
       return { ok: false, brandSlug: brand.slug, payload: { error: '要給 content_id 或貼文標題 title' } };
     }
-    if (!hasUpload && !assetId && !assetName) {
-      return { ok: false, brandSlug: brand.slug, payload: { error: '要給素材 asset_id、asset_name，或 image_base64' } };
+    if (!mediaArgsPresent(args)) {
+      return { ok: false, brandSlug: brand.slug, payload: { error: '要給 asset_name、asset_id、image_base64、video_asset_name 或 video_asset_id' } };
     }
-    const posts = await findPostsForImage(env, brand.id, contentId, title);
+    const posts = await candidatePosts(env, brand.id, contentId, blob, title);
     if (!posts.length) {
       return { ok: false, brandSlug: brand.slug, payload: { error: '找不到這篇貼文。請用行程裡的 contentId，或更完整的標題。' } };
     }
@@ -808,75 +1064,24 @@ export async function callMcpTool(
       return { ok: false, brandSlug: brand.slug, payload: { error: '這篇還沒有內文版本，沒有掛圖。', post: postPreview(post, null) } };
     }
 
-    let asset: LibraryAsset;
-    if (hasUpload) {
-      const saved = await saveLibraryImage(env, user, brand, {
-        ...args,
-        name: text(args.name, 80) || assetName || title || '素材圖片',
-      });
-      if (!saved.ok) return { ok: false, brandSlug: brand.slug, payload: { error: saved.error } };
-      asset = saved.asset;
-    } else {
-      const sql = getSql(env);
-      const rows = assetId && isUuid(assetId)
-        ? await sql`
-            SELECT id, name, file_url FROM brand_assets
-            WHERE id = ${assetId}::uuid AND brand_id = ${brand.id}::uuid
-              AND asset_type = 'image' AND asset_status = 'active'
-            LIMIT 1
-          `
-        : await sql`
-            SELECT id, name, file_url FROM brand_assets
-            WHERE brand_id = ${brand.id}::uuid
-              AND asset_type = 'image' AND asset_status = 'active'
-              AND (name ILIKE ${likeQuery(assetName)} OR coalesce(caption, '') ILIKE ${likeQuery(assetName)})
-            ORDER BY created_at DESC
-            LIMIT 8
-          `;
-      const found = rows as { id: string; name: string; file_url: string | null }[];
-      if (!found.length) {
-        return { ok: false, brandSlug: brand.slug, payload: { error: '素材庫找不到這張圖。請用素材名稱，或直接傳 image_base64。' } };
-      }
-      if (found.length > 1) {
-        return {
-          ok: false,
-          brandSlug: brand.slug,
-          payload: {
-            error: '素材庫有多張符合，請改用 asset_id。',
-            assets: found.map((item) => ({ id: item.id, name: item.name, fileUrl: safeUrl(item.file_url) })),
-            post: postPreview(post, null),
-          },
-        };
-      }
-      if (!found[0].file_url || found[0].file_url.startsWith('data:')) {
-        return { ok: false, brandSlug: brand.slug, payload: { error: '這張素材沒有可發的圖片檔，請重新上傳。' } };
-      }
-      asset = { id: found[0].id, name: found[0].name, fileUrl: found[0].file_url };
+    const resolved = await resolveRequestedMedia(env, user, brand, args, blob);
+    if (!resolved.ok) {
+      return {
+        ok: false,
+        brandSlug: brand.slug,
+        payload: { error: resolved.error, choices: resolved.choices, recent: resolved.recent, post: postPreview(post, null) },
+      };
     }
-
-    const sql = getSql(env);
-    const meta = JSON.stringify({ source: 'mcp', brandAssetId: asset.id, name: asset.name });
-    const updated = await sql`
-      UPDATE content_assets
-      SET file_url = ${asset.fileUrl}, metadata = ${meta}::jsonb
-      WHERE content_version_id = ${versionId}::uuid AND asset_type = 'image'
-      RETURNING id
-    `;
-    if (!updated.length) {
-      await sql`
-        INSERT INTO content_assets (content_version_id, asset_type, file_url, metadata)
-        VALUES (${versionId}::uuid, 'image', ${asset.fileUrl}, ${meta}::jsonb)
-      `;
-    }
-    await markAssetUsed(env, asset.id);
-    const titleLabel = post.title || '這篇貼文';
+    for (const asset of resolved.assets) await writeContentMedia(env, versionId, asset);
+    const image = resolved.assets.find((asset) => asset.assetType === 'image');
+    const video = resolved.assets.find((asset) => asset.assetType === 'video');
     return {
       ok: true,
       brandSlug: brand.slug,
       payload: {
-        summary: `已把「${asset.name}」掛到「${titleLabel}」。內文和排程時間都沒改。`,
-        post: postPreview(post, asset.fileUrl),
-        asset: { id: asset.id, name: asset.name, fileUrl: asset.fileUrl },
+        summary: mediaSummary(post.title || '這篇貼文', resolved.assets, false),
+        post: postPreview(post, image?.fileUrl ?? null, video?.fileUrl ?? null),
+        assets: resolved.assets.map((asset) => ({ id: asset.id, name: asset.name, fileUrl: asset.fileUrl, assetType: asset.assetType })),
       },
     };
   }
@@ -898,7 +1103,7 @@ export async function callMcpTool(
       ok: true,
       brandSlug: brand.slug,
       payload: {
-        summary: `請用 POST multipart，欄位名 file，把影片傳到上傳網址。15 分鐘內有效，只能用一次，上限 40MB。成功後會進 ${brand.name} 素材庫。`,
+        summary: `請用 POST multipart，欄位名 file，把影片傳到上傳網址。15 分鐘內有效，只能用一次，上限 40MB。上傳成功會回 asset id，接著立刻呼叫 attach_post_media 把影片掛到貼文。不要只停在素材庫，也不要說系統不能配影片。`,
         uploadUrl,
         expiresInMinutes: 15,
         maxBytes: VIDEO_MAX,
@@ -909,19 +1114,83 @@ export async function callMcpTool(
 
   if (name === 'draft_post') {
     const topic = text(args.topic, 200);
+    const instruction = text(args.instruction, 800);
+    const contentId = text(args.content_id, 80);
+    const blob = [topic, instruction, text(args.asset_name, 120), text(args.video_asset_name, 120)].filter(Boolean).join('\n');
+    const wantsMedia = Boolean(contentId) || mediaArgsPresent(args) || MEDIA_HINT.test(blob);
+    if (wantsMedia) {
+      const posts = await candidatePosts(env, brand.id, contentId, blob, topic);
+      if (posts.length > 1) {
+        return {
+          ok: false,
+          brandSlug: brand.slug,
+          payload: {
+            error: '找到多篇，請帶 content_id 再掛。不要另開新稿，也不要說系統不能配圖。',
+            posts: posts.map((row) => postPreview(row, null)),
+          },
+        };
+      }
+      if (posts.length === 1) {
+        const post = posts[0];
+        const versionId = post.job_version_id || post.version_id;
+        if (!versionId) {
+          return { ok: false, brandSlug: brand.slug, payload: { error: '這篇還沒有內文版本。', post: postPreview(post, null) } };
+        }
+        const resolved = await resolveRequestedMedia(env, user, brand, args, blob);
+        if (!resolved.ok) {
+          return {
+            ok: false,
+            brandSlug: brand.slug,
+            payload: {
+              error: `「${post.title || '這篇'}」還在，沒有另開新稿。${resolved.error}`,
+              post: postPreview(post, null),
+              choices: resolved.choices,
+              recent: resolved.recent,
+            },
+          };
+        }
+        for (const asset of resolved.assets) await writeContentMedia(env, versionId, asset);
+        const image = resolved.assets.find((asset) => asset.assetType === 'image');
+        const video = resolved.assets.find((asset) => asset.assetType === 'video');
+        return {
+          ok: true,
+          brandSlug: brand.slug,
+          payload: {
+            summary: mediaSummary(post.title || '這篇貼文', resolved.assets, false),
+            created: false,
+            post: postPreview(post, image?.fileUrl ?? null, video?.fileUrl ?? null),
+          },
+        };
+      }
+    }
     if (!topic) return { ok: false, brandSlug: brand.slug, payload: { error: '要給貼文切角 topic' } };
     const drafted = await runEditor(env, user, brand, {
       name: 'draft_post',
       platform: platformOf(args.platform),
       topic,
-      instruction: text(args.instruction, 800) || undefined,
+      instruction: instruction || undefined,
     });
     await markMcpSource(env, brand.id, drafted.draft?.contentId);
+    let summary = drafted.summary;
+    const versionId = drafted.draft?.contentVersionId;
+    if (drafted.ok && versionId && (mediaArgsPresent(args) || MEDIA_HINT.test(instruction))) {
+      const resolved = await resolveRequestedMedia(env, user, brand, args, blob);
+      if (resolved.ok) {
+        for (const asset of resolved.assets) await writeContentMedia(env, versionId, asset);
+        const image = resolved.assets.find((asset) => asset.assetType === 'image');
+        if (drafted.draft && image) drafted.draft.imageUrl = image.fileUrl;
+        summary = mediaSummary(drafted.draft?.title || topic, resolved.assets, true);
+      } else {
+        summary = `已產待審稿「${drafted.draft?.title || topic}」，contentId=${drafted.draft?.contentId}。${resolved.error} 請呼叫 attach_post_media。不要請使用者到行銷中心手動加，也不要再另開一篇。`;
+      }
+    } else if (drafted.ok && MEDIA_HINT.test(blob)) {
+      summary = `已產待審稿「${drafted.draft?.title || topic}」，contentId=${drafted.draft?.contentId}。這次沒有配圖。要掛照片或影片請呼叫 attach_post_media。不要說系統不能配圖，也不要再另開一篇。`;
+    }
     return {
       ok: drafted.ok,
       brandSlug: brand.slug,
       payload: {
-        summary: drafted.summary,
+        summary,
         draft: compactDraft(drafted.draft),
       },
     };
@@ -975,11 +1244,25 @@ export async function callMcpTool(
       scheduledAt,
     });
     await markMcpSource(env, brand.id, scheduled.draft?.contentId);
+    let summary = scheduled.summary;
+    const versionId = scheduled.draft?.contentVersionId || contentVersionId;
+    if (scheduled.ok && versionId && (mediaArgsPresent(args) || MEDIA_HINT.test(instruction))) {
+      const blob = [topic, instruction, text(args.asset_name, 120), text(args.video_asset_name, 120)].filter(Boolean).join('\n');
+      const resolved = await resolveRequestedMedia(env, user, brand, args, blob);
+      if (resolved.ok) {
+        for (const asset of resolved.assets) await writeContentMedia(env, versionId, asset);
+        const image = resolved.assets.find((asset) => asset.assetType === 'image');
+        if (scheduled.draft && image) scheduled.draft.imageUrl = image.fileUrl;
+        summary = `${scheduled.summary} ${mediaSummary(scheduled.draft?.title || topic || '這篇', resolved.assets, false)}`;
+      } else {
+        summary = `${scheduled.summary} ${resolved.error} 請再呼叫 attach_post_media。不要說系統不能配圖。`;
+      }
+    }
     return {
       ok: scheduled.ok,
       brandSlug: brand.slug,
       payload: {
-        summary: scheduled.summary,
+        summary,
         scheduled: mode === 'publish' && scheduled.ok,
         draft: compactDraft(scheduled.draft),
       },

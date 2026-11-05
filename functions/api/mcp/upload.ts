@@ -34,7 +34,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (!saved.ok) return cors(error(saved.error, saved.status));
     return cors(json({
       ok: true,
-      summary: `已把「${saved.name}」存進素材庫。`,
+      summary: `已把「${saved.name}」存進素材庫，asset id 是 ${saved.assetId}。立刻呼叫 attach_post_media，video_asset_id 帶這個 id，再加上貼文標題，影片才會出現在貼文裡。`,
       asset: { id: saved.assetId, name: saved.name, fileUrl: saved.fileUrl, assetType: 'video' },
     }, 201));
   } catch (e) {

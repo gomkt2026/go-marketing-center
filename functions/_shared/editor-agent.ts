@@ -560,7 +560,7 @@ export async function executeEditorTool(
     return {
       ok: true,
       tool: 'draft_post',
-      summary: `已產 ${platform} 待審稿「${result.post.title}」。排程請用 contentId=${saved.contentId}。文案好了,配圖可之後在內容中心補。要我主動發文嗎？`,
+      summary: `已產 ${platform} 待審稿「${result.post.title}」。contentId=${saved.contentId}。`,
       draft,
       drafts: [draft],
     };

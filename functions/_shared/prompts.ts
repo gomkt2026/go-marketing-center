@@ -1678,12 +1678,37 @@ export function buildOfftopicUserPrompt(usedTopics: string[], brandSlug?: string
 // 10/22 起：前兩行要有畫面，最後一行問做過的人遇過哪一種。
 // 10/24 起觀察三天：不再自己貼 2/2。七天內寫過的場面不要再寫。
 // 10/27：Homigo 六個時段連續重發「離職、房東訊息就來了」。重寫後仍中招就整檔不發。
+// 11/08 12:00 之後：近兩週瀏覽往下掉。有留言的稿都是一句別人講過的話，加上做了會怎樣。
+// 三行帶過的笑話、法規解說沒有把人留下。中午那檔維持原結構；下一檔起改成四到六行、只留一句引號、最後一行用「還是」二選一。
+// Washgo 沒有在地事件就不要寫時事。時事鉤子的中位數大約是笑話的三分之一。
 // 正文不放 hashtag、不放連結。主題標籤一篇一個。
 // ============================================================================
 
 export type TrafficFormulaId = 'hook' | 'joke';
 
 const TRAFFIC_HOURS = [9, 12, 18, 21];
+
+/** 2026-11-08 12:00 台北。這個時間點的稿維持原結構，之後的檔才換。 */
+export const TRAFFIC_SHIFT_AT = Date.parse('2026-11-08T04:00:00.000Z');
+
+export function trafficShifted(now = Date.now()): boolean {
+  return now > TRAFFIC_SHIFT_AT;
+}
+
+/** Washgo 只有這種在地事件，時事才比笑話有看頭。 */
+const WASHGO_LOCAL_EVENT = /颱風|豪雨|火災|停電|淹水|車站|梅雨|大火|暴雨/;
+
+export function settleTrafficFormula(
+  slug: string,
+  formula: TrafficFormulaId,
+  theme: string | null | undefined,
+  now: number,
+): TrafficFormulaId {
+  let next = formula;
+  if (next === 'hook' && !theme && slug !== 'taskgo') next = 'joke';
+  if (trafficShifted(now) && slug === 'washgo' && !(theme && WASHGO_LOCAL_EVENT.test(theme))) next = 'joke';
+  return next;
+}
 
 /** 災難、政治表態、喪聞、性騷擾不拿來博流量。
  *  「洋流」這個詞可以接，但標題會被收成這兩個字再寫。
@@ -1734,6 +1759,36 @@ const JOKE_SEEDS: Record<string, string[]> = {
     '先問能做什麼，對方先問一坪多少',
     '吊車進得來，鄰居的樹沒有一起答應',
     '院子想多一間，先被問要不要蓋一棟',
+  ],
+};
+
+/** 11/08 中午之後才用。舊種子這週已經寫完，再抽會重發。 */
+const JOKE_SEEDS_NEXT: Record<string, string[]> = {
+  taskgo: [
+    '收工哨響了，業主說這面先不要收',
+    '圖上寫拆除，後面那戶還住著人',
+    '說好今天只看，看完多留了一面牆的尺寸',
+    '驗收說沒問題，隔天群組多一張照片',
+    '保護膠帶撕下來，牆面跟著起毛',
+    '垃圾清運寫含在裡面，袋子比牆還多',
+  ],
+  homigo: [
+    '管理費跟房租分兩張單，兩張都寫今天',
+    '訪客停車只給一小時，朋友的車先被鎖',
+    '鑰匙只配一把，備用那把在房東身上',
+    '冷氣遙控器不在，房東說用了再買',
+    '陽台不能曬，曬衣繩還在',
+    '押金扣清潔，明細是一行字',
+    '續約只給三天，三天裡有兩天是週末',
+    '垃圾要自己下樓，時間寫在電梯裡那張紙',
+  ],
+  washgo: [
+    '標籤寫乾洗，客人說家裡已經洗過一次',
+    '來拿的人跟單子上的名字不一樣',
+    '制服說明天要穿，袋子裡還有另一件不是他的',
+    '白襯衫領口那圈，客人說送洗前沒有',
+    '收據寫兩件，袋子裡數出來三件',
+    '客人說這件不能烘，烘乾機已經轉完那一輪',
   ],
 };
 
@@ -1839,9 +1894,9 @@ export function pickTrafficTopicTag(slug: string, body: string, requested?: stri
 }
 
 const WORN_SCENES: Record<string, string[]> = {
-  taskgo: ['風向變了', '人到了沒', '鷹架上', '颱風假', '估價單', '排水孔', '開關換', '這面牆', '含清潔', '材料明天'],
-  homigo: ['冷氣室外機', '薪水入帳', '近捷運', '這也叫清潔', '離職那天', '月底才發', '房東訊息就來了', '吃泡麵', '間隔十五天'],
-  washgo: ['洗標', '能不能進水', '梅雨', '廚師服', '補習班', '便當店', '羽絨被', '店門口', '不能縮', '老車站'],
+  taskgo: ['風向變了', '人到了沒', '鷹架上', '颱風假', '估價單', '排水孔', '開關換', '這面牆', '含清潔', '材料明天', '派工單', '已經出了'],
+  homigo: ['冷氣室外機', '薪水入帳', '近捷運', '這也叫清潔', '離職那天', '月底才發', '房東訊息就來了', '吃泡麵', '間隔十五天', '一度電', '裝機', '暗線', '租金補貼'],
+  washgo: ['洗標', '能不能進水', '梅雨', '廚師服', '補習班', '便當店', '羽絨被', '店門口', '不能縮', '老車站', '衣服堆', '自己蒸發', '整條街'],
 };
 
 function chinesePrefix(text: string, size: number): string {
@@ -1874,13 +1929,32 @@ export function trafficSceneIssue(slug: string, body: string, used: string[]): s
   return same ? `開頭和最近的稿一樣：「${key}」` : null;
 }
 
-/** 最後一行要是做過的人才答得上來的問句。 */
-export function trafficEndingIssue(body: string): string | null {
+/** 最後一行要是做過的人才答得上來的問句。中午之後的檔改成二選一，而且只准一句引號。 */
+export function trafficEndingIssue(body: string, shifted = false): string | null {
   const lines = body.split('\n').map((line) => line.trim()).filter(Boolean);
-  if (lines.length < 3) return '少於三行，前兩行要有畫面，最後一行要是問句';
+  if (lines.length < (shifted ? 4 : 3)) {
+    return shifted
+      ? '少於四行，中間要有一句引號，最後一行要二選一'
+      : '少於三行，前兩行要有畫面，最後一行要是問句';
+  }
   const last = lines[lines.length - 1];
   if (!/[？?]/.test(last)) return '最後一行不是問句';
-  if (/你們覺得|大家覺得|有共鳴|同意嗎|你們呢|各位/.test(last)) return '問句太寬，要問做過的人遇過哪一種';
+  if (/你們覺得|大家覺得|有共鳴|同意嗎|你們呢|各位/.test(last)) {
+    return shifted ? '問句太寬，最後一行要用還是二選一' : '問句太寬，要問做過的人遇過哪一種';
+  }
+  if (!shifted) return null;
+  const quotes = (body.match(/「/g) ?? []).length;
+  if (quotes < 1) return '少了一句別人講過的話';
+  if (quotes > 1) return '引號超過一句，變成來回對話';
+  if (!/還是/.test(last) || /遇過哪一種|有沒有遇過|你們有沒有/.test(last)) return '最後一行不是二選一';
+  return null;
+}
+
+/** 這週已經發過、或寫成法規解說的稿。只在中午之後的檔檢查。 */
+export function trafficRepeatIssue(slug: string, body: string): string | null {
+  if (slug === 'homigo' && /律師|違法|租金補貼|一度電|根據法律/.test(body)) return '寫成法規解說';
+  if (slug === 'washgo' && /衣服堆|自己蒸發|老車站|整條街的衣服/.test(body)) return '又寫回這週的洗衣場面';
+  if (slug === 'taskgo' && /材料明天|派工單改|貨已經出了/.test(body)) return '又寫回這週的派工場面';
   return null;
 }
 
@@ -1948,7 +2022,8 @@ export function trafficSystemPrompt(slug: string): string {
 }
 
 function pickJokeSeed(slug: string, hourTw: number, now: number, used: string[] = []): string | null {
-  const seeds = JOKE_SEEDS[slug] ?? JOKE_SEEDS.homigo;
+  const bank = trafficShifted(now) ? JOKE_SEEDS_NEXT : JOKE_SEEDS;
+  const seeds = bank[slug] ?? bank.homigo ?? JOKE_SEEDS.homigo;
   const blob = used.join('\n');
   const worn = wornScenesIn(slug, used);
   const open = seeds.filter((seed) => {
@@ -1985,16 +2060,17 @@ export function composeTrafficPrompt(opts: {
   focusKeyword?: string | null;
   now?: number;
   hourTw?: number;
-}): { prompt: string; category: TrafficFormulaId; label: string; maxChars: number; theme: string; anchor: string } {
+}): { prompt: string; category: TrafficFormulaId; label: string; maxChars: number; minChars: number; theme: string; anchor: string } {
   const now = opts.now ?? Date.now();
   const hourTw = opts.hourTw ?? (new Date(now).getUTCHours() + 8) % 24;
+  const shifted = trafficShifted(now);
   const isJoke = opts.formula === 'joke';
   const taskgo = opts.brandSlug === 'taskgo';
   const theme = (opts.theme ?? '').trim();
   const anchor = !isJoke && theme ? (theme.includes('洋流') ? '洋流' : trendAnchor(theme)) : '';
   const currentWave = theme.includes('洋流');
-  const maxChars = isJoke ? 170 : opts.brandSlug === 'washgo' ? 210 : 250;
-  const minChars = isJoke ? 50 : 80;
+  const maxChars = shifted ? (isJoke ? 260 : 300) : (isJoke ? 170 : opts.brandSlug === 'washgo' ? 210 : 250);
+  const minChars = shifted ? (isJoke ? 90 : 100) : (isJoke ? 50 : 80);
   const label = isJoke ? (taskgo ? '工地笑話' : '品牌笑話') : (taskgo ? '工地判斷' : '時事小故事');
   const defaultTag = BRAND_TOPIC_DEFAULT[opts.brandSlug] ?? '租屋';
   const worn = wornScenesIn(opts.brandSlug, opts.usedTopics);
@@ -2003,9 +2079,13 @@ export function composeTrafficPrompt(opts: {
   const shared = [
     '三個帳號各寫各的，不要寫成同一則新聞的三種版本。',
     '不要寫婆媳、婆婆、媳婦。不要品牌名、報價、連結、hashtag、電話。',
-    '用台灣口語。一句一行。至少三行。',
+    shifted
+      ? '用台灣口語。一句一行。四到六行。正文只能有一組「」，那一句是現場有人講過的話。不要取名字，不要來回傳訊。'
+      : '用台灣口語。一句一行。至少三行。',
     '前兩行就要有畫面，沒點開也看得懂。',
-    '笑點或想被轉出去的那一句放倒數第二行。最後一行只能有一個問句，問做過的人遇過哪一種。不要寫「你們覺得呢」「有共鳴嗎」。',
+    shifted
+      ? '倒數第二行寫回了那句話之後要付的代價。最後一行只能有一個問句，用「還是」讓做過的人二選一。不要寫遇過哪一種、你們覺得呢、有共鳴嗎。'
+      : '笑點或想被轉出去的那一句放倒數第二行。最後一行只能有一個問句，問做過的人遇過哪一種。不要寫「你們覺得呢」「有共鳴嗎」。',
     '不要自己回文。replyBody 回傳空字串。',
     currentWave
       ? '這則熱門只准寫成店裡、巷口或梯間碰到的布條、車、喇叭。正文要出現「洋流」。禁止任何人名、政黨、縣市候選人，禁止寫支持、投給、下架。不評價這股人潮。顏色可以每一件都不一樣。'
@@ -2021,19 +2101,23 @@ export function composeTrafficPrompt(opts: {
   ];
   const lead = isJoke
     ? [
-        '寫一則跟這個品牌生活有關的笑話。要有畫面，倒數第二行是笑點，最後一行讓做過的人想留言。',
+        shifted
+          ? '寫一件這週沒寫過的小事。中間嵌一句別人講過的話。不要寫成三行帶過的笑話。'
+          : '寫一則跟這個品牌生活有關的笑話。要有畫面，倒數第二行是笑點，最後一行讓做過的人想留言。',
         seed ? `場面從這裡長出來：${seed}。` : '近期的固定場面都寫過了。換一個這個品牌生活裡還沒寫過的小事。',
         theme ? `若「${theme}」能變成笑點就用，接不上就不要提。` : '',
-        opts.brandSlug === 'taskgo' ? '笑點是工地習慣：改圖、順便、材料改期、範圍對不攏。不要寫成新聞，不要寫送醫、急診、受傷。不要列工序，不要教訓業主。' : '',
-        opts.brandSlug === 'washgo' ? '可以寫洗衣店、衣服、店門口。不要寫洗好了沒，不要教洗法。' : '',
-        opts.brandSlug === 'homigo' ? '換一個這七天沒寫過的租屋小事。不要再寫離職發薪、房東催租、冷氣室外機、近捷運、這也叫清潔。不要寫家庭對罵。' : '',
+        opts.brandSlug === 'taskgo' ? '笑點是工地習慣：改圖、順便、範圍對不攏。不要寫成新聞，不要寫送醫、急診、受傷。不要列工序，不要教訓業主。' : '',
+        opts.brandSlug === 'washgo' ? '可以寫洗衣店、衣服、收件。不要寫洗好了沒，不要教洗法，不要再寫下雨天衣服堆滿。' : '',
+        opts.brandSlug === 'homigo' ? '換一個這七天沒寫過的租屋小事。不要再寫離職發薪、房東催租、冷氣室外機、近捷運、這也叫清潔，也不要寫律師、違法、租金補貼。不要寫家庭對罵。' : '',
       ]
     : taskgo
       ? [
           theme
             ? `這一則只接這一則時事：「${theme}」。正文要出現「${anchor}」。寫這種情況下工班先判斷什麼，不要編成故事。`
             : '現在沒有可用的時事。寫一個工班在現場會做的判斷，例如颱風前先收哪一項、漏水先看哪裡、圖和現場對不上時誰先停。',
-          '第一行就是那個判斷。中間一個現場畫面，不要給人取名字。倒數第二行寫前面做錯、後面要付的代價。最後一行問做過的人場上先處理哪一項。',
+          shifted
+            ? '第一行就是那個判斷。中間只留一句現場有人講過的話，用一組「」。倒數第二行寫前面做錯、後面要付的代價。最後一行用「還是」二選一。'
+            : '第一行就是那個判斷。中間一個現場畫面，不要給人取名字。倒數第二行寫前面做錯、後面要付的代價。最後一行問做過的人場上先處理哪一項。',
           '不要寫成短篇、新聞稿、步驟清單。不要發明坪數、單價、比例。',
         ]
       : [
@@ -2041,13 +2125,16 @@ export function composeTrafficPrompt(opts: {
             ? `這一則只接這一則時事：「${theme}」。正文要出現「${anchor}」，讓人一眼對上熱門。`
             : '現在沒有可用的時事。改寫一個這週大家會轉的生活場面，仍然用下面的品牌切角。',
           brandHookCut(opts.brandSlug),
-          '結構：第一行點到時事，中間一個具體小場面，倒數第二行是讓人想轉的那一句，最後一行是問句。',
+          shifted
+            ? '結構：第一行點到時事，中間只留一句現場有人講過的話，倒數第二行是做下去要付的代價，最後一行用「還是」二選一。不要寫成法規解說。'
+            : '結構：第一行點到時事，中間一個具體小場面，倒數第二行是讓人想轉的那一句，最後一行是問句。',
           '不要寫成新聞稿，不要列重點，不要硬塞產品。',
         ];
   return {
     category: opts.formula,
     label,
     maxChars,
+    minChars,
     theme: theme || label,
     anchor,
     prompt: [...lead, ...shared].filter(Boolean).join('\n'),

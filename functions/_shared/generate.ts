@@ -7,7 +7,7 @@ import { factProblem } from './office-facts';
 import {
   buildBrandContext, buildPostUserPrompt, buildEngagementEvalPrompt, getBrandVoice,
   OFFTOPIC_SYSTEM_PROMPT, composeOfftopicPrompt,
-  composeTrafficPrompt, pickTrafficTopicTag, taskgoFictionIssue, taskgoLectureIssue, trafficEndingIssue, trafficSceneIssue, trafficStaleIssue, trafficSystemPrompt, type TrafficFormulaId,
+  composeTrafficPrompt, pickTrafficTopicTag, taskgoFictionIssue, taskgoLectureIssue, trafficEndingIssue, trafficRepeatIssue, trafficSceneIssue, trafficShifted, trafficStaleIssue, trafficSystemPrompt, type TrafficFormulaId,
   buildImageInspiredPostPrompt, buildGamePromoPrompt, GAME_PROMO_URL,
   type GamePromoAngle,
   ECOSYSTEM_X_SYSTEM_PROMPT, buildEcosystemXUserPrompt, ECOSYSTEM_X_IMAGE_STYLE,
@@ -873,7 +873,10 @@ export async function generateTrafficPost(
   const taskgo = params.brandSlug === 'taskgo';
   const bbbox = params.brandSlug === 'bbbox';
   const anchor = spec.anchor.trim();
-  const systemPrompt = trafficSystemPrompt(params.brandSlug);
+  const shifted = trafficShifted(params.now ?? Date.now());
+  const systemPrompt = trafficSystemPrompt(params.brandSlug) + (shifted
+    ? '這一篇只留一句引號裡的話，最後一行用「還是」二選一。不要寫法規解說，不要寫成三行帶過的笑話。'
+    : '');
   const userPrompt = [spec.prompt, params.office?.active ? params.office.line : ''].filter(Boolean).join('\n\n');
   let post = await socialChatJson<GeneratedPost>(env, {
     messages: [
@@ -895,10 +898,11 @@ export async function generateTrafficPost(
   const trafficVoice = taiwanVoiceIssue(post.body);
   const lecture = taskgo ? taskgoLectureIssue(post.body) : null;
   const fiction = taskgo ? taskgoFictionIssue(post.body) : null;
-  const stale = trafficStaleIssue(params.brandSlug, post.body);
-  const ending = trafficEndingIssue(post.body);
+  const stale = trafficStaleIssue(params.brandSlug, post.body)
+    || (shifted ? trafficRepeatIssue(params.brandSlug, post.body) : null);
+  const ending = trafficEndingIssue(post.body, shifted);
   const scene = trafficSceneIssue(params.brandSlug, post.body, params.usedTopics);
-  const minChars = spec.category === 'joke' ? 50 : 80;
+  const minChars = spec.minChars;
   if (post.body.length > limit || leaked || missed || post.body.length < minChars || trafficVoice || lecture || fiction || stale || ending || scene) {
     post = await socialChatJson<GeneratedPost>(env, {
       messages: [
@@ -909,15 +913,19 @@ export async function generateTrafficPost(
           role: 'user',
           content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${anchor}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}${lecture ? `，${lecture}` : ''}${fiction ? `，${fiction}` : ''}${stale ? `，${stale}` : ''}${ending ? `，${ending}` : ''}${scene ? `，${scene}` : ''}）。` +
             `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${anchor ? `，正文必須出現「${anchor}」` : taskgo ? (spec.category === 'joke' ? '，改成一則工地習慣的笑話' : '，改成一個現場判斷，不要編成故事') : spec.category === 'joke' ? '，改成一個品牌笑話，笑點放倒數第二行' : '，改成一個讓人想轉的小場面'}。` +
-            '至少三行。最後一行是做過的人才答得上來的問句。replyBody 留空字串。' +
+            (shifted
+              ? '四到六行。正文只能有一組「」。最後一行用「還是」二選一。replyBody 留空字串。'
+              : '至少三行。最後一行是做過的人才答得上來的問句。replyBody 留空字串。') +
             (scene ? `${scene}，換一個沒寫過的場面。` : '') +
             (washgo
               ? '可以寫洗衣店和衣服。不要寫洗好了沒，不要列功能，不要提別的店，不要寫婆媳。禁止簡體、大陸用語。回傳同格式 JSON。'
               : taskgo
-                ? '寫一個現場判斷，或一則工地習慣的笑話。不要取名字，不要寫假對話，不要寫送醫、急診、受傷。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
+                ? (shifted
+                  ? '寫一個現場判斷，或一則工地習慣的笑話。可以有一句引號。不要取名字，不要來回傳訊，不要寫送醫、急診、受傷。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
+                  : '寫一個現場判斷，或一則工地習慣的笑話。不要取名字，不要寫假對話，不要寫送醫、急診、受傷。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。')
                 : bbbox
                   ? '換成一塊地的進場或用途：路進不去、轉彎不夠、院子想多一間。不要報價，不要寫保證合法或回本，不要寫成租屋或派工。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
-                  : '換成這七天沒寫過的租屋小事：水電、管理員、續約、押金、網路、看房話術。不要再寫離職發薪、房東催租、冷氣室外機、近捷運、這也叫清潔。不要寫婆媳、家庭對罵。禁止簡體、大陸用語、「男生都」「女生都」。回傳同格式 JSON。'),
+                  : '換成這七天沒寫過的租屋小事：水電、管理員、續約、押金、網路、看房話術。不要再寫離職發薪、房東催租、冷氣室外機、近捷運、這也叫清潔，也不要寫律師、違法、租金補貼。不要寫婆媳、家庭對罵。禁止簡體、大陸用語、「男生都」「女生都」。回傳同格式 JSON。'),
         },
       ],
       temperature: 0.7,
@@ -927,8 +935,9 @@ export async function generateTrafficPost(
 
   if (params.brandSlug === 'homigo') {
     const repeated = trafficStaleIssue(params.brandSlug, post.body)
+      || (shifted ? trafficRepeatIssue(params.brandSlug, post.body) : null)
       || trafficSceneIssue(params.brandSlug, post.body, params.usedTopics)
-      || trafficEndingIssue(post.body);
+      || trafficEndingIssue(post.body, shifted);
     if (repeated) {
       post = await socialChatJson<GeneratedPost>(env, {
         messages: [
@@ -937,17 +946,20 @@ export async function generateTrafficPost(
           { role: 'assistant', content: JSON.stringify(post) },
           {
             role: 'user',
-            content: `這篇還是不合格：${repeated}。換成水電、管理員、續約漲租、押金、網路或看房話術裡，這七天沒寫過的一件小事。` +
-              '禁止再寫離職、月底才發薪水、房東訊息就來了、吃泡麵、冷氣室外機、近捷運、這也叫清潔。' +
-              '至少三行。最後一行是做過的人才答得上來的問句。replyBody 留空字串。回傳同格式 JSON。',
+            content: `這篇還是不合格：${repeated}。${shifted ? '換成管理費、訪客停車、鑰匙、遙控器、陽台、押金明細、續約天數或垃圾時間裡，這七天沒寫過的一件小事。' : '換成水電、管理員、續約漲租、押金、網路或看房話術裡，這七天沒寫過的一件小事。'}` +
+              '禁止再寫離職、月底才發薪水、房東訊息就來了、吃泡麵、冷氣室外機、近捷運、這也叫清潔，也不要寫律師、違法、租金補貼。' +
+              (shifted
+                ? '四到六行。正文只能有一組「」。最後一行用「還是」二選一。replyBody 留空字串。回傳同格式 JSON。'
+                : '至少三行。最後一行是做過的人才答得上來的問句。replyBody 留空字串。回傳同格式 JSON。'),
           },
         ],
         temperature: 0.4,
       });
       post = finishTrafficPost(post, params.brandSlug);
       const still = trafficStaleIssue(params.brandSlug, post.body)
+        || (shifted ? trafficRepeatIssue(params.brandSlug, post.body) : null)
         || trafficSceneIssue(params.brandSlug, post.body, params.usedTopics)
-        || trafficEndingIssue(post.body);
+        || trafficEndingIssue(post.body, shifted);
       if (still) throw new Error(`Homigo 這一檔還在重發（${still}），先不發`);
     }
   }

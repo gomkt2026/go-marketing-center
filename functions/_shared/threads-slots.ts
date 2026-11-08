@@ -2,7 +2,7 @@ import type { Env } from './env';
 import { getSql } from './db';
 import {
   buildBrandContext,
-  trafficFormulaFor, pickBrandTrend, trendAnchor,
+  trafficFormulaFor, settleTrafficFormula, pickBrandTrend, trendAnchor,
   GAME_PUBLIC_STILLS,
 } from './prompts';
 import { loadGamePromoBrief } from './game-daily';
@@ -17,7 +17,7 @@ import {
   isHourlyFamily, isOfftopicFamily, slotKindLabel,
   type PostingSlotKind,
 } from './posting-slots';
-import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from './auto-post-brands';
+import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand, isDraftOnlyBrand } from './auto-post-brands';
 import { finishOfficeDraft, loadOfficePack } from './office-directive';
 
 /** 品牌相關跟風文時段(台灣時間)。0 點、6 點先留著，這三天一起觀察。 */
@@ -165,7 +165,7 @@ async function writeTrafficDraft(
     slotMs,
     usedTopics,
   );
-  if (formula === 'hook' && !theme && brand.slug !== 'taskgo') formula = 'joke';
+  formula = settleTrafficFormula(brand.slug, formula, theme, slotMs);
   const siblingRows = await sql`
     SELECT b.slug,
            left(regexp_replace(coalesce(cv.body, ''), E'[\\n\\r]+', ' ', 'g'), 36) AS opening
@@ -614,6 +614,7 @@ export async function promoteDueThreadsSafetyNet(env: Env): Promise<number> {
     enabled.filter((slot) => slot.platform === 'threads').map((slot) => `${slot.brandSlug}|${slot.hourTw}`),
   );
   for (const row of rows as { id: string; slot_at: string | null; version_id: string; slug: string }[]) {
+    if (isDraftOnlyBrand(row.slug)) continue;
     const hour = row.slot_at ? hourTWFromIso(row.slot_at) : null;
     if (hour == null || !openHours.has(`${row.slug}|${hour}`)) {
       await sql`

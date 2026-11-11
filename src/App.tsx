@@ -66,7 +66,6 @@ const TokenSpend = lazyPage(() => import('@/pages/settings/TokenSpend'), 'TokenS
 const Inquiries = lazyPage(() => import('@/pages/inquiries/Inquiries'), 'Inquiries');
 const BriefingHub = lazyPage(() => import('@/pages/briefings/BriefingHub'), 'BriefingHub');
 const BriefingPlay = lazyPage(() => import('@/pages/briefings/BriefingPlay'), 'BriefingPlay');
-const GoMarketingPlay = lazyPage(() => import('@/pages/briefings/GoMarketingPlay'), 'GoMarketingPlay');
 const BriefingFilm = lazyPage(() => import('@/pages/briefings/BriefingFilm'), 'BriefingFilm');
 const CrewDirectory = lazyPage(() => import('@/pages/public/crews/Crews'), 'CrewDirectory');
 const CrewProfile = lazyPage(() => import('@/pages/public/crews/Crews'), 'CrewProfile');
@@ -200,7 +199,6 @@ export default function App() {
           {(['', '/en', '/ja'] as const).flatMap((prefix) => ([
             <Route key={`${prefix}/briefings`} path={`${prefix}/briefings`} element={<Suspense fallback={<PublicFallback />}><BriefingHub /></Suspense>} />,
             <Route key={`${prefix}/briefings/watch`} path={`${prefix}/briefings/watch/:slug`} element={<Suspense fallback={<PublicFallback />}><BriefingFilm /></Suspense>} />,
-            <Route key={`${prefix}/briefings/go-marketing`} path={`${prefix}/briefings/go-marketing/play`} element={<Suspense fallback={<PublicFallback />}><GoMarketingPlay /></Suspense>} />,
             <Route key={`${prefix}/briefings/play`} path={`${prefix}/briefings/:slug/play`} element={<Suspense fallback={<PublicFallback />}><BriefingPlay /></Suspense>} />,
             <Route key={`${prefix}/crews`} path={`${prefix}/crews`} element={<Suspense fallback={<PublicFallback />}><CrewDirectory /></Suspense>} />,
             <Route key={`${prefix}/crews/profile`} path={`${prefix}/crews/:slug`} element={<Suspense fallback={<PublicFallback />}><CrewProfile /></Suspense>} />,

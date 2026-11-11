@@ -8,6 +8,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { HubShortcuts } from '@/components/layout/HubShortcuts';
 import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
+import type { BrandUsage } from '@/types';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import {
   ChartCard, DonutChart, PipelineBarChart, PlatformBarChart, StackedPostsChart, CHART,
@@ -26,6 +27,7 @@ export function BrandWorkspace() {
 
   const brandQuery = useAsyncData(() => slug ? api.brand(slug) : Promise.reject(new Error('no slug')), [slug]);
   const workspaceQuery = useAsyncData(() => slug ? api.brandWorkspace(slug) : Promise.reject(new Error('no slug')), [slug]);
+  const usageQuery = useAsyncData(() => slug ? api.brandUsage(slug) : Promise.reject(new Error('no slug')), [slug]);
 
   if (!brand) return brandsLoading ? <LoadingState /> : <Navigate to="/" replace />;
   if (workspaceQuery.error && !workspaceQuery.data) {
@@ -79,6 +81,8 @@ export function BrandWorkspace() {
         <StatCard label="待審閱" value={stats.pendingContents} delay={0.06} tone="var(--color-accent)" />
         <StatCard label="近 28 天曝光" value={data.last28?.impressions ?? 0} delay={0.09} />
       </div>
+
+      <UsageStrip usage={usageQuery.data ?? undefined} />
 
       <div className="grid-3" style={{ gap: 16, marginBottom: 16 }}>
         <Card>
@@ -206,6 +210,45 @@ export function BrandWorkspace() {
           </Card>
         </div>
       )}
+    </div>
+  );
+}
+
+function usdText(value: number) {
+  return `US$${value.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+}
+
+function twdText(value: number, rate: number) {
+  return `NT$${Math.round(value * rate).toLocaleString('zh-TW')}`;
+}
+
+function UsageStrip({ usage }: { usage?: BrandUsage }) {
+  if (!usage) return null;
+  return (
+    <Card style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 10 }}>
+        AI 花費
+        {usage.pendingMigration
+          ? '。花費表尚未建立'
+          : `。台幣依參考匯率 1 美元 = ${usage.rate} 元，從開始記帳之後累計`}
+      </div>
+      <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
+        <UsageFigure label="累計 Token" value={Math.round(usage.tokens).toLocaleString('zh-TW')} />
+        <UsageFigure label="累計美元" value={usdText(usage.costUsd)} />
+        <UsageFigure label="累計台幣" value={twdText(usage.costUsd, usage.rate)} />
+        <UsageFigure label="本月 Token" value={Math.round(usage.monthTokens).toLocaleString('zh-TW')} />
+        <UsageFigure label="本月美元" value={usdText(usage.monthCostUsd)} />
+        <UsageFigure label="本月台幣" value={twdText(usage.monthCostUsd, usage.rate)} />
+      </div>
+    </Card>
+  );
+}
+
+function UsageFigure({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 800 }}>{value}</div>
     </div>
   );
 }

@@ -14,16 +14,16 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const episodeId = url.searchParams.get('episodeId') ?? undefined;
   const brandSlug = url.searchParams.get('brand') ?? undefined;
   let brandId: string | undefined;
+  let brandIds: string[] | undefined;
   if (brandSlug) {
     const brand = await getBrandBySlug(context.env, brandSlug);
     if (!brand) return error('Brand not found', 404);
     if (!canAccessBrand(auth, brand.id)) return forbidden();
     brandId = brand.id;
   } else if (!isSuperAdmin(auth)) {
-    brandId = auth.brandIds[0];
-    if (!brandId) return json({ jobs: [] });
+    brandIds = auth.brandIds;
   }
 
-  const jobs = await listVideoJobs(context.env, { brandId, episodeId });
+  const jobs = await listVideoJobs(context.env, { brandId, brandIds, episodeId });
   return json({ jobs });
 };

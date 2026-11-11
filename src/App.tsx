@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { MetaProvider } from '@/context/MetaContext';
@@ -62,9 +62,11 @@ const Show = lazyPage(() => import('@/pages/public/site/Show'), 'Show');
 const Jiangcheng = lazyPage(() => import('@/pages/public/site/Jiangcheng'), 'Jiangcheng');
 const Center = lazyPage(() => import('@/pages/public/site/Center'), 'Center');
 const GameSeasons = lazyPage(() => import('@/pages/settings/GameSeasons'), 'GameSeasons');
+const TokenSpend = lazyPage(() => import('@/pages/settings/TokenSpend'), 'TokenSpend');
 const Inquiries = lazyPage(() => import('@/pages/inquiries/Inquiries'), 'Inquiries');
 const BriefingHub = lazyPage(() => import('@/pages/briefings/BriefingHub'), 'BriefingHub');
 const BriefingPlay = lazyPage(() => import('@/pages/briefings/BriefingPlay'), 'BriefingPlay');
+const GoMarketingPlay = lazyPage(() => import('@/pages/briefings/GoMarketingPlay'), 'GoMarketingPlay');
 const BriefingFilm = lazyPage(() => import('@/pages/briefings/BriefingFilm'), 'BriefingFilm');
 const CrewDirectory = lazyPage(() => import('@/pages/public/crews/Crews'), 'CrewDirectory');
 const CrewProfile = lazyPage(() => import('@/pages/public/crews/Crews'), 'CrewProfile');
@@ -90,13 +92,20 @@ function PublicFallback() {
   return <LoadingState label={copy.common.loading} />;
 }
 
+function AdminOnly({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingState />;
+  if (user?.role !== 'super_admin') return <Navigate to="/home" replace />;
+  return children;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<LoadingState />}>
       <Routes>
         <Route path="/home" element={<HomeRedirect />} />
-        <Route path="/office" element={<Office />} />
-        <Route path="/overview" element={<Dashboard />} />
+        <Route path="/office" element={<AdminOnly><Office /></AdminOnly>} />
+        <Route path="/overview" element={<AdminOnly><Dashboard /></AdminOnly>} />
         <Route path="/trending" element={<Trending />} />
         <Route path="/:brand/trending" element={<Trending />} />
 
@@ -122,7 +131,7 @@ function AppRoutes() {
         <Route path="/:brand/social" element={<SocialAccounts />} />
         <Route path="/:brand/posting-times" element={<PostingTimes />} />
         <Route path="/:brand/briefings" element={<BrandBriefings />} />
-        <Route path="/personas" element={<AgentPersonas />} />
+        <Route path="/personas" element={<AdminOnly><AgentPersonas /></AdminOnly>} />
         <Route path="/:brand/analytics" element={<Analytics />} />
         <Route path="/:brand/learning" element={<Learning />} />
 
@@ -138,10 +147,11 @@ function AppRoutes() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/mcp" element={<McpConnect />} />
         <Route path="/settings/meta-threads" element={<MetaThreadsPlaybook />} />
-        <Route path="/settings/game" element={<GameSeasons />} />
-        <Route path="/inquiries" element={<Inquiries />} />
-        <Route path="/crew-leads" element={<CrewLeads />} />
-        <Route path="/crew-video-requests" element={<CrewVideoRequests />} />
+        <Route path="/settings/game" element={<AdminOnly><GameSeasons /></AdminOnly>} />
+        <Route path="/settings/usage" element={<AdminOnly><TokenSpend /></AdminOnly>} />
+        <Route path="/inquiries" element={<AdminOnly><Inquiries /></AdminOnly>} />
+        <Route path="/crew-leads" element={<AdminOnly><CrewLeads /></AdminOnly>} />
+        <Route path="/crew-video-requests" element={<AdminOnly><CrewVideoRequests /></AdminOnly>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -190,6 +200,7 @@ export default function App() {
           {(['', '/en', '/ja'] as const).flatMap((prefix) => ([
             <Route key={`${prefix}/briefings`} path={`${prefix}/briefings`} element={<Suspense fallback={<PublicFallback />}><BriefingHub /></Suspense>} />,
             <Route key={`${prefix}/briefings/watch`} path={`${prefix}/briefings/watch/:slug`} element={<Suspense fallback={<PublicFallback />}><BriefingFilm /></Suspense>} />,
+            <Route key={`${prefix}/briefings/go-marketing`} path={`${prefix}/briefings/go-marketing/play`} element={<Suspense fallback={<PublicFallback />}><GoMarketingPlay /></Suspense>} />,
             <Route key={`${prefix}/briefings/play`} path={`${prefix}/briefings/:slug/play`} element={<Suspense fallback={<PublicFallback />}><BriefingPlay /></Suspense>} />,
             <Route key={`${prefix}/crews`} path={`${prefix}/crews`} element={<Suspense fallback={<PublicFallback />}><CrewDirectory /></Suspense>} />,
             <Route key={`${prefix}/crews/profile`} path={`${prefix}/crews/:slug`} element={<Suspense fallback={<PublicFallback />}><CrewProfile /></Suspense>} />,

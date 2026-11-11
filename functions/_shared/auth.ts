@@ -177,6 +177,18 @@ export function requireBrandAccess(user: AuthUser, brandId: string): true | Resp
   return forbidden();
 }
 
+export function canAccessAnyBrand(user: AuthUser, brandIds: Array<string | null | undefined>): boolean {
+  if (isSuperAdmin(user)) return true;
+  return brandIds.some((id) => Boolean(id) && user.brandIds.includes(id as string));
+}
+
+export async function requireSuperAdmin(request: Request, env: Env): Promise<AuthUser | Response> {
+  const auth = await requireAuth(request, env);
+  if (auth instanceof Response) return auth;
+  if (!isSuperAdmin(auth)) return forbidden();
+  return auth;
+}
+
 export function getAuthUserById(env: Env, userId: string): Promise<AuthUser | null> {
   return loadUserRowById(env, userId);
 }

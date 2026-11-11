@@ -91,6 +91,7 @@ export async function speakOfficeMeeting(
   ].filter(Boolean).join('\n');
   if (material.trim().length < 8) return null;
   const completion = await claudeChatJsonWithUsage<{ hook?: unknown; close?: unknown; lines?: unknown }>(env, {
+    bill: false,
     temperature: 0.85,
     maxTokens: 1600,
     timeoutMs: 20000,

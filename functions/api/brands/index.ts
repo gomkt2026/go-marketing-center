@@ -33,6 +33,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     ingestBaseUrl?: string;
     cta?: string;
     editorNickname?: string;
+    voiceGender?: 'male' | 'female';
   };
 
   try {
@@ -48,6 +49,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       ingestBaseUrl: body.ingestBaseUrl,
       cta: body.cta,
       editorNickname: body.editorNickname,
+      voiceGender: body.voiceGender,
     }, auth.id);
     const brand = await getBrandBySlug(context.env, created.slug);
     return json({ brand, ...created }, 201);

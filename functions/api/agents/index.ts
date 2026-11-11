@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
-import { requireAuth } from '../../_shared/auth';
+import { requireAuth, isSuperAdmin } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
 import { json } from '../../_shared/response';
 
@@ -10,15 +10,28 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const sql = getSql(context.env);
-  const rows = await sql`
-    SELECT a.id, a.display_name, a.persona, a.is_active, a.brand_id,
-           r.code AS role_code, b.slug AS brand_slug, b.name AS brand_name
-    FROM ai_agents a
-    JOIN agent_roles r ON r.id = a.role_id
-    LEFT JOIN brands b ON b.id = a.brand_id
-    WHERE a.is_active = true
-    ORDER BY b.name NULLS LAST, a.display_name
-  `;
+  const rows = isSuperAdmin(auth)
+    ? await sql`
+        SELECT a.id, a.display_name, a.persona, a.is_active, a.brand_id,
+               r.code AS role_code, b.slug AS brand_slug, b.name AS brand_name
+        FROM ai_agents a
+        JOIN agent_roles r ON r.id = a.role_id
+        LEFT JOIN brands b ON b.id = a.brand_id
+        WHERE a.is_active = true
+        ORDER BY b.name NULLS LAST, a.display_name
+      `
+    : auth.brandIds.length === 0
+      ? []
+      : await sql`
+          SELECT a.id, a.display_name, a.persona, a.is_active, a.brand_id,
+                 r.code AS role_code, b.slug AS brand_slug, b.name AS brand_name
+          FROM ai_agents a
+          JOIN agent_roles r ON r.id = a.role_id
+          LEFT JOIN brands b ON b.id = a.brand_id
+          WHERE a.is_active = true
+            AND a.brand_id = ANY(${auth.brandIds}::uuid[])
+          ORDER BY b.name NULLS LAST, a.display_name
+        `;
 
   const agents = (rows as Record<string, unknown>[]).map((r) => ({
     id: r.id,

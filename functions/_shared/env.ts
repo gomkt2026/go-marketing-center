@@ -32,6 +32,8 @@ export interface Env {
   ANTHROPIC_API_KEY?: string;
   /** 選填:覆寫發文文案模型,預設 claude-haiku-4-5 */
   ANTHROPIC_TEXT_MODEL?: string;
+  /** 美元換台幣的參考匯率，預設 32。只用於畫面，不寫進每一筆花費。 */
+  USD_TWD_RATE?: string;
   /** ElevenLabs API key(Podcast 語音合成、Conversational AI) */
   ELEVENLABS_API_KEY?: string;
   /** Washgo 阿樂 Conversational Agent id */

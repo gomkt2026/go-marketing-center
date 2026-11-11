@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
-import { requireAuth } from '../../_shared/auth';
+import { requireAuth, canAccessBrand, forbidden } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
 import { rowToCamel } from '../../_shared/case';
 import { logActivity } from '../../_shared/activity';
@@ -21,6 +21,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   if (!body.brandId || !body.ruleType || !body.statement?.trim()) {
     return error('brandId, ruleType, statement are required', 400);
   }
+  if (!canAccessBrand(auth, body.brandId)) return forbidden();
 
   const sql = getSql(context.env);
   const inserted = await sql`

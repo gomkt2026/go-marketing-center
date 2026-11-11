@@ -1,18 +1,18 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
-import type { Env } from '../../../_shared/env';
-import { requireAuth } from '../../../_shared/auth';
-import { getSql } from '../../../_shared/db';
-import { getBrandBySlug } from '../../../_shared/queries';
-import { rowsToCamel } from '../../../_shared/case';
-import { json, error } from '../../../_shared/response';
-import { toPressCoverage } from '../../../_shared/press';
-import { toBrandDocument } from '../../../_shared/documents';
-import { applyDocumentCollateralMigration, isMissingDocumentCollateral } from '../../../_shared/document-migrate';
-import { listBrandImagePrompts } from '../../../_shared/image-prompts';
-import { listBrandVersions } from '../../../_shared/brand-knowledge';
-import { ensureBrandAssetLibrary } from '../../../_shared/brand-assets';
-import { ensureTaskgoProductFilmAssets } from '../../../_shared/taskgo-product-films';
-import { ensureSystemShortAssets } from '../../../_shared/system-shorts';
+import type { Env } from '../../../../_shared/env';
+import { requireAuth } from '../../../../_shared/auth';
+import { getSql } from '../../../../_shared/db';
+import { getBrandBySlug } from '../../../../_shared/queries';
+import { rowsToCamel } from '../../../../_shared/case';
+import { json, error } from '../../../../_shared/response';
+import { toPressCoverage } from '../../../../_shared/press';
+import { toBrandDocument } from '../../../../_shared/documents';
+import { applyDocumentCollateralMigration, isMissingDocumentCollateral } from '../../../../_shared/document-migrate';
+import { listBrandImagePrompts } from '../../../../_shared/image-prompts';
+import { listBrandVersions } from '../../../../_shared/brand-knowledge';
+import { ensureBrandAssetLibrary } from '../../../../_shared/brand-assets';
+import { ensureTaskgoProductFilmAssets } from '../../../../_shared/taskgo-product-films';
+import { ensureSystemShortAssets } from '../../../../_shared/system-shorts';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);

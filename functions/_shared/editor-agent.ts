@@ -3,6 +3,7 @@ import type { AuthUser } from './auth';
 import { getSql } from './db';
 import { rowToCamel } from './case';
 import { chatCompleteJson } from './openai';
+import { runWithUsage, usageActive } from './llm-usage';
 import { ANTI_AI_RULES, ctaRuleForBrand, getBrandVoice, type BrandContext } from './prompts';
 import {
   generatePlatformPost, saveGeneratedContent,
@@ -709,6 +710,9 @@ export async function runEditorChatTurn(
     auth: AuthUser;
   },
 ): Promise<{ reply: string; toolResult?: EditorToolResult; messages: EditorMessageRow[] }> {
+  if (!usageActive()) {
+    return runWithUsage({ brandId: params.brandId, feature: 'editor_chat' }, () => runEditorChatTurn(env, params));
+  }
   const [history, brief] = await Promise.all([
     listEditorMessages(env, params.sessionId, 16),
     loadEditorChatBrief(env, params.brandId),

@@ -427,10 +427,20 @@ function BrandsOnboardPanel() {
   const [blogBaseUrl, setBlogBaseUrl] = useState('');
   const [cta, setCta] = useState('');
   const [editorNickname, setEditorNickname] = useState('小編');
+  const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
+  const [decks, setDecks] = useState<File[]>([]);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [accountName, setAccountName] = useState('');
+  const [accountUsername, setAccountUsername] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
+  const [accountRole, setAccountRole] = useState<UserRole>('brand_manager');
   const [saving, setSaving] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState('');
   const [createdSlug, setCreatedSlug] = useState<string | null>(null);
+  const [createdBrandId, setCreatedBrandId] = useState<string | null>(null);
   const [seoTopicCount, setSeoTopicCount] = useState(0);
+  const [finishNote, setFinishNote] = useState('');
 
   function guessSlug(value: string) {
     return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32);
@@ -452,9 +462,12 @@ function BrandsOnboardPanel() {
         blogBaseUrl: blogBaseUrl || websiteUrl || undefined,
         cta: cta || undefined,
         editorNickname: editorNickname || undefined,
+        voiceGender,
       });
       setCreatedSlug(res.slug);
+      setCreatedBrandId(res.brandId);
       setSeoTopicCount(res.seoTopicCount);
+      setFinishNote('');
       setName('');
       setSlug('');
       setTagline('');
@@ -468,6 +481,42 @@ function BrandsOnboardPanel() {
       setError(err instanceof ApiError ? err.message : '新增品牌失敗');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function finishBrand() {
+    if (!createdSlug || !createdBrandId) return;
+    setError('');
+    setFinishing(true);
+    try {
+      for (const file of decks) {
+        await api.uploadBrandDocument(createdSlug, {
+          file,
+          sourceType: 'presentation',
+          title: file.name,
+        });
+      }
+      for (const file of photos) {
+        await api.uploadBrandAsset(createdSlug, { file, name: file.name });
+      }
+      if (accountUsername.trim() || accountPassword || accountName.trim()) {
+        await api.createAdminUser({
+          displayName: accountName.trim() || accountUsername.trim(),
+          username: accountUsername.trim(),
+          password: accountPassword,
+          role: accountRole,
+          brandIds: [createdBrandId],
+        });
+      }
+      const compiled = await api.compileBrandIntelligence(createdSlug);
+      const site = compiled.usedWebsite ? '已讀官網' : '沒有讀到官網';
+      setFinishNote(`已整理 ${compiled.personaCount} 組人物誌，收進 ${compiled.documentCount} 份文件。${site}。`);
+      setDecks([]);
+      setPhotos([]);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '整理品牌智慧失敗');
+    } finally {
+      setFinishing(false);
     }
   }
 
@@ -532,6 +581,13 @@ function BrandsOnboardPanel() {
             </label>
           </div>
           <label style={labelStyle}>
+            <span>聲音</span>
+            <select value={voiceGender} onChange={(e) => setVoiceGender(e.target.value as 'male' | 'female')} style={inputStyle}>
+              <option value="female">女生</option>
+              <option value="male">男生</option>
+            </select>
+          </label>
+          <label style={labelStyle}>
             <span>官網長文文末 CTA</span>
             <input value={cta} onChange={(e) => setCta(e.target.value)} style={inputStyle} placeholder="空白則用匠管信箱與電話" />
           </label>
@@ -541,9 +597,46 @@ function BrandsOnboardPanel() {
             </div>
           )}
           {createdSlug && (
-            <div style={{ fontSize: 13, lineHeight: 1.7, background: 'var(--color-bg-soft)', padding: '10px 12px', borderRadius: 8 }}>
-              已建立，並產出 {seoTopicCount} 則 SEO 主題。接著補：
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+            <div style={{ fontSize: 13, lineHeight: 1.7, background: 'var(--color-bg-soft)', padding: '12px', borderRadius: 8, display: 'grid', gap: 10 }}>
+              <div>已建立 {createdSlug}，並產出 {seoTopicCount} 則 SEO 主題。上傳簡報或照片後，系統會整理進品牌智慧。</div>
+              <label style={labelStyle}>
+                <span>簡報（PDF／PPT／PPTX，可多檔）</span>
+                <input type="file" multiple accept=".pdf,.ppt,.pptx,application/pdf" onChange={(e) => setDecks(Array.from(e.target.files ?? []))} />
+              </label>
+              <label style={labelStyle}>
+                <span>照片素材（JPG／PNG／WebP，可多檔）</span>
+                <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => setPhotos(Array.from(e.target.files ?? []))} />
+              </label>
+              <div style={{ fontWeight: 700 }}>同時建立這個品牌的登入帳號（可略過）</div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <label style={labelStyle}>
+                  <span>顯示名稱</span>
+                  <input value={accountName} onChange={(e) => setAccountName(e.target.value)} style={inputStyle} />
+                </label>
+                <label style={labelStyle}>
+                  <span>登入帳號</span>
+                  <input value={accountUsername} onChange={(e) => setAccountUsername(e.target.value)} style={inputStyle} />
+                </label>
+              </div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <label style={labelStyle}>
+                  <span>密碼</span>
+                  <input type="password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} style={inputStyle} />
+                </label>
+                <label style={labelStyle}>
+                  <span>角色</span>
+                  <select value={accountRole} onChange={(e) => setAccountRole(e.target.value as UserRole)} style={inputStyle}>
+                    <option value="brand_manager">品牌負責人</option>
+                    <option value="brand_editor">品牌編輯</option>
+                    <option value="viewer">唯讀</option>
+                  </select>
+                </label>
+              </div>
+              {finishNote && <div>{finishNote}</div>}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Button type="button" variant="primary" disabled={finishing} onClick={() => void finishBrand()}>
+                  {finishing ? '整理中…' : '上傳並整理進品牌智慧'}
+                </Button>
                 <Link to={`/${createdSlug}/intelligence`}>品牌智慧</Link>
                 <Link to={`/${createdSlug}/posting-times`}>發文時段</Link>
                 <Link to={`/${createdSlug}/seo`}>官網 SEO</Link>

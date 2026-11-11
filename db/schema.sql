@@ -1376,3 +1376,21 @@ CREATE TABLE IF NOT EXISTS mcp_upload_tokens (
   used_at    TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- AI 文字 token 與產圖張數。台幣不落庫，畫面用 USD_TWD_RATE 換算。
+CREATE TABLE IF NOT EXISTS llm_usage (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id       UUID REFERENCES brands(id) ON DELETE SET NULL,
+  occurred_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  provider       TEXT NOT NULL,
+  model          TEXT NOT NULL,
+  feature        TEXT NOT NULL,
+  input_tokens   INTEGER NOT NULL DEFAULT 0,
+  output_tokens  INTEGER NOT NULL DEFAULT 0,
+  image_count    INTEGER NOT NULL DEFAULT 0,
+  cost_usd       NUMERIC(14, 6) NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_brand_time
+  ON llm_usage (brand_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_time
+  ON llm_usage (occurred_at DESC);

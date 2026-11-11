@@ -173,6 +173,26 @@ export interface BrandWorkspacePayload {
   pressCoverages: PressCoverage[];
 }
 
+export interface UsageTotals {
+  tokens: number;
+  costUsd: number;
+  monthTokens: number;
+  monthCostUsd: number;
+}
+
+export interface BrandUsage extends UsageTotals {
+  rate: number;
+  pendingMigration: boolean;
+}
+
+export interface AdminUsage {
+  rate: number;
+  pendingMigration: boolean;
+  brands: Array<UsageTotals & { id: string; slug: string; name: string }>;
+  cross: UsageTotals;
+  total: UsageTotals;
+}
+
 export interface BrandExample {
   id: string;
   brandId: string;

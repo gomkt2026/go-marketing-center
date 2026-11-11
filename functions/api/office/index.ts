@@ -1,13 +1,13 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
-import { requireAuth } from '../../_shared/auth';
+import { requireSuperAdmin } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
 import { json, failLoad } from '../../_shared/response';
 import { ensureOfficeSuggestions, setOfficeAutoPublish } from '../../_shared/office-directive';
 import { loadOfficeSnapshot } from '../../_shared/office-snapshot';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const auth = await requireAuth(context.request, context.env);
+  const auth = await requireSuperAdmin(context.request, context.env);
   if (auth instanceof Response) return auth;
   try {
     return json(await loadOfficeSnapshot(context.env));
@@ -17,7 +17,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 };
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const auth = await requireAuth(context.request, context.env);
+  const auth = await requireSuperAdmin(context.request, context.env);
   if (auth instanceof Response) return auth;
   try {
     const body = await context.request.json().catch(() => ({})) as { autoPublish?: boolean; suggestion?: string; agentId?: string };
@@ -37,7 +37,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       if (!found.length) return json({ error: '找不到這位小編' }, 404);
       await sql`
         INSERT INTO office_suggestions (agent_id, user_id, body)
-        VALUES (${body.agentId}::uuid, ${auth.userId}::uuid, ${text})
+        VALUES (${body.agentId}::uuid, ${auth.id}::uuid, ${text})
       `;
       return json({ ok: true });
     }

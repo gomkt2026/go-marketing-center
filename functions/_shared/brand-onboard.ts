@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { chatCompleteJson } from './openai';
+import { runWithUsage } from './llm-usage';
 import { DEFAULT_SLOT_DEFS } from './posting-slots';
 import {
   fallbackSeoTopics, replaceBrandSeoTopics,
@@ -15,6 +16,13 @@ const RESERVED_SLUGS = new Set([
   'e', 'go', 'dashboard',
 ]);
 
+export type VoiceGender = 'male' | 'female';
+
+export const VOICE_PRESETS: Record<VoiceGender, { voiceId: string; label: string }> = {
+  male: { voiceId: 'auoHciLZJwKTwYUoRTYz', label: '男聲' },
+  female: { voiceId: '1AKkSX7KMPHIWuz76m0n', label: '女聲' },
+};
+
 export interface OnboardBrandInput {
   name: string;
   slug: string;
@@ -27,6 +35,7 @@ export interface OnboardBrandInput {
   ingestBaseUrl?: string;
   cta?: string;
   editorNickname?: string;
+  voiceGender?: VoiceGender;
 }
 
 export interface OnboardBrandResult {
@@ -64,6 +73,7 @@ export function validateOnboardInput(input: OnboardBrandInput): OnboardBrandInpu
     ingestBaseUrl: input.ingestBaseUrl?.trim() || '',
     cta: input.cta?.trim() || SHARED_BRAND_CTA,
     editorNickname: input.editorNickname?.trim() || '小編',
+    voiceGender: input.voiceGender === 'male' ? 'male' : 'female',
   };
 }
 
@@ -100,6 +110,7 @@ async function generateSeoTopics(env: Env, input: OnboardBrandInput): Promise<Se
 
 export async function onboardBrand(env: Env, raw: OnboardBrandInput, actorUserId: string): Promise<OnboardBrandResult> {
   const input = validateOnboardInput(raw);
+  const voiceGender: VoiceGender = input.voiceGender === 'male' ? 'male' : 'female';
   const sql = getSql(env);
 
   const exists = await sql`SELECT id FROM brands WHERE slug = ${input.slug} LIMIT 1`;
@@ -152,12 +163,13 @@ export async function onboardBrand(env: Env, raw: OnboardBrandInput, actorUserId
       (${brandId}::uuid, ${versionId}::uuid, 'marketing_rule', ${`社群主 CTA 用匠管窗口；官網長文可用品牌指定行動呼籲：${input.cta}`}, 'verified', 4)
   `;
 
+  const voiceLabel = VOICE_PRESETS[voiceGender].label;
   await sql`
     INSERT INTO brand_channels (brand_id, brand_version_id, platform, tone_of_voice, length_guideline, format_guideline, hashtag_count_min, hashtag_count_max, posting_frequency)
     VALUES
-      (${brandId}::uuid, ${versionId}::uuid, 'facebook', '完整敘事、專業可信', '150-400字', '痛點 → 解法 → CTA', 2, 3, '每天台灣 19:00 業者主題'),
-      (${brandId}::uuid, ${versionId}::uuid, 'instagram', '視覺優先、短 hook', '80-180字', '4:5 痛點海報+現場畫面', 8, 12, '每天台灣 19:00 業者主題'),
-      (${brandId}::uuid, ${versionId}::uuid, 'threads', '口語、短、敢聊現場', '1-3 段', '每檔照發文時段主題寫', 0, 4, '依發文時段')
+      (${brandId}::uuid, ${versionId}::uuid, 'facebook', ${`完整敘事、專業可信。聲音：${voiceLabel}`}, '150-400字', '痛點 → 解法 → CTA', 2, 3, '每天台灣 19:00 業者主題'),
+      (${brandId}::uuid, ${versionId}::uuid, 'instagram', ${`視覺優先、短 hook。聲音：${voiceLabel}`}, '80-180字', '4:5 痛點海報+現場畫面', 8, 12, '每天台灣 19:00 業者主題'),
+      (${brandId}::uuid, ${versionId}::uuid, 'threads', ${`口語、短、敢聊現場。聲音：${voiceLabel}`}, '1-3 段', '每檔照發文時段主題寫', 0, 4, '依發文時段')
   `;
   try {
     await sql`
@@ -218,9 +230,15 @@ export async function onboardBrand(env: Env, raw: OnboardBrandInput, actorUserId
     console.error('[onboard] 圖片 prompt 種子略過', e);
   }
 
+  const voice = VOICE_PRESETS[voiceGender];
+  const persona = JSON.stringify({
+    voiceGender,
+    voiceId: voice.voiceId,
+    nickname: input.editorNickname,
+  });
   await sql`
-    INSERT INTO ai_agents (brand_id, role_id, display_name, avatar_color, is_active)
-    SELECT ${brandId}::uuid, r.id, ${`${input.name} ${input.editorNickname}`}, ${input.primaryColor}, true
+    INSERT INTO ai_agents (brand_id, role_id, display_name, avatar_color, is_active, persona)
+    SELECT ${brandId}::uuid, r.id, ${`${input.name} ${input.editorNickname}`}, ${input.primaryColor}, true, ${persona}::jsonb
     FROM agent_roles r
     WHERE r.code = 'brand_ai'
     LIMIT 1
@@ -232,7 +250,7 @@ export async function onboardBrand(env: Env, raw: OnboardBrandInput, actorUserId
     ON CONFLICT (brand_id, user_id) DO NOTHING
   `;
 
-  const topics = await generateSeoTopics(env, input);
+  const topics = await runWithUsage({ brandId, feature: 'onboard_seo' }, () => generateSeoTopics(env, input));
   await replaceBrandSeoTopics(env, brandId, topics);
 
   return {

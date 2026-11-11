@@ -25,10 +25,23 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (auth instanceof Response) return auth;
 
   const sql = getSql(context.env);
-  const [proposals, decisions] = await Promise.all([
-    loadProposals(context.env),
-    sql`SELECT * FROM decisions ORDER BY decided_at DESC`,
-  ]);
+  const decisions = isSuperAdmin(auth)
+    ? await sql`SELECT * FROM decisions ORDER BY decided_at DESC`
+    : auth.brandIds.length === 0
+      ? []
+      : await sql`
+          SELECT d.*
+          FROM decisions d
+          JOIN proposals p ON p.id = d.proposal_id
+          WHERE p.brand_id = ANY(${auth.brandIds}::uuid[])
+             OR EXISTS (
+               SELECT 1 FROM collaboration_brands cb
+               WHERE cb.collaboration_id = p.collaboration_id
+                 AND cb.brand_id = ANY(${auth.brandIds}::uuid[])
+             )
+          ORDER BY d.decided_at DESC
+        `;
+  const proposals = await loadProposals(context.env);
 
   const allowed = new Set(auth.brandIds);
   const scopedProposals = isSuperAdmin(auth)

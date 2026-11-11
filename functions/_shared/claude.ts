@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import type { ChatContentPart, ChatMessage } from './openai';
 import { OpenAIError } from './openai';
+import { noteLlmCall } from './llm-usage';
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -51,7 +52,7 @@ export async function claudeChatJson<T>(
 /** 晨會計費用。模型仍是 Haiku，不改走更貴的模型。 */
 export async function claudeChatJsonWithUsage<T>(
   env: Env,
-  params: { messages: ChatMessage[]; temperature?: number; maxTokens?: number; timeoutMs?: number },
+  params: { messages: ChatMessage[]; temperature?: number; maxTokens?: number; timeoutMs?: number; bill?: boolean },
 ): Promise<{ data: T; usage: ClaudeUsage }> {
   if (!env.ANTHROPIC_API_KEY) {
     throw new OpenAIError(500, 'ANTHROPIC_API_KEY 尚未設定');
@@ -91,15 +92,23 @@ export async function claudeChatJsonWithUsage<T>(
   };
   const raw = (data.content ?? []).filter((b) => b.type === 'text').map((b) => b.text ?? '').join('\n').trim();
   if (!raw) throw new OpenAIError(502, 'Claude 回傳空內容');
+  let parsed: T;
   try {
-    return {
-      data: JSON.parse(extractJson(raw)) as T,
-      usage: {
-        inputTokens: data.usage?.input_tokens ?? 0,
-        outputTokens: data.usage?.output_tokens ?? 0,
-      },
-    };
+    parsed = JSON.parse(extractJson(raw)) as T;
   } catch {
     throw new OpenAIError(502, `Claude 回傳非合法 JSON: ${raw.slice(0, 200)}`);
   }
+  const usage = {
+    inputTokens: data.usage?.input_tokens ?? 0,
+    outputTokens: data.usage?.output_tokens ?? 0,
+  };
+  if (params.bill !== false) {
+    await noteLlmCall(env, {
+      provider: 'anthropic',
+      model: env.ANTHROPIC_TEXT_MODEL ?? DEFAULT_MODEL,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+    });
+  }
+  return { data: parsed, usage };
 }

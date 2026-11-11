@@ -17,8 +17,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (isSuperAdmin(auth)) return json({ users, agents });
 
   const allowed = new Set(auth.brandIds);
-  const scopedAgents = (agents as { brandId?: string }[]).filter((a) => !a.brandId || allowed.has(a.brandId));
-  const scopedUsers = (users as { id: string; role: string }[]).filter((u) => u.id === auth.id || u.role === 'super_admin');
+  const scopedAgents = (agents as { brandId?: string }[]).filter((a) => a.brandId && allowed.has(a.brandId));
+  const scopedUsers = (users as { id: string }[]).filter((u) => u.id === auth.id);
   return json({ users: scopedUsers, agents: scopedAgents });
   } catch (e) {
     return failLoad('meta', e);

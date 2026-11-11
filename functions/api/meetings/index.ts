@@ -74,8 +74,21 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     VALUES (${meetingId}::uuid, 'user', ${auth.id}::uuid)
   `;
 
-  // live_editors 模式:只邀三位品牌小編(brand_ai),不含分析師等其他角色
-  const agentRows = mode === 'live_editors'
+  // 非管理者只能邀自己有權限的品牌小編，不能把其他品牌的人設拉進會議。
+  const agentRows = !isSuperAdmin(auth)
+    ? (body.crossBrand || mode === 'live_editors')
+      ? await sql`
+          SELECT a.id FROM ai_agents a
+          JOIN agent_roles r ON r.id = a.role_id
+          WHERE a.is_active = true
+            AND a.brand_id = ANY(${auth.brandIds}::uuid[])
+            AND r.code = 'brand_ai'
+        `
+      : await sql`
+          SELECT a.id FROM ai_agents a
+          WHERE a.is_active = true AND a.brand_id = ${hostBrand.id}::uuid
+        `
+    : mode === 'live_editors'
     ? await sql`
         SELECT a.id FROM ai_agents a
         JOIN agent_roles r ON r.id = a.role_id

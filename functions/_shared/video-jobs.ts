@@ -173,10 +173,32 @@ export async function getVideoJob(env: Env, id: string): Promise<VideoJobRow | n
 
 export async function listVideoJobs(
   env: Env,
-  params: { brandId?: string; episodeId?: string; limit?: number },
+  params: { brandId?: string; brandIds?: string[]; episodeId?: string; limit?: number },
 ): Promise<VideoJobRow[]> {
   const sql = getSql(env);
   const limit = params.limit ?? 40;
+  if (params.brandIds) {
+    if (!params.brandIds.length) return [];
+    const rows = params.episodeId
+      ? await sql`
+          SELECT v.*, e.title AS episode_title, b.slug AS brand_slug
+          FROM video_jobs v
+          LEFT JOIN podcast_episodes e ON e.id = v.podcast_episode_id
+          LEFT JOIN brands b ON b.id = v.brand_id
+          WHERE v.brand_id = ANY(${params.brandIds}::uuid[])
+            AND v.podcast_episode_id = ${params.episodeId}::uuid
+          ORDER BY v.created_at DESC LIMIT ${limit}
+        `
+      : await sql`
+          SELECT v.*, e.title AS episode_title, b.slug AS brand_slug
+          FROM video_jobs v
+          LEFT JOIN podcast_episodes e ON e.id = v.podcast_episode_id
+          LEFT JOIN brands b ON b.id = v.brand_id
+          WHERE v.brand_id = ANY(${params.brandIds}::uuid[])
+          ORDER BY v.created_at DESC LIMIT ${limit}
+        `;
+    return (rows as Record<string, unknown>[]).map(mapVideoJob);
+  }
   const rows = params.episodeId
     ? await sql`
         SELECT v.*, e.title AS episode_title, b.slug AS brand_slug

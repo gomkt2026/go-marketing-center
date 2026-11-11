@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { generateImage } from './openai';
+import { runWithUsage, usageActive } from './llm-usage';
 import { seoChatJson, socialChatJson } from './social-llm';
 import { loadOfficePack, type OfficePack } from './office-directive';
 import { factProblem } from './office-facts';
@@ -447,6 +448,9 @@ export async function generatePlatformPost(
     applyOffice?: boolean;
   },
 ): Promise<GenerationResult> {
+  if (!usageActive()) {
+    return runWithUsage({ brandId: params.brandCtx.brandId, feature: 'generate_post' }, () => generatePlatformPost(env, params));
+  }
   const { brandCtx, platform } = params;
   const imagePack = await loadBrandImagePromptPack(env, brandCtx.brandId, brandCtx.slug).catch(() => ({
     designStyle: defaultDesignImageStyle(brandCtx.slug),
@@ -787,6 +791,9 @@ export async function generateOfftopicPost(
   env: Env,
   params: { usedTopics: string[]; brandSlug?: string; forceLoveStory?: boolean; usedAngles?: string[]; skipPrediction?: boolean },
 ): Promise<GenerationResult> {
+  if (!usageActive()) {
+    return runWithUsage({ brandSlug: params.brandSlug, feature: 'generate_offtopic' }, () => generateOfftopicPost(env, params));
+  }
   const spec = composeOfftopicPrompt(params.usedTopics, params.brandSlug, {
     forceLoveStory: params.forceLoveStory,
     usedAngles: params.usedAngles,
@@ -867,6 +874,9 @@ export async function generateTrafficPost(
     office?: OfficePack | null;
   },
 ): Promise<GenerationResult> {
+  if (!usageActive()) {
+    return runWithUsage({ brandSlug: params.brandSlug, feature: 'generate_traffic' }, () => generateTrafficPost(env, params));
+  }
   const spec = composeTrafficPrompt(params);
   const limit = spec.maxChars + 40;
   const washgo = params.brandSlug === 'washgo';
@@ -1046,6 +1056,9 @@ export async function generatePostFromImage(
     skipPrediction?: boolean;
   },
 ): Promise<GenerationResult> {
+  if (!usageActive()) {
+    return runWithUsage({ brandId: params.brandCtx.brandId, feature: 'generate_from_image' }, () => generatePostFromImage(env, params));
+  }
   const { brandCtx, imageUrl, platform } = params;
   if (
     (platform === 'facebook' || platform === 'instagram')
@@ -1174,6 +1187,9 @@ export async function generateGamePromoPost(
     stillUrl?: string | null;
   },
 ): Promise<GenerationResult> {
+  if (!usageActive()) {
+    return runWithUsage({ brandId: params.brandCtx.brandId, feature: 'generate_game_promo' }, () => generateGamePromoPost(env, params));
+  }
   const { brandCtx, angle } = params;
   const userPrompt = buildGamePromoPrompt({
     brandSlug: brandCtx.slug,
@@ -1392,6 +1408,9 @@ export async function generateEcosystemXPost(
   env: Env,
   params: { angle: EcosystemXAngle; collaborationContext: string; screenshotUrl?: string | null; screenshotAssetId?: string | null },
 ): Promise<EcosystemXGenerationResult> {
+  if (!usageActive()) {
+    return runWithUsage({ feature: 'ecosystem_x' }, () => generateEcosystemXPost(env, params));
+  }
   const userPrompt = buildEcosystemXUserPrompt({ angle: params.angle, collaborationContext: params.collaborationContext });
   const messages = [
     { role: 'system' as const, content: ECOSYSTEM_X_SYSTEM_PROMPT },
@@ -1562,6 +1581,9 @@ export async function generateSeoArticle(
     marketSignalId?: string | null;
   },
 ): Promise<SeoArticleResult> {
+  if (!usageActive()) {
+    return runWithUsage({ brandId: params.brandCtx.brandId, feature: 'generate_seo' }, () => generateSeoArticle(env, params));
+  }
   const slug = params.brandCtx.slug;
   const seed = params.topicSeed;
   const audience = seed?.audience ?? (slug === 'washgo' ? 'consumer' : undefined);

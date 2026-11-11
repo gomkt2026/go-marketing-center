@@ -251,6 +251,7 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
   let outputTokens = 0;
   try {
     const completion = await claudeChatJsonWithUsage<unknown>(env, {
+      bill: false,
       temperature: 0.7,
       maxTokens: 1600,
       messages: [

@@ -111,6 +111,7 @@ export const api = {
     ingestBaseUrl?: string;
     cta?: string;
     editorNickname?: string;
+    voiceGender?: 'male' | 'female';
   }) =>
     request<{
       brand: import('@/types').Brand;
@@ -133,6 +134,12 @@ export const api = {
     request<{ brand: import('@/types').Brand }>(`/api/brands/${slug}`, {
       method: 'PATCH', body: JSON.stringify(body),
     }),
+
+  compileBrandIntelligence: (slug: string) =>
+    request<{ personaCount: number; documentCount: number; usedWebsite: boolean }>(
+      `/api/brands/${slug}/intelligence/compile`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
 
   brandIntelligence: (slug: string) =>
     request<{
@@ -337,6 +344,11 @@ export const api = {
     request<import('@/types').BrandWorkspacePayload>(`/api/brands/${slug}/workspace`, {
       timeoutMs: WORKSPACE_TIMEOUT_MS,
     }),
+
+  brandUsage: (slug: string) =>
+    request<import('@/types').BrandUsage>(`/api/brands/${slug}/usage`),
+
+  adminUsage: () => request<import('@/types').AdminUsage>('/api/admin/usage'),
 
   createPressCoverage: (slug: string, body: {
     outlet: string; headline: string; articleUrl?: string; publishedOn?: string;

@@ -16,12 +16,17 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if (brandId && !canAccessBrand(auth, brandId)) return forbidden();
 
   const sql = getSql(context.env);
-  const fetched = brandId
+  const rows = brandId
     ? await sql`SELECT * FROM activity_logs WHERE brand_id = ${brandId}::uuid ORDER BY created_at DESC LIMIT 100`
-    : await sql`SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 100`;
-  const rows = isSuperAdmin(auth) || brandId
-    ? fetched
-    : (fetched as { brand_id: string }[]).filter((r) => auth.brandIds.includes(r.brand_id));
+    : isSuperAdmin(auth)
+      ? await sql`SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 100`
+      : auth.brandIds.length === 0
+        ? []
+        : await sql`
+            SELECT * FROM activity_logs
+            WHERE brand_id = ANY(${auth.brandIds}::uuid[])
+            ORDER BY created_at DESC LIMIT 100
+          `;
 
   return json({
     activity: rowsToCamel(rows as Record<string, unknown>[]),

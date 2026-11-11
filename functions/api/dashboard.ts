@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../_shared/env';
-import { requireAuth, isSuperAdmin } from '../_shared/auth';
+import { isSuperAdmin, requireSuperAdmin } from '../_shared/auth';
 import { getSql } from '../_shared/db';
 import { getBrandsForUser } from '../_shared/queries';
 import { rowsToCamel } from '../_shared/case';
@@ -9,7 +9,7 @@ import { ACTION_LABELS } from '../_shared/activity';
 import { latestSeoAuditsByBrand } from '../_shared/seo-audit';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const auth = await requireAuth(context.request, context.env);
+  const auth = await requireSuperAdmin(context.request, context.env);
   if (auth instanceof Response) return auth;
 
   try {
@@ -49,16 +49,30 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         )
       GROUP BY c.brand_id
     `.catch(() => []),
-    sql`
-      SELECT timezone('Asia/Taipei', coalesce(pj.published_at, pj.updated_at))::date AS day,
-             count(*) FILTER (WHERE pj.status = 'published')::int AS published,
-             count(*) FILTER (WHERE pj.status = 'failed')::int AS failed
-      FROM publishing_jobs pj
-      JOIN contents c ON c.id = pj.content_id
-      WHERE coalesce(pj.published_at, pj.updated_at) >= now() - interval '7 days'
-      GROUP BY 1
-      ORDER BY 1
-    `.catch(() => []),
+    (isSuperAdmin(auth)
+      ? sql`
+          SELECT timezone('Asia/Taipei', coalesce(pj.published_at, pj.updated_at))::date AS day,
+                 count(*) FILTER (WHERE pj.status = 'published')::int AS published,
+                 count(*) FILTER (WHERE pj.status = 'failed')::int AS failed
+          FROM publishing_jobs pj
+          JOIN contents c ON c.id = pj.content_id
+          WHERE coalesce(pj.published_at, pj.updated_at) >= now() - interval '7 days'
+          GROUP BY 1
+          ORDER BY 1
+        `
+      : auth.brandIds.length === 0
+        ? Promise.resolve([])
+        : sql`
+            SELECT timezone('Asia/Taipei', coalesce(pj.published_at, pj.updated_at))::date AS day,
+                   count(*) FILTER (WHERE pj.status = 'published')::int AS published,
+                   count(*) FILTER (WHERE pj.status = 'failed')::int AS failed
+            FROM publishing_jobs pj
+            JOIN contents c ON c.id = pj.content_id
+            WHERE coalesce(pj.published_at, pj.updated_at) >= now() - interval '7 days'
+              AND c.brand_id = ANY(${auth.brandIds}::uuid[])
+            GROUP BY 1
+            ORDER BY 1
+          `).catch(() => []),
     sql`
       SELECT c.brand_id, coalesce(sum(pr.impressions), 0)::int AS impressions
       FROM publishing_jobs pj

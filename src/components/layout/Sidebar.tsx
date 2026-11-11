@@ -14,6 +14,7 @@ interface MenuItem {
   end?: boolean;
   onlySlug?: string;
   hideFor?: string[];
+  adminOnly?: boolean;
 }
 
 interface MainItem extends MenuItem {
@@ -26,7 +27,7 @@ interface OtherGroup {
 }
 
 const mainItems: MainItem[] = [
-  { label: '行銷中心', path: '/office', end: true },
+  { label: '行銷中心', path: '/office', end: true, adminOnly: true },
   { label: '儀表板', path: '/workspace', brandScoped: true, end: true },
   { label: '簡報專區', path: '/briefings' },
   {
@@ -57,7 +58,7 @@ const otherGroups: OtherGroup[] = [
   {
     title: '加值內容',
     items: [
-      { label: 'Podcast 節目', path: '/podcast' },
+      { label: 'Podcast 節目', path: '/podcast', adminOnly: true },
       { label: '短影音', path: '/shorts', brandScoped: true },
       { label: '教學 Short', path: '/tutorials', brandScoped: true, onlySlug: 'homigo' },
       { label: '官網 SEO', path: '/seo', brandScoped: true },
@@ -84,17 +85,18 @@ const otherGroups: OtherGroup[] = [
   {
     title: '系統',
     items: [
-      { label: '發文需求', path: '/inquiries', hideFor: ['bbbox'] },
-      { label: '工班客源', path: '/crew-leads', hideFor: ['bbbox'] },
-      { label: '工班拍片', path: '/crew-video-requests', hideFor: ['bbbox'] },
-      { label: '總覽 Dashboard', path: '/overview', end: true, hideFor: ['bbbox'] },
+      { label: '發文需求', path: '/inquiries', hideFor: ['bbbox'], adminOnly: true },
+      { label: '工班客源', path: '/crew-leads', hideFor: ['bbbox'], adminOnly: true },
+      { label: '工班拍片', path: '/crew-video-requests', hideFor: ['bbbox'], adminOnly: true },
+      { label: '總覽 Dashboard', path: '/overview', end: true, hideFor: ['bbbox'], adminOnly: true },
       { label: '持續學習', path: '/learning', brandScoped: true },
       { label: '時間軸', path: '/timeline' },
       { label: '發文時段', path: '/posting-times', brandScoped: true },
       { label: '社群帳號', path: '/social', brandScoped: true },
-      { label: '小編人設', path: '/personas', hideFor: ['bbbox'] },
+      { label: '小編人設', path: '/personas', hideFor: ['bbbox'], adminOnly: true },
       { label: 'Threads 申請手冊', path: '/settings/meta-threads' },
-      { label: '匠城遊戲', path: '/settings/game', hideFor: ['bbbox'] },
+      { label: '匠城遊戲', path: '/settings/game', hideFor: ['bbbox'], adminOnly: true },
+      { label: 'Token 成本', path: '/settings/usage', adminOnly: true },
       { label: 'AI 連接器', path: '/settings/mcp' },
       { label: '設定', path: '/settings', end: true },
     ],
@@ -152,9 +154,21 @@ function SidebarLink({
   );
 }
 
+function canSeeItem(item: MenuItem, isAdmin: boolean, scopedSlug?: string) {
+  if (item.onlySlug && item.onlySlug !== scopedSlug) return false;
+  if (item.hideFor?.includes(scopedSlug ?? '')) return false;
+  if (item.adminOnly && !isAdmin) {
+    if (item.path === '/office' && scopedSlug === 'bbbox') return true;
+    if (item.path === '/podcast' && scopedSlug === 'bbbox') return true;
+    return false;
+  }
+  return true;
+}
+
 export function Sidebar() {
   const { currentBrand, brands } = useBrand();
   const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'super_admin';
   const { isMobile, sidebarOpen, closeSidebar } = useLayout();
   const { pathname } = useLocation();
   const scopedBrand = currentBrand ?? brands[0];
@@ -164,8 +178,7 @@ export function Sidebar() {
     .map((group) => ({
       ...group,
       items: group.items
-        .filter((item) => !item.onlySlug || item.onlySlug === scopedSlug)
-        .filter((item) => !item.hideFor?.includes(scopedSlug ?? ''))
+        .filter((item) => canSeeItem(item, isAdmin, scopedSlug))
         .map((item) => (item.path === '/podcast' && scopedSlug === 'bbbox' ? { ...item, brandScoped: true } : item)),
     }))
     .filter((group) => group.items.length > 0);
@@ -208,9 +221,9 @@ export function Sidebar() {
 
         <nav style={{ flex: 1, padding: '4px 12px 20px' }}>
           <div style={{ marginBottom: 16 }}>
-            {mainItems.map((item) => {
+            {mainItems.filter((item) => canSeeItem(item, isAdmin, scopedSlug)).map((item) => {
               const entry = item.path === '/office' && scopedSlug === 'bbbox'
-                ? { ...item, path: '/bbbox/center' }
+                ? { ...item, path: '/bbbox/center', brandScoped: false, adminOnly: false }
                 : item.path === '/briefings' && scopedSlug === 'bbbox'
                   ? { ...item, brandScoped: true }
                   : item;

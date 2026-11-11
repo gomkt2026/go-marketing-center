@@ -1,4 +1,5 @@
 import type { Env } from './env';
+import { noteLlmCall } from './llm-usage';
 
 const OPENAI_BASE = 'https://api.openai.com/v1';
 
@@ -111,9 +112,19 @@ export async function chatComplete(
     const text = await res.text().catch(() => '');
     throw new OpenAIError(res.status, `OpenAI chat 失敗 (${res.status}): ${text.slice(0, 300)}`);
   }
-  const data = await res.json() as { choices: { message: { content: string } }[] };
+  const data = await res.json() as {
+    choices: { message: { content: string } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new OpenAIError(502, 'OpenAI 回傳空內容');
+  const model = env.OPENAI_TEXT_MODEL ?? 'gpt-4o-mini';
+  await noteLlmCall(env, {
+    provider: 'openai',
+    model,
+    inputTokens: data.usage?.prompt_tokens ?? 0,
+    outputTokens: data.usage?.completion_tokens ?? 0,
+  });
   return content;
 }
 
@@ -171,7 +182,17 @@ export async function polishImagePrompt(env: Env, prompt: string): Promise<strin
       const text = await res.text().catch(() => '');
       throw new OpenAIError(res.status, text.slice(0, 300));
     }
-    const data = await res.json() as { choices?: { message?: { content?: string | null } }[] };
+    const data = await res.json() as {
+      choices?: { message?: { content?: string | null } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
+    await noteLlmCall(env, {
+      provider: 'openai',
+      model: imagePromptModel(env),
+      feature: 'image_prompt',
+      inputTokens: data.usage?.prompt_tokens ?? 0,
+      outputTokens: data.usage?.completion_tokens ?? 0,
+    });
     const next = unwrapImagePrompt(data.choices?.[0]?.message?.content ?? '');
     if (next.length < 80 || next.length < trimmed.length * 0.45) return trimmed;
     return next.slice(0, 6000);
@@ -222,7 +243,9 @@ export async function generateImage(
       n: 1,
     }),
   });
-  return parseImageResponse(res);
+  const bytes = await parseImageResponse(res);
+  await noteLlmCall(env, { provider: 'openai', model, imageCount: 1, feature: 'image' });
+  return bytes;
 }
 
 /**
@@ -269,5 +292,7 @@ export async function generateImageWithReference(
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
   });
-  return parseImageResponse(res);
+  const bytes = await parseImageResponse(res);
+  await noteLlmCall(env, { provider: 'openai', model, imageCount: 1, feature: 'image' });
+  return bytes;
 }

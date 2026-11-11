@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
-import { requireAuth, isSuperAdmin } from '../../_shared/auth';
+import { requireAuth, isSuperAdmin, canAccessBrandSlug } from '../../_shared/auth';
 import { getSql } from '../../_shared/db';
 import { rowsToCamel } from '../../_shared/case';
 import { json, error } from '../../_shared/response';
@@ -10,12 +10,13 @@ import { createBbboxPodcastEpisode, createPodcastEpisode } from '../../_shared/p
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
-  if (!isSuperAdmin(auth)) return json({ episodes: [] });
-
   const sql = getSql(context.env);
   const url = new URL(context.request.url);
   const status = url.searchParams.get('status');
   const show = url.searchParams.get('show') === 'bbbox' ? 'bbbox' : 'trio';
+  if (!isSuperAdmin(auth) && !(show === 'bbbox' && canAccessBrandSlug(auth, 'bbbox'))) {
+    return json({ episodes: [] });
+  }
   const rows = status
     ? await sql`
         SELECT e.id, e.week_of, e.episode_seq, e.title, e.topic_summary, e.status, e.error_message,

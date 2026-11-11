@@ -392,14 +392,14 @@ def render(script: dict, out: Path) -> None:
             image.save(png)
             frames = max(12, int(round(seconds * 30)))
             subprocess.run([
-                'ffmpeg', '-y', '-i', str(png),
+                'ffmpeg', '-nostdin', '-y', '-i', str(png),
                 '-vf', (
                     f"zoompan=z='min(1+0.0009*on,1.065)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
                     f":d={frames}:s={W}x{H}:fps=30,setsar=1,format=yuv420p"
                 ),
                 '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p',
                 str(clip),
-            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            ], check=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             clips.append(clip)
         sweep = work / 'sweep.png'
         light_sweep(sweep)
@@ -418,20 +418,20 @@ def render(script: dict, out: Path) -> None:
         graph.append(f'[{len(clips)}:v]format=rgba[sw];[xf][sw]overlay=x=-640+mod(t*150\\,1900):y=0:format=auto:shortest=1[v]')
         video = work / 'video.mp4'
         subprocess.run([
-            'ffmpeg', '-y',
+            'ffmpeg', '-nostdin', '-y',
             *sum((['-i', str(clip)] for clip in clips), []),
             '-loop', '1', '-i', str(sweep),
             '-filter_complex', ';'.join(graph),
             '-map', '[v]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22',
             '-pix_fmt', 'yuv420p', '-movflags', '+faststart', str(video),
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        ], check=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         bed = work / 'bed.wav'
         write_bed(bed, max(0.5, acc - fade * (len(clips) - 1)), starts)
         subprocess.run([
-            'ffmpeg', '-y', '-i', str(video), '-i', str(bed),
+            'ffmpeg', '-nostdin', '-y', '-i', str(video), '-i', str(bed),
             '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-shortest',
             '-movflags', '+faststart', str(out),
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        ], check=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def main() -> None:

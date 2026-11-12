@@ -50,7 +50,6 @@ const otherGroups: OtherGroup[] = [
   {
     title: '產題',
     items: [
-      { label: '跟小編聊', path: '/editor', brandScoped: true },
       { label: '市場情報', path: '/market', brandScoped: true },
       { label: '即時熱門', path: '/trending', brandScoped: true },
     ],

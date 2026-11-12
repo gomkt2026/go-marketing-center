@@ -270,7 +270,7 @@ export function bbboxAsk(agent: OfficeAgent, text: string, data: OfficeSnapshot)
 }
 
 export function bbboxHref(role: string) {
-  if (role === 'brand_ai') return '/bbbox/editor';
+  if (role === 'brand_ai') return '/bbbox/workspace';
   if (role === 'content_strategist' || role === 'market_analyst') return '/bbbox/intelligence';
   if (role === 'video_editor') return '/bbbox/shorts';
   if (role === 'podcast_producer') return '/bbbox/podcast';

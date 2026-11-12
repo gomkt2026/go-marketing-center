@@ -39,7 +39,6 @@ import { notifyPendingReviewDigest, notifyPublishFailed } from '../../../functio
 import { AUTO_POST_BRAND_SLUGS, isAutoPostBrand } from '../../../functions/_shared/auto-post-brands';
 import { finishOfficeDraft, notePublisherBlocked } from '../../../functions/_shared/office-directive';
 import { runOfficeStandup } from '../../../functions/_shared/office-standup';
-import { attachReadyOfficeFilms } from '../../../functions/_shared/office-film';
 import { runSeoAutoPublish } from '../../../functions/_shared/seo-autopublish';
 import {
   SYSTEM_SHORT_SLOTS, catchupSystemShortSlot, generateSystemShortSlot, hasSystemShorts, isSystemShortDay,
@@ -1214,7 +1213,6 @@ async function runBrandJobs(env: Env, jobs: BrandJobMessage[]): Promise<void> {
 }
 
 async function halfHourlyDispatch(env: Env): Promise<void> {
-  await attachReadyOfficeFilms(env).catch((e) => console.error('[office-film] 掛上會議影片失敗', e));
   const twHour = (new Date().getUTCHours() + 8) % 24;
   const minute = new Date().getUTCMinutes();
   const isTopOfHour = minute < 15 || minute >= 45;

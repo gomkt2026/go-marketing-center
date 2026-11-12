@@ -1,5 +1,5 @@
 import { Suspense, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { MetaProvider } from '@/context/MetaContext';
 import { BrandProvider } from '@/context/BrandContext';
@@ -50,7 +50,6 @@ const CheckinScan = lazyPage(() => import('@/pages/public/CheckinScan'), 'Checki
 const PrivacyPolicy = lazyPage(() => import('@/pages/public/PrivacyPolicy'), 'PrivacyPolicy');
 const BrandCsKnowledge = lazyPage(() => import('@/pages/help/BrandCsKnowledge'), 'BrandCsKnowledge');
 const BrandNetwork = lazyPage(() => import('@/pages/network/BrandNetwork'), 'BrandNetwork');
-const BrandEditorDesk = lazyPage(() => import('@/pages/editor/BrandEditorDesk'), 'BrandEditorDesk');
 const BrandGeo = lazyPage(() => import('@/pages/geo/BrandGeo'), 'BrandGeo');
 const BrandSeo = lazyPage(() => import('@/pages/seo/BrandSeo'), 'BrandSeo');
 const PostingTimes = lazyPage(() => import('@/pages/brand/PostingTimes'), 'PostingTimes');
@@ -98,6 +97,11 @@ function AdminOnly({ children }: { children: ReactNode }) {
   return children;
 }
 
+function RetiredEditor() {
+  const { brand } = useParams();
+  return <Navigate to={brand ? `/${brand}/workspace` : '/home'} replace />;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<LoadingState />}>
@@ -110,7 +114,7 @@ function AppRoutes() {
 
         <Route path="/:brand/workspace" element={<BrandWorkspace />} />
         <Route path="/:brand/center" element={<BbboxCenter />} />
-        <Route path="/:brand/editor" element={<BrandEditorDesk />} />
+        <Route path="/:brand/editor" element={<RetiredEditor />} />
         <Route path="/:brand/intelligence" element={<BrandIntelligence />} />
         <Route path="/:brand/help" element={<BrandCsKnowledge />} />
         <Route path="/:brand/network" element={<BrandNetwork />} />

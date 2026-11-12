@@ -274,7 +274,6 @@ export function ContentCenter() {
       <HubShortcuts
         items={[
           { to: `/${brand.slug}/threads`, label: 'Threads' },
-          { to: `/${brand.slug}/editor`, label: '跟小編聊' },
         ]}
       />
       {(seoGenerating || seoError) && (

@@ -88,6 +88,21 @@ function screenCopy(station: Station, agent: OfficeAgent | undefined, data: Offi
   return { title: '洗滌', line };
 }
 
+function standupSummary(standup: NonNullable<OfficeSnapshot['standup']>): string {
+  const names: Record<string, string> = { homigo: 'Homigo', taskgo: 'TaskGo', washgo: 'Washgo', bbbox: '和居家居' };
+  const themes = (standup.directive?.brands ?? [])
+    .map((brand) => {
+      const theme = brand.theme?.replace(/\s+/g, ' ').trim();
+      return theme ? `${names[brand.slug] ?? brand.slug}：${theme}` : '';
+    })
+    .filter(Boolean);
+  if (themes.length) return `這一班：${themes.join('　')}`;
+  const said = (standup.bubbles ?? []).slice(0, 3)
+    .map((bubble) => `${bubble.who}：${bubble.text.replace(/\s+/g, ' ').trim()}`)
+    .filter((line) => line.length > 1);
+  return said.join('　');
+}
+
 function manuscriptHref(agent: OfficeAgent): string | null {
   if (agent.preview?.slug) return `/${agent.preview.slug}/schedule`;
   if (agent.roleCode === 'brand_ai' && agent.brandSlug) return `/${agent.brandSlug}/schedule`;
@@ -693,13 +708,10 @@ export function Office({ view = false, room = 'go' }: { view?: boolean; room?: '
           {room === 'bbbox' ? '和居家居行銷辦公室' : 'Go 行銷辦公室'}
           <small>{view ? '展示畫面，只能看' : room === 'bbbox' ? '點一個人，問這一牌的草稿和賞屋' : data?.quiet ? '凌晨這一班只留方向，八點才發' : '點一個人，直接問，他用手上的資料回答'}</small>
           {!view && room === 'bbbox' && <Link className="office-film" to="/bbbox/intelligence">品牌智慧</Link>}
-          {!view && room === 'bbbox' && <Link className="office-film" to="/bbbox/editor">跟小盒聊</Link>}
           {!view && room === 'bbbox' && <Link className="office-film" to="/bbbox/contents">草稿工作台</Link>}
           {!view && room !== 'bbbox' && <a className="office-film" href="/watch/office" target="_blank" rel="noreferrer">手機展示連結</a>}
-          {data?.standup?.film_url && !view ? (
-            <a className="office-film" href={data.standup.film_url} target="_blank" rel="noreferrer">看這一班的會議影片</a>
-          ) : data?.standup?.film_status === 'script' && !view ? (
-            <span className="office-film">這一班的影片還在做，做好會放進三個品牌的素材庫</span>
+          {data?.standup && !view ? (
+            <span className="office-film">{standupSummary(data.standup) || '這一班還沒有討論摘要'}</span>
           ) : null}
         </div>
         {!view && <div className="office-counts">

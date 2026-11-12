@@ -3,7 +3,6 @@ import { getSql } from './db';
 import { claudeChatJsonWithUsage } from './claude';
 import { ensureOfficeSuggestions, setOfficeActivity } from './office-directive';
 import { fetchGoogleTrendsTW, fetchTaiwanNews } from './sources';
-import { saveOfficeFilmScript, speakOfficeMeeting } from './office-film';
 import {
   BRAND_SLUGS,
   OFFICE_CAST,
@@ -319,12 +318,6 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
     }));
   }
 
-  const spoken = await speakOfficeMeeting(env, plan).catch(() => null);
-  if (spoken) {
-    inputTokens += spoken.inputTokens;
-    outputTokens += spoken.outputTokens;
-  }
-
   const costUsd = haikuCostUsd(inputTokens, outputTokens);
   const standupId = await insertStandup(env, {
     status: 'completed',
@@ -358,19 +351,6 @@ export async function runOfficeStandup(env: Env, at = new Date()): Promise<Offic
       VALUES (${brandId}::uuid, ${agentId}::uuid, ${standupId}::uuid, ${brand.sourceUrl}, ${brand.finding})
     `;
   }
-
-  await (async () => {
-    const stamped = await sql`SELECT started_at FROM office_standups WHERE id = ${standupId}::uuid`;
-    const startedAt = new Date((stamped[0] as { started_at: string }).started_at).toISOString();
-    await saveOfficeFilmScript(env, {
-      id: standupId,
-      startedAt,
-      hook: spoken?.hook,
-      close: spoken?.close,
-      lines: spoken && spoken.lines.length ? spoken.lines : plan.bubbles,
-      themes: plan.brands.map((brand) => ({ slug: brand.slug, theme: brand.theme })),
-    });
-  })().catch((e) => console.error('[office-film] 會議腳本沒寫入', e));
 
   return {
     status: 'completed',

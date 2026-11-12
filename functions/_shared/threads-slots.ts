@@ -8,7 +8,7 @@ import {
 import { loadGamePromoBrief } from './game-daily';
 import {
   generateTrafficPost, generateGamePromoPost,
-  saveGeneratedContent, findBrandAgent,
+  saveGeneratedContent, findBrandAgent, TrafficHoldError,
 } from './generate';
 import { logActivity } from './activity';
 import { fetchGoogleTrendsTW, fetchTaiwanNews } from './sources';
@@ -189,17 +189,44 @@ async function writeTrafficDraft(
   const anchor = formula === 'hook' && theme ? trendAnchor(theme) : '';
   if (await brandHasHourContent(env, brand.id, slotAt)) return null;
   const office = await loadOfficePack(env, brand.id, brand.slug);
-  const post = await generateTrafficPost(env, {
-    brandSlug: brand.slug,
-    formula,
-    usedTopics,
-    theme,
-    siblings,
-    hourTw: hourTW,
-    now: slotMs,
-    skipPrediction: true,
-    office,
-  });
+  let post: Awaited<ReturnType<typeof generateTrafficPost>>;
+  try {
+    post = await generateTrafficPost(env, {
+      brandSlug: brand.slug,
+      formula,
+      usedTopics,
+      theme,
+      siblings,
+      hourTw: hourTW,
+      now: slotMs,
+      skipPrediction: true,
+      office,
+    });
+  } catch (e) {
+    if (!(e instanceof TrafficHoldError)) throw e;
+    const reason = e.message;
+    await saveGeneratedContent(env, {
+      brandCtx: { brandId: brand.id, slug: brand.slug, name: brand.name, systemPrompt: '' },
+      platform: 'threads',
+      status: 'archived',
+      result: {
+        post: { title: '這一檔先不發', body: reason, hashtags: [], cta: '' },
+        prediction: { score: 0, analysis: reason, suggestions: [] },
+        imageUrl: null,
+        imageError: null,
+      },
+      promptMeta: {
+        source: slotKind,
+        category: formula,
+        trafficFormula: formula,
+        slotAt: slotAt.toISOString(),
+        skipped: 'true',
+        skipReason: reason,
+      },
+    });
+    console.log(`[threads] ${brand.slug} ${slotAt.toISOString()} ${reason}`);
+    return null;
+  }
   if (theme?.includes('洋流')) {
     const scrollStop: Record<string, string> = {
       taskgo: 'https://go-marketing-center.pages.dev/showcase/i/pain-boss.jpg',

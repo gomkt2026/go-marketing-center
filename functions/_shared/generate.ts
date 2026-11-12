@@ -130,6 +130,14 @@ async function loadBrandLogo(env: Env, brandSlug: string): Promise<Uint8Array | 
   }
 }
 
+/** 流量稿重寫一次仍不合格。呼叫端記下這一檔，避免每半小時再整段重打。 */
+export class TrafficHoldError extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'TrafficHoldError';
+  }
+}
+
 export interface GenerationResult {
   post: GeneratedPost;
   prediction: EngagementPrediction;
@@ -562,21 +570,21 @@ export async function generatePlatformPost(
     ? refreshInstagramCopy(post, brandCtx.slug, params.topic).igCraft
     : undefined;
   const voiceIssue = taiwanVoiceIssue([post.body, post.posterHeadline, post.posterAdvantage].filter(Boolean).join('\n'));
-  if ((hardLimit && post.body.length > hardLimit) || voiceIssue || igCraft?.rewriteReason) {
+  const officeFact = officePack?.active
+    ? factProblem(post.body, officePack.cannotClaims, officePack.facts)
+    : null;
+  if ((hardLimit && post.body.length > hardLimit) || voiceIssue || igCraft?.rewriteReason || officeFact) {
     const reasons = [
       hardLimit && post.body.length > hardLimit ? `${post.body.length} 字,超過 ${hardLimit} 字上限` : '',
       voiceIssue ?? '',
       igCraft?.rewriteReason ?? '',
+      officeFact ? `${officeFact}。仍打「${officePack?.theme ?? ''}」，不要寫媒體露出、客戶數、排名` : '',
     ].filter(Boolean).join('；');
-    post = await socialChatJson<GeneratedPost>(env, {
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-        { role: 'assistant', content: JSON.stringify(post) },
-        { role: 'user', content: `這篇不合格：${reasons}。用台灣人日常會講的話重寫${hardLimit && post.body.length > hardLimit ? `，縮短到 ${hardLimit} 字以內` : ''}。寫一個具體場面和一句沒被接住的話，不要和解，不要下結論。禁止簡體、大陸用語、外籍配偶心靈雞湯。回傳同格式 JSON(imagePrompt、posterHeadline、posterAdvantage 若重寫主標也必須是台灣繁中)。` },
-      ],
-      temperature: 0.5,
-    });
+    post = await rewritePost(
+      env,
+      post,
+      `這篇不合格：${reasons}。用台灣人日常會講的話重寫${hardLimit && post.body.length > hardLimit ? `，縮短到 ${hardLimit} 字以內` : ''}。寫一個具體場面和一句沒被接住的話，不要和解，不要下結論。禁止簡體、大陸用語、外籍配偶心靈雞湯。imagePrompt、posterHeadline、posterAdvantage 若重寫，主標也必須是台灣繁中。`,
+    );
     post.body = normalizeMultilineText(post.body);
     post.hashtags = clampHashtags(post.hashtags, platform);
     if (platform === 'instagram') igCraft = refreshInstagramCopy(post, brandCtx.slug, params.topic).igCraft;
@@ -591,23 +599,7 @@ export async function generatePlatformPost(
     theme: officePack?.theme ?? '',
   };
   if (officePack?.active) {
-    let problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
-    if (problem) {
-      post = await socialChatJson<GeneratedPost>(env, {
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-          { role: 'assistant', content: JSON.stringify(post) },
-          { role: 'user', content: `上一則作廢：${problem}。換成不碰這句的寫法，仍打「${officePack.theme}」。不要寫媒體露出、客戶數、排名。回傳同格式 JSON。` },
-        ],
-        temperature: 0.4,
-      });
-      post.body = normalizeMultilineText(post.body);
-      post.hashtags = clampHashtags(post.hashtags, platform);
-      post.cta = ctaForBrand(brandCtx.slug);
-      if (platform === 'instagram') igCraft = refreshInstagramCopy(post, brandCtx.slug, params.topic).igCraft;
-      problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
-    }
+    const problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
     officeState.blocked = problem;
     if (problem) {
       return {
@@ -846,6 +838,36 @@ export async function generateOfftopicPost(
   return { post, prediction, imageUrl: null, imageError: null, offtopicCategory: spec.category, loveAngle: spec.loveAngle };
 }
 
+function postSnapshot(post: GeneratedPost): string {
+  return JSON.stringify({
+    title: post.title,
+    body: post.body,
+    hashtags: post.hashtags,
+    cta: post.cta,
+    imagePrompt: post.imagePrompt,
+    posterHeadline: post.posterHeadline,
+    posterAccent: post.posterAccent,
+    posterAdvantage: post.posterAdvantage,
+    posterKicker: post.posterKicker,
+    replyBody: post.replyBody,
+    topicTag: post.topicTag,
+  });
+}
+
+/** 重寫只送這一篇和要改的地方，不再把品牌知識庫整包重送。 */
+async function rewritePost(env: Env, post: GeneratedPost, instruction: string): Promise<GeneratedPost> {
+  return socialChatJson<GeneratedPost>(env, {
+    messages: [
+      {
+        role: 'system',
+        content: '你在改一篇已經寫好的貼文，不要重寫品牌介紹。只修下面指出的問題。用台灣繁體中文，禁止簡體和大陸用語。回傳同格式 JSON。',
+      },
+      { role: 'user', content: `${instruction}\n\n目前這篇：\n${postSnapshot(post)}` },
+    ],
+    temperature: 0.4,
+  });
+}
+
 function finishTrafficPost(post: GeneratedPost, slug: string): GeneratedPost {
   post.body = normalizeMultilineText(post.body);
   post.hashtags = [];
@@ -896,125 +918,69 @@ export async function generateTrafficPost(
     temperature: 0.9,
   });
   post = finishTrafficPost(post, params.brandSlug);
-  const leaked = (washgo
-    ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|洗楽|HappyWash|happy415|https?:\/\/|工地|業主|房東/
-    : taskgo
-      ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|電鍋|房東/
-      : bbbox
-        ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|保證合法|回本/
-        : /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|工地|電鍋/
-  ).test(post.body);
-  const missed = Boolean(anchor) && !post.body.includes(anchor);
-  const trafficVoice = taiwanVoiceIssue(post.body);
-  const lecture = taskgo ? taskgoLectureIssue(post.body) : null;
-  const fiction = taskgo ? taskgoFictionIssue(post.body) : null;
-  const stale = trafficStaleIssue(params.brandSlug, post.body)
-    || (shifted ? trafficRepeatIssue(params.brandSlug, post.body) : null);
-  const ending = trafficEndingIssue(post.body, shifted);
-  const scene = trafficSceneIssue(params.brandSlug, post.body, params.usedTopics);
-  const minChars = spec.minChars;
-  if (post.body.length > limit || leaked || missed || post.body.length < minChars || trafficVoice || lecture || fiction || stale || ending || scene) {
-    post = await socialChatJson<GeneratedPost>(env, {
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-        { role: 'assistant', content: JSON.stringify(post) },
-        {
-          role: 'user',
-          content: `這篇不合格（${post.body.length} 字${leaked ? '，而且出現不該出現的品牌或店名' : ''}${missed ? `，而且沒有寫到「${anchor}」` : ''}${trafficVoice ? `，${trafficVoice}` : ''}${lecture ? `，${lecture}` : ''}${fiction ? `，${fiction}` : ''}${stale ? `，${stale}` : ''}${ending ? `，${ending}` : ''}${scene ? `，${scene}` : ''}）。` +
-            `用台灣人會講的話重寫到 ${spec.maxChars} 字以內${anchor ? `，正文必須出現「${anchor}」` : taskgo ? (spec.category === 'joke' ? '，改成一則工地習慣的笑話' : '，改成一個現場判斷，不要編成故事') : spec.category === 'joke' ? '，改成一個品牌笑話，笑點放倒數第二行' : '，改成一個讓人想轉的小場面'}。` +
-            (shifted
-              ? '四到六行。正文只能有一組「」。最後一行用「還是」二選一。replyBody 留空字串。'
-              : '至少三行。最後一行是做過的人才答得上來的問句。replyBody 留空字串。') +
-            (scene ? `${scene}，換一個沒寫過的場面。` : '') +
-            (washgo
-              ? '可以寫洗衣店和衣服。不要寫洗好了沒，不要列功能，不要提別的店，不要寫婆媳。禁止簡體、大陸用語。回傳同格式 JSON。'
-              : taskgo
-                ? (shifted
-                  ? '寫一個現場判斷，或一則工地習慣的笑話。可以有一句引號。不要取名字，不要來回傳訊，不要寫送醫、急診、受傷。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
-                  : '寫一個現場判斷，或一則工地習慣的笑話。不要取名字，不要寫假對話，不要寫送醫、急診、受傷。不要列工序，不要寫水泥比例、配比、坍度、做了幾年。不要教訓業主。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。')
-                : bbbox
-                  ? '換成一塊地的進場或用途：路進不去、轉彎不夠、院子想多一間。不要報價，不要寫保證合法或回本，不要寫成租屋或派工。禁止簡體、大陸用語、品牌名。回傳同格式 JSON。'
-                  : '換成這七天沒寫過的租屋小事：水電、管理員、續約、押金、網路、看房話術。不要再寫離職發薪、房東催租、冷氣室外機、近捷運、這也叫清潔，也不要寫律師、違法、租金補貼。不要寫婆媳、家庭對罵。禁止簡體、大陸用語、「男生都」「女生都」。回傳同格式 JSON。'),
-        },
-      ],
-      temperature: 0.7,
-    });
+  const officePack = params.office?.active ? params.office : null;
+  const namedSide = /賴清德|沈伯洋|蔣萬安|民進黨|國民黨|民眾黨|時代力量|柯文哲|小水滴|投給|下架/;
+  const trafficIssues = (draft: GeneratedPost) => {
+    const leaked = (washgo
+      ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|洗楽|HappyWash|happy415|https?:\/\/|工地|業主|房東/
+      : taskgo
+        ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|電鍋|房東/
+        : bbbox
+          ? /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|保證合法|回本/
+          : /匠城|匠管|Homigo|TaskGo|Washgo|homigo|taskgo|washgo|https?:\/\/|自助洗衣|烘衣機|甩乾|工地|電鍋/
+    ).test(draft.body);
+    const missed = Boolean(anchor) && !draft.body.includes(anchor);
+    return [
+      draft.body.length > limit || draft.body.length < spec.minChars ? `${draft.body.length} 字，要在範圍內` : '',
+      leaked ? '出現不該出現的品牌或店名' : '',
+      missed ? `沒有寫到「${anchor}」` : '',
+      taiwanVoiceIssue(draft.body) ?? '',
+      taskgo ? taskgoLectureIssue(draft.body) ?? '' : '',
+      taskgo ? taskgoFictionIssue(draft.body) ?? '' : '',
+      trafficStaleIssue(params.brandSlug, draft.body) ?? '',
+      shifted ? trafficRepeatIssue(params.brandSlug, draft.body) ?? '' : '',
+      trafficEndingIssue(draft.body, shifted) ?? '',
+      trafficSceneIssue(params.brandSlug, draft.body, params.usedTopics) ?? '',
+      namedSide.test(draft.body) ? '出現人名、政黨或投票表態' : '',
+      officePack ? factProblem(draft.body, officePack.cannotClaims, officePack.facts) ?? '' : '',
+    ].filter(Boolean);
+  };
+  if (trafficIssues(post).length) {
+    const homigoFix = params.brandSlug === 'homigo'
+      ? (shifted
+        ? '換成管理費、訪客停車、鑰匙、遙控器、陽台、押金明細、續約天數或垃圾時間裡，這七天沒寫過的一件小事。'
+        : '換成水電、管理員、續約漲租、押金、網路或看房話術裡，這七天沒寫過的一件小事。')
+        + '禁止再寫離職、月底才發薪水、房東訊息就來了、吃泡麵、冷氣室外機、近捷運、這也叫清潔，也不要寫律師、違法、租金補貼。'
+      : '';
+    post = await rewritePost(
+      env,
+      post,
+      `這篇不合格：${trafficIssues(post).join('；')}。用台灣人會講的話重寫到 ${spec.maxChars} 字以內。`
+        + (anchor ? `正文必須出現「${anchor}」。` : '')
+        + (shifted
+          ? '四到六行。正文只能有一組「」。最後一行用「還是」二選一。'
+          : '至少三行。最後一行是做過的人才答得上來的問句。')
+        + homigoFix
+        + (officePack ? `仍打「${officePack.theme}」。不要寫媒體露出、客戶數、排名。` : '')
+        + 'replyBody 留空字串。',
+    );
     post = finishTrafficPost(post, params.brandSlug);
   }
 
-  if (params.brandSlug === 'homigo') {
-    const repeated = trafficStaleIssue(params.brandSlug, post.body)
+  const repeated = params.brandSlug === 'homigo'
+    ? trafficStaleIssue(params.brandSlug, post.body)
       || (shifted ? trafficRepeatIssue(params.brandSlug, post.body) : null)
       || trafficSceneIssue(params.brandSlug, post.body, params.usedTopics)
-      || trafficEndingIssue(post.body, shifted);
-    if (repeated) {
-      post = await socialChatJson<GeneratedPost>(env, {
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-          { role: 'assistant', content: JSON.stringify(post) },
-          {
-            role: 'user',
-            content: `這篇還是不合格：${repeated}。${shifted ? '換成管理費、訪客停車、鑰匙、遙控器、陽台、押金明細、續約天數或垃圾時間裡，這七天沒寫過的一件小事。' : '換成水電、管理員、續約漲租、押金、網路或看房話術裡，這七天沒寫過的一件小事。'}` +
-              '禁止再寫離職、月底才發薪水、房東訊息就來了、吃泡麵、冷氣室外機、近捷運、這也叫清潔，也不要寫律師、違法、租金補貼。' +
-              (shifted
-                ? '四到六行。正文只能有一組「」。最後一行用「還是」二選一。replyBody 留空字串。回傳同格式 JSON。'
-                : '至少三行。最後一行是做過的人才答得上來的問句。replyBody 留空字串。回傳同格式 JSON。'),
-          },
-        ],
-        temperature: 0.4,
-      });
-      post = finishTrafficPost(post, params.brandSlug);
-      const still = trafficStaleIssue(params.brandSlug, post.body)
-        || (shifted ? trafficRepeatIssue(params.brandSlug, post.body) : null)
-        || trafficSceneIssue(params.brandSlug, post.body, params.usedTopics)
-        || trafficEndingIssue(post.body, shifted);
-      if (still) throw new Error(`Homigo 這一檔還在重發（${still}），先不發`);
-    }
-  }
+      || trafficEndingIssue(post.body, shifted)
+    : null;
+  if (repeated) throw new TrafficHoldError(`Homigo 這一檔還在重發（${repeated}），先不發`);
+  if (namedSide.test(post.body)) throw new TrafficHoldError('這一檔寫到站隊，先不發');
 
-  const namedSide = /賴清德|沈伯洋|蔣萬安|民進黨|國民黨|民眾黨|時代力量|柯文哲|小水滴|投給|下架/;
-  if (namedSide.test(post.body)) {
-    post = await socialChatJson<GeneratedPost>(env, {
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-        { role: 'assistant', content: JSON.stringify(post) },
-        {
-          role: 'user',
-          content: '這篇出現了人名、政黨或投票表態。改成店裡、巷口或梯間碰到的一件小事。可以寫「洋流」這個大家在講的現象，禁止任何人名、政黨、支持、投給、下架。不評價。至少三行，最後一行是問句。回傳同格式 JSON。',
-        },
-      ],
-      temperature: 0.4,
-    });
-    post = finishTrafficPost(post, params.brandSlug);
-    if (namedSide.test(post.body)) throw new Error('這一檔寫到站隊，先不發');
-  }
-
-  const officePack = params.office?.active ? params.office : null;
   const officeState = {
     active: !!officePack,
-    blocked: null as string | null,
+    blocked: officePack ? factProblem(post.body, officePack.cannotClaims, officePack.facts) : null,
     theme: officePack?.theme ?? '',
   };
-  if (officePack) {
-    let problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
-    if (problem) {
-      post = await socialChatJson<GeneratedPost>(env, {
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-          { role: 'assistant', content: JSON.stringify(post) },
-          { role: 'user', content: `上一則作廢：${problem}。換成不碰這句的寫法，仍打「${officePack.theme}」。不要寫媒體露出、客戶數、排名。至少三行，最後一行是問句。回傳同格式 JSON。` },
-        ],
-        temperature: 0.4,
-      });
-      post = finishTrafficPost(post, params.brandSlug);
-      problem = factProblem(post.body, officePack.cannotClaims, officePack.facts);
-    }
-    officeState.blocked = problem;
-  }
 
   const prediction = params.skipPrediction || officeState.blocked
     ? { score: 0, analysis: '', suggestions: [] }
@@ -1288,7 +1254,7 @@ export async function saveGeneratedContent(
     campaignId?: string | null;
     generatedByAgentId?: string | null;
     promptMeta?: Record<string, unknown>;
-    status?: 'draft' | 'pending_review' | 'published' | 'scheduled';
+    status?: 'draft' | 'pending_review' | 'published' | 'scheduled' | 'archived';
     /** 覆寫 content_assets.metadata;image_inspired 貼文用來標記「圖片沿用素材庫,不是本次生成」 */
     imageAssetMeta?: Record<string, unknown>;
   },

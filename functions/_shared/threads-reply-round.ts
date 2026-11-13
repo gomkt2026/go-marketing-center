@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { chatCompleteJson } from './openai';
+import { runWithUsage } from './llm-usage';
 import { getBrandVoice, ANTI_AI_RULES } from './prompts';
 import { getThreadsAccount, searchThreadsPosts, type ThreadsAccount, type ThreadsSearchPost } from './threads';
 import {
@@ -338,7 +339,7 @@ export async function processBrandReplyRound(env: Env, params: {
   const listText = candidates
     .map((p, i) => `${i}. @${p.username ?? '匿名'}:${p.text!.slice(0, 280)}`)
     .join('\n---\n');
-  const selection = await chatCompleteJson<{ selections: ReplySelection[] }>(env, {
+  const selection = await runWithUsage({ brandId: params.brandId, feature: 'generate_reply' }, () => chatCompleteJson<{ selections: ReplySelection[] }>(env, {
     temperature: 0.9,
     messages: [
       {
@@ -369,7 +370,7 @@ export async function processBrandReplyRound(env: Env, params: {
         ].join('\n'),
       },
     ],
-  });
+  }));
 
   const picked = (selection.selections ?? [])
     .filter((s) => candidates[s.index] && s.relevance >= REPLY_RELEVANCE_MIN && !replyTextIssue(s.reply))

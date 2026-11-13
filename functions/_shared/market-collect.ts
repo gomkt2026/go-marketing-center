@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { chatCompleteJson } from './openai';
+import { runWithUsage } from './llm-usage';
 import { getBrandVoice } from './prompts';
 import { logActivity } from './activity';
 import { fetchGoogleTrendsTW, fetchGoogleNews, fetchTaiwanNews, fetchPttBoard, fetchDcard, type TrendItem } from './sources';
@@ -103,7 +104,7 @@ export async function collectSignalsForBrand(
 
   const voice = getBrandVoice(brand.slug);
   const listText = fresh.map((c, i) => `${i}. [${c.source}] ${c.title}${c.snippet ? ` — ${c.snippet.slice(0, 120)}` : ''}`).join('\n');
-  const selection = await chatCompleteJson<{ selections: SignalSelection[] }>(env, {
+  const selection = await runWithUsage({ brandId: brand.id, feature: 'market' }, () => chatCompleteJson<{ selections: SignalSelection[] }>(env, {
     temperature: 0.2,
     messages: [
       {
@@ -120,7 +121,7 @@ export async function collectSignalsForBrand(
         ].join('\n'),
       },
     ],
-  });
+  }));
 
   const picked = (selection.selections ?? [])
     .filter((sel) => fresh[sel.index] && sel.relevance >= MIN_RELEVANCE)

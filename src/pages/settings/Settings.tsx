@@ -30,6 +30,7 @@ const permissionMatrix: { action: string; ai: boolean; editor: boolean; manager:
   { action: '執行發布', ai: false, editor: false, manager: true, admin: true },
   { action: '編輯品牌知識草稿', ai: false, editor: true, manager: true, admin: true },
   { action: '發布品牌新版本', ai: false, editor: false, manager: true, admin: true },
+  { action: '新增品牌', ai: false, editor: true, manager: true, admin: true },
   { action: '管理 AI Agents / 權限', ai: false, editor: false, manager: false, admin: true },
 ];
 
@@ -53,11 +54,13 @@ const labelStyle: React.CSSProperties = {
 export function Settings() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'super_admin';
+  const canManageBrands = isAdmin || user?.role === 'brand_manager' || user?.role === 'brand_editor';
   const tabs = [
     { id: 'agents', label: 'AI Agents' },
     { id: 'line', label: 'Line 通知' },
     { id: 'permissions', label: '權限管理' },
-    ...(isAdmin ? [{ id: 'brands', label: '品牌' }, { id: 'accounts', label: '品牌帳號' }] : []),
+    ...(canManageBrands ? [{ id: 'brands', label: '品牌' }] : []),
+    ...(isAdmin ? [{ id: 'accounts', label: '品牌帳號' }] : []),
   ];
   const [tab, setTab] = useState('agents');
   const { brandById } = useBrand();
@@ -170,7 +173,7 @@ export function Settings() {
           )}
         </>
       )}
-      {tab === 'brands' && isAdmin && <BrandsOnboardPanel />}
+      {tab === 'brands' && canManageBrands && <BrandsOnboardPanel />}
       {tab === 'accounts' && isAdmin && <BrandAccountsPanel />}
     </div>
   );
@@ -416,6 +419,9 @@ function LineSpacesPanel() {
 }
 
 function BrandsOnboardPanel() {
+  const { user, refresh } = useAuth();
+  const isAdmin = user?.role === 'super_admin';
+  const canCompile = isAdmin || user?.role === 'brand_manager';
   const { brands, reloadBrands } = useBrand();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -476,7 +482,7 @@ function BrandsOnboardPanel() {
       setWebsiteUrl('');
       setBlogBaseUrl('');
       setCta('');
-      await reloadBrands();
+      await Promise.all([reloadBrands(), refresh()]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '新增品牌失敗');
     } finally {
@@ -499,7 +505,7 @@ function BrandsOnboardPanel() {
       for (const file of photos) {
         await api.uploadBrandAsset(createdSlug, { file, name: file.name });
       }
-      if (accountUsername.trim() || accountPassword || accountName.trim()) {
+      if (isAdmin && (accountUsername.trim() || accountPassword || accountName.trim())) {
         await api.createAdminUser({
           displayName: accountName.trim() || accountUsername.trim(),
           username: accountUsername.trim(),
@@ -508,9 +514,15 @@ function BrandsOnboardPanel() {
           brandIds: [createdBrandId],
         });
       }
-      const compiled = await api.compileBrandIntelligence(createdSlug);
-      const site = compiled.usedWebsite ? '已讀官網' : '沒有讀到官網';
-      setFinishNote(`已整理 ${compiled.personaCount} 組人物誌，收進 ${compiled.documentCount} 份文件。${site}。`);
+      if (canCompile) {
+        const compiled = await api.compileBrandIntelligence(createdSlug);
+        const site = compiled.usedWebsite ? '已讀官網' : '沒有讀到官網';
+        setFinishNote(`已整理 ${compiled.personaCount} 組人物誌，收進 ${compiled.documentCount} 份文件。${site}。`);
+      } else if (decks.length || photos.length) {
+        setFinishNote('檔案已上傳。請到這個品牌的品牌智慧改草稿；發布新版本由品牌負責人操作。');
+      } else {
+        setFinishNote('這個品牌已建立。請到品牌智慧與發文時段各自設定。');
+      }
       setDecks([]);
       setPhotos([]);
     } catch (err) {
@@ -525,8 +537,8 @@ function BrandsOnboardPanel() {
       <Card>
         <h3 style={{ fontSize: 15, marginBottom: 6 }}>新增品牌</h3>
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14, lineHeight: 1.7 }}>
-          建完會自動帶 FB／IG／Threads 發文時段、小編 Agent 與 SEO 主題庫，之後排程會跟 Homigo／TaskGo／Washgo 一樣產社群稿。
-          官網長文可到該品牌「官網 SEO」從主題庫產文。品牌智慧補完後，口吻會更準。
+          建完會自動帶 FB／IG／Threads 發文時段、小編 Agent 與 SEO 主題庫。每個品牌的發文時段和品牌智慧是分開的，
+          設定只影響這個品牌，不會改到其他品牌。官網長文可到該品牌「官網 SEO」從主題庫產文。
         </p>
         <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'grid', gap: 12, maxWidth: 640 }}>
           <div className="grid-2" style={{ gap: 12 }}>
@@ -607,35 +619,39 @@ function BrandsOnboardPanel() {
                 <span>照片素材（JPG／PNG／WebP，可多檔）</span>
                 <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => setPhotos(Array.from(e.target.files ?? []))} />
               </label>
-              <div style={{ fontWeight: 700 }}>同時建立這個品牌的登入帳號（可略過）</div>
-              <div className="grid-2" style={{ gap: 12 }}>
-                <label style={labelStyle}>
-                  <span>顯示名稱</span>
-                  <input value={accountName} onChange={(e) => setAccountName(e.target.value)} style={inputStyle} />
-                </label>
-                <label style={labelStyle}>
-                  <span>登入帳號</span>
-                  <input value={accountUsername} onChange={(e) => setAccountUsername(e.target.value)} style={inputStyle} />
-                </label>
-              </div>
-              <div className="grid-2" style={{ gap: 12 }}>
-                <label style={labelStyle}>
-                  <span>密碼</span>
-                  <input type="password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} style={inputStyle} />
-                </label>
-                <label style={labelStyle}>
-                  <span>角色</span>
-                  <select value={accountRole} onChange={(e) => setAccountRole(e.target.value as UserRole)} style={inputStyle}>
-                    <option value="brand_manager">品牌負責人</option>
-                    <option value="brand_editor">品牌編輯</option>
-                    <option value="viewer">唯讀</option>
-                  </select>
-                </label>
-              </div>
+              {isAdmin && (
+                <>
+                  <div style={{ fontWeight: 700 }}>同時建立這個品牌的登入帳號（可略過）</div>
+                  <div className="grid-2" style={{ gap: 12 }}>
+                    <label style={labelStyle}>
+                      <span>顯示名稱</span>
+                      <input value={accountName} onChange={(e) => setAccountName(e.target.value)} style={inputStyle} />
+                    </label>
+                    <label style={labelStyle}>
+                      <span>登入帳號</span>
+                      <input value={accountUsername} onChange={(e) => setAccountUsername(e.target.value)} style={inputStyle} />
+                    </label>
+                  </div>
+                  <div className="grid-2" style={{ gap: 12 }}>
+                    <label style={labelStyle}>
+                      <span>密碼</span>
+                      <input type="password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} style={inputStyle} />
+                    </label>
+                    <label style={labelStyle}>
+                      <span>角色</span>
+                      <select value={accountRole} onChange={(e) => setAccountRole(e.target.value as UserRole)} style={inputStyle}>
+                        <option value="brand_manager">品牌負責人</option>
+                        <option value="brand_editor">品牌編輯</option>
+                        <option value="viewer">唯讀</option>
+                      </select>
+                    </label>
+                  </div>
+                </>
+              )}
               {finishNote && <div>{finishNote}</div>}
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                 <Button type="button" variant="primary" disabled={finishing} onClick={() => void finishBrand()}>
-                  {finishing ? '整理中…' : '上傳並整理進品牌智慧'}
+                  {finishing ? '整理中…' : canCompile ? '上傳並整理進品牌智慧' : '上傳檔案'}
                 </Button>
                 <Link to={`/${createdSlug}/intelligence`}>品牌智慧</Link>
                 <Link to={`/${createdSlug}/posting-times`}>發文時段</Link>
@@ -649,15 +665,20 @@ function BrandsOnboardPanel() {
       </Card>
 
       <Card>
-        <h3 style={{ fontSize: 15, marginBottom: 12 }}>現有品牌</h3>
+        <h3 style={{ fontSize: 15, marginBottom: 6 }}>現有品牌</h3>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 12, lineHeight: 1.7 }}>
+          發文時段和品牌智慧各自獨立。改一個品牌不會帶到另一個品牌。
+        </p>
         <div style={{ display: 'grid', gap: 10 }}>
           {brands.map((b) => (
-            <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--color-bg-soft)' }}>
+            <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--color-bg-soft)', flexWrap: 'wrap' }}>
               <Avatar label={b.name} color={b.primaryColor} size={32} />
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 140 }}>
                 <div style={{ fontSize: 13, fontWeight: 700 }}>{b.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{b.slug} · {b.tagline || '尚無定位'}</div>
               </div>
+              <Link to={`/${b.slug}/posting-times`} style={{ fontSize: 12 }}>發文時段</Link>
+              <Link to={`/${b.slug}/intelligence`} style={{ fontSize: 12 }}>品牌智慧</Link>
               <Link to={`/${b.slug}/workspace`} style={{ fontSize: 12 }}>工作台</Link>
               <Link to={`/${b.slug}/seo`} style={{ fontSize: 12 }}>SEO</Link>
             </div>

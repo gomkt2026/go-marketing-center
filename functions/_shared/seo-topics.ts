@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { chatCompleteJson } from './openai';
+import { runWithUsage } from './llm-usage';
 import { SEO_TOPIC_BANK, type SeoTopicSeed } from './prompts';
 import { TASKGO_FILM_SEO_TOPICS } from './taskgo-product-films';
 import { SYSTEM_SHORT_SEO_TOPICS } from './system-shorts';
@@ -266,7 +267,7 @@ export async function discoverNewSeoTopics(
 
   let discovered: SeoTopicSeed[] = [];
   try {
-    const result = await chatCompleteJson<{ topics: SeoTopicSeed[] }>(env, {
+    const result = await runWithUsage({ brandId: brand.id, feature: 'generate_seo' }, () => chatCompleteJson<{ topics: SeoTopicSeed[] }>(env, {
       messages: [
         {
           role: 'system',
@@ -286,7 +287,7 @@ export async function discoverNewSeoTopics(
       ],
       temperature: 0.4,
       maxTokens: 1400,
-    });
+    }));
     discovered = (result.topics ?? [])
       .filter((t) => t.topic && t.angle)
       .filter((t) => !existingKeys.has(topicKey(t)) && !findCoveringTitle(t, existingTitles))

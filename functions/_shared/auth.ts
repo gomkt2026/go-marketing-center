@@ -189,6 +189,10 @@ export async function requireSuperAdmin(request: Request, env: Env): Promise<Aut
   return auth;
 }
 
+export function forgetAuthUser(userId: string) {
+  userRowCache.delete(userId);
+}
+
 export function getAuthUserById(env: Env, userId: string): Promise<AuthUser | null> {
   return loadUserRowById(env, userId);
 }

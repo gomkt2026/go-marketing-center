@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_shared/env';
-import { requireAuth } from '../../_shared/auth';
+import { forgetAuthUser, requireAuth } from '../../_shared/auth';
 import { getBrandsForUser, getBrandBySlug } from '../../_shared/queries';
 import { json, error, failLoad } from '../../_shared/response';
 import { onboardBrand } from '../../_shared/brand-onboard';
@@ -19,7 +19,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const auth = await requireAuth(context.request, context.env);
   if (auth instanceof Response) return auth;
-  if (auth.role !== 'super_admin') return error('只有集團管理者可以新增品牌', 403);
+  const canCreate = auth.role === 'super_admin' || auth.role === 'brand_manager' || auth.role === 'brand_editor';
+  if (!canCreate) return error('只有品牌負責人、品牌編輯或集團管理者可以新增品牌', 403);
 
   const body = await context.request.json().catch(() => ({})) as {
     name?: string;
@@ -50,7 +51,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       cta: body.cta,
       editorNickname: body.editorNickname,
       voiceGender: body.voiceGender,
-    }, auth.id);
+    }, auth.id, auth.role);
+    forgetAuthUser(auth.id);
     const brand = await getBrandBySlug(context.env, created.slug);
     return json({ brand, ...created }, 201);
   } catch (e) {

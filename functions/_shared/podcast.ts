@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { chatCompleteJson } from './openai';
+import { runWithUsage } from './llm-usage';
 import { getBrandVoice, ANTI_AI_RULES } from './prompts';
 import { MEETING_EMOTIONS, type MeetingEmotion } from './meeting-ai';
 import { synthesizeDialogue, applyEmotionTag, cloneVoice, DIALOGUE_CHAR_LIMIT } from './elevenlabs';
@@ -304,7 +305,10 @@ export async function createPodcastEpisode(env: Env): Promise<CreatedEpisode> {
   }
   if (!topics.length) throw new Error('近 3 天沒有可用的熱門話題(market_signals 為空)');
 
-  const { title, topicSummary, lines } = await generatePodcastScript(env, hosts, topics);
+  const { title, topicSummary, lines } = await runWithUsage(
+    { feature: 'podcast' },
+    () => generatePodcastScript(env, hosts, topics),
+  );
 
   const weekOf = taipeiWeekMonday();
   const seqRows = await sql`
@@ -503,7 +507,10 @@ export async function createBbboxPodcastEpisode(env: Env, guestSlug: string): Pr
   const host = await getHostBySlug(env, 'bbbox');
   const guest = await getHostBySlug(env, guestSlug);
   const topics = await pickBbboxTopics(env);
-  const { title, topicSummary, lines } = await generateBbboxPodcastScript(env, host, guest, topics);
+  const { title, topicSummary, lines } = await runWithUsage(
+    { brandSlug: 'bbbox', feature: 'podcast' },
+    () => generateBbboxPodcastScript(env, host, guest, topics),
+  );
   const weekOf = taipeiWeekMonday();
   const seqRows = await sql`
     SELECT count(*)::int AS n FROM podcast_episodes
@@ -732,7 +739,10 @@ export async function createInterviewEpisode(env: Env, guestId: string): Promise
   }
 
   const hosts = await getPodcastHosts(env);
-  const { title, topicSummary, lines } = await generateInterviewScript(env, hosts, guest);
+  const { title, topicSummary, lines } = await runWithUsage(
+    { feature: 'podcast' },
+    () => generateInterviewScript(env, hosts, guest),
+  );
 
   const weekOf = taipeiWeekMonday();
   const seqRows = await sql`

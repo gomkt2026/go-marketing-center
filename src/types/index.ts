@@ -180,16 +180,27 @@ export interface UsageTotals {
   monthCostUsd: number;
 }
 
+export interface UsageParts {
+  post: UsageTotals;
+  copy: UsageTotals;
+  podcast: UsageTotals;
+  other: UsageTotals;
+}
+
 export interface BrandUsage extends UsageTotals {
   rate: number;
+  capUsd: number;
+  overCap: boolean;
   pendingMigration: boolean;
+  parts: UsageParts;
 }
 
 export interface AdminUsage {
   rate: number;
+  capUsd: number;
   pendingMigration: boolean;
-  brands: Array<UsageTotals & { id: string; slug: string; name: string }>;
-  cross: UsageTotals;
+  brands: Array<UsageTotals & { id: string; slug: string; name: string; overCap: boolean; parts: UsageParts }>;
+  cross: UsageTotals & { parts: UsageParts };
   total: UsageTotals;
 }
 

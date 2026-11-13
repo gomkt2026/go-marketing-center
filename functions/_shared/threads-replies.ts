@@ -4,6 +4,7 @@ import { getThreadsAccount, replyToThreadsPost, diagnoseThreadsKeywordSearch, ty
 import { logActivity } from './activity';
 import { isThreadsSafetyBlocked } from './social-safety';
 import { chatCompleteJson } from './openai';
+import { runWithUsage } from './llm-usage';
 import { getBrandVoice, ANTI_AI_RULES } from './prompts';
 
 // ============================================================================
@@ -328,7 +329,7 @@ export async function generateThreadsReplyDrafts(env: Env, params: {
   const post = params.postText.trim().slice(0, 500);
   if (post.length < 8) throw new Error('原文太短，無法產回覆');
 
-  const raw = await chatCompleteJson<{ logic?: string; drafts?: Array<{ label?: string; text?: string; why?: string }> }>(env, {
+  const raw = await runWithUsage({ brandSlug: params.brandSlug, feature: 'generate_reply' }, () => chatCompleteJson<{ logic?: string; drafts?: Array<{ label?: string; text?: string; why?: string }> }>(env, {
     temperature: 0.95,
     messages: [
       {
@@ -362,7 +363,7 @@ export async function generateThreadsReplyDrafts(env: Env, params: {
         ].filter(Boolean).join('\n'),
       },
     ],
-  });
+  }));
 
   const drafts = (raw.drafts ?? [])
     .map((d) => ({

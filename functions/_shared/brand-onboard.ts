@@ -2,6 +2,7 @@ import type { Env } from './env';
 import { getSql } from './db';
 import { chatCompleteJson } from './openai';
 import { runWithUsage } from './llm-usage';
+import { invalidateBrandSlugCache } from './queries';
 import { DEFAULT_SLOT_DEFS } from './posting-slots';
 import {
   fallbackSeoTopics, replaceBrandSeoTopics,
@@ -108,9 +109,17 @@ async function generateSeoTopics(env: Env, input: OnboardBrandInput): Promise<Se
   return fallbackSeoTopics(input.name, input.industry);
 }
 
-export async function onboardBrand(env: Env, raw: OnboardBrandInput, actorUserId: string): Promise<OnboardBrandResult> {
+const MEMBER_ROLES = new Set(['super_admin', 'brand_manager', 'brand_editor', 'viewer']);
+
+export async function onboardBrand(
+  env: Env,
+  raw: OnboardBrandInput,
+  actorUserId: string,
+  memberRole = 'super_admin',
+): Promise<OnboardBrandResult> {
   const input = validateOnboardInput(raw);
   const voiceGender: VoiceGender = input.voiceGender === 'male' ? 'male' : 'female';
+  const role = MEMBER_ROLES.has(memberRole) ? memberRole : 'brand_manager';
   const sql = getSql(env);
 
   const exists = await sql`SELECT id FROM brands WHERE slug = ${input.slug} LIMIT 1`;
@@ -246,12 +255,13 @@ export async function onboardBrand(env: Env, raw: OnboardBrandInput, actorUserId
 
   await sql`
     INSERT INTO brand_members (brand_id, user_id, role)
-    VALUES (${brandId}::uuid, ${actorUserId}::uuid, 'super_admin')
+    VALUES (${brandId}::uuid, ${actorUserId}::uuid, ${role}::user_role)
     ON CONFLICT (brand_id, user_id) DO NOTHING
   `;
 
   const topics = await runWithUsage({ brandId, feature: 'onboard_seo' }, () => generateSeoTopics(env, input));
   await replaceBrandSeoTopics(env, brandId, topics);
+  invalidateBrandSlugCache(input.slug, env);
 
   return {
     brandId,

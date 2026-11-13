@@ -8,7 +8,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { HubShortcuts } from '@/components/layout/HubShortcuts';
 import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
-import type { BrandUsage } from '@/types';
+import type { BrandUsage, UsageTotals } from '@/types';
 import { useAsyncData, LoadingState, ErrorState } from '@/hooks/useAsyncData';
 import {
   ChartCard, DonutChart, PipelineBarChart, PlatformBarChart, StackedPostsChart, CHART,
@@ -215,33 +215,76 @@ export function BrandWorkspace() {
 }
 
 function usdText(value: number) {
-  return `US$${value.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+  return `US$${value.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function twdText(value: number, rate: number) {
   return `NT$${Math.round(value * rate).toLocaleString('zh-TW')}`;
 }
 
+const zeroUsage: UsageTotals = { tokens: 0, costUsd: 0, monthTokens: 0, monthCostUsd: 0 };
+
 function UsageStrip({ usage }: { usage?: BrandUsage }) {
   if (!usage) return null;
+  const cap = usage.capUsd || 40;
+  const reached = usage.overCap || usage.monthCostUsd >= cap;
+  const over = usage.monthCostUsd > cap;
+  const ratio = cap > 0 ? Math.min(1, usage.monthCostUsd / cap) : 0;
+  const parts = usage.parts;
   return (
-    <Card style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 10 }}>
-        AI 花費
+    <Card style={{
+      marginBottom: 16,
+      border: reached ? '1px solid #E7B4B4' : undefined,
+      background: reached ? '#FDF0F0' : undefined,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 8 }}>
+        <strong>Token 統計</strong>
+        {reached && (
+          <span style={{ color: '#B85454', fontWeight: 800, fontSize: 13 }}>
+            {over ? `本月已超過 ${usdText(cap)} 上限` : `本月已達 ${usdText(cap)} 上限`}
+          </span>
+        )}
+      </div>
+      <p style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--color-text-muted)', marginBottom: 12 }}>
         {usage.pendingMigration
-          ? '。花費表尚未建立'
-          : `。台幣依參考匯率 1 美元 = ${usage.rate} 元，從開始記帳之後累計`}
+          ? '花費表尚未建立。'
+          : `這個品牌每個月的 AI 花費上限是 ${usdText(cap)}。台幣依參考匯率 1 美元 = ${usage.rate} 元。發文、產文、Podcast 分開計算。`}
+      </p>
+      {reached && (
+        <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 12, color: '#8C3A3A' }}>
+          本月花費 {usdText(usage.monthCostUsd)}（{twdText(usage.monthCostUsd, usage.rate)}），{over ? '已超過上限' : '已達上限'}。
+          下面可以看出是發文、產文還是 Podcast 在增加。
+        </p>
+      )}
+      <div style={{ height: 8, borderRadius: 99, background: 'var(--color-border)', overflow: 'hidden', marginBottom: 6 }}>
+        <div style={{
+          width: `${ratio * 100}%`,
+          height: '100%',
+          background: reached ? '#B85454' : 'var(--color-primary)',
+        }} />
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14 }}>
+        本月 {usdText(usage.monthCostUsd)} / {usdText(cap)}
+        {over ? `，超出 ${usdText(usage.monthCostUsd - cap)}` : reached ? '，已達上限' : ''}
       </div>
       <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
-        <UsageFigure label="累計 Token" value={Math.round(usage.tokens).toLocaleString('zh-TW')} />
-        <UsageFigure label="累計美元" value={usdText(usage.costUsd)} />
-        <UsageFigure label="累計台幣" value={twdText(usage.costUsd, usage.rate)} />
-        <UsageFigure label="本月 Token" value={Math.round(usage.monthTokens).toLocaleString('zh-TW')} />
-        <UsageFigure label="本月美元" value={usdText(usage.monthCostUsd)} />
-        <UsageFigure label="本月台幣" value={twdText(usage.monthCostUsd, usage.rate)} />
+        <UsageFigure label="本月合計" value={`${usdText(usage.monthCostUsd)} · ${Math.round(usage.monthTokens).toLocaleString('zh-TW')} Token`} />
+        <UsageFigure label="發文" value={sliceText(parts?.post ?? zeroUsage)} />
+        <UsageFigure label="產文" value={sliceText(parts?.copy ?? zeroUsage)} />
+        <UsageFigure label="Podcast" value={sliceText(parts?.podcast ?? zeroUsage)} />
+        {(parts?.other.monthTokens ?? 0) > 0 || (parts?.other.monthCostUsd ?? 0) > 0 ? (
+          <UsageFigure label="其他" value={sliceText(parts?.other ?? zeroUsage)} />
+        ) : null}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 12 }}>
+        累計 {usdText(usage.costUsd)}（{twdText(usage.costUsd, usage.rate)}，{Math.round(usage.tokens).toLocaleString('zh-TW')} Token）
       </div>
     </Card>
   );
+}
+
+function sliceText(usage: UsageTotals) {
+  return `${usdText(usage.monthCostUsd)} · ${Math.round(usage.monthTokens).toLocaleString('zh-TW')}`;
 }
 
 function UsageFigure({ label, value }: { label: string; value: string }) {

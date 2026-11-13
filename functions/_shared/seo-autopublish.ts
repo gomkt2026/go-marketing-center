@@ -1,6 +1,7 @@
 import type { Env } from './env';
 import { getSql } from './db';
 import { chatCompleteJson } from './openai';
+import { runWithUsage } from './llm-usage';
 import { logActivity } from './activity';
 import { AUTO_POST_BRAND_SLUGS } from './auto-post-brands';
 import { brandSeoFacts, type BrandContext, type SeoTopicSeed } from './prompts';
@@ -275,7 +276,7 @@ async function pickTopic(
     throw new Error('沒有可寫的新題：素材、新聞、時事、知識與主題庫都已覆蓋');
   }
   try {
-    const picked = await chatCompleteJson<{
+    const picked = await runWithUsage({ brandSlug: brand.slug, feature: 'generate_seo' }, () => chatCompleteJson<{
       index?: number;
       topic?: string;
       primaryKeyword?: string;
@@ -312,7 +313,7 @@ async function pickTopic(
           ].join('\n\n'),
         },
       ],
-    });
+    }));
     const index = Number(picked.index);
     const candidate = shortlist[index] ?? fallback;
     return {
